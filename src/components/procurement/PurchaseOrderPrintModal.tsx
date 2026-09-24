@@ -1,6 +1,9 @@
 import React from 'react';
 import { X, Printer, CheckCircle2, ShieldCheck, Building, Truck, FileText } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
 
 interface PurchaseOrderPrintModalProps {
   isOpen: boolean;
@@ -20,8 +23,8 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="پیش‌نمایش و چاپ برگ سفارش رسمی خرید (PO)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+      
         {/* Header - Not Printed */}
         <div className="no-print flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
@@ -126,8 +129,8 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
                     <th className="py-2.5 px-3">شرح کالا و مشخصات فنی</th>
                     <th className="py-2.5 px-3 text-center">مقدار سفارش</th>
                     <th className="py-2.5 px-3 text-center">واحد</th>
-                    <th className="py-2.5 px-3 text-left">مبلغ واحد (تومان)</th>
-                    <th className="py-2.5 px-3 text-left">مبلغ خالص (تومان)</th>
+                    <th className="py-2.5 px-3 text-left">مبلغ واحد ({moneyUnitLabel()})</th>
+                    <th className="py-2.5 px-3 text-left">مبلغ خالص ({moneyUnitLabel()})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-sans">
@@ -144,10 +147,10 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
                       </td>
                       <td className="py-3 px-3 text-center text-slate-500">{item.unit}</td>
                       <td className="py-3 px-3 text-left font-mono font-medium text-slate-700">
-                        {item.unitPrice.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitPrice, false)}
                       </td>
                       <td className="py-3 px-3 text-left font-mono font-bold text-slate-900">
-                        {item.totalNetPrice.toLocaleString('fa-IR')}
+                        {formatMoney(item.totalNetPrice, false)}
                       </td>
                     </tr>
                   ))}
@@ -161,24 +164,24 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
             <div className="w-80 border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50/50 text-xs">
               <div className="flex justify-between items-center text-slate-600">
                 <span>جمع بهای خالص کالا:</span>
-                <span className="font-mono font-bold text-slate-800">{order.subtotalAmount.toLocaleString('fa-IR')} تومان</span>
+                <span className="font-mono font-bold text-slate-800">{formatMoney(order.subtotalAmount)}</span>
               </div>
               <div className="flex justify-between items-center text-slate-600">
-                <span>مالیات بر ارزش افزوده (۱۰٪):</span>
-                <span className="font-mono font-bold text-slate-800">{order.totalVatAmount.toLocaleString('fa-IR')} تومان</span>
+                <span>مالیات بر ارزش افزوده ({formatPercent(order.subtotalAmount ? (order.totalVatAmount * 100) / order.subtotalAmount : 0)}):</span>
+                <span className="font-mono font-bold text-slate-800">{formatMoney(order.totalVatAmount)}</span>
               </div>
               <div className="flex justify-between items-center text-slate-600">
                 <span>کرایه حمل و تخلیه پای کار:</span>
-                <span className="font-mono font-bold text-slate-800">{order.totalFreightCost.toLocaleString('fa-IR')} تومان</span>
+                <span className="font-mono font-bold text-slate-800">{formatMoney(order.totalFreightCost)}</span>
               </div>
               <div className="border-t-2 border-slate-300 pt-2 flex justify-between items-center font-black text-slate-900 text-sm">
                 <span>مبلغ کل سفارش (ناخالص):</span>
-                <span className="font-mono text-indigo-700">{order.totalOrderAmount.toLocaleString('fa-IR')} تومان</span>
+                <span className="font-mono text-indigo-700">{formatMoney(order.totalOrderAmount)}</span>
               </div>
               {order.advancePaymentAmount > 0 && (
                 <div className="border-t border-dashed border-slate-200 pt-1.5 flex justify-between items-center text-emerald-700 font-bold text-[11px]">
                   <span>پیش‌پرداخت تعهد شده:</span>
-                  <span className="font-mono">{order.advancePaymentAmount.toLocaleString('fa-IR')} تومان ({order.advancePaymentPaid ? 'واریز شده' : 'در نوبت پرداخت'})</span>
+                  <span className="font-mono">{formatMoney(order.advancePaymentAmount)} ({order.advancePaymentPaid ? 'واریز شده' : 'در نوبت پرداخت'})</span>
                 </div>
               )}
             </div>
@@ -190,8 +193,8 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
               <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
               <span>شرایط عمومی و الزامات حقوقی قرارداد خرید:</span>
             </div>
-            {order.termsAndConditions.map((term, i) => (
-              <div key={i} className="flex items-start gap-1.5">
+            {order.termsAndConditions.map((term) => (
+              <div key={term} className="flex items-start gap-1.5">
                 <span className="text-amber-500 font-black">•</span>
                 <span>{term}</span>
               </div>
@@ -222,7 +225,6 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

@@ -24,6 +24,7 @@ import {
   PettyCashSubTab,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { monthlyTotals } from '../../store/selectors';
 
 interface PettyCashDashboardViewProps {
   accounts: PettyCashAccount[];
@@ -73,15 +74,12 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
   const categoryEntries = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
   const maxCategoryAmount = categoryEntries[0]?.[1] || 1;
 
-  // Monthly Spending trend simulation data
-  const monthlyTrends = [
-    { month: 'اردیبهشت', amount: 145_000_000 },
-    { month: 'خرداد', amount: 198_000_000 },
-    { month: 'تیر', amount: 240_000_000 },
-    { month: 'مرداد', amount: 285_000_000 },
-    { month: 'شهریور', amount: 314_700_000 },
-  ];
-  const maxMonthlyAmount = Math.max(...monthlyTrends.map((m) => m.amount));
+  // Monthly spending of approved expenses (last five months with data).
+  const monthlyTrends = monthlyTotals(
+    expenses.filter((e) => e.status === 'approved' || e.status === 'accounting_posted'),
+    5
+  ).map((m) => ({ month: m.label, key: m.period, amount: m.amount }));
+  const maxMonthlyAmount = Math.max(1, ...monthlyTrends.map((m) => m.amount));
 
   return (
     <div className="space-y-6">
@@ -446,16 +444,18 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
               <h4 className="text-sm font-bold text-slate-900">روند مخارج ماهانه تنخواه‌ها</h4>
               <p className="text-xs text-slate-500 mt-0.5">روند مصرف نقدینگی در کارگاه‌ها در ۵ ماه گذشته</p>
             </div>
-            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md tabular-nums">
-              شهریور: {formatCurrency(314_700_000)}
-            </span>
+            {monthlyTrends.length > 0 && (
+              <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md tabular-nums">
+                {monthlyTrends[monthlyTrends.length - 1].month}: {formatCurrency(monthlyTrends[monthlyTrends.length - 1].amount)}
+              </span>
+            )}
           </div>
 
           <div className="space-y-3.5 pt-2">
             {monthlyTrends.map((trend) => {
               const pct = (trend.amount / maxMonthlyAmount) * 100;
               return (
-                <div key={trend.month} className="space-y-1">
+                <div key={trend.key} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-medium text-slate-700">{trend.month}</span>
                     <span className="font-mono text-slate-900 font-bold tabular-nums">

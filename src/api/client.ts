@@ -15,7 +15,8 @@ export interface PaydarPortalConfig {
   userId?: string | number;
   displayName?: string;
   role?: string;
-  can?: (action: string, user: any, context?: any) => boolean;
+  /** Optional runtime permission hook; it can never allow approving one's own document. */
+  can?: (action: string, user: unknown, context?: unknown) => boolean;
   accounting?: {
     currency?: 'toman' | 'rial';
     fiscalYear?: number;
@@ -124,29 +125,57 @@ export async function apiRequest<T>(
     });
 
     if (!response.ok) {
-      const farsiMsg = getFarsiErrorMessage(response.status);
-      throw new ApiError(response.status, `HTTP error ${response.status}`, farsiMsg);
+      // WordPress REST errors carry { code, message }; a Persian message from the server wins.
+      let serverMessage = '';
+      try {
+        const body = (await response.json()) as { message?: unknown };
+        if (typeof body?.message === 'string') serverMessage = body.message;
+      } catch {
+        /* not JSON */
+      }
+      const farsiMsg = /[\u0600-\u06FF]/.test(serverMessage) ? serverMessage : getFarsiErrorMessage(response.status);
+      throw new ApiError(response.status, serverMessage || `HTTP error ${response.status}`, farsiMsg);
     }
 
     return (await response.json()) as T;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof ApiError) {
       throw err;
     }
-    throw new ApiError(0, err.message || 'Network error', 'عدم برقراری ارتباط با سرور. لطفاً اتصال اینترنت خود را بررسی نمایید.');
+    const message = err instanceof Error ? err.message : 'Network error';
+    throw new ApiError(0, message, 'عدم برقراری ارتباط با سرور. لطفاً اتصال اینترنت خود را بررسی نمایید.');
+  }
+}
+
+/** Options of a state-changing command (docs/API-CONTRACT.md). */
+export interface CommandOptions {
+  /** Same key for every retry of one user action; the server answers a repeated key with the first result. */
+  idempotencyKey: string;
+  /** Version of the record the command acts on (optimistic concurrency, answered with 409 when stale). */
+  version?: number;
+}
+
+/**
+ * Sends a command. A network failure (no response) is retried once with the same Idempotency-Key,
+ * so a command is never applied twice.
+ */
+export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint: string, body: unknown, options: CommandOptions): Promise<T> {
+  const headers: Record<string, string> = { 'Idempotency-Key': options.idempotencyKey };
+  if (options.version !== undefined) headers['If-Match'] = `"${options.version}"`;
+  const init: RequestInit = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
+  try {
+    return await apiRequest<T>(endpoint, init);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 0) return apiRequest<T>(endpoint, init);
+    throw err;
   }
 }
 
 /**
- * Mock API service wrapper providing consistent interface during development.
+ * JSON REST helpers used by the WordPress data source (src/api/wordpress).
  */
 export const apiClient = {
-  get: <T>(endpoint: string, params?: Record<string, any>) =>
+  get: <T>(endpoint: string, params?: Record<string, string | number | boolean>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
-  post: <T>(endpoint: string, data: any) =>
-    apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
-  put: <T>(endpoint: string, data: any) =>
-    apiRequest<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: <T>(endpoint: string) =>
-    apiRequest<T>(endpoint, { method: 'DELETE' }),
+  command: sendCommand,
 };

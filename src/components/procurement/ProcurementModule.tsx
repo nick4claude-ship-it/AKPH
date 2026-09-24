@@ -36,37 +36,35 @@ import { NewRequisitionModal } from './NewRequisitionModal';
 import { NewPurchaseOrderModal } from './NewPurchaseOrderModal';
 import { NewSupplierModal } from './NewSupplierModal';
 import { PurchaseOrderPrintModal } from './PurchaseOrderPrintModal';
-import {
-  mockSuppliers,
-  mockRequisitions,
-  mockRfqs,
-  mockPurchaseOrders,
-  mockVendorInvoices,
-} from '../../data/procurementMockData';
+import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
+import { usePermission } from '../../store/session';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { getRelativePersianDate, toPersianDate } from '../../utils/date';
+import { roundRial } from '../../utils/money';
 
 interface ProcurementModuleProps {
   projects: Project[];
   currentUser: UserProfile;
-  onUpdateProjectCost?: (projectId: string, amount: number) => void;
-  onAddJournalEntry?: (entry: any) => void;
-  onAddPaymentRequest?: (request: any) => void;
+  onToast: (msg: string) => void;
 }
 
 export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   projects,
   currentUser,
-  onUpdateProjectCost,
-  onAddJournalEntry,
-  onAddPaymentRequest,
+  onToast,
 }) => {
+  const wf = useWorkflows();
+  const store = useAppState();
+  const { can } = usePermission();
   const [activeTab, setActiveTab] = useState<ProcurementSubTab>('dashboard');
 
   // Procurement Core State
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>(mockRequisitions);
-  const [rfqs, setRfqs] = useState<RequestForQuotation[]>(mockRfqs);
-  const [orders, setOrders] = useState<PurchaseOrder[]>(mockPurchaseOrders);
-  const [invoices, setInvoices] = useState<VendorInvoice[]>(mockVendorInvoices);
+  const [suppliers, setSuppliers] = useStoreSlice('suppliers');
+  const [requisitions, setRequisitions] = useStoreSlice('purchaseRequisitions');
+  const [rfqs, setRfqs] = useStoreSlice('rfqs');
+  const [orders, setOrders] = useStoreSlice('purchaseOrders');
+  const [invoices, setInvoices] = useStoreSlice('vendorInvoices');
 
   // Modals state
   const [isNewRequisitionOpen, setIsNewRequisitionOpen] = useState(false);
@@ -75,55 +73,19 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   const [orderForPrint, setOrderForPrint] = useState<PurchaseOrder | null>(null);
 
   // Handlers
-  const handleApproveRequisition = (
-    reqId: string,
-    level: 'site' | 'project' | 'procurement' | 'finance'
-  ) => {
-    setRequisitions((prev) =>
-      prev.map((r) => {
-        if (r.id !== reqId) return r;
-        const newApprovals = { ...r.approvals };
-        if (level === 'site') {
-          newApprovals.siteSupervisor = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۱',
-            signedBy: currentUser.name,
-          };
-        } else if (level === 'project') {
-          newApprovals.projectManager = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۲',
-            signedBy: currentUser.name,
-          };
-        } else if (level === 'procurement') {
-          newApprovals.procurementManager = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۳',
-            signedBy: currentUser.name,
-          };
-        } else if (level === 'finance') {
-          newApprovals.financialDirector = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۴',
-            signedBy: currentUser.name,
-          };
-        }
-        return {
-          ...r,
-          approvals: newApprovals,
-          status: level === 'finance' ? 'تأیید نهایی مالی/مدیرعامل' : r.status,
-        };
-      })
-    );
+  // Approval chain (site → project → procurement → finance/CEO) is enforced by the workflow service.
+  const handleApproveRequisition = (reqId: string, _level: 'site' | 'project' | 'procurement' | 'finance') => {
+    onToast(wf.approveRequisition(reqId).message);
   };
 
   const handleConvertToRfq = (req: PurchaseRequisition) => {
+    if (!can('purchase_order.create', { projectId: req.projectId })) return onToast('اجازه صدور استعلام بها را ندارید.');
     const newRfq: RequestForQuotation = {
-      id: `rfq-${Date.now()}`,
-      rfqNumber: `RFQ-1403-${rfqs.length + 101}`,
+      id: generateUUID(),
+      rfqNumber: nextDocNumber(rfqs.map((r) => r.rfqNumber), 'RFQ'),
       title: `استعلام بهای اقلام درخواست ${req.requisitionNumber}`,
-      dateCreated: '۱۴۰۳/۰۷/۰۲',
-      submissionDeadline: '۱۴۰۳/۰۷/۱۰',
+      dateCreated: toPersianDate(new Date()),
+      submissionDeadline: getRelativePersianDate(7),
       requisitionId: req.id,
       requisitionNumber: req.requisitionNumber,
       projectId: req.projectId,
@@ -167,50 +129,63 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   const handleGeneratePoFromRfq = (rfq: RequestForQuotation) => {
     const winning = rfq.quotes.find((q) => q.isWinningBid);
     if (!winning) return;
+    if (!can('purchase_order.create', { projectId: rfq.projectId })) return onToast('اجازه صدور سفارش خرید را ندارید.');
+
+    const supplier = suppliers.find((s) => s.id === winning.supplierId);
+    const project = projects.find((p) => p.id === rfq.projectId);
+    const material = store.materials.find((m) => m.name === rfq.materialName);
+    // The quote's VAT only applies when the supplier is VAT-registered; the rate comes from settings.
+    const vatRate = winning.vatIncluded ? store.financeSettings.vatRatePercent / 100 : 0;
+    const net = roundRial(winning.unitPrice * rfq.requiredQty);
+    const vat = roundRial(net * vatRate);
+    const freight = roundRial(winning.freightCostPerUnit * rfq.requiredQty);
+    const total = net + vat + freight;
 
     const newPo: PurchaseOrder = {
-      id: `po-${Date.now()}`,
-      poNumber: `PO-1403-${orders.length + 101}`,
-      issueDate: '۱۴۰۳/۰۷/۰۳',
-      deliveryDueDate: '۱۴۰۳/۰۷/۱۵',
+      id: generateUUID(),
+      poNumber: nextDocNumber(orders.map((o) => o.poNumber), 'PO'),
+      issueDate: toPersianDate(new Date()),
+      deliveryDueDate: getRelativePersianDate(winning.deliveryLeadTimeDays || 14),
       requisitionId: rfq.requisitionId,
       rfqId: rfq.id,
       projectId: rfq.projectId,
       projectName: rfq.projectName,
-      destinationWarehouse: 'انبار کارگاه پروژه',
+      costCenterId: project?.costCenterIds?.[0],
+      counterpartyId: store.counterparties.find((c) => c.kind === 'supplier' && c.name === winning.supplierName)?.id,
+      destinationWarehouse: store.warehouses.find((w) => w.projectId === rfq.projectId)?.name ?? 'انبار کارگاه پروژه',
       supplierId: winning.supplierId,
       supplierName: winning.supplierName,
-      supplierPhone: '۰۲۱-۸۸۰۰۹۹۰۰',
-      supplierAddress: 'تهران، خیابان آزادی',
+      supplierPhone: supplier?.phone ?? '',
+      supplierAddress: supplier?.address ?? '',
       items: [
         {
-          id: `item-${Date.now()}`,
-          materialCode: 'MAT-GEN-01',
+          id: generateUUID(),
+          materialCode: material?.code ?? '',
           materialName: rfq.materialName,
           specifications: rfq.specification,
           orderedQty: rfq.requiredQty,
           receivedQty: 0,
           unit: rfq.unit,
           unitPrice: winning.unitPrice,
-          totalNetPrice: winning.unitPrice * rfq.requiredQty,
-          vatRate: winning.vatIncluded ? 10 : 0,
-          vatAmount: winning.vatAmount,
-          freightAndUnloadingCost: winning.freightCostPerUnit * rfq.requiredQty,
-          totalGrossAmount: winning.totalQuoteAmount,
+          totalNetPrice: net,
+          vatRate,
+          vatAmount: vat,
+          freightAndUnloadingCost: freight,
+          totalGrossAmount: total,
         },
       ],
-      subtotalAmount: winning.unitPrice * rfq.requiredQty,
-      totalVatAmount: winning.vatAmount,
-      totalFreightCost: winning.freightCostPerUnit * rfq.requiredQty,
-      totalOrderAmount: winning.totalQuoteAmount,
+      subtotalAmount: net,
+      totalVatAmount: vat,
+      totalFreightCost: freight,
+      totalOrderAmount: total,
       paymentTerms: winning.paymentTerms,
-      advancePaymentAmount: Math.round(winning.totalQuoteAmount * 0.2),
+      advancePaymentAmount: 0,
       advancePaymentPaid: false,
       status: 'صادر شده و ابلاغ به فروشنده',
       deliveryProgressPercentage: 0,
-      termsAndConditions: ['تحویل با بارنامه رسمی', 'ارائه سرتیفیکیت متالورژی'],
+      termsAndConditions: ['تحویل با بارنامه رسمی'],
       issuedBy: currentUser.name,
-      approvedBy: 'مهندس محمدرضا رادمنش (مدیرعامل)',
+      approvedBy: '',
     };
 
     setOrders((prev) => [newPo, ...prev]);
@@ -218,61 +193,19 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: POStatus) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!can('purchase_order.create', { projectId: order?.projectId })) return onToast('اجازه تغییر وضعیت سفارش را ندارید.');
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status } : o))
     );
   };
 
-  const handleApproveInvoice = (invoiceId: string) => {
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoiceId
-          ? {
-              ...inv,
-              status: 'تأیید تطبیق سه‌جانبه',
-              threeWayMatching: {
-                ...inv.threeWayMatching,
-                status: 'تأیید نهایی مالی',
-              },
-            }
-          : inv
-      )
-    );
+  // Invoice approval posts Dr GRNI + VAT / Cr supplier payable and queues a treasury payment request.
+  // Project cost is not touched here: stocked materials reach the project only when issued.
+  const handleApproveInvoice = (invoiceId: string) => onToast(wf.approveVendorInvoice(invoiceId).message);
 
-    const targetInvoice = invoices.find((inv) => inv.id === invoiceId);
-    if (targetInvoice) {
-      if (onUpdateProjectCost) {
-        onUpdateProjectCost(targetInvoice.projectId, targetInvoice.totalAmount);
-      }
-      if (onAddPaymentRequest) {
-        onAddPaymentRequest({
-          sourceType: 'فاکتور خرید تأمین‌کننده',
-          sourceRefId: targetInvoice.id,
-          sourceRefNumber: targetInvoice.invoiceNumber,
-          projectId: targetInvoice.projectId,
-          projectName: targetInvoice.projectName,
-          beneficiaryName: targetInvoice.supplierName,
-          totalAmount: targetInvoice.totalAmount,
-        });
-      }
-    }
-  };
-
-  const handleRecordPayment = (invoiceId: string, amount: number) => {
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id !== invoiceId) return inv;
-        const newPaid = inv.paidAmount + amount;
-        const newRemaining = Math.max(0, inv.totalAmount - newPaid);
-        return {
-          ...inv,
-          paidAmount: newPaid,
-          remainingBalance: newRemaining,
-          status: newRemaining === 0 ? 'پرداخت شده' : 'پرداخت ناقص',
-        };
-      })
-    );
-  };
+  // Settlement happens in treasury; the request was queued on approval.
+  const handleRecordPayment = (_invoiceId: string, _amount: number) => undefined;
 
   const tabs = [
     { id: 'dashboard', label: 'داشبورد زنجیره تأمین', icon: Layers },
@@ -431,6 +364,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           onClose={() => setIsNewRequisitionOpen(false)}
           projects={projects}
           onAddRequisition={(newReq) => {
+            if (!can('requisition.create', { projectId: newReq.projectId })) return onToast('اجازه ثبت درخواست خرید را ندارید.');
             setRequisitions((prev) => [newReq, ...prev]);
             setIsNewRequisitionOpen(false);
           }}
@@ -444,8 +378,11 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           projects={projects}
           suppliers={suppliers}
           onAddOrder={(newOrder) => {
+            if (!can('purchase_order.create', { projectId: newOrder.projectId }))
+              return { ok: false, message: 'اجازه صدور سفارش خرید را ندارید.' };
             setOrders((prev) => [newOrder, ...prev]);
             setIsNewOrderOpen(false);
+            return { ok: true, message: `سفارش ${newOrder.poNumber} صادر شد.` };
           }}
         />
       )}
@@ -455,6 +392,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           isOpen={isNewSupplierOpen}
           onClose={() => setIsNewSupplierOpen(false)}
           onAddSupplier={(newSup) => {
+            if (!can('supplier.manage')) return onToast('اجازه تعریف تأمین‌کننده را ندارید.');
             setSuppliers((prev) => [newSup, ...prev]);
             setIsNewSupplierOpen(false);
           }}

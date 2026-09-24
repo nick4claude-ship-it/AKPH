@@ -25,6 +25,7 @@ import {
   Building,
   Truck,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 
 interface GoodsReceiptsListViewProps {
   receipts: GoodsReceiptNote[];
@@ -138,7 +139,7 @@ export const GoodsReceiptsListView: React.FC<GoodsReceiptsListViewProps> = ({
             <div className="text-left">
               <span className="text-[10px] text-slate-400 block">جمع ارزش رسیدها</span>
               <span className="font-bold text-slate-900 font-mono">
-                {(totalValue / 1_000_000).toLocaleString('fa-IR')} میلیون تومان
+                {formatMoneyCompact(totalValue)}
               </span>
             </div>
           </div>
@@ -158,7 +159,7 @@ export const GoodsReceiptsListView: React.FC<GoodsReceiptsListViewProps> = ({
                 <th className="p-3.5 font-bold">باسکول و وزن خالص</th>
                 <th className="p-3.5 font-bold">کنترل کیفی QC</th>
                 <th className="p-3.5 font-bold">وضعیت گردش‌کار</th>
-                <th className="p-3.5 font-bold text-left">مبلغ کل (تومان)</th>
+                <th className="p-3.5 font-bold text-left">مبلغ کل ({moneyUnitLabel()})</th>
                 <th className="p-3.5 font-bold text-center">جزئیات / چاپ</th>
               </tr>
             </thead>
@@ -243,7 +244,7 @@ export const GoodsReceiptsListView: React.FC<GoodsReceiptsListViewProps> = ({
                   </td>
 
                   <td className="p-3.5 text-left font-mono font-bold text-slate-900">
-                    {receipt.totalAmount.toLocaleString('fa-IR')}
+                    {formatMoney(receipt.totalAmount, false)}
                   </td>
 
                   <td className="p-3.5 text-center">

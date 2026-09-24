@@ -1,62 +1,48 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import {
   formatInt,
   formatToman,
   formatRial,
+  formatMoney,
   formatMoneyCompact,
+  moneyUnitLabel,
   normalizeDigits,
 } from './money';
 
-export {
-  formatInt,
-  formatToman,
-  formatRial,
-  formatMoneyCompact,
-  normalizeDigits,
-};
+export { formatInt, formatToman, formatRial, formatMoney, formatMoneyCompact, moneyUnitLabel, normalizeDigits };
 
 /**
- * Format numbers with Persian digits and thousand separators
+ * Format quantities and counts (not money) with Persian digits and thousand separators.
  */
 export function formatNumber(value: number): string {
-  if (value === undefined || value === null || isNaN(value)) return '۰';
+  if (value === undefined || value === null || Number.isNaN(value)) return '۰';
   return formatInt(Math.floor(value));
 }
 
 /**
- * Format currency with Rial/Toman separators without duplicate units
+ * Format a stored Rial amount in the display currency, with its unit
+ * (the unit is part of the result — never append «تومان» after it).
  */
-export function formatCurrency(value: number, unit: string = 'تومان'): string {
-  if (value === undefined || value === null || isNaN(value)) return `۰ ${unit}`;
-  if (unit === 'تومان') {
-    return formatToman(value, true);
-  }
-  if (unit === 'ریال') {
-    return formatRial(value, true);
-  }
-  return `${formatInt(Math.floor(value))} ${unit}`;
+export function formatCurrency(rial: number): string {
+  return formatMoney(rial, true);
 }
 
 /**
- * Format standard Latin number with commas (for clean readability when requested)
+ * Stored Rial amount in the display currency with magnitude words (e.g., ۱۸٫۵ میلیارد تومان).
  */
-export function formatCurrencyEn(value: number): string {
-  if (value === undefined || value === null || isNaN(value)) return '0';
-  return Math.floor(value).toLocaleString('en-US');
-}
-
-/**
- * Format currency with billion/million shorthand in Persian (e.g., ۱۸.۵ میلیارد تومان)
- * Accurately handles Hemmat (همت), Milliard, and Million.
- */
-export function formatCurrencyCompact(value: number): string {
-  return formatMoneyCompact(value, false);
+export function formatCurrencyCompact(rial: number): string {
+  return formatMoneyCompact(rial, true);
 }
 
 /**
  * Format percentage with Persian digits
  */
 export function formatPercent(value: number): string {
-  if (value === undefined || value === null || isNaN(value)) return '۰٪';
+  if (value === undefined || value === null || Number.isNaN(value)) return '۰٪';
   const num = Number(value.toFixed(1)).toLocaleString('fa-IR');
   return `${num}٪`;
 }

@@ -20,6 +20,7 @@ import {
   Calendar,
   UserCheck,
 } from 'lucide-react';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface StocktakeViewProps {
   stocktakes: StocktakeAudit[];
@@ -111,7 +112,7 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                       selectedAudit.netVarianceAmount < 0 ? 'text-rose-600' : 'text-emerald-600'
                     }`}
                   >
-                    {selectedAudit.netVarianceAmount.toLocaleString('fa-IR')} تومان
+                    {formatMoney(selectedAudit.netVarianceAmount)}
                   </span>
                 </div>
 
@@ -141,14 +142,14 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                     <th className="p-3 font-bold text-center">موجودی دفاتر (سیستمی)</th>
                     <th className="p-3 font-bold text-center">شمارش عینی (واقعی)</th>
                     <th className="p-3 font-bold text-center">مغایرت مقداری</th>
-                    <th className="p-3 font-bold text-left">نرخ واحد (تومان)</th>
-                    <th className="p-3 font-bold text-left">مبلغ مغایرت (تومان)</th>
+                    <th className="p-3 font-bold text-left">نرخ واحد ({moneyUnitLabel()})</th>
+                    <th className="p-3 font-bold text-left">مبلغ مغایرت ({moneyUnitLabel()})</th>
                     <th className="p-3 font-bold">علت مغایرت و گزارش فنی</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {selectedAudit.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={`${item.materialId}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
                       <td className="p-3 font-bold text-slate-800">
                         {item.materialName}
                         <span className="text-[10px] text-slate-400 block font-mono font-normal">
@@ -181,7 +182,7 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                       </td>
 
                       <td className="p-3 text-left font-mono text-slate-700">
-                        {item.unitPrice.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitPrice, false)}
                       </td>
 
                       <td
@@ -189,7 +190,7 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                           item.varianceAmount < 0 ? 'text-rose-600' : 'text-emerald-600'
                         }`}
                       >
-                        {item.varianceAmount.toLocaleString('fa-IR')}
+                        {formatMoney(item.varianceAmount, false)}
                       </td>
 
                       <td className="p-3 text-slate-600 text-[11px] max-w-xs leading-relaxed">

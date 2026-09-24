@@ -1,24 +1,40 @@
 import React from 'react';
-import { PendingApproval } from '../../types';
+import { ApprovalItem, DocumentEntityType } from '../../types';
+import { useAppState } from '../../store/AppStore';
+import { selectDocumentsFor } from '../../store/domainSelectors';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { X, FileText, CheckCircle2, ShieldCheck, Download, Printer } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
 
 interface DocumentViewerModalProps {
-  item: PendingApproval | null;
+  item: ApprovalItem | null;
   onClose: () => void;
   onApprove: (id: string) => void;
 }
+
+const APPROVAL_DOCUMENT_ENTITY: Partial<Record<ApprovalItem['module'], DocumentEntityType>> = {
+  client_statement: 'client_statement',
+  subcontractor_statement: 'subcontractor_statement',
+  petty_cash_expense: 'petty_cash_expense',
+  vendor_invoice: 'vendor_invoice',
+  payment_request: 'payment_request',
+  journal_entry: 'journal_entry',
+};
 
 export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   item,
   onClose,
   onApprove,
 }) => {
+  const state = useAppState();
   if (!item) return null;
+  const entityType = APPROVAL_DOCUMENT_ENTITY[item.module];
+  const docs = entityType ? selectDocumentsFor(state, entityType, item.recordId) : [];
+  const attachment = docs[0];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+    <Dialog onClose={onClose} label="مشاهده سند مالی و فاکتور پیوست" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+      
         {/* Header */}
         <div className="bg-slate-900 text-white p-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -32,7 +48,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                   {item.docNumber}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">{item.projectName} · {item.costCenter}</p>
+              <p className="text-[10px] text-slate-400">{item.projectName} · {item.costCenterName || '-'}</p>
             </div>
           </div>
           <button
@@ -57,11 +73,11 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
             </div>
             <div>
               <span className="text-[10px] text-slate-500 block font-sans">ثبت‌کننده</span>
-              <span className="font-bold text-slate-900 font-sans text-[11px]">{item.submitter}</span>
+              <span className="font-bold text-slate-900 font-sans text-[11px]">{item.requester}</span>
             </div>
             <div>
               <span className="text-[10px] text-slate-500 block font-sans">طرف حساب (فروشنده)</span>
-              <span className="font-bold text-slate-900 font-sans text-[11px]">{item.counterparty}</span>
+              <span className="font-bold text-slate-900 font-sans text-[11px]">{item.counterpartyName || '-'}</span>
             </div>
           </div>
 
@@ -69,28 +85,28 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           <div className="border border-slate-200 rounded-xl overflow-hidden">
             <div className="bg-slate-100/70 p-2.5 font-bold text-slate-800 border-b border-slate-200 flex justify-between items-center">
               <span>شرح ردیف‌های هزینه و تراز سند</span>
-              <span className="text-[11px] font-normal text-slate-500">طبقه: {item.costClassification}</span>
+              <span className="text-[11px] font-normal text-slate-500">طبقه: {item.classification}</span>
             </div>
             <div className="p-3 space-y-2">
               <div className="flex justify-between items-center py-1 border-b border-slate-100">
                 <span className="text-slate-600">شرح هزینه / کالا:</span>
-                <span className="font-medium text-slate-900">{item.notes || item.expenseType}</span>
+                <span className="font-medium text-slate-900">{item.title}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-100">
                 <span className="text-slate-600">سرفصل حسابداری:</span>
-                <span className="font-medium text-slate-900">{item.category} ({item.expenseType})</span>
+                <span className="font-medium text-slate-900">{item.stage} ({item.moduleLabel})</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-100 font-mono">
                 <span className="text-slate-600 font-sans">مبلغ کل بر اساس فاکتور رسمی:</span>
                 <span className="font-bold text-slate-900 text-sm">{formatCurrencyCompact(item.amount)}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-100 font-mono">
-                <span className="text-slate-600 font-sans">مبلغ پرداخت‌شده (چک / نقد):</span>
-                <span className="font-bold text-emerald-700">{formatCurrencyCompact(item.paymentAmount)}</span>
+                <span className="text-slate-600 font-sans">مرحله در انتظار:</span>
+                <span className="font-bold text-emerald-700 font-sans">{item.stage}</span>
               </div>
               <div className="flex justify-between items-center py-1 font-mono">
-                <span className="text-slate-600 font-sans">مانده تعهد بدهی شرکت:</span>
-                <span className="font-bold text-rose-600">{formatCurrencyCompact(item.pendingLiability)}</span>
+                <span className="text-slate-600 font-sans">نقش تأییدکننده:</span>
+                <span className="font-bold text-rose-600 font-sans">{item.approverRole}</span>
               </div>
             </div>
           </div>
@@ -102,29 +118,29 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                 PDF
               </div>
               <div>
-                <p className="font-bold text-slate-900">{item.attachmentName}</p>
-                <p className="text-[10px] text-slate-500">حجم: ۱.۴ مگابایت · دارای امضای دیجیتال ناظر پروژه</p>
+                <p className="font-bold text-slate-900">{attachment ? attachment.fileName : 'سندی به این رکورد پیوست نشده است'}</p>
+                <p className="text-[10px] text-slate-500">
+                  {attachment ? `${attachment.type} · حجم ${attachment.fileSize} · ${docs.length.toLocaleString('fa-IR')} سند در مرکز اسناد` : 'از مرکز اسناد پیوست را بارگذاری و متصل کنید.'}
+                </p>
               </div>
             </div>
             <button
+              disabled={!attachment?.url}
+              title={attachment?.url ? 'دانلود فایل' : 'فایل اصلی هنوز بارگذاری نشده است (به‌زودی)'}
               onClick={() => {
-                const blob = new Blob(
-                  [`پیوست سند شرکت پیمانکاری\nنام فایل: ${item.attachmentName}\nشماره سند: ${item.docNumber}\nپروژه: ${item.projectName}`],
-                  { type: 'application/pdf' }
-                );
-                const url = URL.createObjectURL(blob);
+                if (!attachment?.url) return;
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = item.attachmentName || 'document.pdf';
+                a.href = attachment.url;
+                a.download = attachment.fileName || attachment.title;
+                a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                a.remove();
               }}
-              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>دانلود</span>
+              <span>{attachment?.url ? 'دانلود' : 'دانلود (به‌زودی)'}</span>
             </button>
           </div>
         </div>
@@ -145,10 +161,9 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
             className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>تأیید فوری سند توسط مدیرعامل</span>
+            <span>تأیید سند</span>
           </button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

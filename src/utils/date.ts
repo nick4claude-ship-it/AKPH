@@ -182,3 +182,52 @@ export function getRelativePersianDate(daysOffset: number = 0): string {
 export function formatDocumentYearCode(prefix: string): string {
   return `${prefix}-${getCurrentFiscalYear()}`;
 }
+
+/** Sortable day index of a Jalali 'YYYY/MM/DD' date (NaN when unparseable). */
+export function dayIndex(date?: string): number {
+  const m = (date || '').replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (!m) return NaN;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return y * 365 + (mo <= 6 ? (mo - 1) * 31 : 186 + (mo - 7) * 30) + d;
+}
+
+const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+const toFa = (n: number, width = 0) => String(n).padStart(width, '0').replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+
+const persianPartsFormatter = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric' });
+const leapCache = new Map<number, boolean>();
+
+/** true when Esfand of Jalali year `y` has 30 days (from the platform's Persian calendar). */
+export function isJalaliLeapYear(y: number): boolean {
+  const cached = leapCache.get(y);
+  if (cached !== undefined) return cached;
+  // The last days of Esfand fall on 19–21 March of Gregorian year y + 622.
+  let leap = false;
+  for (const day of [19, 20, 21]) {
+    const parts = persianPartsFormatter.formatToParts(new Date(Date.UTC(y + 622, 2, day, 12)));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    if (get('year') === y && get('month') === 12 && get('day') === 30) leap = true;
+  }
+  leapCache.set(y, leap);
+  return leap;
+}
+
+export function jalaliMonthLength(y: number, m: number): number {
+  if (m <= 6) return 31;
+  if (m <= 11) return 30;
+  return isJalaliLeapYear(y) ? 30 : 29;
+}
+
+/** A valid Jalali calendar date «YYYY/MM/DD» (Persian or Latin digits), or null. */
+export function parseJalaliDate(date?: string | null): { y: number; m: number; d: number } | null {
+  const match = toLatin((date || '').trim()).match(/^(1[2-5]\d{2})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (!match) return null;
+  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (m < 1 || m > 12 || d < 1 || d > jalaliMonthLength(y, m)) return null;
+  return { y, m, d };
+}
+
+/** Last real day of Jalali year `y`: ۱۲/۳۰ in a leap year, otherwise ۱۲/۲۹. */
+export function jalaliYearEnd(y: number): string {
+  return `${toFa(y)}/${toFa(12, 2)}/${toFa(jalaliMonthLength(y, 12), 2)}`;
+}

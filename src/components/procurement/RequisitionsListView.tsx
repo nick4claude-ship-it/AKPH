@@ -17,6 +17,8 @@ import {
   FileText,
 } from 'lucide-react';
 import { PurchaseRequisition, Project, RequisitionPriority, RequisitionStatus } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney } from '../../utils/money';
 
 interface RequisitionsListViewProps {
   requisitions: PurchaseRequisition[];
@@ -135,7 +137,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
               <option value="تأیید سرپرست کارگاه">تأیید سرپرست کارگاه</option>
               <option value="تأیید فنی پروژه">تأیید فنی پروژه</option>
               <option value="مصوبه مدیر تدارکات">مصوبه مدیر تدارکات</option>
-              <option value="تأیید نهایی مالی/مدیرعامل">تأیید نهایی مالی/مدیرعامل</option>
+              <option value="تأیید نهایی مدیر ارشد">تأیید نهایی مدیر ارشد</option>
               <option value="در حال استعلام بها (RFQ)">در حال استعلام بها (RFQ)</option>
               <option value="سفارش صادر شده (PO)">سفارش صادر شده (PO)</option>
             </select>
@@ -197,7 +199,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                   </td>
 
                   <td className="py-3.5 px-4 text-left font-mono font-bold text-slate-900">
-                    {req.totalEstimatedAmount.toLocaleString('fa-IR')} تومان
+                    {formatMoney(req.totalEstimatedAmount)}
                   </td>
 
                   <td className="py-3.5 px-4 text-center">
@@ -205,7 +207,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                       className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold ${
                         req.status === 'سفارش صادر شده (PO)'
                           ? 'bg-emerald-100 text-emerald-800'
-                          : req.status === 'تأیید نهایی مالی/مدیرعامل'
+                          : req.status === 'تأیید نهایی مدیر ارشد'
                           ? 'bg-indigo-100 text-indigo-800'
                           : req.status === 'در حال استعلام بها (RFQ)'
                           ? 'bg-cyan-100 text-cyan-800'
@@ -255,8 +257,8 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
 
       {/* Detailed Modal for Single Requisition */}
       {activeReqForDetail && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <Dialog onClose={() => setActiveReqForDetail(null)} label="پرونده تقاضای خرید" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          
             <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -322,10 +324,10 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                             {it.requestedQty.toLocaleString('fa-IR')} {it.unit}
                           </td>
                           <td className="p-2.5 text-left font-mono">
-                            {it.estimatedUnitPrice.toLocaleString('fa-IR')}
+                            {formatMoney(it.estimatedUnitPrice, false)}
                           </td>
                           <td className="p-2.5 text-left font-mono font-bold text-indigo-700">
-                            {it.estimatedTotalPrice.toLocaleString('fa-IR')}
+                            {formatMoney(it.estimatedTotalPrice, false)}
                           </td>
                         </tr>
                       ))}
@@ -356,7 +358,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
 
                   {/* Step 3: Procurement Manager */}
                   <div className={`p-2.5 rounded-xl border ${activeReqForDetail.approvals.procurementManager?.approved ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                    <div className="font-bold text-[11px]">۳. مدیر تدارکات</div>
+                    <div className="font-bold text-[11px]">۳. تأیید تدارکات (حسابدار)</div>
                     <div className="text-[10px] mt-1">
                       {activeReqForDetail.approvals.procurementManager?.approved ? '✓ تأیید شده' : 'در انتظار'}
                     </div>
@@ -364,7 +366,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
 
                   {/* Step 4: Finance / CEO */}
                   <div className={`p-2.5 rounded-xl border ${activeReqForDetail.approvals.financialDirector?.approved ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                    <div className="font-bold text-[11px]">۴. مدیر مالی / عامل</div>
+                    <div className="font-bold text-[11px]">۴. مدیر ارشد</div>
                     <div className="text-[10px] mt-1">
                       {activeReqForDetail.approvals.financialDirector?.approved ? '✓ تأیید نهایی' : 'در نوبت'}
                     </div>
@@ -391,8 +393,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                 بستن
               </button>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

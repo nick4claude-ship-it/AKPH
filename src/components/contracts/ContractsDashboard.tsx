@@ -26,6 +26,11 @@ import {
   ChevronLeft,
   FileSpreadsheet,
 } from 'lucide-react';
+import { formatInt, formatMoney, formatMoneyCompact } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
+import { useAppState } from '../../store/AppStore';
+import type { ContractsSubTab } from './ContractsModule';
+import { dayIndex, todayIndex } from '../../store/domainSelectors';
 
 interface ContractsDashboardProps {
   contracts: Contract[];
@@ -35,7 +40,7 @@ interface ContractsDashboardProps {
   onOpenNewContract: () => void;
   onOpenNewStatement: () => void;
   onSelectStatement: (statement: DetailedProgressStatement) => void;
-  onNavigateTab: (tab: any) => void;
+  onNavigateTab: (tab: ContractsSubTab) => void;
 }
 
 export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
@@ -64,6 +69,29 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
     (s) => s.status === 'submitted_to_consultant' || s.status === 'under_consultant_review' || s.status === 'submitted_to_employer'
   );
   const totalPendingStatementsAmount = pendingStatements.reduce((sum, s) => sum + s.grossAmount, 0);
+
+  // Alerts and secondary figures computed from the store (no fixed samples).
+  const store = useAppState();
+  const today = todayIndex();
+  const totalApprovedChanges = contracts.reduce((sum, c) => sum + c.approvedChangesValue, 0);
+  const totalInitial = contracts.reduce((sum, c) => sum + c.initialValue, 0);
+  const changesPercent = totalInitial > 0 ? (totalApprovedChanges / totalInitial) * 100 : 0;
+  const overdue = statements.filter((s) => s.remainingPayable > 0 && ['approved_by_employer', 'claimed', 'partially_paid'].includes(s.status) && dayIndex(s.dueDate) < today);
+  const overdueAmount = overdue.reduce((sum, s) => sum + s.remainingPayable, 0);
+  const contractIds = new Set(contracts.map((c) => c.id));
+  const exceeded = store.contractBoq.filter((b) => contractIds.has(b.contractId) && b.cumulativeExecutedQuantity > b.initialQuantity);
+  const endingSoon = contracts.filter((c) => c.status === 'فعال' && dayIndex(c.endDate) - today >= 0 && dayIndex(c.endDate) - today <= 60);
+  type Alert = { id: string; title: string; value: string; description: string; tone: string; tab?: ContractsSubTab; action?: string };
+  const alerts: Alert[] = [
+    ...(overdue.length
+      ? [{ id: 'overdue', title: `مطالبات سررسیدگذشته (${formatInt(overdue.length)} صورت‌وضعیت)`, value: formatMoney(overdueAmount), description: overdue.slice(0, 3).map((s) => `${s.statementNumber} — ${s.projectName}`).join('، '), tone: 'bg-rose-50/70 border-rose-200/80 text-rose-900', tab: 'payments' as const, action: 'پیگیری وصول' }]
+      : []),
+    ...exceeded.slice(0, 3).map((b) => ({ id: `boq-${b.id}`, title: 'عبور کارکرد از مقدار پیمان', value: `+${formatInt(b.cumulativeExecutedQuantity - b.initialQuantity)} ${b.unit}`, description: `ردیف ${b.code} (${b.description}) نیاز به الحاقیه یا دستورکار دارد.`, tone: 'bg-amber-50/70 border-amber-200/80 text-amber-900', tab: 'boq' as const, action: 'بررسی فهرست‌بها' })),
+    ...(pendingStatements.length
+      ? [{ id: 'pending', title: `صورت‌وضعیت در انتظار مشاور/کارفرما (${formatInt(pendingStatements.length)})`, value: formatMoney(totalPendingStatementsAmount), description: pendingStatements.slice(0, 3).map((s) => s.statementNumber).join('، '), tone: 'bg-blue-50/70 border-blue-200/80 text-blue-900', tab: 'statements' as const, action: 'مشاهده صورت‌وضعیت‌ها' }]
+      : []),
+    ...endingSoon.map((c) => ({ id: `end-${c.id}`, title: 'نزدیک شدن به تاریخ خاتمه قرارداد', value: c.endDate, description: `${c.code} — ${c.projectTitle}`, tone: 'bg-slate-50 border-slate-200 text-slate-800' })),
+  ];
 
   // Overall financial execution ratios
   const executionRatio = totalContractsValue > 0 ? (totalExecutedValue / totalContractsValue) * 100 : 0;
@@ -153,13 +181,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {Number((totalContractsValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalContractsValue)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>الحاقیه‌های مصوب: ۶.۴۵ م.ت</span>
-            <span className="text-emerald-600 font-medium">+۱۰.۲٪ افزایش سقف</span>
+            <span>الحاقیه‌های مصوب: {formatMoneyCompact(totalApprovedChanges)}</span>
+            <span className="text-emerald-600 font-medium">+{formatPercent(changesPercent)} افزایش سقف</span>
           </div>
         </div>
 
@@ -173,10 +200,9 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-indigo-950 tracking-tight">
-              {Number((totalExecutedValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalExecutedValue)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">پیشرفت ریالی کارکرد:</span>
             <span className="font-bold text-indigo-700">{Number(executionRatio.toFixed(1)).toLocaleString('fa-IR')}٪</span>
@@ -193,12 +219,11 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-purple-950 tracking-tight">
-              {Number((totalBilledValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalBilledValue)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تأییدشده: {Number((totalApprovedBilledValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')} م.ت</span>
+            <span>تأییدشده: {formatMoneyCompact(totalApprovedBilledValue)}</span>
             <span className="text-purple-600 font-medium">{Number(billingRatio.toFixed(1)).toLocaleString('fa-IR')}٪ از پیمان</span>
           </div>
         </div>
@@ -213,10 +238,9 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-emerald-700 tracking-tight">
-              {Number((totalReceivedValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalReceivedValue)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">نسبت وصولی از صورت‌وضعیت:</span>
             <span className="font-bold text-emerald-600">{Number(collectionRatio.toFixed(1)).toLocaleString('fa-IR')}٪</span>
@@ -233,14 +257,13 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-rose-700 tracking-tight">
-              {Number((totalReceivableValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalReceivableValue)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="text-rose-600 font-medium">۸۸۲ م.ت سررسید گذشته</span>
+            <span className="text-rose-600 font-medium">{formatMoneyCompact(overdueAmount)} سررسید گذشته</span>
             <button
-              onClick={() => onNavigateTab('receivables')}
+              onClick={() => onNavigateTab('payments')}
               className="text-rose-700 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
             >
               پیگیری وصول
@@ -259,10 +282,9 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-800 tracking-tight">
-              {Number((totalPendingStatementsAmount / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalPendingStatementsAmount)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>{pendingStatements.length.toLocaleString('fa-IR')} فقره صورت‌وضعیت</span>
             <span className="text-amber-700 font-medium">مشاور و کارفرما</span>
@@ -279,10 +301,9 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-teal-900 tracking-tight">
-              {Number(((totalContractsValue - totalExecutedValue) / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')}
+              {formatMoneyCompact((totalContractsValue - totalExecutedValue))}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>ظرفیت جذب کارگاه‌ها</span>
             <span className="text-teal-700 font-medium">{Number((100 - executionRatio).toFixed(1)).toLocaleString('fa-IR')}٪ مانده</span>
@@ -345,10 +366,10 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                     <span className="text-[11px] text-slate-500">({contract.employer})</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-600">
-                    <span>مبلغ فعلی: <strong>{(contract.currentValue / 1_000_000_000).toFixed(1)}</strong> م.ت</span>
-                    <span>کارکرد: <strong className="text-indigo-700">{(contract.executedValue / 1_000_000_000).toFixed(1)}</strong> م.ت</span>
-                    <span>وصولی: <strong className="text-emerald-700">{(contract.receivedValue / 1_000_000_000).toFixed(1)}</strong> م.ت</span>
-                    <span className="text-rose-700 font-bold">طلب: {(contract.receivableValue / 1_000_000_000).toFixed(1)} م.ت</span>
+                    <span>مبلغ فعلی: <strong>{formatMoneyCompact(contract.currentValue)}</strong> م.ت</span>
+                    <span>کارکرد: <strong className="text-indigo-700">{formatMoneyCompact(contract.executedValue)}</strong> م.ت</span>
+                    <span>وصولی: <strong className="text-emerald-700">{formatMoneyCompact(contract.receivedValue)}</strong> م.ت</span>
+                    <span className="text-rose-700 font-bold">طلب: {formatMoneyCompact(contract.receivableValue)}</span>
                   </div>
                 </div>
 
@@ -402,78 +423,29 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                 <h3 className="text-sm font-bold text-slate-900">هشدارهای مدیریتی و ریسک‌های مالی قراردادها</h3>
               </div>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                ۴ اعلان فعال
+                {formatInt(alerts.length)} اعلان فعال
               </span>
             </div>
 
             <div className="space-y-2.5">
-              {/* Alert 1 */}
-              <div className="p-3 rounded-xl bg-rose-50/70 border border-rose-200/80 flex items-start gap-3">
-                <span className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0"></span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-rose-900">مطالبات معوق سررسید گذشته (۴۵ روز تاخیر)</span>
-                    <span className="text-[10px] font-bold text-rose-700">۸۸۲,۷۵۰,۰۰۰ تومان</span>
+              {alerts.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">هشدار فعالی برای قراردادها وجود ندارد.</p>}
+              {alerts.map((a) => (
+                <div key={a.id} className={`p-3 rounded-xl border flex items-start gap-3 ${a.tone}`}>
+                  <span className="w-2 h-2 rounded-full bg-current mt-1.5 shrink-0 opacity-70"></span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold">{a.title}</span>
+                      <span className="text-[10px] font-bold">{a.value}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5">{a.description}</p>
+                    {a.tab && (
+                      <button onClick={() => onNavigateTab(a.tab!)} className="mt-1.5 text-[11px] font-bold hover:underline cursor-pointer">
+                        {a.action} ➔
+                      </button>
+                    )}
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
-                    صورت‌وضعیت شماره ۰۸ تقاطع فجر توسط سازمان مهندسی و عمران شهر تهران تایید شده ولی واریز نشده است.
-                  </p>
-                  <button
-                    onClick={() => onNavigateTab('receivables')}
-                    className="mt-1.5 text-[11px] font-bold text-rose-700 hover:underline cursor-pointer"
-                  >
-                    پیگیری وصول و ثبت اخطار مالی ➔
-                  </button>
                 </div>
-              </div>
-
-              {/* Alert 2 */}
-              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3">
-                <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0"></span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-900">عبور مقدار کارکرد از سقف اولیه پیمان (Quantity Exceeded)</span>
-                    <span className="text-[10px] font-bold text-amber-700">+۵۰۰ مترمکعب مازاد</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
-                    ردیف ۰۰۱ (خاکبرداری گود برج رونیکا) از سقف ۱۲,۰۰۰ به ۱۲,۵۰۰ مترمکعب رسیده و نیاز به ثبت الحاقیه یا دستورکار دارد.
-                  </p>
-                  <button
-                    onClick={() => onNavigateTab('boq')}
-                    className="mt-1.5 text-[11px] font-bold text-amber-800 hover:underline cursor-pointer"
-                  >
-                    بررسی کنترل احجام در فهرست‌بها ➔
-                  </button>
-                </div>
-              </div>
-
-              {/* Alert 3 */}
-              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 flex items-start gap-3">
-                <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-900">صورت‌وضعیت در انتظار بررسی مشاور</span>
-                    <span className="text-[10px] font-bold text-blue-700">۷۰۸,۱۸۰,۰۰۰ تومان</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
-                    صورت‌وضعیت موقت ۰۵ برج رونیکا در کارتابل مهندسین مشاور سازه‌اندیش شرق بیش از ۵ روز معطل مانده است.
-                  </p>
-                </div>
-              </div>
-
-              {/* Alert 4 */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
-                <span className="w-2 h-2 rounded-full bg-slate-400 mt-1.5 shrink-0"></span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800">نزدیک شدن قرارداد به تاریخ خاتمه</span>
-                    <span className="text-[10px] font-bold text-slate-600">پروژه تقاطع فجر</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
-                    مدت پیمان در تاریخ ۱۴۰۳/۰۸/۱۵ به پایان می‌رسد. لایحه تمدید مدت مجاز (تاخیرات) باید ارسال شود.
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -547,7 +519,7 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
 
                     <div className="text-left shrink-0">
                       <div className="text-xs font-black text-slate-900">
-                        {stm.grossAmount.toLocaleString('fa-IR')} تومان
+                        {formatMoney(stm.grossAmount)}
                       </div>
                       <div className="flex items-center justify-end gap-1.5 mt-1">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${st.bg} ${st.text}`}>

@@ -10,10 +10,10 @@ import {
   DetailedProgressStatement,
   ContractAmendment,
   StatementPayment,
-  ContractDocument,
   ContractAuditLog,
   UserProfile,
 } from '../../types';
+import { ContractFile } from './contractFiles';
 import {
   Building2,
   Calendar,
@@ -37,6 +37,7 @@ import {
   FileSpreadsheet,
   Settings,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 
 interface ContractDetailViewProps {
   contract: Contract;
@@ -44,7 +45,7 @@ interface ContractDetailViewProps {
   statements: DetailedProgressStatement[];
   amendments: ContractAmendment[];
   payments: StatementPayment[];
-  documents: ContractDocument[];
+  documents: ContractFile[];
   auditLogs: ContractAuditLog[];
   currentUser: UserProfile;
   onBack: () => void;
@@ -52,6 +53,18 @@ interface ContractDetailViewProps {
   onOpenNewAmendment: (contract: Contract) => void;
   onSelectStatement: (statement: DetailedProgressStatement) => void;
 }
+
+type DetailTab =
+  | 'overview'
+    | 'boq'
+    | 'statements'
+    | 'payments'
+    | 'deductions'
+    | 'amendments'
+    | 'documents'
+    | 'correspondence'
+    | 'financial_summary'
+    | 'audit_log';
 
 export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
   contract,
@@ -67,18 +80,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
   onOpenNewAmendment,
   onSelectStatement,
 }) => {
-  const [activeTab, setActiveTab] = useState<
-    | 'overview'
-    | 'boq'
-    | 'statements'
-    | 'payments'
-    | 'deductions'
-    | 'amendments'
-    | 'documents'
-    | 'correspondence'
-    | 'financial_summary'
-    | 'audit_log'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
 
   // Filter items for this contract
   const contractBOQ = boqItems.filter((b) => b.contractId === contract.id);
@@ -148,17 +150,17 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
           <div className="px-2 pt-2 sm:pt-0">
             <span className="text-[11px] text-slate-400 block mb-1">مبلغ کل پیمان (فعلی)</span>
             <span className="text-lg font-black text-amber-400">
-              {Number((contract.currentValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(contract.currentValue)}
             </span>
             <span className="text-[10px] text-slate-400 block mt-0.5">
-              اولیه: {(contract.initialValue / 1_000_000_000).toFixed(1)} + تغییرات {(contract.approvedChangesValue / 1_000_000_000).toFixed(1)}
+              اولیه: {formatMoneyCompact(contract.initialValue)} + تغییرات {formatMoneyCompact(contract.approvedChangesValue)}
             </span>
           </div>
 
           <div className="px-2 pt-2 sm:pt-0">
             <span className="text-[11px] text-slate-400 block mb-1">کارکرد اجراشده (متره)</span>
             <span className="text-lg font-black text-indigo-300">
-              {Number((contract.executedValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(contract.executedValue)}
             </span>
             <span className="text-[10px] text-indigo-400 block mt-0.5 font-bold">
               {Number(execPct.toFixed(1)).toLocaleString('fa-IR')}٪ پیشرفت فیزیکی
@@ -168,7 +170,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
           <div className="px-2 pt-2 sm:pt-0">
             <span className="text-[11px] text-slate-400 block mb-1">صورت‌وضعیت ارسالی (Billed)</span>
             <span className="text-lg font-black text-purple-300">
-              {Number((contract.billedValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(contract.billedValue)}
             </span>
             <span className="text-[10px] text-purple-400 block mt-0.5">
               {Number(billedPct.toFixed(1)).toLocaleString('fa-IR')}٪ از کل پیمان
@@ -178,7 +180,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
           <div className="px-2 pt-2 sm:pt-0">
             <span className="text-[11px] text-slate-400 block mb-1">دریافتی نقد و اسناد (Received)</span>
             <span className="text-lg font-black text-emerald-400">
-              {Number((contract.receivedValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(contract.receivedValue)}
             </span>
             <span className="text-[10px] text-emerald-400 block mt-0.5 font-bold">
               {Number(receivedPct.toFixed(1)).toLocaleString('fa-IR')}٪ وصولی
@@ -188,7 +190,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
           <div className="px-2 pt-2 sm:pt-0">
             <span className="text-[11px] text-slate-400 block mb-1">مانده مطالبات (Receivable)</span>
             <span className="text-lg font-black text-rose-400">
-              {Number((contract.receivableValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(contract.receivableValue)}
             </span>
             <span className="text-[10px] text-rose-300 block mt-0.5">
               تاییدشده وصول‌نشده
@@ -198,7 +200,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
           <div className="px-2 pt-2 sm:pt-0">
             <span className="text-[11px] text-slate-400 block mb-1">ظرفیت کار باقیمانده (Remaining)</span>
             <span className="text-lg font-black text-teal-300">
-              {Number((contract.remainingValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(contract.remainingValue)}
             </span>
             <span className="text-[10px] text-teal-400 block mt-0.5 font-bold">
               {Number((100 - execPct).toFixed(1)).toLocaleString('fa-IR')}٪ حجم مانده
@@ -239,7 +241,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as DetailTab)}
               className={`py-3.5 px-3.5 shrink-0 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === tab.id
                   ? 'border-amber-500 text-amber-950 font-bold bg-white'
@@ -380,7 +382,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                       <th className="p-3">شرح عملیات</th>
                       <th className="p-3 text-center">واحد</th>
                       <th className="p-3 text-left">مقدار اولیه</th>
-                      <th className="p-3 text-left">بهای واحد (تومان)</th>
+                      <th className="p-3 text-left">بهای واحد ({moneyUnitLabel()})</th>
                       <th className="p-3 text-left">مبلغ اولیه</th>
                       <th className="p-3 text-left">کارکرد اجراشده</th>
                       <th className="p-3 text-left">مبلغ کارکرد</th>
@@ -399,9 +401,9 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                         </td>
                         <td className="p-3 text-center font-bold text-slate-600">{item.unit}</td>
                         <td className="p-3 text-left font-mono font-medium">{item.initialQuantity.toLocaleString('fa-IR')}</td>
-                        <td className="p-3 text-left font-mono">{item.unitRate.toLocaleString('fa-IR')}</td>
+                        <td className="p-3 text-left font-mono">{formatMoney(item.unitRate, false)}</td>
                         <td className="p-3 text-left font-mono font-bold text-slate-800">
-                          {item.initialAmount.toLocaleString('fa-IR')}
+                          {formatMoney(item.initialAmount, false)}
                         </td>
                         <td className="p-3 text-left font-mono">
                           <span className="font-bold text-indigo-700">
@@ -414,7 +416,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                           )}
                         </td>
                         <td className="p-3 text-left font-mono font-bold text-indigo-900">
-                          {item.executedAmount.toLocaleString('fa-IR')}
+                          {formatMoney(item.executedAmount, false)}
                         </td>
                         <td className="p-3 text-center">
                           <span
@@ -475,9 +477,9 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                       <th className="p-3">شماره صورت‌وضعیت</th>
                       <th className="p-3">نوع</th>
                       <th className="p-3">دوره کارکرد</th>
-                      <th className="p-3 text-left">مبلغ ناخالص (تومان)</th>
+                      <th className="p-3 text-left">مبلغ ناخالص ({moneyUnitLabel()})</th>
                       <th className="p-3 text-left">کسورات قانونی</th>
-                      <th className="p-3 text-left">مبلغ خالص (تومان)</th>
+                      <th className="p-3 text-left">مبلغ خالص ({moneyUnitLabel()})</th>
                       <th className="p-3 text-left">دریافتی</th>
                       <th className="p-3 text-left">مانده طلب</th>
                       <th className="p-3 text-center">وضعیت گردش</th>
@@ -497,19 +499,19 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                           {stm.periodStartDate} تا {stm.periodEndDate}
                         </td>
                         <td className="p-3 text-left font-mono font-bold text-slate-800">
-                          {stm.grossAmount.toLocaleString('fa-IR')}
+                          {formatMoney(stm.grossAmount, false)}
                         </td>
                         <td className="p-3 text-left font-mono text-rose-700">
-                          {stm.totalDeductions.toLocaleString('fa-IR')}
+                          {formatMoney(stm.totalDeductions, false)}
                         </td>
                         <td className="p-3 text-left font-mono font-bold text-indigo-900">
-                          {stm.netPayable.toLocaleString('fa-IR')}
+                          {formatMoney(stm.netPayable, false)}
                         </td>
                         <td className="p-3 text-left font-mono text-emerald-700 font-bold">
-                          {stm.receivedAmount.toLocaleString('fa-IR')}
+                          {formatMoney(stm.receivedAmount, false)}
                         </td>
                         <td className="p-3 text-left font-mono font-bold text-rose-600">
-                          {stm.remainingPayable.toLocaleString('fa-IR')}
+                          {formatMoney(stm.remainingPayable, false)}
                         </td>
                         <td className="p-3 text-center">
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
@@ -545,7 +547,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                   <p className="text-xs text-slate-500">واریزی‌های نقدی، اسناد خزانه (اخزا)، چک‌های بانکی و تهاترها</p>
                 </div>
                 <div className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
-                  مجموع وصولی: {Number((contract.receivedValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')} میلیارد تومان
+                  مجموع وصولی: {formatMoneyCompact(contract.receivedValue)}
                 </div>
               </div>
 
@@ -559,7 +561,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                       <th className="p-3">شماره پیگیری / حواله</th>
                       <th className="p-3">حساب مبدا (کارفرما)</th>
                       <th className="p-3">بانک مقصد شرکت</th>
-                      <th className="p-3 text-left">مبلغ واریزی (تومان)</th>
+                      <th className="p-3 text-left">مبلغ واریزی ({moneyUnitLabel()})</th>
                       <th className="p-3 text-center">سند حسابداری</th>
                     </tr>
                   </thead>
@@ -577,7 +579,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                         <td className="p-3 text-slate-600">{p.payerAccount}</td>
                         <td className="p-3 font-medium text-slate-800">{p.destinationBank}</td>
                         <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                          {p.amount.toLocaleString('fa-IR')}
+                          {formatMoney(p.amount, false)}
                         </td>
                         <td className="p-3 text-center">
                           <span className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-mono">
@@ -698,8 +700,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                         <span className="text-xs text-slate-600">
                           مبلغ اثر:{' '}
                           <strong className="text-emerald-700">
-                            {amd.amount > 0 ? `+${(amd.amount / 1_000_000_000).toFixed(2)}` : (amd.amount / 1_000_000_000).toFixed(2)}{' '}
-                            میلیارد تومان
+                            {amd.amount > 0 ? `+${formatMoneyCompact(amd.amount)}` : formatMoneyCompact(amd.amount)}
                           </strong>
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -749,7 +750,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                         </span>
                       </div>
                     </div>
-                    <button className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer" title="دانلود فایل">
+                    <button disabled aria-label="دانلود فایل (به‌زودی)" className="p-1.5 text-slate-300 cursor-not-allowed" title="دانلود فایل (به‌زودی)">
                       <Download className="w-4 h-4" />
                     </button>
                   </div>
@@ -799,31 +800,31 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                   <h4 className="font-bold text-slate-900 border-b pb-2">صورت تطبیق مالی پیمان</h4>
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
                     <span className="text-slate-600">مبلغ اولیه قرارداد:</span>
-                    <span className="font-bold font-mono text-slate-900">{(contract.initialValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono text-slate-900">{formatMoneyCompact(contract.initialValue)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
                     <span className="text-slate-600">الحاقیه‌های مصوب (افزایش سقف):</span>
-                    <span className="font-bold font-mono text-emerald-700">+{(contract.approvedChangesValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono text-emerald-700">+{formatMoneyCompact(contract.approvedChangesValue)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/60 bg-amber-50/50 px-1 rounded">
                     <span className="font-bold text-amber-950">مبلغ نهایی فعلی پیمان:</span>
-                    <span className="font-black font-mono text-amber-900">{(contract.currentValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-black font-mono text-amber-900">{formatMoneyCompact(contract.currentValue)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
                     <span className="text-slate-600">ارزش کل کارکرد متره شده:</span>
-                    <span className="font-bold font-mono text-indigo-700">{(contract.executedValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono text-indigo-700">{formatMoneyCompact(contract.executedValue)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
                     <span className="text-slate-600">کل صورت‌وضعیت‌های ارسال‌شده:</span>
-                    <span className="font-bold font-mono text-purple-700">{(contract.billedValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono text-purple-700">{formatMoneyCompact(contract.billedValue)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
                     <span className="text-slate-600">کل دریافتی‌های قطعی نقد و اسناد:</span>
-                    <span className="font-bold font-mono text-emerald-700">{(contract.receivedValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono text-emerald-700">{formatMoneyCompact(contract.receivedValue)}</span>
                   </div>
                   <div className="flex justify-between py-1 bg-rose-50 px-1 rounded">
                     <span className="font-bold text-rose-900">مانده مطالبات معوق از کارفرما:</span>
-                    <span className="font-black font-mono text-rose-700">{(contract.receivableValue / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-black font-mono text-rose-700">{formatMoneyCompact(contract.receivableValue)}</span>
                   </div>
                 </div>
 

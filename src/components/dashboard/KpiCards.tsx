@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { KpiItem } from '../../types';
 import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface KpiCardsProps {
   kpis: KpiItem[];
@@ -51,7 +52,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ kpis, onCardClick }) => {
           <span>شاخص‌های کلیدی عملکرد مالی (KPIs)</span>
           <span className="text-xs font-normal text-slate-400">· کلیک برای جزئیات و پایش</span>
         </h3>
-        <span className="text-xs text-slate-400 hidden sm:inline">واحد مبالغ: تومان</span>
+        <span className="text-xs text-slate-400 hidden sm:inline">واحد مبالغ: {moneyUnitLabel()}</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -88,7 +89,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ kpis, onCardClick }) => {
                 <div className="text-[11px] text-slate-400 font-mono tabular-nums mt-0.5 truncate">
                   {kpi.unit === 'درصد'
                     ? `${kpi.value.toFixed(1)} درصد سود انباشته`
-                    : `${formatNumber(kpi.value)} ${kpi.unit}`}
+                    : formatMoney(kpi.value)}
                 </div>
               </div>
 

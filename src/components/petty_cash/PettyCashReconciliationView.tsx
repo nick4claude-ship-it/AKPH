@@ -20,7 +20,9 @@ import {
   User,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { generateUUID } from '../../utils/ids';
+import { dayIndex, toPersianDate } from '../../utils/date';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { moneyUnitLabel } from '../../utils/money';
 
 interface PettyCashReconciliationViewProps {
   accounts: PettyCashAccount[];
@@ -28,8 +30,16 @@ interface PettyCashReconciliationViewProps {
   expenses: PettyCashExpense[];
   replenishments: PettyCashReplenishment[];
   currentUser: User;
-  onSaveReconciliation: (recon: PettyCashReconciliation) => void;
+  onSaveReconciliation: (input: ReconciliationInput) => { ok: boolean; message: string };
 }
+
+export type ReconciliationInput = Pick<
+  PettyCashReconciliation,
+  'pettyCashId' | 'periodStartDate' | 'periodEndDate' | 'actualCountedCash' | 'discrepancyReason' | 'notes'
+>;
+
+/** First day of the current Jalali month, e.g. «۱۴۰۵/۰۷/۰۱». */
+const monthStart = () => toPersianDate(new Date()).replace(/\/[۰-۹0-9]+$/, '/۰۱');
 
 export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewProps> = ({
   accounts,
@@ -42,69 +52,53 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
 
-  const [periodStartDate, setPeriodStartDate] = useState('۱۴۰۳/۰۶/۰۱');
-  const [periodEndDate, setPeriodEndDate] = useState('۱۴۰۳/۰۶/۳۱');
+  // The count is made today; the period starts on the chosen date.
+  const [periodStartDate, setPeriodStartDate] = useState(monthStart);
+  const periodEndDate = toPersianDate(new Date());
+  const start = dayIndex(periodStartDate) || 0;
+  const inPeriod = (d: string) => (dayIndex(d) || 0) >= start;
 
-  // Compute live values for selected account:
-  // In a real system, we filter by date range; here we sum up account values
-  const openingBalance = 45_000_000;
+  // Expected balance is the fund's book balance; the period's movements explain how it was reached.
+  // Cash that should be in hand: book balance minus expenses paid out but still awaiting approval.
+  const expectedBalance = (selectedAccount?.actualBalance ?? 0) - (selectedAccount?.pendingExpenses ?? 0);
   const accountReplenishmentsSum = replenishments
-    .filter((r) => r.pettyCashId === selectedAccount?.id)
+    .filter((r) => r.pettyCashId === selectedAccount?.id && inPeriod(r.date))
     .reduce((sum, r) => sum + r.amount, 0);
   const accountApprovedExpensesSum = expenses
     .filter(
       (e) =>
         e.pettyCashId === selectedAccount?.id &&
-        (e.status === 'approved' || e.status === 'accounting_posted')
+        (e.status === 'approved' || e.status === 'accounting_posted') &&
+        inPeriod(e.date)
     )
     .reduce((sum, e) => sum + e.amount, 0);
-
-  // Formula: Opening + Replenishments - Approved Expenses
-  const expectedBalance = openingBalance + accountReplenishmentsSum - accountApprovedExpensesSum;
+  const openingBalance = (selectedAccount?.actualBalance ?? 0) - accountReplenishmentsSum + accountApprovedExpensesSum;
 
   // Actual physical counted cash input
   const [actualCountedCash, setActualCountedCash] = useState<number>(expectedBalance);
   const [discrepancyReason, setDiscrepancyReason] = useState('');
   const [notes, setNotes] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const discrepancy = actualCountedCash - expectedBalance; // 0 = balanced, < 0 = deficit, > 0 = surplus
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-
-    let status: PettyCashReconciliation['status'] = 'متعادل (بدون مغایرت)';
-    if (discrepancy < 0) {
-      status = 'دارای کسری';
-    } else if (discrepancy > 0) {
-      status = 'دارای مازاد';
-    }
-
-    const newRecon: PettyCashReconciliation = {
-      id: generateUUID(),
-      reconNumber: `RCN-1403-00${Math.floor(20 + Math.random() * 80)}`,
+    if (!selectedAccount) return setFormError('تنخواه را انتخاب کنید.');
+    const result = onSaveReconciliation({
       pettyCashId: selectedAccount.id,
-      pettyCashTitle: selectedAccount.title,
       periodStartDate,
       periodEndDate,
-      openingBalance,
-      totalReplenishments: accountReplenishmentsSum,
-      totalApprovedExpenses: accountApprovedExpensesSum,
-      expectedBalance,
       actualCountedCash,
-      discrepancy,
-      status,
       discrepancyReason: discrepancy !== 0 ? discrepancyReason : undefined,
-      adjustmentDocNumber:
-        discrepancy !== 0 ? `ACC-1403-ADJ-00${Math.floor(10 + Math.random() * 90)}` : undefined,
-      officerName: selectedAccount.holderName,
-      financeApproverName: `${currentUser.name} (${currentUser.role})`,
-      date: '۱۴۰۳/۰۷/۰۱',
       notes,
-    };
-
-    onSaveReconciliation(newRecon);
-    setNotification('صورتجلسه تسویه و تطبیق تنخواه با موفقیت در سیستم ثبت گردید.');
+    });
+    if (!result.ok) return setFormError(result.message);
+    setFormError(null);
+    setDiscrepancyReason('');
+    setNotes('');
+    setNotification(result.message);
     setTimeout(() => setNotification(null), 4000);
   };
 
@@ -148,7 +142,11 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
               </label>
               <select
                 value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedAccountId(e.target.value);
+                  const acc = accounts.find((a) => a.id === e.target.value);
+                  setActualCountedCash((acc?.actualBalance ?? 0) - (acc?.pendingExpenses ?? 0));
+                }}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >
                 {accounts.map((a) => (
@@ -174,8 +172,8 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
               <input
                 type="text"
                 value={periodEndDate}
-                onChange={(e) => setPeriodEndDate(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
+                readOnly
+                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono bg-slate-50"
               />
             </div>
           </div>
@@ -223,14 +221,12 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
             <div className="space-y-3">
               <label className="block text-xs font-bold text-slate-800">
-                موجودی واقعی شمارش‌شده کارگاه / پرینت بانکی (تومان) <span className="text-rose-500">*</span>
+                موجودی واقعی شمارش‌شده کارگاه / پرینت بانکی ({moneyUnitLabel()}) <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="number"
-                step="1000"
+              <MoneyInput
                 required
                 value={actualCountedCash}
-                onChange={(e) => setActualCountedCash(Number(e.target.value))}
+                onValueChange={(v) => setActualCountedCash(v)}
                 className="w-full text-sm px-3.5 py-2.5 border border-slate-300 rounded-xl font-mono font-bold focus:ring-2 focus:ring-amber-500 tabular-nums"
               />
               <span className="text-[11px] text-slate-500 block">
@@ -261,7 +257,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                 </div>
                 <div className="text-xl font-black font-mono mt-2 tabular-nums">
                   {discrepancy === 0
-                    ? 'بدون اختلاف (۰ تومان)'
+                    ? 'بدون اختلاف'
                     : `${discrepancy > 0 ? '+' : ''}${formatCurrency(discrepancy)}`}
                 </div>
               </div>
@@ -304,6 +300,12 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
             />
           </div>
 
+          {formError && (
+            <p className="text-xs text-rose-700 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
+
           <div className="flex items-center justify-between pt-4 border-t border-slate-200">
             <div className="text-xs text-slate-500">
               مسئول تسویه:{' '}
@@ -326,7 +328,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
         <div className="p-4 border-b border-slate-200">
           <h3 className="text-sm font-bold text-slate-900">سوابق صورتجلسات تسویه دوره‌ای تنخواه‌ها</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            آرشیو رسمی صورتجلسات مغایرت‌گیری و تاییدات مدیر مالی
+            آرشیو رسمی صورتجلسات مغایرت‌گیری و تأییدات مالی
           </p>
         </div>
 

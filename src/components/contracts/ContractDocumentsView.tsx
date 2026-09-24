@@ -4,19 +4,23 @@
  */
 
 import React, { useState } from 'react';
-import { Contract, ContractDocument, UserProfile } from '../../types';
+import { Contract, UserProfile } from '../../types';
+import { ContractFile } from './contractFiles';
 import { FileText, Download, Plus, Search, Paperclip, Eye } from 'lucide-react';
 
 interface ContractDocumentsViewProps {
   contracts: Contract[];
-  documents: ContractDocument[];
+  documents: ContractFile[];
   currentUser: UserProfile;
+  /** Uploads happen in the single document center. */
+  onUpload?: () => void;
 }
 
 export const ContractDocumentsView: React.FC<ContractDocumentsViewProps> = ({
   contracts,
   documents,
   currentUser,
+  onUpload,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContractId, setSelectedContractId] = useState('all');
@@ -43,9 +47,9 @@ export const ContractDocumentsView: React.FC<ContractDocumentsViewProps> = ({
           </p>
         </div>
 
-        <button className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs cursor-pointer">
+        <button onClick={onUpload} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs cursor-pointer">
           <Paperclip className="w-4 h-4" />
-          <span>بارگذاری سند جدید</span>
+          <span>بارگذاری سند در مرکز اسناد</span>
         </button>
       </div>
 
@@ -110,11 +114,12 @@ export const ContractDocumentsView: React.FC<ContractDocumentsViewProps> = ({
                   {doc.uploadDate} · {doc.fileSize}
                 </span>
                 <button
-                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 font-bold text-xs"
-                  title="دانلود فایل"
+                  disabled
+                  className="p-1.5 rounded-lg text-slate-400 cursor-not-allowed flex items-center gap-1 font-bold text-xs"
+                  title="دانلود فایل (به‌زودی)"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>دانلود</span>
+                  <span>دانلود (به‌زودی)</span>
                 </button>
               </div>
             </div>

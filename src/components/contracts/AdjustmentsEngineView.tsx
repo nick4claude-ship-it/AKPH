@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import { Contract, PriceAdjustment, UserProfile } from '../../types';
 import { TrendingUp, Plus, FileSpreadsheet, CheckCircle2, FileText, Download } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel, formatInt } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
 
 interface AdjustmentsEngineViewProps {
   contracts: Contract[];
@@ -24,6 +26,7 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
     (a) => selectedContractId === 'all' || a.contractId === selectedContractId
   );
 
+  const approvedCount = filteredAdjustments.filter((a) => a.status === 'تأیید کارفرما' || a.status === 'اعمال شده در صورت‌وضعیت').length;
   const totalAdjustments = filteredAdjustments.reduce(
     (sum, a) => sum + a.calculatedAdjustmentAmount,
     0
@@ -63,7 +66,7 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <span className="text-xs text-slate-500 block mb-1">مجموع مبالغ تعدیل محاسبه‌شده</span>
           <span className="text-xl font-black text-amber-900 font-mono">
-            {(totalAdjustments / 1_000_000_000).toFixed(2)} میلیارد تومان
+            {formatMoneyCompact(totalAdjustments)}
           </span>
           <span className="text-[11px] text-slate-400 block mt-1">تعداد دوره‌ها: {filteredAdjustments.length} فصل</span>
         </div>
@@ -76,8 +79,12 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <span className="text-xs text-slate-500 block mb-1">وضعیت تاییدات مشاور و کارفرما</span>
-          <span className="text-sm font-bold text-emerald-700 block">۸۵٪ تایید شده و منضم به صورت‌وضعیت</span>
-          <span className="text-[11px] text-slate-400 block mt-1">دارای کاربرگ‌های اکسل تفکیکی</span>
+          <span className="text-sm font-bold text-emerald-700 block">
+            {formatPercent(filteredAdjustments.length ? (approvedCount * 100) / filteredAdjustments.length : 0)} تأیید کارفرما یا اعمال‌شده
+          </span>
+          <span className="text-[11px] text-slate-400 block mt-1">
+            {formatInt(approvedCount)} از {formatInt(filteredAdjustments.length)} تعدیل
+          </span>
         </div>
       </div>
 
@@ -93,7 +100,7 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
               <th className="p-3 text-center">شاخص دوره کارکرد (I)</th>
               <th className="p-3 text-center">ضریب تعدیل (P)</th>
               <th className="p-3 text-left">مبلغ مبنای کارکرد</th>
-              <th className="p-3 text-left">مبلغ تعدیل (تومان)</th>
+              <th className="p-3 text-left">مبلغ تعدیل ({moneyUnitLabel()})</th>
               <th className="p-3 text-center">وضعیت</th>
               <th className="p-3 text-center">کاربرگ محاسبات</th>
             </tr>
@@ -117,10 +124,10 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
                     +{adj.coefficient.toFixed(3)}
                   </td>
                   <td className="p-3 text-left font-mono text-slate-600">
-                    {adj.baseAmount.toLocaleString('fa-IR')}
+                    {formatMoney(adj.baseAmount, false)}
                   </td>
                   <td className="p-3 text-left font-mono font-black text-emerald-800">
-                    {adj.calculatedAdjustmentAmount.toLocaleString('fa-IR')}
+                    {formatMoney(adj.calculatedAdjustmentAmount, false)}
                   </td>
                   <td className="p-3 text-center">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -129,9 +136,9 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
                   </td>
                   <td className="p-3 text-center">
                     {adj.attachedCalcSheetName ? (
-                      <button className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer">
+                      <button disabled title="به‌زودی" className="px-2.5 py-1 rounded bg-slate-100 text-slate-400 text-[10px] font-bold inline-flex items-center gap-1 cursor-not-allowed">
                         <Download className="w-3 h-3" />
-                        <span>اکسل محاسبات</span>
+                        <span>اکسل محاسبات (به‌زودی)</span>
                       </button>
                     ) : (
                       <span className="text-slate-400 text-[10px]">-</span>

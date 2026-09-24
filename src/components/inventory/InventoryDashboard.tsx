@@ -34,6 +34,8 @@ import {
   Layers,
   Search,
 } from 'lucide-react';
+import { formatInt, formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
 
 interface InventoryDashboardProps {
   warehouses: Warehouse[];
@@ -103,7 +105,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
               مدیریت زنجیره تأمین کارگاهی
             </span>
             <span className="text-xs text-slate-300">
-              {warehouses.length.toLocaleString('fa-IR')} انبار فعال (۵ کارگاه + ۱ بارانداز مرکزی)
+              {formatInt(warehouses.length)} انبار فعال
             </span>
           </div>
           <h2 className="text-lg font-black tracking-tight text-white">
@@ -162,12 +164,11 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900">
-              {(totalInventoryValuation / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })}
+              {formatMoneyCompact(totalInventoryValuation)}
             </span>
-            <span className="text-xs text-slate-500">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تعداد اقلام کاتالوگ: {materials.length.toLocaleString('fa-IR')} قلم</span>
+            <span>تعداد اقلام کاتالوگ: {formatInt(materials.length)} قلم</span>
             <span className="text-blue-600 font-bold">ارزیابی بر مبنای میانگین</span>
           </div>
         </div>
@@ -182,13 +183,12 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-emerald-700">
-              {(totalReceiptsValue / 1_000_000).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalReceiptsValue)}
             </span>
-            <span className="text-xs text-emerald-600">میلیون تومان</span>
-          </div>
+                      </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>{receipts.length.toLocaleString('fa-IR')} پارت بارنامه و باسکول</span>
-            <span className="text-emerald-700 font-bold">۱۰۰٪ تاییدیه کیفی QC</span>
+            <span>{formatInt(receipts.length)} پارت بارنامه و باسکول</span>
+            <span className="text-emerald-700 font-bold">{formatPercent(receipts.length ? (receipts.filter((r) => r.qcApprovalStatus === 'تأیید کامل').length / receipts.length) * 100 : 0)} تأیید کامل QC</span>
           </div>
         </div>
 
@@ -202,12 +202,11 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900">
-              {(totalIssuesValue / 1_000_000).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalIssuesValue)}
             </span>
-            <span className="text-xs text-slate-500">میلیون تومان</span>
-          </div>
+                      </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تهاتر پیمانکاران جزء: {(subcontractorContraValue / 1_000_000).toLocaleString('fa-IR')} م.ت</span>
+            <span>تهاتر پیمانکاران جزء: {formatMoneyCompact(subcontractorContraValue)}</span>
             <span className="text-amber-600 font-bold">ثبت در بهای تمام‌شده</span>
           </div>
         </div>
@@ -222,12 +221,12 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-rose-600">
-              {criticalItems.length.toLocaleString('fa-IR')}
+              {formatInt(criticalItems.length)}
             </span>
             <span className="text-xs text-rose-600 font-bold">قلم زیر حد مجاز</span>
           </div>
           <div className="mt-2 pt-2 border-t border-rose-200/60 flex items-center justify-between text-[11px] text-rose-700">
-            <span>{severelyLowItems.length.toLocaleString('fa-IR')} قلم در وضعیت بحرانی فوری</span>
+            <span>{formatInt(severelyLowItems.length)} قلم در وضعیت بحرانی فوری</span>
             <button
               onClick={() => onNavigateTab('items')}
               className="font-bold underline hover:text-rose-900 cursor-pointer"
@@ -315,7 +314,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     <div>
                       <span className="text-[10px] text-slate-400 block">ارزش موجودی</span>
                       <span className="font-bold text-slate-900">
-                        {(wh.totalValuation / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
+                        {formatMoneyCompact(wh.totalValuation)}
                       </span>
                     </div>
 
@@ -359,7 +358,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     <th className="pb-2 font-medium">تأمین‌کننده / راننده</th>
                     <th className="pb-2 font-medium">وزن خالص باسکول</th>
                     <th className="pb-2 font-medium">تأییدیه کیفی QC</th>
-                    <th className="pb-2 font-medium text-left">مبلغ کل (تومان)</th>
+                    <th className="pb-2 font-medium text-left">مبلغ کل ({moneyUnitLabel()})</th>
                     <th className="pb-2 font-medium text-center">عملیات</th>
                   </tr>
                 </thead>
@@ -408,7 +407,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                       </td>
 
                       <td className="py-3 text-left font-bold text-slate-900 font-mono">
-                        {r.totalAmount.toLocaleString('fa-IR')}
+                        {formatMoney(r.totalAmount, false)}
                       </td>
 
                       <td className="py-3 text-center">
@@ -445,11 +444,11 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             <div className="mt-3 p-3 bg-white/80 rounded-xl border border-amber-200 flex items-center justify-between">
               <span className="text-xs text-slate-600 font-medium">مجموع مصالح تهاتری دوره:</span>
               <span className="text-sm font-black text-amber-700 font-mono">
-                {(subcontractorContraValue / 1_000_000).toLocaleString('fa-IR')} م.ت
+                {formatMoneyCompact(subcontractorContraValue)}
               </span>
             </div>
             <div className="mt-2 text-[10px] text-amber-900 flex items-center justify-between">
-              <span>تعداد حواله‌های امانی و تهاتری: {issues.filter((i) => i.isSubcontractorContra).length.toLocaleString('fa-IR')} سند</span>
+              <span>تعداد حواله‌های امانی و تهاتری: {formatInt(issues.filter((i) => i.isSubcontractorContra).length)} سند</span>
               <button
                 onClick={() => onNavigateTab('issues')}
                 className="font-bold text-amber-900 underline hover:text-amber-950 cursor-pointer"
@@ -467,7 +466,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                 انتقالات در حال حمل بین کارگاه‌ها
               </h4>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
-                {inTransitTransfers.length.toLocaleString('fa-IR')} محموله
+                {formatInt(inTransitTransfers.length)} محموله
               </span>
             </div>
 
@@ -488,7 +487,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     </div>
                     <div className="mt-1 text-[10px] text-slate-500 flex items-center justify-between">
                       <span>راننده: {t.driverName} ({t.truckPlate})</span>
-                      <span className="font-bold text-indigo-700">{(t.totalCost / 1_000_000).toLocaleString('fa-IR')} م.ت</span>
+                      <span className="font-bold text-indigo-700">{formatMoneyCompact(t.totalCost)}</span>
                     </div>
                   </div>
                 ))}

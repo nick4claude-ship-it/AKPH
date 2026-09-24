@@ -11,6 +11,12 @@ import {
   UserProfile,
 } from '../../../types';
 import { X, Building, Hammer, Plus, DollarSign, Calendar } from 'lucide-react';
+import { Dialog } from '../../common/Dialog';
+import { formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
+import { IntegerInput, MoneyInput } from '../../common/NumberInput';
+import { generateUUID, nextDocNumber } from '../../../utils/ids';
+import { getRelativePersianDate } from '../../../utils/date';
+import { useAppState } from '../../../store/AppStore';
 
 interface NewSubcontractorContractModalProps {
   isOpen: boolean;
@@ -27,17 +33,19 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
   currentUser,
   onSave,
 }) => {
-  const [projectId, setProjectId] = useState<string>(projects[0]?.id || 'prj-101');
+  const existingNumbers = useAppState().subcontractorContracts.map((c) => c.contractNumber);
+  const [projectId, setProjectId] = useState<string>(projects[0]?.id || '');
+  const [formError, setFormError] = useState<string | null>(null);
   const [subcontractorName, setSubcontractorName] = useState('');
   const [subcontractorPhone, setSubcontractorPhone] = useState('');
   const [tradeType, setTradeType] = useState<SubcontractorTradeType>('جوشکاری و اسکلت فلزی');
-  const [contractNumber, setContractNumber] = useState(`SUB-PRJ-${Date.now().toString().slice(-4)}`);
+  const [contractNumber, setContractNumber] = useState(() => nextDocNumber(existingNumbers, 'SUB'));
   const [title, setTitle] = useState('');
-  const [contractValue, setContractValue] = useState<number>(1_000_000_000);
+  const [contractValue, setContractValue] = useState<number>(0);
   const [unitRateDescription, setUnitRateDescription] = useState('نرخ واحد توافقی بر اساس فهرست مقادیر');
-  const [startDate, setStartDate] = useState('۱۴۰۳/۰۷/۰۱');
-  const [endDate, setEndDate] = useState('۱۴۰۴/۰۱/۳۱');
-  const [advancePaid, setAdvancePaid] = useState<number>(100_000_000);
+  const [startDate, setStartDate] = useState(() => getRelativePersianDate(0));
+  const [endDate, setEndDate] = useState(() => getRelativePersianDate(180));
+  const [advancePaid, setAdvancePaid] = useState<number>(0);
   const [retentionDepositRate, setRetentionDepositRate] = useState<number>(5);
   const [notes, setNotes] = useState('');
 
@@ -47,14 +55,20 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProject) return setFormError('پروژه را انتخاب کنید.');
+    if (!subcontractorName.trim()) return setFormError('نام پیمانکار را وارد کنید.');
+    if (contractValue <= 0) return setFormError('مبلغ قرارداد باید بیش از صفر باشد.');
+    if (advancePaid > contractValue) return setFormError('پیش‌پرداخت از مبلغ قرارداد بیشتر است.');
+    if (retentionDepositRate > 100) return setFormError('درصد سپرده نمی‌تواند بیش از ۱۰۰ باشد.');
+    if (!selectedProject.costCenterIds?.[0]) return setFormError('برای این پروژه مرکز هزینه تعریف نشده است.');
 
     const newContract: SubcontractorContract = {
-      id: `sub-cnt-${Date.now()}`,
+      id: generateUUID(),
       contractNumber,
       title: title || `عملیات ${tradeType} پروژه ${selectedProject.name}`,
       projectId: selectedProject.id,
       projectName: selectedProject.name,
-      costCenterId: selectedProject.costCenterIds?.[0] || 'cc-prj101-01',
+      costCenterId: selectedProject.costCenterIds[0],
       counterpartyId: 'cp-sub-01',
       subcontractorName,
       subcontractorPhone,
@@ -80,8 +94,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+    <Dialog onClose={onClose} label="انعقاد قرارداد پیمانکار جزء جدید" overlayClassName="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto" className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+      
         <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-amber-500/10">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950">
@@ -181,16 +195,15 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">سقف مبلغ کل قرارداد (تومان):</label>
-              <input
-                type="number"
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">سقف مبلغ کل قرارداد ({moneyUnitLabel()}):</label>
+              <MoneyInput
                 required
                 value={contractValue}
-                onChange={(e) => setContractValue(Number(e.target.value))}
+                onValueChange={(v) => setContractValue(v)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
               />
               <span className="text-[10px] text-slate-400 block mt-1">
-                {(contractValue / 1_000_000).toLocaleString('fa-IR')} میلیون تومان
+                {formatMoneyCompact(contractValue)}
               </span>
             </div>
           </div>
@@ -210,7 +223,7 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             <label className="text-xs font-bold text-slate-700 block mb-1.5">شرح نرخ پایه و بهای واحد توافقی:</label>
             <input
               type="text"
-              placeholder="مثال: کیلویی ۱۹,۰۰۰ تومان جوشکاری نفوذی یا متری ۴۵,۰۰۰ تومان قالب‌بندی"
+              placeholder="مثال: نرخ هر کیلو جوشکاری نفوذی یا هر متر قالب‌بندی طبق فهرست‌بها"
               value={unitRateDescription}
               onChange={(e) => setUnitRateDescription(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
@@ -240,11 +253,10 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">پیش‌پرداخت اولیه (تومان):</label>
-              <input
-                type="number"
+              <label className="text-xs font-bold text-slate-700 block mb-1.5">پیش‌پرداخت اولیه ({moneyUnitLabel()}):</label>
+              <MoneyInput
                 value={advancePaid}
-                onChange={(e) => setAdvancePaid(Number(e.target.value))}
+                onValueChange={(v) => setAdvancePaid(v)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
               />
             </div>
@@ -252,10 +264,9 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             <div>
               <label className="text-xs font-bold text-slate-700 block mb-1.5">درصد سپرده حسن انجام کار:</label>
               <div className="flex items-center gap-1">
-                <input
-                  type="number"
+                <MoneyInput
                   value={retentionDepositRate}
-                  onChange={(e) => setRetentionDepositRate(Number(e.target.value))}
+                  onValueChange={(v) => setRetentionDepositRate(v)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
                 />
                 <span className="text-xs text-slate-400">٪</span>
@@ -274,6 +285,11 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             />
           </div>
 
+          {formError && (
+            <p className="text-xs text-rose-700 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
             <button
               type="button"
@@ -290,7 +306,6 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

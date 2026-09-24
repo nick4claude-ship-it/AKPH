@@ -24,6 +24,8 @@ import {
   Building,
   Hammer,
 } from 'lucide-react';
+import { Dialog } from '../../common/Dialog';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
 
 interface SubcontractorStatementDetailModalProps {
   isOpen: boolean;
@@ -55,14 +57,18 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
     switch (status) {
       case 'submitted':
         return 0;
-      case 'site_review':
+      case 'measured':
         return 1;
-      case 'pm_approved':
+      case 'site_review':
         return 2;
-      case 'management_approved':
+      case 'pm_approved':
         return 3;
-      case 'paid':
+      case 'finance_approved':
+        return 4;
+      case 'management_approved':
         return 5;
+      case 'paid':
+        return 7;
       default:
         return 0;
     }
@@ -71,17 +77,18 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
   const currentStep = getWorkflowStepIndex(statement.status);
 
   const steps = [
-    { title: '۱. ثبت کار انجام‌شده', desc: 'پیمانکار جزء' },
-    { title: '۲. بررسی کارگاه', desc: 'سرپرست کارگاه' },
-    { title: '۳. تأیید مدیر پروژه', desc: 'مدیر پروژه' },
-    { title: '۴. تأیید مدیریت', desc: 'مدیرعامل / مالی' },
-    { title: '۵. پرداخت و تسویه', desc: 'امور مالی' },
-    { title: '۶. ثبت هزینه پروژه', desc: 'سند دوبل حسابداری' },
+    { title: '۱. کارکرد', desc: 'پیمانکار جزء' },
+    { title: '۲. اندازه‌گیری', desc: 'مدیر پروژه' },
+    { title: '۳. تأیید کارگاه', desc: 'مدیر پروژه' },
+    { title: '۴. تأیید مدیر پروژه', desc: 'مدیر پروژه' },
+    { title: '۵. تأیید مالی', desc: 'حسابدار' },
+    { title: '۶. تأیید مدیر ارشد', desc: 'ثبت بدهی و درخواست پرداخت' },
+    { title: '۷. پرداخت', desc: 'فقط در خزانه' },
   ];
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <Dialog onClose={onClose} label="جزئیات صورت‌وضعیت پیمانکار جزء" overlayClassName="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto" className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+      
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-amber-500/10">
           <div className="flex items-center gap-3">
@@ -197,28 +204,28 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                   <span className="text-slate-400 block text-[10px]">مبلغ ناخالص کارکرد:</span>
                   <span className="text-base font-black text-slate-900">
-                    {(statement.grossAmount / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    {formatMoneyCompact(statement.grossAmount)}
                   </span>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                   <span className="text-slate-400 block text-[10px]">مجموع کسورات:</span>
                   <span className="text-base font-black text-rose-700">
-                    {(statement.totalDeductions / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    {formatMoneyCompact(statement.totalDeductions)}
                   </span>
                 </div>
 
                 <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
                   <span className="text-amber-800 block text-[10px] font-bold">خالص قابل پرداخت:</span>
                   <span className="text-base font-black text-amber-950">
-                    {(statement.netPayable / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    {formatMoneyCompact(statement.netPayable)}
                   </span>
                 </div>
 
                 <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
                   <span className="text-emerald-800 block text-[10px] font-bold">مبلغ پرداخت‌شده:</span>
                   <span className="text-base font-black text-emerald-950">
-                    {(statement.paidAmount / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    {formatMoneyCompact(statement.paidAmount)}
                   </span>
                 </div>
               </div>
@@ -265,10 +272,10 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                             {item.cumulativeQuantity.toLocaleString('fa-IR')}
                           </td>
                           <td className="p-2.5 text-left text-slate-600">
-                            {item.unitRate.toLocaleString('fa-IR')}
+                            {formatMoney(item.unitRate, false)}
                           </td>
                           <td className="p-2.5 text-left font-black text-slate-900">
-                            {(item.currentAmount / 1_000_000).toLocaleString('fa-IR')} م.ت
+                            {formatMoneyCompact(item.currentAmount)}
                           </td>
                         </tr>
                       ))}
@@ -284,25 +291,25 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                   <div>
                     <span className="text-slate-400 text-[10px] block">سپرده حسن انجام کار:</span>
                     <strong className="text-slate-800">
-                      {(statement.deductions.retention / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(statement.deductions.retention)}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">استهلاک پیش‌پرداخت:</span>
                     <strong className="text-slate-800">
-                      {(statement.deductions.advancePaymentDeduction / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(statement.deductions.advancePaymentDeduction)}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">جریمه ایمنی یا پرت مصالح:</span>
                     <strong className="text-slate-800">
-                      {(statement.deductions.safetyOrWastePenalty / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(statement.deductions.safetyOrWastePenalty)}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">سایر کسورات:</span>
                     <strong className="text-slate-800">
-                      {(statement.deductions.otherDeductions / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(statement.deductions.otherDeductions)}
                     </strong>
                   </div>
                 </div>
@@ -348,7 +355,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
               <div className="space-y-2">
                 {statement.workflowHistory.map((log, index) => (
                   <div
-                    key={index}
+                    key={`${log.date}-${log.time}-${log.toStatus}-${index}`}
                     className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-start gap-3"
                   >
                     <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold">
@@ -413,8 +420,8 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                     <th className="p-2 border-l border-slate-300">شرح عملیات</th>
                     <th className="p-2 border-l border-slate-300 text-center">واحد</th>
                     <th className="p-2 border-l border-slate-300 text-center">مقدار</th>
-                    <th className="p-2 border-l border-slate-300 text-left">نرخ واحد (تومان)</th>
-                    <th className="p-2 text-left">مبلغ کل (تومان)</th>
+                    <th className="p-2 border-l border-slate-300 text-left">نرخ واحد ({moneyUnitLabel()})</th>
+                    <th className="p-2 text-left">مبلغ کل ({moneyUnitLabel()})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -427,28 +434,28 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                         {item.currentQuantity.toLocaleString('fa-IR')}
                       </td>
                       <td className="p-2 border-l border-slate-200 text-left">
-                        {item.unitRate.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitRate, false)}
                       </td>
-                      <td className="p-2 text-left font-bold">{item.currentAmount.toLocaleString('fa-IR')}</td>
+                      <td className="p-2 text-left font-bold">{formatMoney(item.currentAmount, false)}</td>
                     </tr>
                   ))}
                   <tr className="bg-slate-50 font-bold border-t border-slate-300">
                     <td colSpan={5} className="p-2 text-left border-l border-slate-300">
                       مبلغ ناخالص صورت‌وضعیت:
                     </td>
-                    <td className="p-2 text-left">{statement.grossAmount.toLocaleString('fa-IR')}</td>
+                    <td className="p-2 text-left">{formatMoney(statement.grossAmount, false)}</td>
                   </tr>
                   <tr className="bg-slate-50 border-t border-slate-200 text-rose-700">
                     <td colSpan={5} className="p-2 text-left border-l border-slate-300">
                       کسورات (حسن انجام کار، پیش‌پرداخت، جریمه):
                     </td>
-                    <td className="p-2 text-left">{statement.totalDeductions.toLocaleString('fa-IR')}</td>
+                    <td className="p-2 text-left">{formatMoney(statement.totalDeductions, false)}</td>
                   </tr>
                   <tr className="bg-amber-100 font-black border-t border-slate-300 text-amber-950">
                     <td colSpan={5} className="p-2 text-left border-l border-slate-300">
                       خالص قابل پرداخت به پیمانکار:
                     </td>
-                    <td className="p-2 text-left">{statement.netPayable.toLocaleString('fa-IR')} تومان</td>
+                    <td className="p-2 text-left">{formatMoney(statement.netPayable)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -504,7 +511,6 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

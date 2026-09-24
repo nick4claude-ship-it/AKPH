@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { PurchaseOrder, Project, POStatus } from '../../types';
+import { formatMoney } from '../../utils/money';
 
 interface PurchaseOrdersViewProps {
   orders: PurchaseOrder[];
@@ -184,7 +185,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                   </td>
 
                   <td className="py-3.5 px-4 text-left font-mono font-black text-slate-900">
-                    {order.totalOrderAmount.toLocaleString('fa-IR')} تومان
+                    {formatMoney(order.totalOrderAmount)}
                   </td>
 
                   <td className="py-3.5 px-4 text-center">

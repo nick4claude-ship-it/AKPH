@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Project, PendingApproval, ProgressStatement, PettyCash } from '../../types';
+import { Project, ApprovalItem, DetailedProgressStatement, PettyCashAccount } from '../../types';
 import { formatCurrencyCompact } from '../../utils/formatters';
 import { Search, Building2, FileText, UserCheck, Coins, Receipt, X, ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   projects: Project[];
-  approvals: PendingApproval[];
-  statements: ProgressStatement[];
-  pettyCashList: PettyCash[];
+  approvals: ApprovalItem[];
+  statements: DetailedProgressStatement[];
+  pettyFunds: PettyCashAccount[];
   onSelectProject: (p: Project) => void;
-  onSelectApproval: (a: PendingApproval) => void;
-  onSelectStatement: (s: ProgressStatement) => void;
+  onSelectApproval: (a: ApprovalItem) => void;
+  onSelectStatement: (s: DetailedProgressStatement) => void;
 }
 
 export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
@@ -21,7 +22,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   projects,
   approvals,
   statements,
-  pettyCashList,
+  pettyFunds,
   onSelectProject,
   onSelectApproval,
   onSelectStatement,
@@ -60,21 +61,21 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     (a) =>
       a.docNumber.toLowerCase().includes(q) ||
       a.projectName.toLowerCase().includes(q) ||
-      (a.counterparty || '').toLowerCase().includes(q) ||
-      (a.submitter || '').toLowerCase().includes(q) ||
-      a.expenseType.toLowerCase().includes(q)
+      (a.counterpartyName || '').toLowerCase().includes(q) ||
+      a.requester.toLowerCase().includes(q) ||
+      a.moduleLabel.toLowerCase().includes(q)
   );
 
   // Matched Progress Statements
   const matchedStatements = statements.filter(
     (s) =>
-      s.number.toLowerCase().includes(q) ||
+      s.statementNumber.toLowerCase().includes(q) ||
       s.projectName.toLowerCase().includes(q) ||
       (s.client || '').toLowerCase().includes(q)
   );
 
   // Matched Petty Cash
-  const matchedPettyCash = pettyCashList.filter(
+  const matchedPettyCash = pettyFunds.filter(
     (pc) =>
       pc.holderName.toLowerCase().includes(q) ||
       pc.projectName.toLowerCase().includes(q) ||
@@ -88,8 +89,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     matchedPettyCash.length;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-20">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+    <Dialog onClose={onClose} label="جستجوی سراسری" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-20" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+      
         {/* Search Input Bar */}
         <div className="p-4 border-b border-slate-200 flex items-center gap-3 bg-slate-50/60">
           <Search className="w-5 h-5 text-amber-500 shrink-0" />
@@ -241,16 +242,16 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                               <div className="font-bold text-slate-900 flex items-center gap-1.5">
                                 <span className="font-mono text-amber-700">{a.docNumber}</span>
                                 <span>-</span>
-                                <span>{a.expenseType}</span>
+                                <span>{a.moduleLabel}</span>
                               </div>
                               <div className="text-[11px] text-slate-500">
-                                {a.projectName} · فروشنده: {a.counterparty}
+                                {a.projectName} · طرف حساب: {a.counterpartyName || '-'}
                               </div>
                             </div>
                           </div>
                           <div className="text-left font-mono tabular-nums">
                             <div className="font-bold text-slate-900">{formatCurrencyCompact(a.amount)}</div>
-                            <div className="text-[10px] text-amber-600">{a.status}</div>
+                            <div className="text-[10px] text-amber-600">{a.stage}</div>
                           </div>
                         </div>
                       ))}
@@ -278,12 +279,12 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                               <FileText className="w-3.5 h-3.5" />
                             </div>
                             <div>
-                              <div className="font-bold text-slate-900">{s.number}</div>
+                              <div className="font-bold text-slate-900">{s.statementNumber}</div>
                               <div className="text-[11px] text-slate-500">{s.projectName}</div>
                             </div>
                           </div>
                           <div className="text-left font-mono tabular-nums">
-                            <div className="font-bold text-emerald-700">{formatCurrencyCompact(s.approvedAmount)}</div>
+                            <div className="font-bold text-emerald-700">{formatCurrencyCompact(s.approvedNetPayable ?? s.netPayable)}</div>
                             <div className="text-[10px] text-slate-500">{s.status}</div>
                           </div>
                         </div>
@@ -302,7 +303,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           </div>
           <span className="font-mono text-slate-400">Ctrl + K</span>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

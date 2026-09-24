@@ -15,6 +15,7 @@ import {
   Building,
   CheckCircle2,
 } from 'lucide-react';
+import { formatMoneyCompact } from '../../utils/money';
 
 interface WarehousesListViewProps {
   warehouses: Warehouse[];
@@ -110,7 +111,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
               <div className="bg-slate-50 p-2.5 rounded-xl text-center">
                 <span className="text-[10px] text-slate-400 block">ارزش کل موجودی</span>
                 <span className="font-bold text-indigo-700 font-mono">
-                  {(wh.totalValuation / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
+                  {formatMoneyCompact(wh.totalValuation)}
                 </span>
               </div>
             </div>

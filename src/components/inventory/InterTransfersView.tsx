@@ -21,6 +21,7 @@ import {
   FileText,
   Building,
 } from 'lucide-react';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface InterTransfersViewProps {
   transfers: InterWarehouseTransfer[];
@@ -183,13 +184,13 @@ export const InterTransfersView: React.FC<InterTransfersViewProps> = ({
                   <tr className="border-b border-slate-100 text-slate-400 text-[11px]">
                     <th className="pb-1.5 font-medium">کد و نام متریال</th>
                     <th className="pb-1.5 font-medium">مقدار جابجایی</th>
-                    <th className="pb-1.5 font-medium text-left">نرخ واحد (تومان)</th>
-                    <th className="pb-1.5 font-medium text-left">ارزش محموله (تومان)</th>
+                    <th className="pb-1.5 font-medium text-left">نرخ واحد ({moneyUnitLabel()})</th>
+                    <th className="pb-1.5 font-medium text-left">ارزش محموله ({moneyUnitLabel()})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {t.items.map((item, idx) => (
-                    <tr key={idx}>
+                    <tr key={`${item.materialId}-${idx}`}>
                       <td className="py-2">
                         <span className="font-bold text-slate-800 block">{item.materialName}</span>
                         <span className="text-[10px] text-slate-400 font-mono">{item.materialCode}</span>
@@ -198,10 +199,10 @@ export const InterTransfersView: React.FC<InterTransfersViewProps> = ({
                         {item.quantity.toLocaleString('fa-IR')} {item.unit}
                       </td>
                       <td className="py-2 text-left font-mono text-slate-600">
-                        {item.unitCost.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitCost, false)}
                       </td>
                       <td className="py-2 text-left font-mono font-bold text-slate-900">
-                        {item.totalCost.toLocaleString('fa-IR')}
+                        {formatMoney(item.totalCost, false)}
                       </td>
                     </tr>
                   ))}
@@ -214,7 +215,7 @@ export const InterTransfersView: React.FC<InterTransfersViewProps> = ({
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-600 font-medium">ارزش کل انتقال:</span>
                 <span className="font-black text-indigo-700 font-mono text-sm">
-                  {t.totalCost.toLocaleString('fa-IR')} تومان
+                  {formatMoney(t.totalCost)}
                 </span>
               </div>
             </div>

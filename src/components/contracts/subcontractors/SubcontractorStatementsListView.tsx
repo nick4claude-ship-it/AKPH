@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   CheckSquare,
 } from 'lucide-react';
+import { formatMoneyCompact } from '../../../utils/money';
 
 interface SubcontractorStatementsListViewProps {
   statements: SubcontractorProgressStatement[];
@@ -93,11 +94,25 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
             ثبت اولیه پیمانکار
           </span>
         );
+      case 'measured':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
+            <Clock className="w-3 h-3 text-sky-700" />
+            اندازه‌گیری شد
+          </span>
+        );
+      case 'finance_approved':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-100 text-teal-900 border border-teal-300">
+            <CheckSquare className="w-3 h-3 text-teal-700" />
+            تأیید مالی (منتظر مدیر ارشد)
+          </span>
+        );
       case 'site_review':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
             <Clock className="w-3 h-3 text-amber-700" />
-            در حال بررسی کارگاه
+            تأیید کارگاه
           </span>
         );
       case 'pm_approved':
@@ -111,7 +126,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
             <ShieldCheck className="w-3 h-3 text-purple-700" />
-            تأیید مدیریت (آماده پرداخت)
+            تأیید مدیر ارشد (بدهی ثبت شد)
           </span>
         );
       case 'paid':
@@ -170,15 +185,14 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">ناخالص کارکرد اعلامی</span>
           <span className="text-base font-black text-slate-900">
-            {(totalGross / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalGross)}
           </span>
-          <span className="text-[10px] text-slate-400 block mt-0.5">میلیون تومان</span>
-        </div>
+                  </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">تأییدشده متره کارگاه</span>
           <span className="text-base font-black text-blue-700">
-            {(totalSiteVerified / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalSiteVerified)}
           </span>
           <span className="text-[10px] text-blue-600 block mt-0.5">
             {totalGross > 0 ? Number(((totalSiteVerified / totalGross) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ پذیرش
@@ -188,23 +202,21 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">کسورات (سپرده/پیش‌پرداخت)</span>
           <span className="text-base font-black text-amber-700">
-            {(totalDeductions / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalDeductions)}
           </span>
-          <span className="text-[10px] text-amber-600 block mt-0.5">میلیون تومان</span>
-        </div>
+                  </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">خالص مصوب قابل پرداخت</span>
           <span className="text-base font-black text-purple-700">
-            {(totalNet / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalNet)}
           </span>
-          <span className="text-[10px] text-purple-600 block mt-0.5">میلیون تومان</span>
-        </div>
+                  </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">مبالغ پرداخت‌شده قطعی</span>
           <span className="text-base font-black text-emerald-700">
-            {(totalPaid / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalPaid)}
           </span>
           <span className="text-[10px] text-emerald-600 block mt-0.5 font-bold">
             {totalNet > 0 ? Number(((totalPaid / totalNet) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ تسویه
@@ -214,7 +226,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
         <div className="bg-rose-50/60 p-3.5 rounded-xl border border-rose-200 shadow-2xs">
           <span className="text-[11px] text-rose-800 font-bold block mb-1">مانده بدهی پرداختنی</span>
           <span className="text-base font-black text-rose-700">
-            {(totalRemaining / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalRemaining)}
           </span>
           <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">تعهد فوری AKPH</span>
         </div>
@@ -340,28 +352,27 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
                     </td>
 
                     <td className="p-3.5 text-left font-black text-slate-800">
-                      {(stmt.grossAmount / 1_000_000).toLocaleString('fa-IR')}
-                      <span className="text-[9px] text-slate-400 block font-normal">تومان</span>
+                      {formatMoneyCompact(stmt.grossAmount)}
                     </td>
 
                     <td className="p-3.5 text-left font-bold text-blue-700">
-                      {(stmt.siteVerifiedAmount / 1_000_000).toLocaleString('fa-IR')}
+                      {formatMoneyCompact(stmt.siteVerifiedAmount)}
                       <span className="text-[9px] text-blue-500 block font-normal">
-                        کسورات: {(stmt.totalDeductions / 1_000_000).toLocaleString('fa-IR')}
+                        کسورات: {formatMoneyCompact(stmt.totalDeductions)}
                       </span>
                     </td>
 
                     <td className="p-3.5 text-left font-black text-purple-700">
-                      {(stmt.netPayable / 1_000_000).toLocaleString('fa-IR')}
+                      {formatMoneyCompact(stmt.netPayable)}
                       {stmt.remainingPayable > 0 && (
                         <span className="text-[9px] text-rose-600 block font-bold">
-                          مانده: {(stmt.remainingPayable / 1_000_000).toLocaleString('fa-IR')}
+                          مانده: {formatMoneyCompact(stmt.remainingPayable)}
                         </span>
                       )}
                     </td>
 
                     <td className="p-3.5 text-left font-bold text-emerald-700">
-                      {(stmt.paidAmount / 1_000_000).toLocaleString('fa-IR')}
+                      {formatMoneyCompact(stmt.paidAmount)}
                       {stmt.paymentMethod && (
                         <span className="text-[9px] text-slate-400 block font-normal">
                           {stmt.paymentMethod}

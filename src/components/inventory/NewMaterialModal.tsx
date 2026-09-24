@@ -10,6 +10,11 @@ import {
   UserProfile,
 } from '../../types';
 import { X, Package, Plus } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
+import { moneyUnitLabel } from '../../utils/money';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { useAppState } from '../../store/AppStore';
 
 interface NewMaterialModalProps {
   isOpen: boolean;
@@ -35,28 +40,27 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
   currentUser,
   onSubmitMaterial,
 }) => {
-  if (!isOpen) return null;
-
+  const existingCodes = useAppState().materials.map((m) => m.code);
   const [name, setName] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [category, setCategory] = useState<MaterialCategory>('آهن‌آلات و میلگرد');
   const [unit, setUnit] = useState('کیلوگرم');
   const [specifications, setSpecifications] = useState('');
   const [standardGrade, setStandardGrade] = useState('');
-  const [reorderLevel, setReorderLevel] = useState<number>(1000);
-  const [minSafetyStock, setMinSafetyStock] = useState<number>(500);
-  const [maxCapacity, setMaxCapacity] = useState<number>(5000);
-  const [initialStock, setInitialStock] = useState<number>(1200);
-  const [averageUnitPrice, setAverageUnitPrice] = useState<number>(30000);
+  const [reorderLevel, setReorderLevel] = useState<number>(0);
+  const [minSafetyStock, setMinSafetyStock] = useState<number>(0);
+  const [maxCapacity, setMaxCapacity] = useState<number>(0);
   const [storageLocationBin, setStorageLocationBin] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim()) return setFormError('نام کالا را وارد کنید.');
+    if (minSafetyStock > reorderLevel && reorderLevel > 0) return setFormError('حداقل موجودی ایمن نباید از نقطه سفارش بیشتر باشد.');
 
-    const randomCode = Math.floor(100 + Math.random() * 900);
+    // Stock and its cost enter only through goods receipts (so the ledger and the kardex agree).
     const newMat: MaterialItem = {
-      id: `mat-${Date.now()}`,
-      code: `MAT-${category.substring(0, 3)}-${randomCode}`,
+      id: generateUUID(),
+      code: nextDocNumber(existingCodes, 'MAT'),
       name: name.trim(),
       category,
       unit,
@@ -65,9 +69,9 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
       reorderLevel,
       minSafetyStock,
       maxCapacity,
-      currentStock: initialStock,
-      averageUnitPrice,
-      totalStockValue: initialStock * averageUnitPrice,
+      currentStock: 0,
+      averageUnitPrice: 0,
+      totalStockValue: 0,
       requiresInspection: true,
       storageLocationBin: storageLocationBin.trim() || 'انبار سرپوشیده',
     };
@@ -77,8 +81,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+    <Dialog onClose={onClose} label="تعریف کدینگ متریال و مصالح جدید در انبار" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+      
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -185,45 +189,31 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <label className="text-[10px] text-slate-500 block mb-1">نقطه سفارش مجدد</label>
-                <input
-                  type="number"
+                <IntegerInput
                   value={reorderLevel}
-                  onChange={(e) => setReorderLevel(Number(e.target.value))}
+                  onValueChange={(v) => setReorderLevel(v)}
                   className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center"
                 />
               </div>
 
               <div>
                 <label className="text-[10px] text-slate-500 block mb-1">حداقل موجودی ایمن</label>
-                <input
-                  type="number"
+                <IntegerInput
                   value={minSafetyStock}
-                  onChange={(e) => setMinSafetyStock(Number(e.target.value))}
+                  onValueChange={(v) => setMinSafetyStock(v)}
                   className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center text-rose-600"
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] text-slate-500 block mb-1">موجودی اولیه دپو</label>
-                <input
-                  type="number"
-                  value={initialStock}
-                  onChange={(e) => setInitialStock(Number(e.target.value))}
-                  className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-slate-500 block mb-1">نرخ میانگین واحد (تومان)</label>
-                <input
-                  type="number"
-                  value={averageUnitPrice}
-                  onChange={(e) => setAverageUnitPrice(Number(e.target.value))}
-                  className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center font-bold"
-                />
-              </div>
+              <p className="col-span-full text-[10px] text-slate-500">موجودی و بهای کالا فقط از طریق رسید انبار (از سفارش خرید) وارد می‌شود.</p>
             </div>
           </div>
+
+          {formError && (
+            <p className="text-xs text-rose-700 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
 
           {/* Footer */}
           <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
@@ -244,7 +234,6 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

@@ -26,44 +26,45 @@ import {
   Building2,
   X,
 } from 'lucide-react';
-import { Project, UserProfile } from '../../types';
-import {
-  Employee,
-  MonthlyTimesheet,
-  PayrollSlip,
-  mockEmployees,
-  mockTimesheets,
-  mockPayrollSlips,
-} from '../../data/hrPayrollMockData';
+import { Project, UserProfile, PayrollSlip } from '../../types';
+import { useAppState } from '../../store/AppStore';
+import { usePermission } from '../../store/session';
+import { Dialog } from '../common/Dialog';
+import { useWorkflows } from '../../store/useWorkflows';
+import { useNavigate } from 'react-router-dom';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface PayrollModuleProps {
   projects: Project[];
   currentUser: UserProfile;
-  onAddJournalEntry?: (entry: any) => void;
-  onAddPaymentRequest?: (request: any) => void;
+  onToast: (msg: string) => void;
 }
 
 export const PayrollModule: React.FC<PayrollModuleProps> = ({
   projects,
   currentUser,
-  onAddJournalEntry,
-  onAddPaymentRequest,
+  onToast,
 }) => {
+  const wf = useWorkflows();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'payroll_slips' | 'employees' | 'timesheets'>('payroll_slips');
 
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
-  const [timesheets, setTimesheets] = useState<MonthlyTimesheet[]>(mockTimesheets);
-  const [slips, setSlips] = useState<PayrollSlip[]>(mockPayrollSlips);
+  const { can } = usePermission();
+  const { employees, timesheets, payrollSlips } = useAppState();
+  // Periods come from the slips; the latest one is shown first.
+  const periods = [...new Set(payrollSlips.map((s) => s.monthYear))].sort();
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>('۱۴۰۳/۰۶');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => periods[periods.length - 1] ?? '');
+  const slips = payrollSlips.filter((s) => s.monthYear === selectedMonth);
+  const hasCalculated = slips.some((s) => s.status === 'محاسبه شده');
+  const canApprove = can('payroll.approve');
 
   // Modal State for Slip View & Print
   const [selectedSlipForModal, setSelectedSlipForModal] = useState<PayrollSlip | null>(null);
-  const [isAccountingCreated, setIsAccountingCreated] = useState<boolean>(true);
   const [notification, setNotification] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
   const showNotification = (text: string, type: 'success' | 'info' = 'success') => {
@@ -79,36 +80,16 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   const totalIncomeTax = slips.reduce((acc, s) => acc + s.incomeTaxDeduction, 0);
   const totalCompanyLaborCost = slips.reduce((acc, s) => acc + s.totalCostForCompany, 0);
 
-  // Trigger Accounting Entry for Payroll
+  // Financial approval of the month's calculated slips posts one payroll entry
+  // (Dr salary cost per cost center / Cr salaries, insurance, tax, loans) and queues the net pay in treasury.
   const handleGenerateAccountingEntry = () => {
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        title: `سند شناسایی حقوق و دستمزد و بیمه شهریورماه ۱۴۰۳`,
-        amount: totalCompanyLaborCost,
-        type: 'حقوق و دستمزد',
-        description: `ثبت هزینه حقوق، بیمه سهم کارفرما ۲۳٪، بیمه سهم کارگر ۷٪ و مالیات حقوق به تفکیک مراکز هزینه کارگاهی و ستادی`,
-      });
-      showNotification('سند حسابداری حقوق و دستمزد با تفکیک هزینه‌های مستقیم پروژه و سربار صادر گردید.');
-    }
+    const result = wf.approvePayrollPeriod(selectedMonth);
+    showNotification(result.message, result.ok ? 'success' : 'info');
+    onToast(result.message);
   };
 
-  // Trigger Payment Request in Treasury
-  const handleGeneratePaymentBatch = () => {
-    if (onAddPaymentRequest) {
-      onAddPaymentRequest({
-        sourceType: 'حقوق و دستمزد ماهانه',
-        sourceRefId: 'BATCH-PAY-140306',
-        sourceRefNumber: 'لیست حقوق واریزی شهریور ۱۴۰۳',
-        projectId: 'prj-101',
-        projectName: 'ستاد مرکزی و دفتر راهبری',
-        costCenterId: 'cc-hq',
-        counterpartyId: 'cp-bnk-01',
-        beneficiaryName: 'بانک عامل - فایل پایا واریز گروهی پرسنل',
-        totalAmount: totalNetPayable,
-      });
-      showNotification('دستور پرداخت گروهی خالص حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.');
-    }
-  };
+  // Net pay is paid only in treasury, from the request created on approval.
+  const handleGeneratePaymentBatch = () => navigate('/finance/payments');
 
   const filteredSlips = slips.filter((s) => {
     if (selectedProjectId !== 'all' && s.projectId !== selectedProjectId) return false;
@@ -167,19 +148,35 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {periods.length > 1 && (
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              aria-label="دوره حقوق"
+              className="px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-mono"
+            >
+              {periods.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             onClick={handleGenerateAccountingEntry}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
+            disabled={!canApprove || !hasCalculated}
+            title={!canApprove ? 'مجوز تأیید حقوق را ندارید.' : !hasCalculated ? 'فیش محاسبه‌شده‌ای در انتظار تأیید نیست.' : ''}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-40"
           >
             <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>صدور سند حسابداری حقوق</span>
+            <span>تأیید مالی حقوق و صدور سند</span>
           </button>
           <button
             onClick={handleGeneratePaymentBatch}
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
           >
             <CreditCard className="w-3.5 h-3.5" />
-            <span>ارسال دستور پرداخت به خزانه</span>
+            <span>مشاهده درخواست پرداخت در خزانه</span>
           </button>
         </div>
       </div>
@@ -189,8 +186,8 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">بهای تمام‌شده نیروی انسانی دوره</span>
           <div className="text-lg font-bold text-slate-900 font-mono">
-            {formatNumber(totalCompanyLaborCost)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalCompanyLaborCost, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium">ناخالص حقوق + ۲۳٪ سهم کارفرما</span>
         </div>
@@ -198,8 +195,8 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">خالص پرداختی به پرسنل (Net Pay)</span>
           <div className="text-lg font-bold text-emerald-700 font-mono">
-            {formatNumber(totalNetPayable)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalNetPayable, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-emerald-600 font-medium">واریز به حساب‌های بانکی</span>
         </div>
@@ -207,8 +204,8 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">حق بیمه ۳۰٪ تأمین اجتماعی</span>
           <div className="text-lg font-bold text-blue-700 font-mono">
-            {formatNumber(totalWorkerInsurance + totalEmployerInsurance)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalWorkerInsurance + totalEmployerInsurance, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-blue-600 font-medium">سهم کارگر ۷٪ + سهم شرکت ۲۳٪</span>
         </div>
@@ -216,8 +213,8 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">مالیات تکلیفی حقوق (ماده ۸۴)</span>
           <div className="text-lg font-bold text-rose-700 font-mono">
-            {formatNumber(totalIncomeTax)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalIncomeTax, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-rose-600 font-medium">قابل واریز به دارایی تا پایان ماه بعد</span>
         </div>
@@ -340,16 +337,16 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
                         <span className="text-[10px] text-slate-400 font-mono">{slip.costCenterId}</span>
                       </td>
                       <td className="py-3 px-3 text-left font-mono font-medium text-slate-700">
-                        {formatNumber(slip.grossTotalSalary)}
+                        {formatMoney(slip.grossTotalSalary, false)}
                       </td>
                       <td className="py-3 px-3 text-left font-mono text-blue-700">
-                        {formatNumber(slip.workerInsuranceDeduction)}
+                        {formatMoney(slip.workerInsuranceDeduction, false)}
                       </td>
                       <td className="py-3 px-3 text-left font-mono text-rose-700">
-                        {formatNumber(slip.incomeTaxDeduction)}
+                        {formatMoney(slip.incomeTaxDeduction, false)}
                       </td>
                       <td className="py-3 px-3 text-left font-mono font-bold text-emerald-800">
-                        {formatNumber(slip.netPayableSalary)}
+                        {formatMoney(slip.netPayableSalary, false)}
                       </td>
                       <td className="py-3 px-3">
                         <span
@@ -419,7 +416,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400">حقوق پایه حکمی:</span>
-                <strong className="font-mono text-slate-900">{formatNumber(emp.baseSalary)} تومان</strong>
+                <strong className="font-mono text-slate-900">{formatMoney(emp.baseSalary)}</strong>
               </div>
             </div>
           ))}
@@ -478,8 +475,12 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
 
       {/* Modal: Payroll Slip Detailed Print Preview */}
       {selectedSlipForModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog
+          onClose={() => setSelectedSlipForModal(null)}
+          label={`فیش حقوق ${selectedSlipForModal.employeeName}`}
+          overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150"
+        >
             {/* Header of Slip */}
             <div className="flex items-center justify-between pb-4 border-b-2 border-slate-900 mb-4">
               <div>
@@ -489,6 +490,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
               </div>
               <button
                 onClick={() => setSelectedSlipForModal(null)}
+                aria-label="بستن"
                 className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
               >
                 ✕
@@ -529,36 +531,36 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <div className="bg-emerald-50 px-3 py-2 border-b border-emerald-100 font-bold text-emerald-900 flex justify-between">
                   <span>مزایا و درآمدها</span>
-                  <span>مبلغ (تومان)</span>
+                  <span>مبلغ ({moneyUnitLabel()})</span>
                 </div>
                 <div className="p-3 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-slate-600">حقوق پایه ماهانه:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.baseSalaryGross)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.baseSalaryGross, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">حق مسکن:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.housingAllowance)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.housingAllowance, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">بن خواروبار:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.foodAllowance)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.foodAllowance, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">حق اولاد:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.childAllowance)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.childAllowance, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">حق تخصص کارگاهی:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.specialSkillAllowance)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.specialSkillAllowance, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">اضافه کاری:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.overtimePay)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.overtimePay, false)}</span>
                   </div>
                   <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
                     <span>جمع ناخالص مزایا:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.grossTotalSalary)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.grossTotalSalary, false)}</span>
                   </div>
                 </div>
               </div>
@@ -567,24 +569,24 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <div className="bg-rose-50 px-3 py-2 border-b border-rose-100 font-bold text-rose-900 flex justify-between">
                   <span>کسورات قانونی و وام</span>
-                  <span>مبلغ (تومان)</span>
+                  <span>مبلغ ({moneyUnitLabel()})</span>
                 </div>
                 <div className="p-3 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-slate-600">بیمه سهم کارگر (۷٪):</span>
-                    <span className="font-mono text-rose-700">{formatNumber(selectedSlipForModal.workerInsuranceDeduction)}</span>
+                    <span className="font-mono text-rose-700">{formatMoney(selectedSlipForModal.workerInsuranceDeduction, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">مالیات بر حقوق:</span>
-                    <span className="font-mono text-rose-700">{formatNumber(selectedSlipForModal.incomeTaxDeduction)}</span>
+                    <span className="font-mono text-rose-700">{formatMoney(selectedSlipForModal.incomeTaxDeduction, false)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">مساعده / اقساط وام:</span>
-                    <span className="font-mono">{formatNumber(selectedSlipForModal.loanDeduction)}</span>
+                    <span className="font-mono">{formatMoney(selectedSlipForModal.loanDeduction, false)}</span>
                   </div>
                   <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
                     <span>جمع کسورات:</span>
-                    <span className="font-mono text-rose-700">{formatNumber(selectedSlipForModal.totalDeductions)}</span>
+                    <span className="font-mono text-rose-700">{formatMoney(selectedSlipForModal.totalDeductions, false)}</span>
                   </div>
                 </div>
               </div>
@@ -594,7 +596,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
             <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between mb-4">
               <span className="text-xs font-bold">خالص پرداختی به حساب پرسنل:</span>
               <span className="text-base font-bold font-mono text-amber-400">
-                {formatNumber(selectedSlipForModal.netPayableSalary)} تومان
+                {formatMoney(selectedSlipForModal.netPayableSalary)}
               </span>
             </div>
 
@@ -619,8 +621,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -71,95 +71,71 @@ export interface KpiItem {
   previousValue: number;
   changePercent: number;
   isPositiveGood: boolean;
-  unit: string;
+  /** 'money' values are Rials (formatted in the display currency); 'درصد' values are percentages. */
+  unit: 'money' | 'درصد';
   icon: string;
   description: string;
   changePeriod?: string;
   color?: string;
 }
 
-export type PettyCashStatus = 'normal' | 'warning' | 'critical';
+// ==================== APPROVAL CENTER ====================
 
-export interface PettyCash {
-  id: string;
-  code: string;
-  holderName: string; // مسئول تنخواه
-  projectName: string;
-  projectId: string;
-  actualBalance: number; // موجودی واقعی در حساب
-  pendingExpenses: number; // هزینه‌های در انتظار تأیید
-  usableBalance: number; // موجودی قابل مصرف
-  ceilingLimit: number; // سقف تنخواه
-  lastTransactionDate: string;
-  lastTransactionDesc: string;
-  status: PettyCashStatus;
-  bankAccount: string;
-}
+/** Owner modules whose records can wait in the approval center. The record stays in its module. */
+export type ApprovalModule =
+  | 'client_statement'
+  | 'subcontractor_statement'
+  | 'petty_cash_expense'
+  | 'vendor_invoice'
+  | 'purchase_requisition'
+  | 'payment_request'
+  | 'payroll'
+  | 'journal_entry';
 
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-export type ExpenseCategory = 
-  | 'مصالح'
-  | 'نیروی انسانی'
-  | 'ماشین‌آلات'
-  | 'حمل‌ونقل'
-  | 'پیمانکاران جزء'
-  | 'خرید'
-  | 'اداری'
-  | 'بیمه'
-  | 'مالیات'
-  | 'سایر';
-
-export interface PendingApproval {
-  id: string;
-  docNumber: string; // شماره سند
+/** A pending approval, gathered by a selector from the owning module's records. */
+export interface ApprovalItem {
+  id: string; // `${module}:${recordId}`
+  module: ApprovalModule;
+  moduleLabel: string;
+  recordId: string;
+  docNumber: string;
+  title: string;
+  amount: number;
+  requester: string;
   projectId: string;
   projectName: string;
-  costCenterId: string; // شناسه مرکز هزینه
-  costCenter?: string; // مرکز هزینه برای سازگاری
-  submitter?: string; // ثبت‌کننده
-  counterpartyId?: string; // طرف‌حساب مرتبط
-  expenseType: string; // نوع هزینه (فاکتور تنخواه، خرید مستقیم، صورت‌وضعیت پیمانکار جزء...)
-  category: ExpenseCategory;
-  costClassification: 'مستقیم پروژه' | 'سربار و ستادی';
-  amount: number; // کل مبلغ هزینه
-  paymentAmount: number; // پرداخت شده
-  pendingLiability: number; // مانده بدهی
+  costCenterName?: string;
+  counterpartyName?: string;
   date: string;
-  status: ApprovalStatus;
-  attachmentName: string;
-  counterparty?: string; // طرف حساب / فروشنده
-  notes?: string;
+  /** Step that is waiting now, e.g. «تأیید مدیر پروژه». */
+  stage: string;
+  /** Role expected to act on this step. */
+  approverRole: string;
+  /** Permission the approver needs; checked with the record's project and creator. */
+  action: import('../utils/permissions').UserAction;
+  /** Separation-of-duties facts (creator, previous approver, project) for the permission check. */
+  context: import('../utils/permissions').ActionContext;
+  classification: 'مستقیم پروژه' | 'سربار و ستادی' | 'مالی';
+  documentCount: number;
 }
 
-export type StatementStatus = 
-  | 'در انتظار بررسی کارفرما'
-  | 'تأیید اولیه نظارت'
-  | 'تأیید نهایی کارفرما'
-  | 'تسویه شده'
-  | 'معوق';
-
-export interface ProgressStatement {
-  id: string;
-  number: string; // شماره صورت‌وضعیت
-  projectId: string;
-  projectName: string;
-  costCenterId: string; // شناسه مرکز هزینه
-  counterpartyId: string; // شناسه طرف‌حساب (کارفرما)
-  client?: string; // اختیاری برای سازگاری نمایش
-  submittedAmount: number; // مبلغ ارسالی پیمانکار
-  approvedAmount: number; // مبلغ تأییدشده کارفرما
-  receivedAmount: number; // مبلغ دریافتی (Receipt)
-  receivables: number; // مانده مطالبات (Approved - Received)
-  overdueAmount: number; // مبلغ معوق (سررسید گذشته)
-  submissionDate: string;
-  dueDate: string;
-  status: StatementStatus;
-}
+// ==================== NOTIFICATION CENTER ====================
 
 export type AlertPriority = 'critical' | 'warning' | 'info';
 
+export type NotificationKind =
+  | 'low_stock'
+  | 'low_petty_cash'
+  | 'contract_ending'
+  | 'overdue_receivable'
+  | 'payable_due'
+  | 'approval_required'
+  | 'missing_document';
+
+/** Notifications are computed from store data; only dismissals are stored. */
 export interface ManagementAlert {
   id: string;
+  kind: NotificationKind;
   title: string;
   description: string;
   priority: AlertPriority;
@@ -167,15 +143,22 @@ export interface ManagementAlert {
   relatedProjectId?: string;
   relatedProjectName?: string;
   actionLabel?: string;
-  actionType?: string;
+  /** Route to open for acting on the notification. */
+  actionPath?: string;
+  amount?: number;
 }
+
+/** Roles of the paydar-portal WordPress plugin (the only roles the portal knows). */
+export type PortalRole = 'مدیر سیستم' | 'مدیر ارشد' | 'مدیر پروژه' | 'حسابدار';
 
 export interface UserProfile {
   id: string;
   name: string;
-  role: 'مدیرعامل' | 'مدیر مالی' | 'حسابدار ارشد' | 'مدیر پروژه' | 'سرپرست کارگاه' | 'حسابرس و ناظر';
+  role: PortalRole;
   email: string;
   avatar: string;
+  /** Projects a «مدیر پروژه» manages; other roles see every project. */
+  projectIds?: string[];
 }
 
 export type User = UserProfile;
@@ -254,14 +237,21 @@ export interface JournalEntry {
   costCenterId?: string;
   costCenterName?: string;
   submitter: string; // ثبت‌کننده
+  submitterId?: string;
+  approvedById?: string;
   status: JournalEntryStatus;
   rows: JournalEntryRow[];
   totalDebit: number;
   totalCredit: number;
   isBalanced: boolean;
   attachments?: string[];
-  reversedFromDocId?: string; // در صورت برگشت/معکوس
+  /** On a reversal entry: the entry it cancels. The original entry itself is never modified. */
+  reversedFromDocId?: string;
+  reversedFromDocNumber?: string;
+  /** @deprecated legacy seed field; reversal state is derived from reversedFromDocId. */
   reversalDocId?: string;
+  /** Server concurrency token (WordPress); sent back as If-Match with every command on this entry. */
+  version?: number;
   history: {
     date: string;
     time: string;
@@ -342,6 +332,10 @@ export interface CashDesk {
   balance: number;
   location: string;
   lastCountDate: string;
+  projectId?: string;
+  projectName?: string;
+  ceilingLimit?: number;
+  lastAuditDate?: string;
 }
 
 export interface ReceiptRecord {
@@ -361,6 +355,11 @@ export interface ReceiptRecord {
   description: string;
   journalEntryId?: string;
   status: 'وصول شده' | 'در جریان وصول' | 'برگشت خورده';
+  /** Receipt source per the payments & receipts layer. */
+  sourceType?: 'صورت‌وضعیت کارفرما' | 'پیش‌پرداخت' | 'سایر درآمدها';
+  statementId?: string;
+  contractId?: string;
+  bankAccountId?: string;
 }
 
 export interface PaymentRecord {
@@ -446,6 +445,38 @@ export interface AuditLog {
 
 export type PettyCashAccountStatus = 'active' | 'suspended' | 'closed';
 
+/** Each project may hold several funds, one per holder role. */
+export type PettyCashFundType = 'project_manager' | 'site_supervisor' | 'procurement' | 'headquarters';
+
+export const PETTY_CASH_FUND_LABELS: Record<PettyCashFundType, string> = {
+  project_manager: 'تنخواه مدیر پروژه',
+  site_supervisor: 'تنخواه سرپرست کارگاه',
+  procurement: 'تنخواه خرید',
+  headquarters: 'تنخواه ستاد',
+};
+
+export type PettyCashApprovalLevel = 'site_manager_and_finance' | 'project_and_finance' | 'ceo_full';
+
+/** Company-wide finance settings (read from the data source, editable in Settings). */
+export interface FinanceSettings {
+  /** نرخ مالیات بر ارزش افزوده به درصد (مثلاً ۱۰). */
+  vatRatePercent: number;
+  /** سال‌های مالی بسته‌شده؛ ثبت سند با تاریخ این سال‌ها ممکن نیست. */
+  closedFiscalYears: number[];
+}
+
+/** Stored petty cash policy; limits and approval chains are read from here, not hard-coded. */
+export interface PettyCashSettings {
+  fundLimits: Record<PettyCashFundType, { ceiling: number; minBalanceWarning: number; maxSingleExpense: number }>;
+  /** Expenses up to this amount need only the accountant. */
+  siteLevelMax: number;
+  /** Expenses up to this amount need project manager + accountant; above it the senior manager as well. */
+  projectLevelMax: number;
+  approvalChains: Record<PettyCashApprovalLevel, PortalRole[]>;
+  /** Low balance alert when usable balance falls below this share of the ceiling. */
+  lowBalancePercent: number;
+}
+
 export interface PettyCashAccount {
   id: string;
   code: string;
@@ -457,6 +488,7 @@ export interface PettyCashAccount {
   projectName: string;
   costCenterId: string;
   costCenterName: string;
+  fundType: PettyCashFundType;
   ceilingLimit: number; // سقف مجاز تنخواه
   minBalanceWarning: number; // حداقل موجودی هشدار
   actualBalance: number; // موجودی واقعی فیزیکی/بانکی
@@ -510,14 +542,10 @@ export interface PettyCashExpense {
   invoiceDate: string;
   description: string;
   paymentMethod: 'کارت تنخواه' | 'نقد' | 'حواله/انتقال' | 'سایر';
-  attachments: PettyCashAttachment[];
   status: PettyCashExpenseStatus;
-  approvalLevelRequired: 'site_manager_and_finance' | 'project_and_finance' | 'ceo_full';
+  approvalLevelRequired: PettyCashApprovalLevel;
   currentApprovalStep:
-    | 'سرپرست کارگاه'
-    | 'مدیر پروژه'
-    | 'مدیر مالی'
-    | 'مدیرعامل'
+    | PortalRole
     | 'تکمیل شده'
     | 'رد شده'
     | 'بازگشت به کاربر'
@@ -525,6 +553,7 @@ export interface PettyCashExpense {
   approvalHistory: {
     level: string;
     approverName: string;
+    approverId?: string;
     approverRole: string;
     date: string;
     time: string;
@@ -533,6 +562,7 @@ export interface PettyCashExpense {
   }[];
   rejectionReason?: string;
   submitterName: string;
+  submitterId?: string;
   submitterRole: string;
   inventoryTarget: 'direct_consumption' | 'send_to_warehouse';
   inventoryItemCode?: string;
@@ -835,23 +865,14 @@ export interface StatementPayment {
   journalEntryId?: string;
 }
 
-export interface ContractDocument {
-  id: string;
-  contractId?: string;
-  statementId?: string;
-  fileName: string;
-  fileType: 'قرارداد اولیه' | 'الحاقیه' | 'صورت‌جلسه کارگاهی' | 'فایل اکسل متره' | 'نقشه فنی' | 'سند تأییدیه' | 'مکاتبات';
-  version: string;
-  uploadDate: string;
-  uploaderName: string;
-  fileSize: string;
-  downloadUrl?: string;
-}
-
 export interface StatementWorkflowHistory {
   date: string;
   time: string;
   user: string;
+  /** User id of the actor; separation of duties compares ids, never display names. */
+  userId?: string;
+  /** Permission the step used (tells approvals apart from preparation steps). */
+  stepAction?: string;
   role: string;
   fromStatus: StatementWorkflowStatus;
   toStatus: StatementWorkflowStatus;
@@ -892,10 +913,12 @@ export type SubcontractorTradeType =
   | 'سایر پیمانکاری جزء';
 
 export type SubcontractorStatementWorkflowStatus =
-  | 'submitted' // ثبت توسط پیمانکار جزء / دفتر فنی کارگاه
-  | 'site_review' // بررسی کارگاه (بررسی احجام توسط سرپرست کارگاه)
+  | 'submitted' // ثبت کارکرد توسط پیمانکار جزء / دفتر فنی کارگاه
+  | 'measured' // اندازه‌گیری و متره انجام شد
+  | 'site_review' // تأیید کارگاه (کنترل احجام توسط سرپرست کارگاه)
   | 'pm_approved' // تأیید مدیر پروژه
-  | 'management_approved' // تأیید مدیریت و امور مالی
+  | 'finance_approved' // تأیید مالی
+  | 'management_approved' // تأیید مدیر ارشد ← ثبت بدهی و درخواست پرداخت
   | 'paid' // پرداخت‌شده و ثبت هزینه پروژه
   | 'rejected' // رد شده
   | 'returned_for_revision'; // برگشت جهت اصلاح متره
@@ -983,6 +1006,11 @@ export interface SubcontractorProgressStatement {
   pmApprovalNote?: string;
   pmApproverName?: string;
   pmApprovalDate?: string;
+  measuredByName?: string;
+  measurementDate?: string;
+  financeApprovalNote?: string;
+  financeApproverName?: string;
+  financeApprovalDate?: string;
   managementApprovalNote?: string;
   managementApproverName?: string;
   managementApprovalDate?: string;
@@ -996,13 +1024,14 @@ export interface SubcontractorProgressStatement {
     date: string;
     time: string;
     user: string;
+    userId?: string;
+    stepAction?: string;
     role: string;
     fromStatus: SubcontractorStatementWorkflowStatus;
     toStatus: SubcontractorStatementWorkflowStatus;
     action: string;
     comment?: string;
   }[];
-  attachments?: string[];
 }
 
 export type ContractsMainViewMode = 'client' | 'subcontractor';
@@ -1052,7 +1081,6 @@ export interface DetailedProgressStatement {
   paymentStatus: 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue';
   overdueDays: number;
   workflowHistory: StatementWorkflowHistory[];
-  attachments: ContractDocument[];
   accountingJournalEntryId?: string;
 }
 
@@ -1085,7 +1113,45 @@ export type MaterialCategory =
   | 'ابزارآلات و تجهیزات قالب‌بندی'
   | 'تجهیز کارگاه و HSE';
 
-export type WarehouseType = 'کارگاهی' | 'مرکزی' | 'ضایعات' | 'امانی';
+export type WarehouseType = 'کارگاهی' | 'مرکزی' | 'موقت کارگاهی' | 'ضایعات' | 'امانی';
+
+/** Quantity of one material in one warehouse; reservedQty is held for approved issue requests. */
+export interface StockBalance {
+  warehouseId: string;
+  materialId: string;
+  qty: number;
+  reservedQty: number;
+}
+
+export interface StockReservation {
+  id: string;
+  warehouseId: string;
+  materialId: string;
+  qty: number;
+  projectId: string;
+  /** Store issue request that holds the reservation. */
+  issueId: string;
+  status: 'active' | 'consumed' | 'released';
+  date: string;
+}
+
+export interface StockReturn {
+  id: string;
+  returnNumber: string;
+  date: string;
+  kind: 'project_to_warehouse' | 'warehouse_to_supplier';
+  /** Store issue (return from project) or goods receipt (return to supplier) being reversed. */
+  sourceId: string;
+  sourceNumber: string;
+  warehouseId: string;
+  projectId: string;
+  materialId: string;
+  qty: number;
+  unitCost: number;
+  totalCost: number;
+  reason: string;
+  journalEntryId?: string;
+}
 
 export interface Warehouse {
   id: string;
@@ -1205,6 +1271,8 @@ export interface StoreIssueVoucher {
   receivedByCrewLeaderName: string;
   items: StoreIssueItem[];
   totalCost: number;
+  requestedById?: string;
+  confirmedById?: string;
   status: 'درخواست اولیه' | 'تأیید مدیر کارگاه' | 'خروج قطعی از انبار';
   accountingJournalEntryId?: string;
 }
@@ -1266,8 +1334,16 @@ export interface StocktakeAudit {
 export interface KardexEntry {
   id: string;
   materialId: string;
+  warehouseId?: string;
   date: string;
-  docType: 'رسید ورود انبار' | 'حواله مصرف کارگاه' | 'انتقال ورودی' | 'انتقال خروجی' | 'تعدیل انبارگردانی';
+  docType:
+    | 'رسید ورود انبار'
+    | 'حواله مصرف کارگاه'
+    | 'انتقال ورودی'
+    | 'انتقال خروجی'
+    | 'تعدیل انبارگردانی'
+    | 'برگشت از پروژه'
+    | 'برگشت به تأمین‌کننده';
   docNumber: string;
   warehouseName: string;
   counterparty: string;
@@ -1354,7 +1430,7 @@ export type RequisitionStatus =
   | 'تأیید سرپرست کارگاه'
   | 'تأیید فنی پروژه'
   | 'مصوبه مدیر تدارکات'
-  | 'تأیید نهایی مالی/مدیرعامل'
+  | 'تأیید نهایی مدیر ارشد'
   | 'در حال استعلام بها (RFQ)'
   | 'سفارش صادر شده (PO)'
   | 'لغو شده';
@@ -1387,12 +1463,13 @@ export interface PurchaseRequisition {
   priority: RequisitionPriority;
   status: RequisitionStatus;
   requesterName: string;
+  requesterId?: string;
   requesterRole: string;
   approvals: {
-    siteSupervisor?: { approved: boolean; date?: string; signedBy?: string };
-    projectManager?: { approved: boolean; date?: string; signedBy?: string };
-    procurementManager?: { approved: boolean; date?: string; signedBy?: string };
-    financialDirector?: { approved: boolean; date?: string; signedBy?: string };
+    siteSupervisor?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
+    projectManager?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
+    procurementManager?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
+    financialDirector?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
   };
   items: RequisitionItem[];
   totalEstimatedAmount: number;
@@ -1531,6 +1608,10 @@ export interface VendorInvoice {
   totalAmount: number;
   paidAmount: number;
   remainingBalance: number;
+  /** Value (with VAT) of goods returned after the invoice; already deducted from remainingBalance. */
+  returnedAmount?: number;
+  registeredById?: string;
+  approvedById?: string;
   status: 'در حال تطبیق' | 'تأیید تطبیق سه‌جانبه' | 'پرداخت شده' | 'پرداخت ناقص' | 'دارای مغایرت و متوقف';
   threeWayMatching: {
     poMatched: boolean;
@@ -1561,7 +1642,14 @@ export type FinancialEventType =
   | 'PETTY_CASH_EXPENSE_APPROVED'
   | 'TREASURY_PAYMENT'
   | 'TREASURY_RECEIPT'
-  | 'BANK_RECONCILIATION_MATCH';
+  | 'PETTY_CASH_REPLENISHMENT'
+  | 'STOCKTAKE_ADJUSTMENT'
+  | 'STORE_RETURN'
+  | 'PURCHASE_RETURN'
+  | 'BANK_RECONCILIATION_MATCH'
+  | 'JOURNAL_REVERSAL'
+  | 'FISCAL_YEAR_CLOSE'
+  | 'INVENTORY_TRANSFER';
 
 export type FinancialEventModule =
   | 'procurement'
@@ -1582,16 +1670,270 @@ export interface FinancialEvent {
   costCenterId: string;
   counterpartyId: string;
   amount: number;
+  /** Date of the source document (statement, invoice, receipt …). */
   date: string;
-  status: 'draft' | 'posted' | 'rejected';
+  /**
+   * Date of the accounting entry: the approval/posting day. Defaults to today; only an authorised user
+   * may pick another day inside an open fiscal year.
+   */
+  postingDate?: string;
+  /** 'reversed': its entry was reversed together with the source operation; it can be posted again. */
+  status: 'draft' | 'posted' | 'rejected' | 'reversed';
   details?: Record<string, any>;
   journalEntryId?: string;
   docNumber?: string;
 }
 
-export type { PaymentRequest, PaymentSourceType, PaymentMethodType } from '../data/paymentsTreasuryMockData';
-export type { SystemDocument, DocumentCategory } from '../data/documentsMockData';
-export type { PayrollSlip, Employee, MonthlyTimesheet } from '../data/hrPayrollMockData';
+export type PaymentSourceType =
+  | 'صورت‌وضعیت پیمانکار جزء'
+  | 'فاکتور خرید تأمین‌کننده'
+  | 'شارژ و تسویه تنخواه'
+  | 'حقوق و دستمزد ماهانه'
+  | 'پیش‌پرداخت خرید'
+  | 'حق بیمه و مالیات'
+  | 'پیش‌پرداخت پیمانکار جزء'
+  | 'سایر هزینه‌های عمومی';
+
+export type PaymentMethodType =
+  | 'حواله ساتنا'
+  | 'حواله پایا'
+  | 'چک صیادی بانکی'
+  | 'کارت به کارت'
+  | 'صندوق نقد'
+  | 'تهاتر ملکی/خدماتی';
+
+export interface PaymentRequest {
+  id: string;
+  requestNumber: string;
+  sourceType: PaymentSourceType;
+  sourceRefId: string; // e.g. statement id, po id, invoice id
+  sourceRefNumber: string;
+  date: string;
+  dueDate: string;
+  projectId: string;
+  projectName: string;
+  costCenterId: string;
+  beneficiaryName: string;
+  counterpartyId?: string; // دریافت‌کننده وجه
+  beneficiaryType: 'پیمانکار جزء' | 'تأمین‌کننده' | 'مسئول تنخواه' | 'پرسنل' | 'سازمان تامین اجتماعی' | 'سازمان امور مالیاتی';
+  beneficiaryAccount: {
+    bankName: string;
+    shebaNumber: string;
+    accountNumber: string;
+  };
+  totalAmount: number;
+  approvedAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  priority: 'فوری / بحرانی' | 'عادی' | 'پایین';
+  status: 'پیش‌نویس' | 'در انتظار تأیید مالی' | 'تأیید مدیر ارشد' | 'در صف پرداخت خزانه' | 'پرداخت شده' | 'رد شده';
+  /** Tax payments: which liability is settled (VAT on sales, payroll tax, subcontractor withholding). */
+  taxKind?: 'vat' | 'payroll' | 'withholding';
+  approvedBy?: string;
+  approvedById?: string;
+  approvedDate?: string;
+  paymentMethod?: PaymentMethodType;
+  payerBankAccountId?: string;
+  payerBankAccountName?: string;
+  paymentDate?: string;
+  trackingNumber?: string;
+  journalEntryId?: string;
+  notes?: string;
+  /** User who created the request (the approver must be someone else). */
+  requestedBy?: string;
+  requestedById?: string;
+}
+
+export interface TreasuryCheck {
+  id: string;
+  checkType: 'صادره (پرداختی)' | 'وارده (دریافتی)';
+  sayadNumber: string; // شناسه صیاد ۱۶ رقمی
+  checkNumber: string;
+  bankName: string;
+  branch: string;
+  amount: number;
+  issueDate: string;
+  dueDate: string;
+  drawer: string; // صادرکننده
+  payee: string; // در وجه
+  projectId?: string;
+  projectName?: string;
+  relatedDocNumber?: string;
+  status: 'در جریان وصول/سررسید' | 'پاس شده و تسویه' | 'برگشت خورده' | 'ابطال شده' | 'واگذار شده';
+  clearedDate?: string;
+}
+
+export interface ProjectCashDesk extends CashDesk {
+  projectId: string;
+  projectName: string;
+  ceilingLimit: number;
+  lastAuditDate: string;
+}
+
+
+// ==================== DOCUMENT CENTER ====================
+
+export type DocumentCategory =
+  | 'قرارداد اصلی کارفرما'
+  | 'قرارداد پیمانکار جزء'
+  | 'الحاقیه قرارداد'
+  | 'صورت‌وضعیت کارفرما'
+  | 'صورت‌وضعیت پیمانکار جزء'
+  | 'فایل متره و اندازه‌گیری'
+  | 'فاکتور خرید تأمین‌کننده'
+  | 'فاکتور هزینه تنخواه'
+  | 'نامه و مکاتبات رسمی'
+  | 'صورتجلسه کارگاهی'
+  | 'نقشه اجرایی و ازبیلت'
+  | 'گزارش کنترل کیفیت و آزمایشگاه'
+  | 'ضمانت‌نامه بانکی'
+  | 'رسید و سند مالی';
+
+export type DocumentEntityType =
+  | 'project'
+  | 'contract'
+  | 'subcontract'
+  | 'client_statement'
+  | 'subcontractor_statement'
+  | 'counterparty'
+  | 'petty_cash_expense'
+  | 'vendor_invoice'
+  | 'purchase_order'
+  | 'goods_receipt'
+  | 'payment_request'
+  | 'receipt'
+  | 'journal_entry';
+
+export interface DocumentLink {
+  entityType: DocumentEntityType;
+  entityId: string;
+}
+
+/** Single document archive: every attachment in the system is a Document linked to its records. */
+export interface Document {
+  id: string;
+  title: string;
+  type: DocumentCategory;
+  fileName: string;
+  links: DocumentLink[];
+  docNumber: string;
+  date: string;
+  fileFormat: 'PDF' | 'DWG' | 'XLSX' | 'JPG' | 'DOCX';
+  fileSize: string;
+  version: string;
+  status: 'معتبر و جاری' | 'نیازمند تمدید' | 'منقضی شده' | 'پیش‌نویس';
+  confidentiality: 'عادی' | 'محرمانه مدیریت' | 'فنی کارگاهی';
+  registeredBy: string;
+  tags: string[];
+  description: string;
+  /** Guarantee documents: amount and expiry. */
+  amount?: number;
+  expiryDate?: string;
+  url?: string;
+}
+
+/** Alias to avoid clashing with the DOM `Document` type inside components. */
+export type AppDocument = Document;
+export interface Employee {
+  id: string;
+  personnelCode: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  nationalCode: string;
+  birthDate: string;
+  phone: string;
+  email: string;
+  role: string;
+  department: 'فنی و مهندسی' | 'مالی و اداری' | 'اجرایی کارگاه' | 'تدارکات و انبار' | 'مدیریت و کنترل پروژه' | 'HSE و ایمنی';
+  assignedProjectId: string;
+  assignedProjectName: string;
+  costCenterId: string;
+  hireDate: string;
+  contractType: 'پیمانی تمام‌وقت' | 'قراردادی موقت' | 'ساعتی/مشاوره‌ای' | 'کارگری روزمزد';
+  baseSalary: number; // حقوق پایه ماهانه
+  housingAllowance: number; // حق مسکن
+  foodAllowance: number; // بن خواروبار
+  childAllowance: number; // حق اولاد
+  specialSkillAllowance: number; // حق تخصص و کارگاهی
+  childrenCount: number;
+  maritalStatus: 'متاهل' | 'مجرد';
+  bankAccount: {
+    bankName: string;
+    shebaNumber: string;
+    accountNumber: string;
+  };
+  insuranceNumber: string;
+  status: 'فعال' | 'مرخصی بدون حقوق' | 'تسویه شده';
+}
+
+export interface MonthlyTimesheet {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  monthYear: string; // e.g. ۱۴۰۳/۰۶
+  projectId: string;
+  standardWorkDays: number;
+  actualWorkDays: number;
+  absentDays: number;
+  paidLeaveDays: number;
+  overtimeHours: number;
+  nightWorkHours: number;
+  holidayWorkHours: number;
+  missionDays: number;
+  status: 'تأیید سرپرست کارگاه' | 'تأیید مدیر پروژه' | 'تأیید منابع انسانی';
+}
+
+export interface PayrollSlip {
+  id: string;
+  slipNumber: string;
+  monthYear: string;
+  employeeId: string;
+  employeeName: string;
+  personnelCode: string;
+  role: string;
+  department: string;
+  projectId: string;
+  projectName: string;
+  costCenterId: string;
+  issueDate: string;
+
+  // Carried over
+  actualWorkDays: number;
+  overtimeHours: number;
+
+  // Earnings (مزایا و ناخالص حقوق)
+  baseSalaryGross: number;
+  housingAllowance: number;
+  foodAllowance: number;
+  childAllowance: number;
+  specialSkillAllowance: number;
+  overtimePay: number;
+  missionPay: number;
+  grossTotalSalary: number; // جمع ناخالص دریافتی
+
+  // Deductions (کسورات قانونی و اختیاری)
+  workerInsuranceDeduction: number; // سهم کارگر ۷٪
+  incomeTaxDeduction: number; // مالیات حقوق
+  loanDeduction: number; // مساعده یا وام پرسنلی
+  disciplinaryDeduction: number;
+  totalDeductions: number; // جمع کسورات
+
+  // Net Pay (خالص پرداختی)
+  netPayableSalary: number;
+
+  // Employer Contributions (سهم کارفرما برای سند حسابداری)
+  employerInsuranceContribution: number; // سهم کارفرما ۲۳٪ (۲۰٪ تامین اجتماعی + ۳٪ بیمه بیکاری)
+  totalCostForCompany: number; // هزینه تمام‌شده پرسنل برای پروژه (Gross + Employer Insurance)
+
+  // Financial status
+  calculatedById?: string;
+  approvedById?: string;
+  status: 'محاسبه شده' | 'تأیید مالی' | 'صادر شده جهت پرداخت' | 'پرداخت شده';
+  journalEntryId?: string;
+  paymentRequestId?: string;
+}
+
 
 
 

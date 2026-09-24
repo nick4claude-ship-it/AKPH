@@ -17,6 +17,7 @@ import {
   getFormattedCurrentPersianDate,
   getCurrentPersianMonthName,
 } from '../../utils/date';
+import { formatInt } from '../../utils/money';
 
 interface HeaderProps {
   title: string;
@@ -32,7 +33,8 @@ interface HeaderProps {
   user: UserProfile;
   alerts: ManagementAlert[];
   onOpenAlertsModal: () => void;
-  onSwitchUser: () => void;
+  /** DEV only: opens the role switcher; without it the user badge is plain text. */
+  onSwitchUser?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -91,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => onSelectProject(e.target.value)}
               className="bg-transparent border-none text-xs text-slate-800 font-medium focus:outline-none cursor-pointer pr-1 pl-4"
             >
-              <option value="all">تمام پروژه‌ها (۵ پروژه فعال)</option>
+              <option value="all">تمام پروژه‌ها ({formatInt(projects.length)} پروژه)</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.code} - {p.name}
@@ -138,7 +140,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-          <span className="hidden sm:inline">دستیار هوشمند</span>
+          <span className="hidden sm:inline">دستیار (نمایشی)</span>
         </button>
 
         {/* Export PDF Button */}
@@ -147,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-xs"
         >
           <Printer className="w-3.5 h-3.5 text-amber-400" />
-          <span>دریافت PDF</span>
+          <span>چاپ / PDF</span>
         </button>
 
         {/* Notifications Popover */}
@@ -208,23 +210,30 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* User Role Switcher */}
-        <button
-          onClick={onSwitchUser}
-          className="flex items-center gap-2 p-1 pl-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-transparent hover:border-slate-200"
-          title="تغییر نقش کاربری برای آزمودن دسترسی‌ها"
-        >
-          <img
-            src={user.avatar}
-            alt={user.name}
-            className="w-7 h-7 rounded-full object-cover border border-slate-200"
-          />
-          <div className="text-right hidden xl:block">
-            <p className="text-xs font-bold text-slate-800 leading-tight">{user.name}</p>
-            <p className="text-[10px] text-slate-500">{user.role}</p>
-          </div>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-        </button>
+        {/* User badge (role switcher in DEV only) */}
+        {(() => {
+          const badge = (
+            <>
+              <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200" />
+              <div className="text-right hidden xl:block">
+                <p className="text-xs font-bold text-slate-800 leading-tight">{user.name}</p>
+                <p className="text-[10px] text-slate-500">{user.role}</p>
+              </div>
+            </>
+          );
+          return onSwitchUser ? (
+            <button
+              onClick={onSwitchUser}
+              className="flex items-center gap-2 p-1 pl-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-dashed border-amber-300"
+              title="تغییر نقش کاربری (فقط محیط توسعه)"
+            >
+              {badge}
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 p-1 pl-2">{badge}</div>
+          );
+        })()}
       </div>
     </header>
   );

@@ -1,12 +1,13 @@
 import React from 'react';
-import { ProgressStatement } from '../../types';
+import { DetailedProgressStatement } from '../../types';
+import { clientStatementPhase, clientStatementReceivable, ClientStatementPhase } from '../../store/statementPhase';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { FileText, Clock, AlertTriangle, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
 interface ProgressStatementsSummaryProps {
-  statements: ProgressStatement[];
+  statements: DetailedProgressStatement[];
   onOpenStatementsModule: () => void;
-  onSelectStatement: (statement: ProgressStatement) => void;
+  onSelectStatement: (statement: DetailedProgressStatement) => void;
 }
 
 export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps> = ({
@@ -14,30 +15,32 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
   onOpenStatementsModule,
   onSelectStatement,
 }) => {
-  const pendingCount = statements.filter((s) => s.status === 'در انتظار بررسی کارفرما').length;
-  const unapprovedAmount = statements
-    .filter((s) => s.status === 'در انتظار بررسی کارفرما')
-    .reduce((sum, s) => sum + s.submittedAmount, 0);
+  const inReview = statements.filter((s) => clientStatementPhase(s) === 'in_review');
+  const pendingCount = inReview.length;
+  const unapprovedAmount = inReview.reduce((sum, s) => sum + s.netPayable, 0);
 
-  const totalReceivables = statements.reduce((sum, s) => sum + s.receivables, 0);
+  const totalReceivables = statements.reduce((sum, s) => sum + clientStatementReceivable(s), 0);
   const totalReceived = statements.reduce((sum, s) => sum + s.receivedAmount, 0);
-  const totalOverdue = statements.reduce((sum, s) => sum + s.overdueAmount, 0);
+  const totalOverdue = statements
+    .filter((s) => clientStatementPhase(s) === 'overdue')
+    .reduce((sum, s) => sum + clientStatementReceivable(s), 0);
 
-  const getStatusBadge = (status: ProgressStatement['status']) => {
+  const getStatusBadge = (status: ClientStatementPhase) => {
     switch (status) {
-      case 'معوق':
+      case 'overdue':
         return (
           <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
             معوق و سررسیدگذشته
           </span>
         );
-      case 'در انتظار بررسی کارفرما':
+      case 'in_review':
+      case 'returned':
         return (
           <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
             در انتظار بررسی
           </span>
         );
-      case 'تأیید نهایی کارفرما':
+      case 'approved':
         return (
           <span className="text-[10px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
             تأیید شده / در صف وصول
@@ -46,7 +49,7 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
       default:
         return (
           <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            {status}
+            تسویه شده
           </span>
         );
     }
@@ -133,26 +136,26 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
                 className="hover:bg-blue-50/30 transition-colors cursor-pointer"
               >
                 <td className="py-2.5 px-3 font-semibold text-slate-900">
-                  {st.number}
+                  {st.statementNumber}
                 </td>
                 <td className="py-2.5 px-3">
                   <div className="text-slate-800 font-medium">{st.projectName}</div>
                   <div className="text-[10px] text-slate-500">{st.client}</div>
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-slate-700">
-                  {formatCurrencyCompact(st.submittedAmount)}
+                  {formatCurrencyCompact(st.netPayable)}
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-emerald-700 font-bold">
-                  {formatCurrencyCompact(st.approvedAmount)}
+                  {formatCurrencyCompact(clientStatementPhase(st) === 'in_review' ? 0 : st.approvedNetPayable ?? st.netPayable)}
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-slate-600">
                   {formatCurrencyCompact(st.receivedAmount)}
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-rose-600 font-semibold">
-                  {formatCurrencyCompact(st.receivables)}
+                  {formatCurrencyCompact(clientStatementReceivable(st))}
                 </td>
                 <td className="py-2.5 px-3 text-center">
-                  {getStatusBadge(st.status)}
+                  {getStatusBadge(clientStatementPhase(st))}
                 </td>
               </tr>
             ))}

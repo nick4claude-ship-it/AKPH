@@ -13,15 +13,20 @@ import {
   SubcontractorProgressStatement,
   FinancialEvent,
   JournalEntry,
+  AccountNode,
   BankAccount,
-  CashDesk,
-  PaymentRequest,
   ReceiptRecord,
   PaymentRecord,
-  SystemDocument,
+  AppDocument,
+  PettyCashSettings,
+  PettyCashReplenishment,
+  PettyCashReplenishmentRequest,
+  PurchaseRequisition,
+  StockBalance,
+  StockReservation,
+  StockReturn,
   PettyCashAccount,
   PettyCashExpense,
-  PurchaseRequisition,
   PurchaseOrder,
   VendorInvoice,
   GoodsReceiptNote,
@@ -30,10 +35,31 @@ import {
   Warehouse,
   BankReconciliationItem,
   PayrollSlip,
-  PendingApproval,
-  ManagementAlert,
+  PaymentRequest,
+  ProjectCashDesk,
+  Subledger,
+  AuditLog,
+  TreasuryCheck,
+  Supplier,
+  RequestForQuotation,
+  InterWarehouseTransfer,
+  StocktakeAudit,
+  KardexEntry,
+  Employee,
+  MonthlyTimesheet,
+  ContractBOQItem,
+  ContractAmendment,
+  AdvancePaymentRecord,
+  PriceAdjustment,
+  ContractAuditLog,
+  PettyCashReconciliation,
+  PettyCashCategoryItem,
+  FinanceSettings,
 } from '../types';
 
+/**
+ * تنها منبع داده برنامه. هر موجودیت فقط یک نسخه دارد و همه ماژول‌ها از همین‌جا می‌خوانند و می‌نویسند.
+ */
 export interface AppState {
   projects: Project[];
   costCenters: CostCenter[];
@@ -44,14 +70,19 @@ export interface AppState {
   subcontractorStatements: SubcontractorProgressStatement[];
   financialEvents: FinancialEvent[];
   journalEntries: JournalEntry[];
+  chartOfAccounts: AccountNode[];
   bankAccounts: BankAccount[];
-  cashDesks: CashDesk[];
+  cashDesks: ProjectCashDesk[];
+  pettyCashAccounts: PettyCashAccount[];
+  pettyCashExpenses: PettyCashExpense[];
+  pettyCashReplenishments: PettyCashReplenishment[];
+  pettyCashRequests: PettyCashReplenishmentRequest[];
+  pettyCashSettings: PettyCashSettings;
   paymentRequests: PaymentRequest[];
   receipts: ReceiptRecord[];
   payments: PaymentRecord[];
-  documents: SystemDocument[];
-  pettyCashAccounts: PettyCashAccount[];
-  pettyCashExpenses: PettyCashExpense[];
+  documents: AppDocument[];
+  bankReconciliations: BankReconciliationItem[];
   purchaseRequisitions: PurchaseRequisition[];
   purchaseOrders: PurchaseOrder[];
   vendorInvoices: VendorInvoice[];
@@ -59,43 +90,52 @@ export interface AppState {
   storeIssues: StoreIssueVoucher[];
   materials: MaterialItem[];
   warehouses: Warehouse[];
-  bankReconciliations: BankReconciliationItem[];
+  stockBalances: StockBalance[];
+  stockReservations: StockReservation[];
+  stockReturns: StockReturn[];
   payrollSlips: PayrollSlip[];
-  pendingApprovals: PendingApproval[];
-  alerts: ManagementAlert[];
+  employees: Employee[];
+  timesheets: MonthlyTimesheet[];
+  subledgers: Subledger[];
+  auditLogs: AuditLog[];
+  treasuryChecks: TreasuryCheck[];
+  suppliers: Supplier[];
+  rfqs: RequestForQuotation[];
+  interTransfers: InterWarehouseTransfer[];
+  stocktakes: StocktakeAudit[];
+  kardex: KardexEntry[];
+  contractBoq: ContractBOQItem[];
+  contractAmendments: ContractAmendment[];
+  advancePayments: AdvancePaymentRecord[];
+  priceAdjustments: PriceAdjustment[];
+  contractAuditLogs: ContractAuditLog[];
+  pettyCashReconciliations: PettyCashReconciliation[];
+  pettyCashCategories: PettyCashCategoryItem[];
+  financeSettings: FinanceSettings;
+  /** Only dismissals are stored; notifications themselves are computed from data. */
+  /** Notifications each user has dismissed (per user id). */
+  dismissedNotificationIds: Record<string, string[]>;
 }
 
+export type SliceKey = keyof AppState;
+
+export type SliceUpdater<K extends SliceKey> = AppState[K] | ((prev: AppState[K]) => AppState[K]);
+
 export type AppAction =
-  | { type: 'POST_FINANCIAL_EVENT'; payload: { event: FinancialEvent; journalEntry?: JournalEntry } }
-  | { type: 'ADD_JOURNAL_ENTRY'; payload: JournalEntry }
-  | { type: 'ADD_PROJECT'; payload: Project }
-  | { type: 'UPDATE_PROJECT'; payload: Project }
-  | { type: 'ADD_CONTRACT'; payload: Contract }
-  | { type: 'UPDATE_CONTRACT'; payload: Contract }
-  | { type: 'ADD_CLIENT_STATEMENT'; payload: DetailedProgressStatement }
-  | { type: 'UPDATE_CLIENT_STATEMENT'; payload: DetailedProgressStatement }
-  | { type: 'APPROVE_CLIENT_STATEMENT'; payload: { id: string; approvedAmount?: number } }
-  | { type: 'ADD_SUBCONTRACTOR_CONTRACT'; payload: SubcontractorContract }
-  | { type: 'UPDATE_SUBCONTRACTOR_CONTRACT'; payload: SubcontractorContract }
-  | { type: 'ADD_SUBCONTRACTOR_STATEMENT'; payload: SubcontractorProgressStatement }
-  | { type: 'UPDATE_SUBCONTRACTOR_STATEMENT'; payload: SubcontractorProgressStatement }
-  | { type: 'APPROVE_SUBCONTRACTOR_STATEMENT'; payload: { id: string } }
-  | { type: 'ADD_PURCHASE_REQUISITION'; payload: PurchaseRequisition }
-  | { type: 'UPDATE_PURCHASE_REQUISITION'; payload: PurchaseRequisition }
-  | { type: 'ADD_PURCHASE_ORDER'; payload: PurchaseOrder }
-  | { type: 'UPDATE_PURCHASE_ORDER'; payload: PurchaseOrder }
-  | { type: 'ADD_GOODS_RECEIPT'; payload: GoodsReceiptNote }
-  | { type: 'ADD_VENDOR_INVOICE'; payload: VendorInvoice }
-  | { type: 'APPROVE_VENDOR_INVOICE'; payload: { id: string } }
-  | { type: 'ADD_STORE_ISSUE'; payload: StoreIssueVoucher }
-  | { type: 'ADD_PETTY_CASH_EXPENSE'; payload: PettyCashExpense }
-  | { type: 'APPROVE_PETTY_CASH_EXPENSE'; payload: { id: string } }
-  | { type: 'REPLENISH_PETTY_CASH'; payload: { accountId: string; amount: number; sourceBankId: string } }
-  | { type: 'EXECUTE_PAYMENT'; payload: { payment: PaymentRecord; bankAccountId: string } }
-  | { type: 'EXECUTE_RECEIPT'; payload: { receipt: ReceiptRecord; bankAccountId: string } }
-  | { type: 'MATCH_BANK_RECONCILIATION'; payload: { id: string; matchedDocNumber: string } }
-  | { type: 'APPROVE_PAYROLL'; payload: { id: string } }
-  | { type: 'ADD_DOCUMENT'; payload: SystemDocument }
-  | { type: 'APPROVE_PENDING_APPROVAL'; payload: { id: string; approverName: string } }
-  | { type: 'REJECT_PENDING_APPROVAL'; payload: { id: string; reason: string } }
-  | { type: 'DISMISS_ALERT'; payload: { id: string } };
+  | { type: 'SET_SLICE'; key: SliceKey; updater: unknown }
+  | { type: 'APPLY_POSTING'; event: FinancialEvent; entry: JournalEntry }
+  | { type: 'REPLACE_STATE'; state: AppState }
+  /** Records returned by the server after a command; replaced (or added) by id. */
+  | { type: 'MERGE_SERVER_RECORDS'; records: { slice: SliceKey; upserted: Record<string, unknown>[] }[] };
+
+/** ورودی postFinancialEvent: شناسه و وضعیت توسط موتور ثبت تعیین می‌شود. */
+export type FinancialEventInput = Omit<FinancialEvent, 'id' | 'status' | 'journalEntryId' | 'docNumber'>;
+
+export interface PostingResult {
+  ok: boolean;
+  /** true when the same sourceModule+sourceId+type was already posted; no new entry was created. */
+  duplicate: boolean;
+  event?: FinancialEvent;
+  entry?: JournalEntry;
+  error?: string;
+}

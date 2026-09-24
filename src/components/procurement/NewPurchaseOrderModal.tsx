@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, FileCheck, Check, Truck } from 'lucide-react';
 import { Project, Supplier, PurchaseOrder, PurchaseOrderItem } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel, roundRial } from '../../utils/money';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { toPersianDate, getRelativePersianDate } from '../../utils/date';
+import { toPersianDigits } from '../../utils/formatters';
+import { useAppState } from '../../store/AppStore';
+import { useCurrentUser } from '../../store/session';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
 
 interface NewPurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   projects: Project[];
   suppliers: Supplier[];
-  onAddOrder: (order: PurchaseOrder) => void;
+  onAddOrder: (order: PurchaseOrder) => { ok: boolean; message: string } | void;
 }
 
 export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
@@ -17,14 +25,18 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
   suppliers,
   onAddOrder,
 }) => {
-  const [projectId, setProjectId] = useState(projects[0]?.id || 'prj-101');
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id || 'sup-101');
-  const [destinationWarehouse, setDestinationWarehouse] = useState('انبار کارگاه رونیکا');
-  const [deliveryDueDate, setDeliveryDueDate] = useState('۱۴۰۳/۰۷/۲۰');
-  const [paymentTerms, setPaymentTerms] = useState('چک صیادی ۶۰ روزه');
+  const store = useAppState();
+  const user = useCurrentUser();
+  const vatRate = store.financeSettings.vatRatePercent / 100;
+  const [projectId, setProjectId] = useState(projects[0]?.id || '');
+  const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
+  const [destinationWarehouse, setDestinationWarehouse] = useState('');
+  const [deliveryDueDate, setDeliveryDueDate] = useState(() => getRelativePersianDate(14));
+  const [paymentTerms, setPaymentTerms] = useState('');
   const [advancePaymentAmount, setAdvancePaymentAmount] = useState(0);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [items, setItems] = useState<Array<{
+  type DraftItem = {
     id: string;
     materialCode: string;
     materialName: string;
@@ -32,131 +44,112 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
     orderedQty: number;
     unit: string;
     unitPrice: number;
-    vatRate: number;
     freightAndUnloadingCost: number;
-  }>>([
-    {
-      id: 'poi-1',
-      materialCode: 'MAT-STEEL-001',
-      materialName: 'میلگرد آجدار A3 سایز ۲۰ شاخه ۱۲ متری',
-      specifications: 'تولید ذوب‌آهن اصفهان دارای شناسنامه آنالیز متالورژی',
-      orderedQty: 30000,
-      unit: 'کیلوگرم',
-      unitPrice: 28200,
-      vatRate: 0.1,
-      freightAndUnloadingCost: 15_000_000,
-    },
-  ]);
+  };
+  const emptyItem = (): DraftItem => ({
+    id: generateUUID(),
+    materialCode: '',
+    materialName: '',
+    specifications: '',
+    orderedQty: 0,
+    unit: '',
+    unitPrice: 0,
+    freightAndUnloadingCost: 0,
+  });
+  const [items, setItems] = useState<DraftItem[]>(() => [emptyItem()]);
 
   if (!isOpen) return null;
 
-  const handleAddItem = () => {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: `poi-${Date.now()}`,
-        materialCode: 'MAT-GEN-01',
-        materialName: '',
-        specifications: '',
-        orderedQty: 100,
-        unit: 'شاخه',
-        unitPrice: 1000000,
-        vatRate: 0.1,
-        freightAndUnloadingCost: 5_000_000,
-      },
-    ]);
-  };
+  const handleAddItem = () => setItems((prev) => [...prev, emptyItem()]);
 
   const handleRemoveItem = (id: string) => {
     if (items.length <= 1) return;
     setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
-  const handleUpdateItem = (id: string, field: string, value: any) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, [field]: value } : it))
-    );
+  const handleUpdateItem = <K extends keyof DraftItem>(id: string, field: K, value: DraftItem[K]) => {
+    setFormError(null);
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
   };
 
-  const subtotal = items.reduce(
-    (acc, it) => acc + (it.orderedQty || 0) * (it.unitPrice || 0),
-    0
-  );
-
-  const totalVat = items.reduce(
-    (acc, it) => acc + (it.orderedQty || 0) * (it.unitPrice || 0) * (it.vatRate || 0),
-    0
-  );
-
-  const totalFreight = items.reduce(
-    (acc, it) => acc + (it.freightAndUnloadingCost || 0),
-    0
-  );
-
+  // Every amount is a whole number of Rials; VAT uses the rate stored in the finance settings.
+  const lines = items.map((it) => {
+    const net = it.orderedQty * it.unitPrice;
+    const vat = roundRial(net * vatRate);
+    return { ...it, net, vat, gross: net + vat + it.freightAndUnloadingCost };
+  });
+  const subtotal = lines.reduce((acc, l) => acc + l.net, 0);
+  const totalVat = lines.reduce((acc, l) => acc + l.vat, 0);
+  const totalFreight = lines.reduce((acc, l) => acc + l.freightAndUnloadingCost, 0);
   const grandTotal = subtotal + totalVat + totalFreight;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const selectedProj = projects.find((p) => p.id === projectId);
     const selectedSup = suppliers.find((s) => s.id === supplierId);
-    const poNumber = `PO-1403-0${Math.floor(Math.random() * 40) + 95}`;
+    if (!selectedProj) return setFormError('پروژه را انتخاب کنید.');
+    if (!selectedSup) return setFormError('تأمین‌کننده را انتخاب کنید.');
+    if (lines.some((l) => !l.materialName.trim() || !l.unit.trim() || l.orderedQty <= 0 || l.unitPrice <= 0)) {
+      return setFormError('برای هر ردیف نام کالا، واحد، مقدار و فی را وارد کنید.');
+    }
+    if (advancePaymentAmount > grandTotal) return setFormError('پیش‌پرداخت از جمع سفارش بیشتر است.');
 
     const newPO: PurchaseOrder = {
-      id: `po-${Date.now()}`,
-      poNumber,
-      issueDate: '۱۴۰۳/۰۷/۰۳',
+      id: generateUUID(),
+      poNumber: nextDocNumber(store.purchaseOrders.map((o) => o.poNumber), 'PO'),
+      issueDate: toPersianDate(new Date()),
       deliveryDueDate,
-      projectId,
-      projectName: selectedProj ? selectedProj.name : 'پروژه عمومی',
+      projectId: selectedProj.id,
+      projectName: selectedProj.name,
+      costCenterId: selectedProj.costCenterIds?.[0],
       destinationWarehouse,
-      supplierId,
-      supplierName: selectedSup ? selectedSup.name : 'تأمین‌کننده طرف حساب',
-      supplierPhone: selectedSup ? selectedSup.phone : '۰۲۱-۸۸۰۰۰۰۰۰',
-      supplierAddress: selectedSup ? selectedSup.address : 'تهران',
-      items: items.map((it) => {
-        const net = (it.orderedQty || 0) * (it.unitPrice || 0);
-        const vat = net * (it.vatRate || 0);
-        return {
-          id: it.id,
-          materialCode: it.materialCode,
-          materialName: it.materialName,
-          specifications: it.specifications,
-          orderedQty: Number(it.orderedQty) || 0,
-          receivedQty: 0,
-          unit: it.unit,
-          unitPrice: Number(it.unitPrice) || 0,
-          totalNetPrice: net,
-          vatRate: it.vatRate,
-          vatAmount: vat,
-          freightAndUnloadingCost: Number(it.freightAndUnloadingCost) || 0,
-          totalGrossAmount: net + vat + (Number(it.freightAndUnloadingCost) || 0),
-        };
-      }),
+      supplierId: selectedSup.id,
+      counterpartyId: store.counterparties.find((c) => c.kind === 'supplier' && c.name === selectedSup.name)?.id,
+      supplierName: selectedSup.name,
+      supplierPhone: selectedSup.phone,
+      supplierAddress: selectedSup.address,
+      items: lines.map((l) => ({
+        id: l.id,
+        materialCode: l.materialCode,
+        materialName: l.materialName.trim(),
+        specifications: l.specifications,
+        orderedQty: l.orderedQty,
+        receivedQty: 0,
+        unit: l.unit.trim(),
+        unitPrice: l.unitPrice,
+        totalNetPrice: l.net,
+        vatRate,
+        vatAmount: l.vat,
+        freightAndUnloadingCost: l.freightAndUnloadingCost,
+        totalGrossAmount: l.gross,
+      })),
       subtotalAmount: subtotal,
       totalVatAmount: totalVat,
       totalFreightCost: totalFreight,
       totalOrderAmount: grandTotal,
       paymentTerms,
-      advancePaymentAmount: Number(advancePaymentAmount) || 0,
-      advancePaymentPaid: Number(advancePaymentAmount) > 0,
+      advancePaymentAmount,
+      // Issuing the order does not pay the advance; treasury does.
+      advancePaymentPaid: false,
       status: 'صادر شده و ابلاغ به فروشنده',
       deliveryProgressPercentage: 0,
       termsAndConditions: [
-        'توزین نهایی ملاک تسویه، باسکول دیجیتال ۶۰ تنی پای کارگاه می‌باشد.',
+        'توزین نهایی ملاک تسویه، باسکول دیجیتال پای کارگاه می‌باشد.',
         'فروشنده متعهد به صدور فاکتور رسمی در سامانه مودیان مالیاتی کشور است.',
         'هرگونه مغایرت فنی در آزمایشگاه موجب عودت کل بار به هزینه فروشنده است.',
       ],
-      issuedBy: 'مهندس آریافر (مدیر تدارکات)',
-      approvedBy: 'مهندس شایان فرهمند (مدیرعامل)',
+      issuedBy: `${user.name} (${user.role})`,
+      approvedBy: '',
     };
 
-    onAddOrder(newPO);
+    const result = onAddOrder(newPO);
+    if (result && !result.ok) return setFormError(result.message);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="صدور برگ سفارش قطعی خرید (PO)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+      
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
@@ -300,10 +293,9 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-[11px] text-slate-600 mb-1">تعداد/مقدار سفارش:</label>
-                      <input
-                        type="number"
+                      <IntegerInput
                         value={item.orderedQty}
-                        onChange={(e) => handleUpdateItem(item.id, 'orderedQty', Number(e.target.value))}
+                        onValueChange={(v) => handleUpdateItem(item.id, 'orderedQty', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
                         required
                       />
@@ -320,21 +312,19 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">نرخ توافقی فی (تومان):</label>
-                      <input
-                        type="number"
+                      <label className="block text-[11px] text-slate-600 mb-1">نرخ توافقی فی ({moneyUnitLabel()}):</label>
+                      <MoneyInput
                         value={item.unitPrice}
-                        onChange={(e) => handleUpdateItem(item.id, 'unitPrice', Number(e.target.value))}
+                        onValueChange={(v) => handleUpdateItem(item.id, 'unitPrice', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
                       <label className="block text-[11px] text-slate-600 mb-1">کرایه حمل و تخلیه:</label>
-                      <input
-                        type="number"
+                      <MoneyInput
                         value={item.freightAndUnloadingCost}
-                        onChange={(e) => handleUpdateItem(item.id, 'freightAndUnloadingCost', Number(e.target.value))}
+                        onValueChange={(v) => handleUpdateItem(item.id, 'freightAndUnloadingCost', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-amber-500 outline-hidden"
                       />
                     </div>
@@ -348,21 +338,27 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
           <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
             <div className="flex justify-between items-center text-slate-600">
               <span>مبلغ خالص کالا:</span>
-              <span className="font-mono font-bold">{subtotal.toLocaleString('fa-IR')} تومان</span>
+              <span className="font-mono font-bold">{formatMoney(subtotal)}</span>
             </div>
             <div className="flex justify-between items-center text-slate-600">
-              <span>مالیات بر ارزش افزوده (۱۰٪):</span>
-              <span className="font-mono font-bold">{totalVat.toLocaleString('fa-IR')} تومان</span>
+              <span>مالیات بر ارزش افزوده ({toPersianDigits(store.financeSettings.vatRatePercent)}٪):</span>
+              <span className="font-mono font-bold">{formatMoney(totalVat)}</span>
             </div>
             <div className="flex justify-between items-center text-slate-600">
               <span>مجموع هزینه حمل:</span>
-              <span className="font-mono font-bold">{totalFreight.toLocaleString('fa-IR')} تومان</span>
+              <span className="font-mono font-bold">{formatMoney(totalFreight)}</span>
             </div>
             <div className="border-t border-slate-200 pt-2 flex justify-between items-center font-black text-slate-900 text-sm">
               <span>مبلغ نهایی سفارش (ناخالص):</span>
-              <span className="font-mono text-amber-600 text-base">{grandTotal.toLocaleString('fa-IR')} تومان</span>
+              <span className="font-mono text-amber-600 text-base">{formatMoney(grandTotal)}</span>
             </div>
           </div>
+
+          {formError && (
+            <p className="text-xs text-rose-700 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
 
           <div className="flex justify-end gap-3 pt-2 border-t border-slate-200">
             <button
@@ -381,7 +377,6 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

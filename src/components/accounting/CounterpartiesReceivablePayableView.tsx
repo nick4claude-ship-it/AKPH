@@ -18,6 +18,7 @@ import {
   Subledger,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { moneyUnitLabel } from '../../utils/money';
 
 interface CounterpartiesReceivablePayableViewProps {
   viewMode: 'counterparties' | 'receivables' | 'payables';
@@ -52,15 +53,15 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-mono">
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">کل کارکرد تاییدشده (Billed)</span>
-            <strong className="text-sm text-slate-800">{formatCurrency(totalBilled)} تومان</strong>
+            <strong className="text-sm text-slate-800">{formatCurrency(totalBilled)}</strong>
           </div>
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">کل وصولی‌های نقدی (Received)</span>
-            <strong className="text-sm text-teal-700">{formatCurrency(totalReceived)} تومان</strong>
+            <strong className="text-sm text-teal-700">{formatCurrency(totalReceived)}</strong>
           </div>
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">مانده مطالبات تجاری (Claims)</span>
-            <strong className="text-sm text-rose-700">{formatCurrency(totalRemaining)} تومان</strong>
+            <strong className="text-sm text-rose-700">{formatCurrency(totalRemaining)}</strong>
           </div>
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">مطالبات معوق سررسید گذشته</span>
@@ -83,7 +84,7 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
                 <tr>
                   <th className="py-3 px-4">کارفرما / طرف حساب بدهکار</th>
                   <th className="py-3 px-3">پروژه مرتبط</th>
-                  <th className="py-3 px-3 font-mono text-left">صورت‌وضعیت کارکرد (تومان)</th>
+                  <th className="py-3 px-3 font-mono text-left">صورت‌وضعیت کارکرد ({moneyUnitLabel()})</th>
                   <th className="py-3 px-3 font-mono text-left text-teal-700">مبلغ دریافتی نقد</th>
                   <th className="py-3 px-3 font-mono text-left text-rose-700">مانده مطالبه</th>
                   <th className="py-3 px-3">تاریخ سررسید</th>
@@ -143,15 +144,15 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">کل بهای کالا و خدمات تحویلی</span>
-            <strong className="text-sm text-slate-800">{formatCurrency(totalIncurred)} تومان</strong>
+            <strong className="text-sm text-slate-800">{formatCurrency(totalIncurred)}</strong>
           </div>
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">مبالغ پرداخت‌شده تاکنون</span>
-            <strong className="text-sm text-emerald-700">{formatCurrency(totalPaid)} تومان</strong>
+            <strong className="text-sm text-emerald-700">{formatCurrency(totalPaid)}</strong>
           </div>
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">مانده تعهد پرداختنی (بدهی باز)</span>
-            <strong className="text-sm text-amber-800">{formatCurrency(totalRemainingPayable)} تومان</strong>
+            <strong className="text-sm text-amber-800">{formatCurrency(totalRemainingPayable)}</strong>
           </div>
         </div>
 
@@ -171,7 +172,7 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
                   <th className="py-3 px-4">طرف حساب بستانکار</th>
                   <th className="py-3 px-3">نوع طرف حساب</th>
                   <th className="py-3 px-3">پروژه و کارگاه</th>
-                  <th className="py-3 px-3 font-mono text-left">بهای فاکتور (تومان)</th>
+                  <th className="py-3 px-3 font-mono text-left">بهای فاکتور ({moneyUnitLabel()})</th>
                   <th className="py-3 px-3 font-mono text-left text-emerald-700">پرداختی تاکنون</th>
                   <th className="py-3 px-3 font-mono text-left text-amber-800">مانده بدهی شرکت</th>
                   <th className="py-3 px-3">موعد سررسید</th>
@@ -250,7 +251,7 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
                 <th className="py-3 px-3">نوع طرف حساب</th>
                 <th className="py-3 px-3 font-mono">شناسه ملی / کد اقتصادی</th>
                 <th className="py-3 px-3 font-mono">تلفن تماس</th>
-                <th className="py-3 px-3 font-mono text-left">مانده حساب (تومان)</th>
+                <th className="py-3 px-3 font-mono text-left">مانده حساب ({moneyUnitLabel()})</th>
                 <th className="py-3 px-4 text-center">ماهیت مانده</th>
               </tr>
             </thead>

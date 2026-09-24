@@ -20,7 +20,12 @@ import {
   PettyCashReconciliation,
   Project,
 } from '../../types';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { useAppState } from '../../store/AppStore';
+import { documentCount } from '../../store/domainSelectors';
+import { formatCurrency, formatNumber, formatPercent } from '../../utils/formatters';
+import { toPersianDate } from '../../utils/date';
+import { Dialog } from '../common/Dialog';
+import { formatInt, moneyUnitLabel } from '../../utils/money';
 
 interface PettyCashReportsViewProps {
   accounts: PettyCashAccount[];
@@ -37,6 +42,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
   reconciliations,
   projects,
 }) => {
+  const appState = useAppState();
   const [selectedReportType, setSelectedReportType] = useState<
     'statement' | 'project_category' | 'missing_docs' | 'rejected' | 'reconciliation_sheet'
   >('statement');
@@ -53,10 +59,28 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
   );
 
   const missingDocsExpenses = expenses.filter(
-    (e) => !e.invoiceNumber || e.attachments.length === 0
+    (e) => !e.invoiceNumber || !documentCount(appState, 'petty_cash_expense', e.id)
   );
 
   const rejectedExpenses = expenses.filter((e) => e.status === 'rejected');
+
+  // Spend per category from approved expenses.
+  const approvedExpenses = expenses.filter((e) => e.status === 'approved' || e.status === 'accounting_posted');
+  const approvedTotal = approvedExpenses.reduce((a, e) => a + e.amount, 0);
+  const categoryRows = [...new Set(approvedExpenses.map((e) => e.category))]
+    .map((cat) => {
+      const rows = approvedExpenses.filter((e) => e.category === cat);
+      const total = rows.reduce((a, e) => a + e.amount, 0);
+      return {
+        cat,
+        count: rows.length,
+        total,
+        projects: [...new Set(rows.map((e) => e.projectName))].join('، '),
+        pct: approvedTotal ? (total * 100) / approvedTotal : 0,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
+  const lastReconciliation = reconciliations.find((r) => r.pettyCashId === selectedAccount?.id);
 
   // Trigger print
   const handlePrint = () => {
@@ -272,30 +296,22 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                   <tr>
                     <th className="py-3 px-4">سرفصل هزینه</th>
                     <th className="py-3 px-4">تعداد فاکتورها</th>
-                    <th className="py-3 px-4 text-left">مجموع مبلغ (تومان)</th>
+                    <th className="py-3 px-4 text-left">مجموع مبلغ ({moneyUnitLabel()})</th>
                     <th className="py-3 px-4">پروژه‌های درگیر</th>
                     <th className="py-3 px-4 text-left">سهم از کل مخارج</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {[
-                    { cat: 'مصالح ساختمانی', count: 8, total: 98_500_000, projects: 'رونیکا، البرز، نیلوفر', pct: '31.3%' },
-                    { cat: 'سوخت و روانکارها', count: 6, total: 64_000_000, projects: 'تقاطع فجر، رونیکا', pct: '20.3%' },
-                    { cat: 'ماشین‌آلات و تجهیزات', count: 4, total: 46_000_000, projects: 'تقاطع فجر، البرز', pct: '14.6%' },
-                    { cat: 'تعمیرات اضطراری', count: 5, total: 38_500_000, projects: 'نیلوفر، رونیکا', pct: '12.2%' },
-                    { cat: 'ابزار و ملزومات فنی', count: 7, total: 32_200_000, projects: 'رونیکا، نیلوفر، ستاد', pct: '10.2%' },
-                    { cat: 'تغذیه و رفاهی', count: 4, total: 21_000_000, projects: 'بیمارستان البرز', pct: '6.7%' },
-                    { cat: 'اداری و دفتری', count: 3, total: 14_500_000, projects: 'ستاد مرکزی', pct: '4.6%' },
-                  ].map((row) => (
+                  {categoryRows.map((row) => (
                     <tr key={row.cat} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-bold text-slate-900">{row.cat}</td>
-                      <td className="py-3 px-4 font-mono text-slate-700">{row.count.toLocaleString('fa-IR')}</td>
+                      <td className="py-3 px-4 font-mono text-slate-700">{formatInt(row.count)}</td>
                       <td className="py-3 px-4 text-left font-mono font-bold text-slate-900 tabular-nums">
                         {formatCurrency(row.total)}
                       </td>
                       <td className="py-3 px-4 text-slate-600">{row.projects}</td>
                       <td className="py-3 px-4 text-left font-mono font-semibold text-amber-700">
-                        {row.pct}
+                        {formatPercent(row.pct)}
                       </td>
                     </tr>
                   ))}
@@ -359,7 +375,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                 سیاهه فاکتورهای ردشده کارگاه‌ها و علل رد
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                مواردی که در نظارت مالی یا کارتابل مدیرعامل تایید نگردیده‌اند
+                مواردی که در کارتابل تأیید، تأیید نگردیده‌اند
               </p>
             </div>
 
@@ -467,8 +483,8 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
       {/* Official Print/PDF Modal (Prompt Section 25 & 16) */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 print:shadow-none print:border-none print:m-0 print:p-0">
+        <Dialog onClose={() => setIsPrintModalOpen(false)} label="پیش‌نمایش چاپ گزارش تنخواه" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 print:shadow-none print:border-none print:m-0 print:p-0">
+          
             {/* Modal Print Toolbar */}
             <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl flex items-center justify-between print:hidden">
               <div className="text-xs font-bold text-slate-800">
@@ -509,8 +525,8 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                 </div>
 
                 <div className="text-left text-xs space-y-1 font-mono">
-                  <div>شماره مدرک: RCN-1403-091</div>
-                  <div>تاریخ تنظیم: ۱۴۰۳/۰۷/۰۲</div>
+                  <div>شماره مدرک: {lastReconciliation?.reconNumber ?? '—'}</div>
+                  <div>تاریخ تنظیم: {toPersianDate(new Date())}</div>
                   <div>پیوست: دارد</div>
                 </div>
               </div>
@@ -545,7 +561,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                       <th className="p-2 border-l border-slate-300">سرفصل</th>
                       <th className="p-2 border-l border-slate-300">فروشنده</th>
                       <th className="p-2 border-l border-slate-300">شرح خرید</th>
-                      <th className="p-2 text-left">مبلغ (تومان)</th>
+                      <th className="p-2 text-left">مبلغ ({moneyUnitLabel()})</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -592,8 +608,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

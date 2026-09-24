@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, AlertCircle, ShoppingCart, Check } from 'lucide-react';
 import { Project, ProcurementCategory, RequisitionPriority, PurchaseRequisition } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { getRelativePersianDate, toPersianDate } from '../../utils/date';
+import { useAppState } from '../../store/AppStore';
+import { useCurrentUser } from '../../store/session';
 
 interface NewRequisitionModalProps {
   isOpen: boolean;
@@ -21,116 +28,98 @@ const CATEGORIES: ProcurementCategory[] = [
   'خدمات مهندسی و پیمانکاران دست‌دوم',
 ];
 
+type DraftItem = {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  specification: string;
+  category: ProcurementCategory;
+  requestedQty: number;
+  unit: string;
+  estimatedUnitPrice: number;
+  requiredDeliveryDate: string;
+  suggestedVendors?: string;
+};
+
+const emptyItem = (): DraftItem => ({
+  id: generateUUID(),
+  materialCode: '',
+  materialName: '',
+  specification: '',
+  category: 'آهن‌آلات و مقاطع فولادی',
+  requestedQty: 0,
+  unit: 'کیلوگرم',
+  estimatedUnitPrice: 0,
+  requiredDeliveryDate: getRelativePersianDate(14),
+  suggestedVendors: '',
+});
+
 export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
   isOpen,
   onClose,
   projects,
   onAddRequisition,
 }) => {
-  const [projectId, setProjectId] = useState(projects[0]?.id || 'prj-101');
-  const [priority, setPriority] = useState<RequisitionPriority>('بالا');
-  const [wbsCode, setWbsCode] = useState('WBS-1.2.4');
-  const [costCenter, setCostCenter] = useState('اسکلت و سقف');
-  const [requesterName, setRequesterName] = useState('مهندس ناظر کارگاه');
-  const [requesterRole, setRequesterRole] = useState('سرپرست کارگاه');
+  const currentUser = useCurrentUser();
+  const existingNumbers = useAppState().purchaseRequisitions.map((r) => r.requisitionNumber);
+  const [projectId, setProjectId] = useState(projects[0]?.id || '');
+  const [priority, setPriority] = useState<RequisitionPriority>('عادی');
+  const [costCenter, setCostCenter] = useState('');
   const [justification, setJustification] = useState('');
-
-  // Item form states
-  const [items, setItems] = useState<Array<{
-    id: string;
-    materialCode: string;
-    materialName: string;
-    specification: string;
-    category: ProcurementCategory;
-    requestedQty: number;
-    unit: string;
-    estimatedUnitPrice: number;
-    requiredDeliveryDate: string;
-    suggestedVendors?: string;
-  }>>([
-    {
-      id: 'item-1',
-      materialCode: 'MAT-STEEL-001',
-      materialName: 'میلگرد آجدار A3 سایز ۲۰ شاخه ۱۲ متری',
-      specification: 'تولید استاندارد با سرتیفیکیت کشش و خمش',
-      category: 'آهن‌آلات و مقاطع فولادی',
-      requestedQty: 25000,
-      unit: 'کیلوگرم',
-      estimatedUnitPrice: 28500,
-      requiredDeliveryDate: '۱۴۰۳/۰۷/۱۵',
-      suggestedVendors: 'ذوب‌آهن اصفهان، فولاد کویر',
-    },
-  ]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [items, setItems] = useState<DraftItem[]>(() => [emptyItem()]);
 
   if (!isOpen) return null;
 
-  const handleAddItem = () => {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: `item-${Date.now()}`,
-        materialCode: 'MAT-NEW',
-        materialName: '',
-        specification: '',
-        category: 'آهن‌آلات و مقاطع فولادی',
-        requestedQty: 100,
-        unit: 'شاخه',
-        estimatedUnitPrice: 500000,
-        requiredDeliveryDate: '۱۴۰۳/۰۷/۲۰',
-        suggestedVendors: '',
-      },
-    ]);
-  };
+  const handleAddItem = () => setItems((prev) => [...prev, emptyItem()]);
 
   const handleRemoveItem = (id: string) => {
     if (items.length <= 1) return;
     setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
-  const handleUpdateItem = (id: string, field: string, value: any) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, [field]: value } : it))
-    );
+  const handleUpdateItem = <K extends keyof DraftItem>(id: string, field: K, value: DraftItem[K]) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
   };
 
-  const totalAmount = items.reduce(
-    (acc, it) => acc + (it.requestedQty || 0) * (it.estimatedUnitPrice || 0),
-    0
-  );
+  const totalAmount = items.reduce((acc, it) => acc + it.requestedQty * it.estimatedUnitPrice, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const selectedProj = projects.find((p) => p.id === projectId);
-    const prNumber = `PR-1403-0${Math.floor(Math.random() * 50) + 90}`;
+    if (!selectedProj) return setFormError('پروژه را انتخاب کنید.');
+    if (items.some((it) => !it.materialName.trim())) return setFormError('نام کالای هر ردیف را وارد کنید.');
+    if (items.some((it) => it.requestedQty <= 0)) return setFormError('مقدار هر ردیف باید بیش از صفر باشد.');
+    setFormError(null);
 
+    // The requester is the signed-in user; no approval is pre-filled (nobody approves their own request).
     const newReq: PurchaseRequisition = {
-      id: `pr-${Date.now()}`,
-      requisitionNumber: prNumber,
-      date: '۱۴۰۳/۰۷/۰۳',
+      id: generateUUID(),
+      requisitionNumber: nextDocNumber(existingNumbers, 'PR'),
+      date: toPersianDate(new Date()),
       projectId,
-      projectName: selectedProj ? selectedProj.name : 'پروژه عمومی',
-      wbsCode,
-      costCenter,
+      projectName: selectedProj.name,
+      wbsCode: costCenter.trim(),
+      costCenter: costCenter.trim(),
       priority,
       status: 'پیش‌نویس کارگاه',
-      requesterName,
-      requesterRole,
-      justification: justification || 'تقاضای خرید مصالح بر اساس پیشرفت فیزیکی کارگاه و نیاز مبرم خط تولید.',
+      requesterName: currentUser.name,
+      requesterId: currentUser.id,
+      requesterRole: currentUser.role,
+      justification: justification.trim(),
       totalEstimatedAmount: totalAmount,
-      approvals: {
-        siteSupervisor: { approved: true, date: '۱۴۰۳/۰۷/۰۳', signedBy: requesterName },
-      },
+      approvals: {},
       items: items.map((it) => ({
         id: it.id,
-        materialCode: it.materialCode || 'MAT-GEN',
-        materialName: it.materialName || 'مصالح ساختمانی',
+        materialCode: it.materialCode,
+        materialName: it.materialName.trim(),
         specification: it.specification,
         category: it.category,
-        requestedQty: Number(it.requestedQty) || 0,
-        approvedQty: Number(it.requestedQty) || 0,
+        requestedQty: it.requestedQty,
+        approvedQty: it.requestedQty,
         unit: it.unit,
-        estimatedUnitPrice: Number(it.estimatedUnitPrice) || 0,
-        estimatedTotalPrice: (Number(it.requestedQty) || 0) * (Number(it.estimatedUnitPrice) || 0),
+        estimatedUnitPrice: it.estimatedUnitPrice,
+        estimatedTotalPrice: it.requestedQty * it.estimatedUnitPrice,
         requiredDeliveryDate: it.requiredDeliveryDate,
         suggestedVendors: it.suggestedVendors ? [it.suggestedVendors] : [],
       })),
@@ -141,8 +130,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="ثبت تقاضای خرید مصالح و تجهیزات (PR)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+      
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
@@ -211,20 +200,18 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               <label className="block font-bold text-slate-700 mb-1">نام درخواست‌کننده:</label>
               <input
                 type="text"
-                value={requesterName}
-                onChange={(e) => setRequesterName(e.target.value)}
+                value={currentUser.name}
+                readOnly
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                required
               />
             </div>
             <div>
               <label className="block font-bold text-slate-700 mb-1">سمت در کارگاه:</label>
               <input
                 type="text"
-                value={requesterRole}
-                onChange={(e) => setRequesterRole(e.target.value)}
+                value={currentUser.role}
+                readOnly
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                required
               />
             </div>
           </div>
@@ -288,10 +275,9 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-[11px] text-slate-600 mb-1">مقدار درخواستی:</label>
-                      <input
-                        type="number"
+                      <IntegerInput
                         value={item.requestedQty}
-                        onChange={(e) => handleUpdateItem(item.id, 'requestedQty', Number(e.target.value))}
+                        onValueChange={(v) => handleUpdateItem(item.id, 'requestedQty', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
@@ -308,11 +294,10 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">برآورد نرخ فی (تومان):</label>
-                      <input
-                        type="number"
+                      <label className="block text-[11px] text-slate-600 mb-1">برآورد نرخ فی ({moneyUnitLabel()}):</label>
+                      <MoneyInput
                         value={item.estimatedUnitPrice}
-                        onChange={(e) => handleUpdateItem(item.id, 'estimatedUnitPrice', Number(e.target.value))}
+                        onValueChange={(v) => handleUpdateItem(item.id, 'estimatedUnitPrice', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
@@ -357,11 +342,17 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
             />
           </div>
 
+          {formError && (
+            <p className="text-xs text-rose-700 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
+
           {/* Total Bar */}
           <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
             <span className="font-bold text-indigo-900">مجموع برآورد تقریبی تقاضای خرید:</span>
             <span className="font-black text-indigo-800 text-sm font-mono">
-              {totalAmount.toLocaleString('fa-IR')} تومان
+              {formatMoney(totalAmount)}
             </span>
           </div>
 
@@ -383,7 +374,6 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

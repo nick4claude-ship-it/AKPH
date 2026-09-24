@@ -1,16 +1,19 @@
 import React from 'react';
-import { Project, KpiItem, PettyCash, ProgressStatement } from '../../types';
+import { Project, KpiItem, PettyCashAccount, DetailedProgressStatement } from '../../types';
 import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
 import { toPersianDate, getCurrentFiscalYear } from '../../utils/date';
 import { X, Printer, Download, Building2, CheckCircle2 } from 'lucide-react';
+import { companyLogo } from '../../assets/images';
+import { Dialog } from '../common/Dialog';
+import { moneyUnitLabel } from '../../utils/money';
 
 interface PdfReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   projects: Project[];
   kpis: KpiItem[];
-  pettyCashList: PettyCash[];
-  statements: ProgressStatement[];
+  pettyFunds: PettyCashAccount[];
+  statements: DetailedProgressStatement[];
   targetProject?: Project | null;
 }
 
@@ -19,8 +22,8 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
   onClose,
   projects,
   kpis,
-  pettyCashList,
-  statements,
+  pettyFunds: _pettyFunds,
+  statements: _statements,
   targetProject,
 }) => {
   if (!isOpen) return null;
@@ -36,8 +39,8 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
   const totalReceivables = selectedProjects.reduce((sum, p) => sum + p.receivables, 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl my-auto overflow-hidden animate-in fade-in duration-200">
+    <Dialog onClose={onClose} label="خلاصه شاخص‌های کلیدی مالی شرکت (Executive KPIs)" overlayClassName="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl my-auto overflow-hidden animate-in fade-in duration-200">
+      
         {/* Modal Top Bar (Hidden during print) */}
         <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -70,7 +73,7 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-lg border border-slate-300 p-1 flex items-center justify-center overflow-hidden">
                 <img
-                  src="/src/assets/images/company_logo_emblem_1790176049355.jpg"
+                  src={companyLogo}
                   alt="لوگوی شرکت"
                   className="w-full h-full object-cover"
                 />
@@ -110,7 +113,7 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
               <strong>فیلترهای اعمال‌شده:</strong>{' '}
               {targetProject ? `پروژه اختصاصی: ${targetProject.name} (${targetProject.code})` : 'تمام پروژه‌های عمرانی فعال (۵ پروژه)'} · مبنای محاسبات: تعهدی و جریان نقد
             </div>
-            <div className="font-mono text-slate-500">واحد مبالغ: میلیون و میلیارد تومان</div>
+            <div className="font-mono text-slate-500">واحد مبالغ: {moneyUnitLabel()}</div>
           </div>
 
           {/* KPI Summary Block */}
@@ -220,7 +223,6 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

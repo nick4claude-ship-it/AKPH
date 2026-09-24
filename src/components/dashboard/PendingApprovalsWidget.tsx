@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { PendingApproval } from '../../types';
+import { ApprovalItem } from '../../types';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { CheckCircle2, XCircle, FileText, AlertCircle, Clock, Eye, Check, X } from 'lucide-react';
+import { usePermission } from '../../store/session';
+import { formatInt } from '../../utils/money';
 
 interface PendingApprovalsWidgetProps {
-  approvals: PendingApproval[];
+  approvals: ApprovalItem[];
   onApprove: (id: string) => void;
   onReject: (id: string, reason?: string) => void;
-  onViewDoc: (item: PendingApproval) => void;
+  onViewDoc: (item: ApprovalItem) => void;
 }
 
 export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
@@ -18,11 +20,14 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
 }) => {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const { check } = usePermission();
+  const permissionFor = (item: ApprovalItem) => check(item.action, item.context);
 
-  const pendingList = approvals.filter((a) => a.status === 'pending');
+  const pendingList = approvals;
 
   const handleConfirmReject = (id: string) => {
-    onReject(id, rejectReason || 'عدم تطابق با مستندات پیوست');
+    if (!rejectReason.trim()) return;
+    onReject(id, rejectReason.trim());
     setRejectingId(null);
     setRejectReason('');
   };
@@ -39,11 +44,11 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <span>کارتابل هزینه‌های در انتظار تأیید</span>
               <span className="text-[11px] font-mono bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold">
-                {pendingList.length} سند جدید
+                {formatInt(pendingList.length)} سند جدید
               </span>
             </h3>
             <p className="text-[11px] text-slate-500">
-              بررسی و تأیید/رد فاکتورهای تنخواه، خریدهای مستقیم، ماشین‌آلات و اسناد مالی توسط مدیرعامل
+              بررسی و تأیید/رد فاکتورهای تنخواه، خریدها، صورت‌وضعیت‌ها و اسناد مالی بر اساس نقش شما
             </p>
           </div>
         </div>
@@ -63,12 +68,12 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                 <th className="py-2.5 px-3">شماره سند</th>
                 <th className="py-2.5 px-3">پروژه و مرکز هزینه</th>
                 <th className="py-2.5 px-3">ثبت‌کننده و طرف حساب</th>
-                <th className="py-2.5 px-3">نوع هزینه / سرفصل</th>
+                <th className="py-2.5 px-3">نوع رکورد / مرحله</th>
                 <th className="py-2.5 px-3 text-left">مبلغ کل هزینه</th>
-                <th className="py-2.5 px-3 text-left">پرداخت / بدهی</th>
+                <th className="py-2.5 px-3 text-left">مرحله / پیوست</th>
                 <th className="py-2.5 px-3 text-center">تاریخ</th>
                 <th className="py-2.5 px-3 text-center">مستند</th>
-                <th className="py-2.5 px-3 text-center">دستور مدیرعامل</th>
+                <th className="py-2.5 px-3 text-center">اقدام</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -83,25 +88,25 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                   <td className="py-3 px-3">
                     <div className="font-bold text-slate-900">{item.projectName}</div>
                     <div className="text-[11px] text-slate-500 truncate max-w-44">
-                      {item.costCenter}
+                      {item.costCenterName || '-'}
                     </div>
                   </td>
 
                   {/* Submitter & Counterparty */}
                   <td className="py-3 px-3">
-                    <div className="text-slate-800 font-medium">{item.submitter}</div>
+                    <div className="text-slate-800 font-medium">{item.requester}</div>
                     <div className="text-[11px] text-slate-500 truncate max-w-36">
-                      فروشنده: {item.counterparty}
+                      طرف حساب: {item.counterpartyName || '-'}
                     </div>
                   </td>
 
                   {/* Expense Type & Classification */}
                   <td className="py-3 px-3">
-                    <span className="font-medium text-slate-800">{item.expenseType}</span>
+                    <span className="font-medium text-slate-800">{item.moduleLabel}</span>
                     <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                      <span className="text-amber-700 font-semibold">{item.category}</span>
+                      <span className="text-amber-700 font-semibold">{item.stage}</span>
                       <span>·</span>
-                      <span>{item.costClassification}</span>
+                      <span>{item.classification}</span>
                     </div>
                   </td>
 
@@ -112,12 +117,10 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
 
                   {/* Payment vs Debt (Expense != Payment principle) */}
                   <td className="py-3 px-3 font-mono tabular-nums text-left text-[11px]">
-                    <div className="text-emerald-700">پرداختی: {formatCurrencyCompact(item.paymentAmount)}</div>
-                    {item.pendingLiability > 0 && (
-                      <div className="text-rose-600 font-medium">
-                        بدهی: {formatCurrencyCompact(item.pendingLiability)}
-                      </div>
-                    )}
+                    <div className="text-slate-500">تأییدکننده: {item.approverRole}</div>
+                    <div className={item.documentCount ? 'text-emerald-700' : 'text-rose-600 font-medium'}>
+                      {item.documentCount ? `${formatInt(item.documentCount)} سند پیوست` : 'بدون سند پیوست'}
+                    </div>
                   </td>
 
                   {/* Date */}
@@ -150,7 +153,8 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                         />
                         <button
                           onClick={() => handleConfirmReject(item.id)}
-                          className="bg-rose-600 text-white p-1 rounded hover:bg-rose-700 cursor-pointer"
+                          disabled={!rejectReason.trim()}
+                          className="disabled:opacity-40 bg-rose-600 text-white p-1 rounded hover:bg-rose-700 cursor-pointer"
                           title="تأیید رد سند"
                         >
                           <Check className="w-3 h-3" />
@@ -167,14 +171,17 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                       <div className="flex items-center gap-1.5 justify-center">
                         <button
                           onClick={() => onApprove(item.id)}
-                          className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs"
+                          disabled={!permissionFor(item).ok}
+                          title={permissionFor(item).reason}
+                          className="disabled:opacity-40 flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs"
                         >
                           <Check className="w-3 h-3" />
                           <span>تأیید</span>
                         </button>
                         <button
                           onClick={() => setRejectingId(item.id)}
-                          className="flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
+                          disabled={!permissionFor(item).ok}
+                          className="disabled:opacity-40 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
                         >
                           <X className="w-3 h-3" />
                           <span>رد</span>

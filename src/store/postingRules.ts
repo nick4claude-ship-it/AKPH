@@ -3,681 +3,546 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  FinancialEvent,
-  JournalEntry,
-  JournalEntryRow,
-  JournalEntryType,
-  AccountNode,
-} from '../types';
-import { mockChartOfAccounts } from '../data/accountingMockData';
-import { toPersianDate, toPersianTime, getCurrentFiscalYear } from '../utils/date';
-import { generateUUID, getNextSequentialDocNumber } from '../utils/ids';
-import { getCounterpartyName } from '../data/counterpartiesMockData';
+import { AccountNode, FinancialEvent, FinancialEventType, JournalEntryType, DeductionType } from '../types';
 
 /**
- * Recursively search the official Chart of Accounts by ASCII account code.
- * Ensures all posting rules strictly resolve codes through AccountNode.code.
+ * جدول قواعد ثبت: هر نوع رویداد مالی به یک تابع قاعده نگاشت می‌شود که ردیف‌های سند دوبل را می‌سازد.
+ * کد حساب‌ها فقط از کدینگ حسابداری (AccountNode.code) خوانده می‌شود؛ کد ناموجود خطا می‌دهد.
  */
-export function findAccountNode(code: string, tree: AccountNode[] = mockChartOfAccounts): AccountNode | null {
-  for (const node of tree) {
-    if (node.code === code) return node;
-    if (node.children && node.children.length > 0) {
-      const found = findAccountNode(code, node.children);
-      if (found) return found;
-    }
-  }
-  return null;
+
+export interface PostingRow {
+  accountCode: string;
+  accountName: string;
+  description: string;
+  debit: number;
+  credit: number;
+  subledgerCode?: string;
+  subledgerName?: string;
+  projectId?: string;
+  projectName?: string;
+  costCenterId?: string;
+  costCenterName?: string;
 }
 
-/**
- * Helper to safely fetch an account name or throw an error if account code is invalid.
- */
-function getAccountOrThrow(code: string): { code: string; title: string } {
-  const node = findAccountNode(code);
-  if (!node) {
-    throw new Error(`[PostingEngine] Invalid account code '${code}' not found in Chart of Accounts!`);
-  }
-  return { code: node.code, title: node.title };
-}
-
-export interface PostingRuleResult {
+export interface PostingRuleOutput {
   entryType: JournalEntryType;
   title: string;
-  rows: Array<{
-    accountCode: string;
-    description: string;
-    debit: number;
-    credit: number;
-    subledgerCode?: string;
-    subledgerName?: string;
-    projectId?: string;
-    projectName?: string;
-    costCenterId?: string;
-    costCenterName?: string;
-  }>;
+  rows: PostingRow[];
 }
 
-/**
- * Definitive Rule-Based Posting Engine mapping Financial Events to balanced Double-Entry Journal Entries.
- */
-export function generatePostingRows(
-  event: FinancialEvent,
-  projectName?: string,
-  costCenterName?: string
-): PostingRuleResult {
-  const counterpartyName = getCounterpartyName(event.counterpartyId) || 'نامشخص';
-  const rows: PostingRuleResult['rows'] = [];
-  let entryType: JournalEntryType = 'عمومی';
-  let title = '';
+export interface PostingContext {
+  /** Resolves an account from the chart of accounts, throwing if the code does not exist. */
+  account: (code: string) => AccountNode;
+  counterpartyName: string;
+  projectName?: string;
+  costCenterName?: string;
+  /** True when the event's cost center is a headquarters/overhead center (not a project site). */
+  isOverheadCostCenter: (costCenterId?: string) => boolean;
+  costCenterNameOf: (costCenterId?: string) => string | undefined;
+  projectNameOf: (projectId?: string) => string | undefined;
+}
 
-  switch (event.type) {
-    // 1. خرید کالای انباری - رسید انبار: موجودی انبار / کالای دریافتی فاکتورنشده (بدون هزینه پروژه)
-    case 'GOODS_RECEIPT': {
-      entryType = 'انبارداری';
-      title = `رسید انبار شماره ${event.sourceId} - ثبت موقت موجودی انبار مصالح`;
-      const invAcc = getAccountOrThrow('11501'); // موجودی انبار مصالح و اقلام پای کار
-      const clearingAcc = getAccountOrThrow('21401'); // کالای دریافتی فاکتورنشده (حساب موقت انبار)
+export type PostingRule = (event: FinancialEvent, ctx: PostingContext) => PostingRuleOutput;
 
-      rows.push({
-        accountCode: invAcc.code,
-        description: `ورود مصالح به انبار بابت رسید ${event.sourceId} از تأمین‌کننده ${counterpartyName}`,
-        debit: event.amount,
-        credit: 0,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
+export interface DeductionLine {
+  type: string;
+  amount: number;
+  title?: string;
+}
 
-      rows.push({
-        accountCode: clearingAcc.code,
-        description: `بستانکاری موقت کالای دریافتی فاکتورنشده (رسید ${event.sourceId}) تا دریافت فاکتور رسمی`,
-        debit: 0,
-        credit: event.amount,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-      break;
-    }
+/** Posting accounts, by role. Every code must exist in the chart of accounts. */
+export const ACCOUNTS = {
+  bank: '11101',
+  cashDesk: '11102',
+  pettyCash: '11103',
+  receivables: '11201',
+  loansToStaff: '11303',
+  purchaseVat: '11304',
+  advanceToSubcontractors: '11402',
+  inventory: '11501',
+  supplierPayables: '21101',
+  subcontractorPayables: '21102',
+  insurancePayable: '21201',
+  salesVatPayable: '21202',
+  payrollTaxPayable: '21203',
+  subcontractorWithholdingTax: '21204',
+  grniClearing: '21401',
+  salaryPayable: '21501',
+  subRetention: '21601',
+  subInsurance: '21602',
+  subOtherDeductions: '21603',
+  bankSuspense: '21701',
+  retainedEarnings: '33',
+  clientAdvances: '21301',
+  contractRevenue: '41101',
+  clientSuppliedMaterials: '41102',
+  stocktakeGain: '41301',
+  otherIncome: '41302',
+  materialsCost: '51101',
+  purchasePriceVariance: '51102',
+  siteLaborCost: '51201',
+  subcontractorCost: '51301',
+  hqSalaryCost: '61101',
+  bankFees: '62101',
+  stocktakeLoss: '62401',
+  cashShortage: '62402',
+} as const;
 
-    // 2. خرید کالای انباری - فاکتور تأمین‌کننده: بستن حساب موقت انبار + ارزش‌افزوده / بستانکاران تجاری (بدون هزینه پروژه)
-    case 'VENDOR_INVOICE': {
-      entryType = 'خرید';
-      title = `فاکتور خرید تأمین‌کننده ${counterpartyName} (عطف ${event.sourceId})`;
-      const clearingAcc = getAccountOrThrow('21401'); // کالای دریافتی فاکتورنشده
-      const vatAcc = getAccountOrThrow('11304'); // مالیات بر ارزش افزوده خرید (اعتبار مالیاتی)
-      const payableAcc = getAccountOrThrow('21101'); // بستانکاران تأمین‌کننده مصالح
+/** کسورات صورت‌وضعیت کارفرما: هر نوع کسر در حساب اختصاصی خودش. */
+export const CLIENT_DEDUCTION_ACCOUNTS: Record<DeductionType, string> = {
+  advance_payment: '21301', // استهلاک پیش‌دریافت (کاهش بدهی)
+  retention: '11301', // سپرده حسن انجام کار نزد کارفرما
+  insurance: '11302', // سپرده بیمه ماده ۳۸ نزد کارفرما
+  tax: '11305', // مالیات تکلیفی مکسوره توسط کارفرما
+  materials: '41102', // مصالح تحویلی کارفرما: کسر درآمد پیمان (نه دارایی)
+  vat: '11307', // ارزش افزوده مکسوره نزد کارفرما
+  penalties: '62301', // جرائم تأخیر
+  on_account: '21302', // علی‌الحساب‌های دریافتی قبلی
+  other: '11308', // سایر کسورات
+};
 
-      const subtotal = event.details?.subtotal ?? event.amount;
-      const vatAmount = event.details?.vatAmount ?? (event.amount - subtotal);
-      const totalPayable = subtotal + vatAmount;
+/** کسورات صورت‌وضعیت پیمانکار جزء. */
+export const SUBCONTRACTOR_DEDUCTION_ACCOUNTS: Record<string, string> = {
+  retention: '21601',
+  insurance: '21602',
+  tax: '21204', // مالیات تکلیفی مکسوره از پیمانکار (بدهی به سازمان امور مالیاتی)
+  advance_payment: '11402',
+  penalty: '21603',
+  other: '21603',
+};
 
-      rows.push({
-        accountCode: clearingAcc.code,
-        description: `تسویه حساب موقت انبار بابت فاکتور خرید ${event.sourceId}`,
-        debit: subtotal,
-        credit: 0,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
+/** حساب طرف بدهکار در پرداخت‌های خزانه بر اساس نوع بدهی. */
+export const PAYABLE_ACCOUNTS: Record<string, string> = {
+  supplier: '21101',
+  subcontractor: '21102',
+  payroll: '21501',
+  insurance: '21201',
+  tax_vat: '21202',
+  tax_payroll: '21203',
+  tax_withholding: '21204',
+  petty_cash: '11103',
+  advance: '11401', // پیش‌پرداخت خرید
+  subcontractor_advance: '11402', // پیش‌پرداخت پیمانکار جزء (همان حسابی که استهلاک از آن کسر می‌شود)
+  general_expense: '612', // فقط برای «سایر هزینه‌های عمومی» صریح؛ نوع ناشناخته خطاست
+};
 
-      if (vatAmount > 0) {
-        rows.push({
-          accountCode: vatAcc.code,
-          description: `اعتبار مالیات بر ارزش افزوده خرید ۱۰٪ فاکتور ${event.sourceId}`,
-          debit: vatAmount,
-          credit: 0,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-        });
-      }
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
-      rows.push({
-        accountCode: payableAcc.code,
-        description: `بستانکاری تأمین‌کننده ${counterpartyName} بابت فاکتور خرید ${event.sourceId}`,
-        debit: 0,
-        credit: totalPayable,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-      break;
-    }
+function row(
+  ctx: PostingContext,
+  code: string,
+  description: string,
+  debit: number,
+  credit: number,
+  extra: Partial<PostingRow> = {}
+): PostingRow {
+  const node = ctx.account(code);
+  return { accountCode: node.code, accountName: node.title, description, debit, credit, ...extra };
+}
 
-    // 3. مصرف انبار: بدهکار بهای تمام‌شده پروژه (مرکز هزینه) / بستانکار موجودی انبار به میانگین موزون (افزایش هزینه پروژه)
-    case 'STORE_ISSUE': {
-      entryType = 'انبارداری';
-      title = `حواله مصرف انبار ${event.sourceId} در مرکز هزینه ${costCenterName || event.costCenterId}`;
-      const projectCostAcc = getAccountOrThrow('51101'); // هزینه مصالح مصرفی مستقیم در کارگاه‌ها
-      const invAcc = getAccountOrThrow('11501'); // موجودی انبار مصالح
+function projectTags(event: FinancialEvent, ctx: PostingContext): Partial<PostingRow> {
+  return {
+    projectId: event.projectId || undefined,
+    projectName: ctx.projectName,
+    costCenterId: event.costCenterId || undefined,
+    costCenterName: ctx.costCenterName,
+  };
+}
 
-      rows.push({
-        accountCode: projectCostAcc.code,
-        description: `بهای تمام‌شده مستقیم مصرف مصالح حواله ${event.sourceId} در پروژه ${projectName || event.projectId}`,
-        debit: event.amount,
-        credit: 0,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
+function partyTags(event: FinancialEvent, ctx: PostingContext): Partial<PostingRow> {
+  return { subledgerCode: event.counterpartyId, subledgerName: ctx.counterpartyName };
+}
 
-      rows.push({
-        accountCode: invAcc.code,
-        description: `خروج مصالح از انبار به بهای میانگین موزون مصرفی حواله ${event.sourceId}`,
-        debit: 0,
-        credit: event.amount,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-      break;
-    }
-
-    // 4. صورت‌وضعیت کارفرما پس از تأیید: بدهکار مطالبات و کسورات / بستانکار درآمد کارکرد و ارزش‌افزوده (متوازن)
-    case 'CLIENT_STATEMENT_APPROVED': {
-      entryType = 'فروش';
-      title = `شناسایی درآمد و مطالبات صورت‌وضعیت کارفرما ${event.sourceId}`;
-      const receivablesAcc = getAccountOrThrow('11201'); // مطالبات از کارفرمایان
-      const retentionAcc = getAccountOrThrow('11301'); // سپرده حسن انجام کار نزد کارفرما
-      const insuranceAcc = getAccountOrThrow('11302'); // سپرده بیمه ماده ۳۸
-      const advanceAcc = getAccountOrThrow('21301'); // پیش‌دریافت کارفرما
-      const revenueAcc = getAccountOrThrow('41101'); // درآمد کارکرد پیمانکاری
-      const salesVatAcc = getAccountOrThrow('21202'); // مالیات بر ارزش افزوده فروش
-
-      const grossAmount = event.details?.grossAmount ?? event.amount;
-      const vatAmount = event.details?.vatAmount ?? 0;
-      const retention = event.details?.retentionAmount ?? Math.round(grossAmount * 0.1);
-      const insurance = event.details?.insuranceDeduction ?? Math.round(grossAmount * 0.05);
-      const advanceAmort = event.details?.advanceAmortization ?? 0;
-      const otherDeductions = event.details?.otherDeductions ?? 0;
-
-      // Net approved receivables
-      const netReceivable = (grossAmount + vatAmount) - (retention + insurance + advanceAmort + otherDeductions);
-
-      rows.push({
-        accountCode: receivablesAcc.code,
-        description: `خالص مطالبات قابل وصول از کارفرما ${counterpartyName} صورت‌وضعیت ${event.sourceId}`,
-        debit: netReceivable,
-        credit: 0,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      if (retention > 0) {
-        rows.push({
-          accountCode: retentionAcc.code,
-          description: `کسر سپرده حسن انجام کار ۱۰٪ صورت‌وضعیت ${event.sourceId}`,
-          debit: retention,
-          credit: 0,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-          projectId: event.projectId,
-          projectName,
-        });
-      }
-
-      if (insurance > 0) {
-        rows.push({
-          accountCode: insuranceAcc.code,
-          description: `کسر ودیعه بیمه ماده ۳۸ تأمین اجتماعی ۵٪ صورت‌وضعیت ${event.sourceId}`,
-          debit: insurance,
-          credit: 0,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-          projectId: event.projectId,
-          projectName,
-        });
-      }
-
-      if (advanceAmort > 0) {
-        rows.push({
-          accountCode: advanceAcc.code,
-          description: `استهلاک اقساط پیش‌دریافت کارفرما صورت‌وضعیت ${event.sourceId}`,
-          debit: advanceAmort,
-          credit: 0,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-          projectId: event.projectId,
-          projectName,
-        });
-      }
-
-      if (otherDeductions > 0) {
-        const otherAcc = getAccountOrThrow('11303');
-        rows.push({
-          accountCode: otherAcc.code,
-          description: `سایر کسورات قانونی و کارگاهی صورت‌وضعیت ${event.sourceId}`,
-          debit: otherDeductions,
-          credit: 0,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-          projectId: event.projectId,
-          projectName,
-        });
-      }
-
-      rows.push({
-        accountCode: revenueAcc.code,
-        description: `شناسایی درآمد ناخالص کارکرد مصوب صورت‌وضعیت ${event.sourceId} پروژه ${projectName || event.projectId}`,
-        debit: 0,
-        credit: grossAmount,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      if (vatAmount > 0) {
-        rows.push({
-          accountCode: salesVatAcc.code,
-          description: `مالیات بر ارزش افزوده فروش صورت‌وضعیت ${event.sourceId}`,
-          debit: 0,
-          credit: vatAmount,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-        });
-      }
-      break;
-    }
-
-    // 5. صورت‌وضعیت جزء پس از تأیید مدیرعامل: بدهکار بهای پروژه / بستانکار پرداختنی پیمانکار و کسورات
-    case 'SUBCONTRACTOR_STATEMENT_APPROVED': {
-      entryType = 'عمومی';
-      title = `تأیید صورت‌وضعیت پیمانکار جزء ${counterpartyName} (عطف ${event.sourceId})`;
-      const subCostAcc = getAccountOrThrow('51301'); // هزینه قراردادهای پیمانکاران جزء
-      const subPayableAcc = getAccountOrThrow('21102'); // بستانکاران پیمانکاران جزء
-      const subRetentionAcc = getAccountOrThrow('21601'); // سپرده حسن انجام کار مکسوره پیمانکاران
-      const advanceAmortAcc = getAccountOrThrow('11402'); // پیش‌پرداخت به پیمانکاران جزء
-
-      const grossAmount = event.details?.grossAmount ?? event.amount;
-      const retention = event.details?.retentionAmount ?? Math.round(grossAmount * 0.1);
-      const advanceAmort = event.details?.advanceAmortization ?? 0;
-      const otherDeductions = event.details?.otherDeductions ?? 0;
-      const netPayable = grossAmount - (retention + advanceAmort + otherDeductions);
-
-      rows.push({
-        accountCode: subCostAcc.code,
-        description: `بهای تمام‌شده کارکرد تأییدشده پیمانکار جزء ${counterpartyName} در صورت‌وضعیت ${event.sourceId}`,
-        debit: grossAmount,
-        credit: 0,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      rows.push({
-        accountCode: subPayableAcc.code,
-        description: `خالص بستانکاری قابل پرداخت به پیمانکار جزء ${counterpartyName} (عطف ${event.sourceId})`,
-        debit: 0,
-        credit: netPayable,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      if (retention > 0) {
-        rows.push({
-          accountCode: subRetentionAcc.code,
-          description: `کسر سپرده حسن انجام کار ۱۰٪ پیمانکار جزء ${counterpartyName}`,
-          debit: 0,
-          credit: retention,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-          projectId: event.projectId,
-          projectName,
-        });
-      }
-
-      if (advanceAmort > 0) {
-        rows.push({
-          accountCode: advanceAmortAcc.code,
-          description: `استهلاک پیش‌پرداخت داده‌شده به پیمانکار جزء ${counterpartyName}`,
-          debit: 0,
-          credit: advanceAmort,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-          projectId: event.projectId,
-          projectName,
-        });
-      }
-
-      if (otherDeductions > 0) {
-        const subInsAcc = getAccountOrThrow('21602');
-        rows.push({
-          accountCode: subInsAcc.code,
-          description: `سایر کسورات و بیمه مکسوره پیمانکار جزء ${counterpartyName}`,
-          debit: 0,
-          credit: otherDeductions,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-        });
-      }
-      break;
-    }
-
-    // 6. حقوق و دستمزد پس از تأیید: بدهکار هزینه حقوق هر مرکز هزینه / بستانکار حقوق، بیمه و مالیات
-    case 'PAYROLL_APPROVED': {
-      entryType = 'حقوق و دستمزد';
-      title = `سند حقوق و دستمزد ماهانه کارگاه/ستاد (عطف ${event.sourceId})`;
-      const isHq = event.costCenterId === 'cc-hq' || !event.projectId;
-      const salaryExpAcc = isHq ? getAccountOrThrow('61101') : getAccountOrThrow('51201');
-      const salaryPayableAcc = getAccountOrThrow('21501'); // حقوق و مزایای پرداختنی
-      const insurancePayableAcc = getAccountOrThrow('21201'); // بیمه پرداختنی
-      const taxPayableAcc = getAccountOrThrow('21202'); // مالیات تکلیفی پرداختنی
-
-      const grossSalary = event.details?.grossSalary ?? event.amount;
-      const netSalary = event.details?.netSalary ?? Math.round(grossSalary * 0.77);
-      const insurance = event.details?.insuranceAmount ?? Math.round(grossSalary * 0.16);
-      const tax = event.details?.taxAmount ?? (grossSalary - (netSalary + insurance));
-
-      rows.push({
-        accountCode: salaryExpAcc.code,
-        description: `هزینه ناخالص حقوق و دستمزد پرسنل در مرکز هزینه ${costCenterName || event.costCenterId}`,
-        debit: grossSalary,
-        credit: 0,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      rows.push({
-        accountCode: salaryPayableAcc.code,
-        description: `خالص حقوق و دستمزد پرداختنی به پرسنل (عطف ${event.sourceId})`,
-        debit: 0,
-        credit: netSalary,
-        costCenterId: event.costCenterId,
-      });
-
-      rows.push({
-        accountCode: insurancePayableAcc.code,
-        description: `حق بیمه سهم کارگر و کارفرما پرداختنی به سازمان تأمین اجتماعی`,
-        debit: 0,
-        credit: insurance,
-        costCenterId: event.costCenterId,
-      });
-
-      if (tax > 0) {
-        rows.push({
-          accountCode: taxPayableAcc.code,
-          description: `مالیات تکلیفی مکسوره حقوق پرداختنی به اداره مالیات`,
-          debit: 0,
-          credit: tax,
-          costCenterId: event.costCenterId,
-        });
-      }
-      break;
-    }
-
-    // 7. هزینه تنخواه پس از تأیید مالی: بدهکار هزینه پروژه / بستانکار وجه صندوق/تنخواه
-    case 'PETTY_CASH_EXPENSE_APPROVED': {
-      entryType = 'تنخواه';
-      title = `سند هزینه تنخواه کارگاهی شماره ${event.sourceId}`;
-      const projectCostAcc = getAccountOrThrow('51101'); // هزینه مستقیم کارگاهی
-      const pettyFundAcc = getAccountOrThrow('11103'); // تنخواه‌گردان‌های کارگاه‌ها
-
-      rows.push({
-        accountCode: projectCostAcc.code,
-        description: `هزینه تنخواه مصوب ${event.sourceId} در مرکز هزینه ${costCenterName || event.costCenterId}`,
-        debit: event.amount,
-        credit: 0,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      rows.push({
-        accountCode: pettyFundAcc.code,
-        description: `کاهش موجودی صندوق تنخواه بابت فاکتور مصوب ${event.sourceId}`,
-        debit: 0,
-        credit: event.amount,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-      });
-      break;
-    }
-
-    // 8. پرداخت خزانه‌داری: بستانکار بانک در برابر بدهکار پرداختنی
-    case 'TREASURY_PAYMENT': {
-      entryType = 'پرداخت';
-      title = `سند پرداخت بانکی حواله/چک ${event.sourceId} به ${counterpartyName}`;
-      const bankAcc = getAccountOrThrow('11101'); // موجودی نزد بانک‌ها
-      
-      // Determine payable account based on counterparty kind / details
-      let payableAcc = getAccountOrThrow('21101'); // تأمین‌کننده پیش‌فرض
-      if (event.details?.payableType === 'subcontractor' || event.counterpartyId.startsWith('cp-sub')) {
-        payableAcc = getAccountOrThrow('21102');
-      } else if (event.details?.payableType === 'payroll' || event.counterpartyId.startsWith('cp-emp')) {
-        payableAcc = getAccountOrThrow('21501');
-      }
-
-      rows.push({
-        accountCode: payableAcc.code,
-        description: `تسویه بدهی و پرداخت به ${counterpartyName} طبق دستور پرداخت ${event.sourceId}`,
-        debit: event.amount,
-        credit: 0,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-        costCenterId: event.costCenterId,
-        costCenterName,
-      });
-
-      rows.push({
-        accountCode: bankAcc.code,
-        description: `خروج وجه از حساب بانکی بابت دستور پرداخت ${event.sourceId}`,
-        debit: 0,
-        credit: event.amount,
-        subledgerCode: event.details?.bankAccountId || 'bank-1',
-        subledgerName: event.details?.bankName || 'بانک تجارت / ملت',
-      });
-      break;
-    }
-
-    // 9. دریافت خزانه‌داری: بدهکار بانک در برابر بستانکار مطالبات
-    case 'TREASURY_RECEIPT': {
-      entryType = 'دریافت';
-      title = `سند دریافت و واریز بانکی ${event.sourceId} از ${counterpartyName}`;
-      const bankAcc = getAccountOrThrow('11101'); // موجودی نزد بانک‌ها
-      const receivableAcc = getAccountOrThrow('11201'); // مطالبات از کارفرمایان
-
-      rows.push({
-        accountCode: bankAcc.code,
-        description: `ورود وجه به حساب بانکی بابت وصول مطالبات کارفرما ${counterpartyName} (عطف ${event.sourceId})`,
-        debit: event.amount,
-        credit: 0,
-        subledgerCode: event.details?.bankAccountId || 'bank-1',
-        subledgerName: event.details?.bankName || 'بانک تجارت',
-      });
-
-      rows.push({
-        accountCode: receivableAcc.code,
-        description: `کاهش مانده مطالبات کارفرما ${counterpartyName} بابت واریزی ${event.sourceId}`,
-        debit: 0,
-        credit: event.amount,
-        subledgerCode: event.counterpartyId,
-        subledgerName: counterpartyName,
-        projectId: event.projectId,
-        projectName,
-      });
-      break;
-    }
-
-    // 10. مغایرت بانکی: رفع مغایرت واریز یا برداشت با وضعیت تطبیق
-    case 'BANK_RECONCILIATION_MATCH': {
-      const isDeposit = event.details?.type === 'واریز';
-      const bankAcc = getAccountOrThrow('11101');
-      if (isDeposit) {
-        entryType = 'دریافت';
-        title = `سند رفع مغایرت بانکی: واریز فاقد سند دفتری (${event.sourceId})`;
-        const suspenseAcc = getAccountOrThrow('21101'); // بستانکاران متفرقه / معلق
-
-        rows.push({
-          accountCode: bankAcc.code,
-          description: `ثبت ورود وجه واریزی بانکی نامشخص طبق صورت‌حساب بانک (عطف ${event.sourceId})`,
-          debit: event.amount,
-          credit: 0,
-          subledgerCode: event.details?.bankAccountId || 'bank-1',
-          subledgerName: 'بانک عامل',
-        });
-
-        rows.push({
-          accountCode: suspenseAcc.code,
-          description: `شناسایی بستانکاری موقت تا تعیین منشأ واریز بانکی ${event.sourceId}`,
-          debit: 0,
-          credit: event.amount,
-          subledgerCode: event.counterpartyId,
-          subledgerName: counterpartyName,
-        });
-      } else {
-        entryType = 'پرداخت';
-        title = `سند رفع مغایرت بانکی: کارمزد یا برداشت بانکی فاقد سند (${event.sourceId})`;
-        const bankFeeAcc = getAccountOrThrow('62101'); // کارمزد خدمات بانکی
-
-        rows.push({
-          accountCode: bankFeeAcc.code,
-          description: `هزینه کارمزد بانکی و خدمات الکترونیک تراکنش ${event.sourceId}`,
-          debit: event.amount,
-          credit: 0,
-          costCenterId: 'cc-hq',
-          costCenterName: 'ستاد مرکزی',
-        });
-
-        rows.push({
-          accountCode: bankAcc.code,
-          description: `برداشت کارمزد طبق صورت‌حساب رسمی بانک (عطف ${event.sourceId})`,
-          debit: 0,
-          credit: event.amount,
-          subledgerCode: event.details?.bankAccountId || 'bank-1',
-          subledgerName: 'بانک عامل',
-        });
-      }
-      break;
-    }
-
-    default:
-      throw new Error(`[PostingEngine] Unsupported financial event type: ${event.type}`);
+function requireDetail<T>(event: FinancialEvent, key: string): T {
+  const value = event.details?.[key];
+  if (value === undefined || value === null) {
+    throw new Error(`[PostingEngine] رویداد ${event.type} فاقد جزئیات الزامی «${key}» است.`);
   }
-
-  return { entryType, title, rows };
+  return value as T;
 }
 
-/**
- * Creates a balanced JournalEntry from a FinancialEvent.
- * Strictly verifies that totalDebit === totalCredit and account codes are valid.
- */
-export function buildJournalEntry(
-  event: FinancialEvent,
-  existingDocNumbers: string[],
-  submitter: string = 'مدیر مالی',
-  projectName?: string,
-  costCenterName?: string
-): { success: boolean; entry?: JournalEntry; error?: string } {
-  try {
-    const { entryType, title, rows: rawRows } = generatePostingRows(event, projectName, costCenterName);
+export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
+  // رسید انبار: بدهکار موجودی / بستانکار کالای دریافتی فاکتورنشده. هزینه پروژه تغییر نمی‌کند.
+  GOODS_RECEIPT: (e, ctx) => ({
+    entryType: 'انبارداری',
+    title: `رسید انبار ${e.details?.docNumber || e.sourceId} از ${ctx.counterpartyName}`,
+    rows: [
+      row(ctx, ACCOUNTS.inventory, `ورود کالا به انبار طبق رسید ${e.details?.docNumber || e.sourceId}`, e.amount, 0, {
+        ...projectTags(e, ctx),
+        subledgerCode: e.details?.warehouseId,
+        subledgerName: e.details?.warehouseName,
+      }),
+      row(ctx, ACCOUNTS.grniClearing, `کالای دریافتی فاکتورنشده - ${ctx.counterpartyName}`, 0, e.amount, {
+        ...partyTags(e, ctx),
+        projectId: e.projectId || undefined,
+        projectName: ctx.projectName,
+      }),
+    ],
+  }),
 
-    const docNumber = getNextSequentialDocNumber(
-      existingDocNumbers,
-      'ACC',
-      4,
-      getCurrentFiscalYear()
-    );
+  // فاکتور خرید: حساب کالای فاکتورنشده به ارزش رسید انبار بسته می‌شود؛ اختلاف قیمت فاکتور با رسید به
+  // حساب مغایرت قیمت خرید؛ ارزش‌افزوده خرید جدا؛ بستانکار پرداختنی تأمین‌کننده (جمع فاکتور).
+  VENDOR_INVOICE: (e, ctx) => {
+    const subtotal = requireDetail<number>(e, 'subtotal');
+    const vat = e.details?.vatAmount ?? 0;
+    const receiptValue: number = e.details?.receiptValue ?? subtotal;
+    const variance = subtotal - receiptValue;
+    const ref = e.details?.docNumber || e.sourceId;
+    const party = { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName };
+    const rows = [row(ctx, ACCOUNTS.grniClearing, `تسویه کالای دریافتی فاکتورنشده (ارزش رسید) با فاکتور ${ref}`, receiptValue, 0, party)];
+    if (variance > 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `مغایرت قیمت فاکتور ${ref} با رسید انبار`, variance, 0, projectTags(e, ctx)));
+    if (vat > 0) rows.push(row(ctx, ACCOUNTS.purchaseVat, `ارزش افزوده خرید فاکتور ${ref}`, vat, 0, partyTags(e, ctx)));
+    rows.push(row(ctx, ACCOUNTS.supplierPayables, `بستانکاری ${ctx.counterpartyName} بابت فاکتور ${ref}`, 0, subtotal + vat, party));
+    if (variance < 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `مغایرت قیمت فاکتور ${ref} با رسید انبار`, 0, -variance, projectTags(e, ctx)));
+    return { entryType: 'خرید', title: `فاکتور خرید ${ref} - ${ctx.counterpartyName}`, rows };
+  },
 
-    let totalDebit = 0;
-    let totalCredit = 0;
-
-    const rows: JournalEntryRow[] = rawRows.map((r) => {
-      const node = findAccountNode(r.accountCode);
-      const accountName = node ? node.title : 'حساب نامشخص';
-      totalDebit += r.debit;
-      totalCredit += r.credit;
-
-      return {
-        id: generateUUID(),
-        accountCode: r.accountCode,
-        accountName,
-        subledgerCode: r.subledgerCode || '',
-        subledgerName: r.subledgerName || '',
-        description: r.description,
-        debit: r.debit,
-        credit: r.credit,
-        projectId: r.projectId,
-        projectName: r.projectName,
-        costCenterId: r.costCenterId,
-        costCenterName: r.costCenterName,
-      };
-    });
-
-    // Check balance
-    if (Math.abs(totalDebit - totalCredit) > 1) { // 1 Rial/Toman rounding tolerance
-      return {
-        success: false,
-        error: `[PostingEngine] Unbalanced voucher for event ${event.type}: Total Debit (${totalDebit}) !== Total Credit (${totalCredit})`,
-      };
-    }
-
-    const now = new Date();
-    const entry: JournalEntry = {
-      id: generateUUID(),
-      docNumber,
-      date: event.date || toPersianDate(now),
-      title,
-      type: entryType,
-      projectId: event.projectId,
-      projectName,
-      costCenterId: event.costCenterId,
-      costCenterName,
-      submitter,
-      status: 'ثبت قطعی',
-      rows,
-      totalDebit,
-      totalCredit,
-      isBalanced: true,
-      history: [
-        {
-          date: toPersianDate(now),
-          time: toPersianTime(now),
-          user: submitter,
-          action: `صدور خودکار سند حسابداری از رویداد مالی [${event.type}]`,
-          note: `منبع: ${event.sourceModule} / شناسه: ${event.sourceId}`,
-        },
+  // مصرف انبار: بدهکار بهای پروژه (مرکز هزینه) / بستانکار موجودی، به قیمت میانگین موزون.
+  STORE_ISSUE: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    return {
+      entryType: 'انبارداری',
+      title: `حواله مصرف ${ref} - ${ctx.costCenterName || ctx.projectName || ''}`.trim(),
+      rows: [
+        row(ctx, ACCOUNTS.materialsCost, `مصرف مصالح طبق حواله ${ref} به بهای میانگین موزون`, e.amount, 0, projectTags(e, ctx)),
+        row(ctx, ACCOUNTS.inventory, `خروج کالا از انبار طبق حواله ${ref}`, 0, e.amount, {
+          ...projectTags(e, ctx),
+          subledgerCode: e.details?.warehouseId,
+          subledgerName: e.details?.warehouseName,
+        }),
       ],
     };
+  },
 
-    return { success: true, entry };
-  } catch (err: any) {
-    return { success: false, error: err?.message || String(err) };
-  }
-}
+  // صورت‌وضعیت کارفرما پس از تأیید کارفرما: مطالبات + کسورات (هر کسر در حساب خودش) = درآمد + ارزش‌افزوده.
+  CLIENT_STATEMENT_APPROVED: (e, ctx) => {
+    const vat = e.details?.vatAmount ?? 0;
+    const deductions = (e.details?.deductions ?? []) as DeductionLine[];
+    const ref = e.details?.docNumber || e.sourceId;
+    const totalDeductions = sum(deductions.map((d) => d.amount));
+    const netReceivable = e.amount - totalDeductions;
+    if (netReceivable < 0) {
+      throw new Error(`[PostingEngine] جمع کسورات صورت‌وضعیت ${ref} از مبلغ ناخالص بیشتر است.`);
+    }
+    const rows = [
+      row(ctx, ACCOUNTS.receivables, `خالص مطالبات صورت‌وضعیت ${ref}`, netReceivable, 0, {
+        ...partyTags(e, ctx),
+        ...projectTags(e, ctx),
+      }),
+    ];
+    for (const d of deductions) {
+      if (d.amount <= 0) continue;
+      const code = CLIENT_DEDUCTION_ACCOUNTS[d.type as DeductionType];
+      if (!code) throw new Error(`[PostingEngine] نوع کسر «${d.type}» حساب تعریف‌شده ندارد.`);
+      rows.push(
+        row(ctx, code, `${d.title || 'کسر'} صورت‌وضعیت ${ref}`, d.amount, 0, {
+          ...partyTags(e, ctx),
+          projectId: e.projectId || undefined,
+          projectName: ctx.projectName,
+        })
+      );
+    }
+    rows.push(
+      row(ctx, ACCOUNTS.contractRevenue, `درآمد کارکرد مصوب صورت‌وضعیت ${ref}`, 0, e.amount - vat, projectTags(e, ctx))
+    );
+    if (vat > 0) {
+      rows.push(row(ctx, ACCOUNTS.salesVatPayable, `ارزش افزوده فروش صورت‌وضعیت ${ref}`, 0, vat, partyTags(e, ctx)));
+    }
+    return { entryType: 'صورت وضعیت', title: `شناسایی درآمد صورت‌وضعیت ${ref} - ${ctx.counterpartyName}`, rows };
+  },
+
+  // صورت‌وضعیت جزء پس از تأیید مدیر ارشد: بدهکار بهای پروژه / بستانکار پرداختنی پیمانکار و کسورات.
+  SUBCONTRACTOR_STATEMENT_APPROVED: (e, ctx) => {
+    const deductions = (e.details?.deductions ?? []) as DeductionLine[];
+    const ref = e.details?.docNumber || e.sourceId;
+    const totalDeductions = sum(deductions.map((d) => d.amount));
+    const netPayable = e.amount - totalDeductions;
+    if (netPayable < 0) {
+      throw new Error(`[PostingEngine] جمع کسورات صورت‌وضعیت ${ref} از مبلغ کارکرد بیشتر است.`);
+    }
+    const rows = [
+      row(ctx, ACCOUNTS.subcontractorCost, `کارکرد تأییدشده ${ctx.counterpartyName} - ${ref}`, e.amount, 0, {
+        ...partyTags(e, ctx),
+        ...projectTags(e, ctx),
+      }),
+      row(ctx, ACCOUNTS.subcontractorPayables, `خالص قابل پرداخت به ${ctx.counterpartyName} - ${ref}`, 0, netPayable, {
+        ...partyTags(e, ctx),
+        projectId: e.projectId || undefined,
+        projectName: ctx.projectName,
+      }),
+    ];
+    for (const d of deductions) {
+      if (d.amount <= 0) continue;
+      const code = SUBCONTRACTOR_DEDUCTION_ACCOUNTS[d.type];
+      if (!code) throw new Error(`[PostingEngine] نوع کسر «${d.type}» حساب تعریف‌شده ندارد.`);
+      const extra: Partial<PostingRow> = { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName };
+      rows.push(
+        d.type === 'advance_payment'
+          ? row(ctx, code, `استهلاک پیش‌پرداخت ${ctx.counterpartyName} - ${ref}`, 0, d.amount, extra)
+          : row(ctx, code, `${d.title || 'کسر'} ${ctx.counterpartyName} - ${ref}`, 0, d.amount, extra)
+      );
+    }
+    return { entryType: 'صورت وضعیت', title: `تأیید صورت‌وضعیت پیمانکار جزء ${ref} - ${ctx.counterpartyName}`, rows };
+  },
+
+  // حقوق پس از تأیید: بدهکار هزینه حقوق هر مرکز هزینه / بستانکار حقوق پرداختنی، بیمه، مالیات و مساعده.
+  PAYROLL_APPROVED: (e, ctx) => {
+    const lines = requireDetail<Array<{ projectId?: string; costCenterId: string; amount: number }>>(e, 'lines');
+    const credits = requireDetail<{ netSalary: number; insurance: number; tax: number; loans?: number }>(e, 'credits');
+    const period = e.details?.period || e.sourceId;
+    const rows: PostingRow[] = lines
+      .filter((l) => l.amount > 0)
+      .map((l) => {
+        const overhead = ctx.isOverheadCostCenter(l.costCenterId);
+        return row(
+          ctx,
+          overhead ? ACCOUNTS.hqSalaryCost : ACCOUNTS.siteLaborCost,
+          `هزینه حقوق و سهم بیمه کارفرما دوره ${period} - ${ctx.costCenterNameOf(l.costCenterId) || l.costCenterId}`,
+          l.amount,
+          0,
+          {
+            projectId: overhead ? undefined : l.projectId,
+            projectName: overhead ? undefined : ctx.projectNameOf(l.projectId),
+            costCenterId: l.costCenterId,
+            costCenterName: ctx.costCenterNameOf(l.costCenterId),
+          }
+        );
+      });
+    rows.push(row(ctx, ACCOUNTS.salaryPayable, `خالص حقوق پرداختنی دوره ${period}`, 0, credits.netSalary));
+    if (credits.insurance > 0) {
+      rows.push(row(ctx, ACCOUNTS.insurancePayable, `بیمه سهم کارگر و کارفرما دوره ${period}`, 0, credits.insurance));
+    }
+    if (credits.tax > 0) {
+      rows.push(row(ctx, ACCOUNTS.payrollTaxPayable, `مالیات حقوق دوره ${period}`, 0, credits.tax));
+    }
+    if ((credits.loans ?? 0) > 0) {
+      rows.push(row(ctx, ACCOUNTS.loansToStaff, `کسر اقساط مساعده پرسنل دوره ${period}`, 0, credits.loans!));
+    }
+    return { entryType: 'حقوق و دستمزد', title: `سند حقوق و دستمزد دوره ${period}`, rows };
+  },
+
+  // هزینه تنخواه پس از تأیید مالی: بدهکار هزینه پروژه / بستانکار وجه همان صندوق تنخواه.
+  PETTY_CASH_EXPENSE_APPROVED: (e, ctx) => {
+    const pettyCashId = requireDetail<string>(e, 'pettyCashId');
+    const requested: string | undefined = e.details?.expenseAccountCode;
+    let expenseCode: string = ACCOUNTS.materialsCost;
+    if (requested && /^[56]/.test(requested)) {
+      ctx.account(requested);
+      expenseCode = requested;
+    }
+    const ref = e.details?.docNumber || e.sourceId;
+    return {
+      entryType: 'تنخواه',
+      title: `هزینه تنخواه ${ref} - ${e.details?.pettyCashTitle || ''}`.trim(),
+      rows: [
+        row(ctx, expenseCode, `${e.details?.description || 'هزینه تنخواه'} (${ref})`, e.amount, 0, {
+          ...projectTags(e, ctx),
+          subledgerCode: e.counterpartyId,
+          subledgerName: ctx.counterpartyName,
+        }),
+        row(ctx, ACCOUNTS.pettyCash, `کسر از تنخواه ${e.details?.pettyCashTitle || pettyCashId} بابت ${ref}`, 0, e.amount, {
+          subledgerCode: pettyCashId,
+          subledgerName: e.details?.pettyCashTitle,
+          projectId: e.projectId || undefined,
+          projectName: ctx.projectName,
+        }),
+      ],
+    };
+  },
+
+  // شارژ تنخواه از بانک: بدهکار تنخواه / بستانکار بانک.
+  PETTY_CASH_REPLENISHMENT: (e, ctx) => {
+    const pettyCashId = requireDetail<string>(e, 'pettyCashId');
+    const bankAccountId = requireDetail<string>(e, 'bankAccountId');
+    return {
+      entryType: 'پرداخت',
+      title: `شارژ تنخواه ${e.details?.pettyCashTitle || pettyCashId}`,
+      rows: [
+        row(ctx, ACCOUNTS.pettyCash, `واریز شارژ تنخواه طبق حواله ${e.details?.trackingNumber || e.sourceId}`, e.amount, 0, {
+          subledgerCode: pettyCashId,
+          subledgerName: e.details?.pettyCashTitle,
+          projectId: e.projectId || undefined,
+          projectName: ctx.projectName,
+        }),
+        row(ctx, ACCOUNTS.bank, `برداشت بابت شارژ تنخواه ${e.details?.pettyCashTitle || pettyCashId}`, 0, e.amount, {
+          subledgerCode: bankAccountId,
+          subledgerName: e.details?.bankName,
+        }),
+      ],
+    };
+  },
+
+  // پرداخت خزانه: بدهکار حساب پرداختنی / بستانکار بانک یا صندوق.
+  TREASURY_PAYMENT: (e, ctx) => {
+    const payableType = requireDetail<string>(e, 'payableType');
+    const payableCode = PAYABLE_ACCOUNTS[payableType];
+    if (!payableCode) throw new Error(`[PostingEngine] نوع بدهی «${payableType}» برای پرداخت تعریف نشده است.`);
+    const fromCashDesk = Boolean(e.details?.cashDeskId);
+    const sourceId: string = fromCashDesk ? e.details!.cashDeskId : requireDetail<string>(e, 'bankAccountId');
+    const ref = e.details?.docNumber || e.sourceId;
+    return {
+      entryType: 'پرداخت',
+      title: `پرداخت ${ref} به ${ctx.counterpartyName}`,
+      rows: [
+        row(ctx, payableCode, `تسویه بدهی ${ctx.counterpartyName} طبق ${ref}`, e.amount, 0, {
+          ...(payableType === 'petty_cash'
+            ? { subledgerCode: e.details?.pettyCashId, subledgerName: e.details?.pettyCashTitle }
+            : partyTags(e, ctx)),
+          projectId: e.projectId || undefined,
+          projectName: ctx.projectName,
+        }),
+        row(ctx, fromCashDesk ? ACCOUNTS.cashDesk : ACCOUNTS.bank, `خروج وجه بابت ${ref}`, 0, e.amount, {
+          subledgerCode: sourceId,
+          subledgerName: e.details?.bankName,
+        }),
+      ],
+    };
+  },
+
+  // دریافت: بدهکار بانک / بستانکار مطالبات (صورت‌وضعیت)، پیش‌دریافت یا سایر درآمدها.
+  TREASURY_RECEIPT: (e, ctx) => {
+    const bankAccountId = requireDetail<string>(e, 'bankAccountId');
+    const ref = e.details?.docNumber || e.sourceId;
+    const receiptType: 'statement' | 'advance' | 'other_income' = e.details?.receiptType || 'statement';
+    const creditCode =
+      receiptType === 'advance' ? ACCOUNTS.clientAdvances : receiptType === 'other_income' ? ACCOUNTS.otherIncome : ACCOUNTS.receivables;
+    const creditLabel =
+      receiptType === 'advance' ? 'پیش‌دریافت از' : receiptType === 'other_income' ? 'درآمد متفرقه از' : 'کاهش مطالبات';
+    return {
+      entryType: 'دریافت',
+      title: `دریافت ${ref} از ${ctx.counterpartyName}`,
+      rows: [
+        row(ctx, ACCOUNTS.bank, `واریز وجه از ${ctx.counterpartyName} طبق ${ref}`, e.amount, 0, {
+          subledgerCode: bankAccountId,
+          subledgerName: e.details?.bankName,
+        }),
+        row(ctx, creditCode, `${creditLabel} ${ctx.counterpartyName} بابت ${ref}`, 0, e.amount, {
+          ...partyTags(e, ctx),
+          projectId: e.projectId || undefined,
+          projectName: ctx.projectName,
+        }),
+      ],
+    };
+  },
+
+  // برگشت کالا از پروژه به انبار: بدهکار موجودی / بستانکار بهای پروژه (به بهای حواله اصلی).
+  STORE_RETURN: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    const inv = { subledgerCode: e.details?.warehouseId, subledgerName: e.details?.warehouseName };
+    return {
+      entryType: 'انبارداری',
+      title: `برگشت کالا از پروژه به انبار ${ref}`,
+      rows: [
+        row(ctx, ACCOUNTS.inventory, `ورود مجدد کالای برگشتی ${ref}`, e.amount, 0, { ...projectTags(e, ctx), ...inv }),
+        row(ctx, ACCOUNTS.materialsCost, `کاهش بهای مصالح پروژه بابت برگشت ${ref}`, 0, e.amount, projectTags(e, ctx)),
+      ],
+    };
+  },
+
+  // برگشت کالا به تأمین‌کننده: قبل از فاکتور ← کالای فاکتورنشده؛ بعد از فاکتور ← بستانکاران با ارزش‌افزوده
+  // و برگشت ارزش‌افزوده خرید. بستانکار موجودی به بهای خروج.
+  PURCHASE_RETURN: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    const invoiced = Boolean(e.details?.invoiced);
+    const vat: number = invoiced ? e.details?.vatAmount ?? 0 : 0;
+    const inventoryValue: number = e.details?.inventoryValue ?? e.amount;
+    const variance = e.amount - inventoryValue;
+    const party = { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName };
+    const inv = { subledgerCode: e.details?.warehouseId, subledgerName: e.details?.warehouseName, projectId: e.projectId || undefined, projectName: ctx.projectName };
+    const rows = [
+      row(
+        ctx,
+        invoiced ? ACCOUNTS.supplierPayables : ACCOUNTS.grniClearing,
+        `${invoiced ? 'کاهش بدهی' : 'کاهش کالای فاکتورنشده'} ${ctx.counterpartyName} بابت برگشت ${ref}`,
+        e.amount + vat,
+        0,
+        party
+      ),
+      row(ctx, ACCOUNTS.inventory, `خروج کالای مرجوعی ${ref} از انبار به بهای میانگین`, 0, inventoryValue, inv),
+    ];
+    if (vat > 0) rows.push(row(ctx, ACCOUNTS.purchaseVat, `برگشت ارزش افزوده خرید بابت مرجوعی ${ref}`, 0, vat, partyTags(e, ctx)));
+    if (variance > 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `اختلاف قیمت خرید و میانگین موجودی مرجوعی ${ref}`, 0, variance, projectTags(e, ctx)));
+    if (variance < 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `اختلاف قیمت خرید و میانگین موجودی مرجوعی ${ref}`, -variance, 0, projectTags(e, ctx)));
+    return { entryType: 'انبارداری', title: `برگشت از خرید ${ref} به ${ctx.counterpartyName}`, rows };
+  },
+
+  // انتقال بین انبارها: بدهکار موجودی انبار مقصد / بستانکار موجودی انبار مبدأ (زیرحساب هر انبار)، به بهای میانگین.
+  INVENTORY_TRANSFER: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    return {
+      entryType: 'انبارداری',
+      title: `انتقال بین انبارها ${ref}`,
+      rows: [
+        row(ctx, ACCOUNTS.inventory, `ورود کالای انتقالی ${ref} به ${e.details?.targetWarehouseName || ''}`.trim(), e.amount, 0, {
+          subledgerCode: requireDetail<string>(e, 'targetWarehouseId'),
+          subledgerName: e.details?.targetWarehouseName,
+          projectId: e.details?.targetProjectId || undefined,
+        }),
+        row(ctx, ACCOUNTS.inventory, `خروج کالای انتقالی ${ref} از ${e.details?.sourceWarehouseName || ''}`.trim(), 0, e.amount, {
+          subledgerCode: requireDetail<string>(e, 'sourceWarehouseId'),
+          subledgerName: e.details?.sourceWarehouseName,
+          projectId: e.projectId || undefined,
+        }),
+      ],
+    };
+  },
+
+  // تعدیل انبارگردانی: کسری ← هزینه کسری / موجودی؛ اضافی ← موجودی / سایر درآمدها.
+  STOCKTAKE_ADJUSTMENT: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    const inv = { subledgerCode: e.details?.warehouseId, subledgerName: e.details?.warehouseName };
+    // Legacy events carry a single direction; new ones carry loss and gain separately (never netted).
+    const loss: number = e.details?.loss ?? (e.details?.direction === 'loss' ? e.amount : 0);
+    const gain: number = e.details?.gain ?? (e.details?.direction === 'gain' ? e.amount : 0);
+    if (loss + gain !== e.amount) throw new Error(`[PostingEngine] جمع کسری و اضافه انبارگردانی ${ref} با مبلغ رویداد برابر نیست.`);
+    const rows: PostingRow[] = [];
+    if (loss > 0) {
+      rows.push(row(ctx, ACCOUNTS.stocktakeLoss, `کسری انبارگردانی ${ref}`, loss, 0, projectTags(e, ctx)));
+      rows.push(row(ctx, ACCOUNTS.inventory, `کاهش موجودی بابت کسری ${ref}`, 0, loss, inv));
+    }
+    if (gain > 0) {
+      rows.push(row(ctx, ACCOUNTS.inventory, `افزایش موجودی بابت اضافات ${ref}`, gain, 0, inv));
+      rows.push(row(ctx, ACCOUNTS.stocktakeGain, `اضافات انبارگردانی ${ref}`, 0, gain, projectTags(e, ctx)));
+    }
+    return { entryType: 'انبارداری', title: `سند تعدیل انبارگردانی ${ref}`, rows };
+  },
+
+  // مغایرت بانکی: واریز فاقد سند ← بانک / واریز نامشخص؛ برداشت فاقد سند ← کارمزد بانکی / بانک.
+  BANK_RECONCILIATION_MATCH: (e, ctx) => {
+    const bankAccountId = requireDetail<string>(e, 'bankAccountId');
+    const direction = requireDetail<'واریز' | 'برداشت'>(e, 'direction');
+    const desc = e.details?.description || e.sourceId;
+    const bankTags = { subledgerCode: bankAccountId, subledgerName: e.details?.bankName };
+    return direction === 'واریز'
+      ? {
+          entryType: 'دریافت',
+          title: `سند رفع مغایرت بانکی: واریز فاقد سند دفتری`,
+          rows: [
+            row(ctx, ACCOUNTS.bank, `شناسایی واریز طبق صورت‌حساب بانک: ${desc}`, e.amount, 0, bankTags),
+            row(ctx, ACCOUNTS.bankSuspense, `واریز نامشخص در انتظار تعیین تکلیف: ${desc}`, 0, e.amount),
+          ],
+        }
+      : {
+          entryType: 'پرداخت',
+          title: `سند رفع مغایرت بانکی: برداشت فاقد سند دفتری`,
+          rows: [
+            row(ctx, ACCOUNTS.bankFees, `کارمزد/برداشت بانکی: ${desc}`, e.amount, 0),
+            row(ctx, ACCOUNTS.bank, `برداشت طبق صورت‌حساب بانک: ${desc}`, 0, e.amount, bankTags),
+          ],
+        };
+  },
+
+  // سند معکوس: ردیف‌های سند اصلی با جابه‌جایی بدهکار و بستانکار (ردیف‌ها در details.rows).
+  JOURNAL_REVERSAL: (e) => ({
+    entryType: requireDetail<JournalEntryType>(e, 'entryType'),
+    title: `سند معکوس سند ${requireDetail<string>(e, 'originalDocNumber')} - علت: ${e.details?.reason || '-'}`,
+    rows: requireDetail<PostingRow[]>(e, 'rows'),
+  }),
+
+  // بستن حساب‌های موقت سال مالی به سود (زیان) انباشته (ردیف‌ها از مانده دفاتر همان سال محاسبه می‌شود).
+  FISCAL_YEAR_CLOSE: (e) => ({
+    entryType: 'بستن حساب‌ها',
+    title: `سند بستن حساب‌های درآمد و هزینه سال مالی ${requireDetail<number>(e, 'fiscalYear')}`,
+    rows: requireDetail<PostingRow[]>(e, 'rows'),
+  }),
+};

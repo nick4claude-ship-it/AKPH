@@ -17,6 +17,7 @@ import {
   ArrowUpRight,
   TrendingUp,
 } from 'lucide-react';
+import { formatMoneyCompact } from '../../utils/money';
 
 interface ContractsListViewProps {
   contracts: Contract[];
@@ -151,29 +152,29 @@ export const ContractsListView: React.FC<ContractsListViewProps> = ({
                     <span className="text-[10px] text-slate-400 block mt-0.5">مشاور: {c.consultant}</span>
                   </td>
                   <td className="p-3 text-left font-mono">
-                    {(c.initialValue / 1_000_000_000).toFixed(2)} م.ت
+                    {formatMoneyCompact(c.initialValue)}
                   </td>
                   <td className="p-3 text-left font-mono text-emerald-700 font-medium">
                     {c.approvedChangesValue > 0
-                      ? `+${(c.approvedChangesValue / 1_000_000_000).toFixed(2)} م.ت`
+                      ? `+${formatMoneyCompact(c.approvedChangesValue)}`
                       : '-'}
                   </td>
                   <td className="p-3 text-left font-mono font-black text-amber-950">
-                    {(c.currentValue / 1_000_000_000).toFixed(2)} م.ت
+                    {formatMoneyCompact(c.currentValue)}
                   </td>
                   <td className="p-3 text-left font-mono">
                     <span className="font-bold text-indigo-700">
-                      {(c.executedValue / 1_000_000_000).toFixed(2)} م.ت
+                      {formatMoneyCompact(c.executedValue)}
                     </span>
                     <span className="block text-[10px] text-indigo-500 font-bold">
                       {execPct.toFixed(1)}٪
                     </span>
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                    {(c.receivedValue / 1_000_000_000).toFixed(2)} م.ت
+                    {formatMoneyCompact(c.receivedValue)}
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-rose-600">
-                    {(c.receivableValue / 1_000_000_000).toFixed(2)} م.ت
+                    {formatMoneyCompact(c.receivableValue)}
                   </td>
                   <td className="p-3 text-center">
                     <span

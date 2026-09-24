@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { expenseCategoryTotals } from '../../data/mockData';
+import { ExpenseCategoryTotal } from '../../store/selectors';
 import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
 import { PieChart, Layers, Split } from 'lucide-react';
 
-export const ExpenseBreakdown: React.FC = () => {
+export const ExpenseBreakdown: React.FC<{ totals: ExpenseCategoryTotal[] }> = ({ totals }) => {
   const [filterType, setFilterType] = useState<'all' | 'direct' | 'indirect'>('all');
 
-  const directCategories = ['مصالح پایه و ساختمانی', 'دستمزد و نیروی انسانی', 'پیمانکاران جزء و تخصصی', 'ماشین‌آلات و تجهیزات سنگین', 'حمل‌ونقل و باربری', 'خرید تجهیزات خاص و تاسیسات'];
-  
-  const filteredTotals = expenseCategoryTotals.filter((item) => {
-    if (filterType === 'direct') return directCategories.includes(item.name);
-    if (filterType === 'indirect') return !directCategories.includes(item.name);
+  const filteredTotals = totals.filter((item) => {
+    if (filterType === 'direct') return item.isDirect;
+    if (filterType === 'indirect') return !item.isDirect;
     return true;
   });
 

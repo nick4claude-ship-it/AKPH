@@ -19,6 +19,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { generateUUID } from '../../utils/ids';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { IntegerInput } from '../common/NumberInput';
+import { toPersianDate } from '../../utils/date';
 
 interface NewTransferModalProps {
   isOpen: boolean;
@@ -26,7 +30,7 @@ interface NewTransferModalProps {
   warehouses: Warehouse[];
   materials: MaterialItem[];
   currentUser: UserProfile;
-  onSubmitTransfer: (transfer: InterWarehouseTransfer) => void;
+  onSubmitTransfer: (transfer: InterWarehouseTransfer) => { ok: boolean; message: string };
 }
 
 export const NewTransferModal: React.FC<NewTransferModalProps> = ({
@@ -37,23 +41,22 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
   currentUser,
   onSubmitTransfer,
 }) => {
-  if (!isOpen) return null;
-
   const [sourceWarehouseId, setSourceWarehouseId] = useState(warehouses[0]?.id || '');
   const [targetWarehouseId, setTargetWarehouseId] = useState(warehouses[1]?.id || '');
   const [waybillNumber, setWaybillNumber] = useState('');
   const [driverName, setDriverName] = useState('');
   const [truckPlate, setTruckPlate] = useState('');
 
-  const [items, setItems] = useState([
+  const [items, setItems] = useState(() => [
     {
+      rowKey: generateUUID(),
       materialId: materials[0]?.id || '',
       materialCode: materials[0]?.code || '',
       materialName: materials[0]?.name || '',
       unit: materials[0]?.unit || 'کیلوگرم',
-      quantity: 500,
-      unitCost: materials[0]?.averageUnitPrice || 30000,
-      totalCost: (materials[0]?.averageUnitPrice || 30000) * 500,
+      quantity: 0,
+      unitCost: materials[0]?.averageUnitPrice || 0,
+      totalCost: 0,
     },
   ]);
 
@@ -100,39 +103,39 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (sourceWarehouseId === targetWarehouseId) {
-      setFormError('انبار مبدأ و مقصد نمی‌توانند یکسان باشند.');
-      return;
-    }
+    if (!sourceWh || !targetWh) return setFormError('انبار مبدأ و مقصد را انتخاب کنید.');
+    if (sourceWarehouseId === targetWarehouseId) return setFormError('انبار مبدأ و مقصد نمی‌توانند یکسان باشند.');
+    if (items.some((i) => i.quantity <= 0)) return setFormError('مقدار هر ردیف باید بیش از صفر باشد.');
+    if (!waybillNumber.trim()) return setFormError('شماره بارنامه را وارد کنید.');
     setFormError(null);
 
-    const randomNum = Math.floor(10 + Math.random() * 90);
     const newTrf: InterWarehouseTransfer = {
       id: generateUUID(),
-      transferNumber: `انتقال بین کارگاهی ۰${randomNum}`,
-      date: '۱۴۰۳/۰۷/۰۴',
+      transferNumber: '',
+      date: toPersianDate(new Date()),
       sourceWarehouseId,
-      sourceWarehouseName: sourceWh ? sourceWh.name : 'انبار مبدأ',
-      sourceProjectId: sourceWh ? sourceWh.projectName : 'پروژه مبدأ',
+      sourceWarehouseName: sourceWh.name,
+      sourceProjectId: sourceWh.projectId || '',
       targetWarehouseId,
-      targetWarehouseName: targetWh ? targetWh.name : 'انبار مقصد',
-      targetProjectId: targetWh ? targetWh.projectName : 'پروژه مقصد',
-      waybillNumber: waybillNumber.trim() || `TRF-BL-${randomNum}44`,
-      driverName: driverName.trim() || 'راننده ترانزیت داخلی',
-      truckPlate: truckPlate.trim() || '۵۲ ایران ۷۷',
-      items,
+      targetWarehouseName: targetWh.name,
+      targetProjectId: targetWh.projectId || '',
+      waybillNumber: waybillNumber.trim(),
+      driverName: driverName.trim(),
+      truckPlate: truckPlate.trim(),
+      items: items.map(({ rowKey: _k, ...i }) => i),
       totalCost,
       status: 'در مسیر حمل',
       authorizedBy: `${currentUser.name} (${currentUser.role})`,
     };
 
-    onSubmitTransfer(newTrf);
+    const result = onSubmitTransfer(newTrf);
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+    <Dialog onClose={onClose} label="صدور مجوز انتقال مصالح بین کارگاه‌ها (Inter-Site Transfer)" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+      
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -247,13 +250,13 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
                     <th className="p-2.5">عنوان مصالح</th>
                     <th className="p-2.5">واحد</th>
                     <th className="p-2.5">تعداد / مقدار جابجایی</th>
-                    <th className="p-2.5">نرخ واحد (تومان)</th>
+                    <th className="p-2.5">نرخ واحد ({moneyUnitLabel()})</th>
                     <th className="p-2.5 text-left">ارزش کل</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {items.map((item, idx) => (
-                    <tr key={idx}>
+                    <tr key={item.rowKey}>
                       <td className="p-2.5">
                         <select
                           value={item.materialId}
@@ -271,21 +274,19 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
                       <td className="p-2.5 text-slate-600 font-medium">{item.unit}</td>
 
                       <td className="p-2.5">
-                        <input
-                          type="number"
-                          min={1}
+                        <IntegerInput
                           value={item.quantity}
-                          onChange={(e) => handleQtyChange(idx, Number(e.target.value))}
+                          onValueChange={(v) => handleQtyChange(idx, v)}
                           className="w-28 px-2 py-1 rounded-lg border border-slate-200 font-mono text-center"
                         />
                       </td>
 
                       <td className="p-2.5 font-mono text-slate-700">
-                        {item.unitCost.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitCost, false)}
                       </td>
 
                       <td className="p-2.5 text-left font-mono font-bold text-slate-900">
-                        {item.totalCost.toLocaleString('fa-IR')}
+                        {formatMoney(item.totalCost, false)}
                       </td>
                     </tr>
                   ))}
@@ -313,7 +314,6 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   InventorySubTab,
   Warehouse,
@@ -11,22 +11,15 @@ import {
   GoodsReceiptNote,
   StoreIssueVoucher,
   InterWarehouseTransfer,
-  StocktakeAudit,
-  KardexEntry,
   Project,
   UserProfile,
 } from '../../types';
-import {
-  mockWarehouses,
-  mockMaterialItems,
-  mockGoodsReceipts,
-  mockStoreIssues,
-  mockInterTransfers,
-  mockStocktakeAudits,
-  mockKardexRecords,
-} from '../../data/inventoryMockData';
+import { usePermission } from '../../store/session';
 
 import { InventoryDashboard } from './InventoryDashboard';
+import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
+import { selectMaterials, selectWarehouses, selectStockByWarehouse } from '../../store/domainSelectors';
 import { MaterialsCatalogView } from './MaterialsCatalogView';
 import { GoodsReceiptsListView } from './GoodsReceiptsListView';
 import { StoreIssuesListView } from './StoreIssuesListView';
@@ -54,32 +47,37 @@ import {
   AlertTriangle,
   Plus,
   RefreshCw,
+  type LucideIcon,
 } from 'lucide-react';
+import { formatMoney } from '../../utils/money';
 
 interface InventoryModuleProps {
   currentUser: UserProfile;
   projects: Project[];
-  onUpdateProjectCost?: (projectId: string, amount: number) => void;
-  onAddJournalEntry?: (entry: any) => void;
 }
 
 export const InventoryModule: React.FC<InventoryModuleProps> = ({
   currentUser,
   projects,
-  onUpdateProjectCost,
-  onAddJournalEntry,
 }) => {
   // Navigation
   const [activeTab, setActiveTab] = useState<InventorySubTab>('dashboard');
 
   // Core State
-  const [warehouses, setWarehouses] = useState<Warehouse[]>(mockWarehouses);
-  const [materials, setMaterials] = useState<MaterialItem[]>(mockMaterialItems);
-  const [receipts, setReceipts] = useState<GoodsReceiptNote[]>(mockGoodsReceipts);
-  const [issues, setIssues] = useState<StoreIssueVoucher[]>(mockStoreIssues);
-  const [transfers, setTransfers] = useState<InterWarehouseTransfer[]>(mockInterTransfers);
-  const [stocktakes, setStocktakes] = useState<StocktakeAudit[]>(mockStocktakeAudits);
-  const [kardexRecords, setKardexRecords] = useState<KardexEntry[]>(mockKardexRecords);
+  // Stock lives only in per-warehouse balances; catalog and warehouse totals are derived from them.
+  const appState = useAppState();
+  const { can } = usePermission();
+  const wf = useWorkflows();
+  const warehouses = useMemo(() => selectWarehouses(appState), [appState]);
+  const materials = useMemo(() => selectMaterials(appState), [appState]);
+  const [, setMaterials] = useStoreSlice('materials');
+  const receipts = appState.goodsReceipts;
+  const issues = appState.storeIssues;
+  const [stockWarehouseId, setStockWarehouseId] = useState<string>('');
+  // Transfers, stocktakes and the kardex are store records written by the inventory workflows.
+  const transfers = appState.interTransfers;
+  const stocktakes = appState.stocktakes;
+  const kardexRecords = appState.kardex;
 
   // Selected Material for Kardex
   const [selectedKardexMaterialId, setSelectedKardexMaterialId] = useState<string | undefined>(undefined);
@@ -101,256 +99,56 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Handler: Add new Goods Receipt Note (GRN)
-  const handleAddReceipt = (newReceipt: GoodsReceiptNote) => {
-    setReceipts((prev) => [newReceipt, ...prev]);
-
-    // Update material quantities in catalog & kardex
-    newReceipt.items.forEach((item) => {
-      setMaterials((prev) =>
-        prev.map((m) =>
-          m.id === item.materialId
-            ? {
-                ...m,
-                currentStock: m.currentStock + item.acceptedQty,
-                totalStockValue: (m.currentStock + item.acceptedQty) * m.averageUnitPrice,
-              }
-            : m
-        )
-      );
-
-      // Add to Kardex
-      const newKardex: KardexEntry = {
-        id: `kdx-${Date.now()}-${Math.random()}`,
-        materialId: item.materialId,
-        date: newReceipt.date,
-        docType: 'رسید ورود انبار',
-        docNumber: newReceipt.receiptNumber,
-        warehouseName: newReceipt.warehouseName,
-        counterparty: newReceipt.supplierName,
-        inQty: item.acceptedQty,
-        outQty: 0,
-        balanceQty: (materials.find((m) => m.id === item.materialId)?.currentStock || 0) + item.acceptedQty,
-        unitCost: item.unitPrice,
-        balanceValuation: item.totalPrice,
-      };
-      setKardexRecords((prev) => [newKardex, ...prev]);
-    });
-
-    // Update warehouse total valuation
-    setWarehouses((prev) =>
-      prev.map((w) =>
-        w.id === newReceipt.warehouseId
-          ? { ...w, totalValuation: w.totalValuation + newReceipt.totalAmount }
-          : w
-      )
-    );
-
-    // Emit Accounting Journal Entry (ورود کالا به انبار)
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        date: newReceipt.date,
-        description: `ثبت رسید انبار مصالح شماره ${newReceipt.receiptNumber} - ${newReceipt.supplierName}`,
-        reference: newReceipt.receiptNumber,
-        items: [
-          {
-            accountCode: '۱۱۱۰۱',
-            accountName: 'موجودی کالا و مصالح انبار کارگاه',
-            debit: newReceipt.totalAmount,
-            credit: 0,
-          },
-          {
-            accountCode: '۲۰۱۰۱',
-            accountName: 'حساب‌های پرداختنی تجاری - تأمین‌کنندگان',
-            debit: 0,
-            credit: newReceipt.totalAmount,
-          },
-        ],
-      });
-    }
-
-    showToast(`رسید انبار ${newReceipt.receiptNumber} با موفقیت ثبت و به موجودی اضافه شد.`);
+  // Goods receipt from a purchase order: stock ↑, weighted average, kardex row, Dr inventory / Cr GRNI.
+  const handleReceiveFromPO = (input: Parameters<typeof wf.receiveGoodsFromPO>[0]) => {
+    const result = wf.receiveGoodsFromPO(input);
+    showToast(result.message);
+    return result;
   };
 
-  // Handler: Add new Store Issue Voucher (SIV)
+  // Issue request reserves stock; confirming it charges the project at weighted average and writes the kardex.
   const handleAddIssue = (newIssue: StoreIssueVoucher) => {
-    setIssues((prev) => [newIssue, ...prev]);
-
-    // Decrease material stock & update Kardex
-    newIssue.items.forEach((item) => {
-      setMaterials((prev) =>
-        prev.map((m) =>
-          m.id === item.materialId
-            ? {
-                ...m,
-                currentStock: Math.max(0, m.currentStock - item.issuedQty),
-                totalStockValue: Math.max(0, m.currentStock - item.issuedQty) * m.averageUnitPrice,
-              }
-            : m
-        )
-      );
-
-      const targetMat = materials.find((m) => m.id === item.materialId);
-      const newBal = targetMat ? Math.max(0, targetMat.currentStock - item.issuedQty) : 0;
-
-      const newKardex: KardexEntry = {
-        id: `kdx-${Date.now()}-${Math.random()}`,
-        materialId: item.materialId,
-        date: newIssue.date,
-        docType: 'حواله مصرف کارگاه',
-        docNumber: newIssue.issueNumber,
-        warehouseName: newIssue.warehouseName,
-        counterparty: newIssue.subcontractorName || 'اکیپ اجرایی پروژه',
-        inQty: 0,
-        outQty: item.issuedQty,
-        balanceQty: newBal,
-        unitCost: item.unitCost,
-        balanceValuation: newBal * item.unitCost,
-      };
-      setKardexRecords((prev) => [newKardex, ...prev]);
-    });
-
-    // Decrease warehouse total valuation
-    setWarehouses((prev) =>
-      prev.map((w) =>
-        w.id === newIssue.warehouseId
-          ? { ...w, totalValuation: Math.max(0, w.totalValuation - newIssue.totalCost) }
-          : w
-      )
-    );
-
-    // Update project cost
-    if (onUpdateProjectCost && newIssue.projectId) {
-      onUpdateProjectCost(newIssue.projectId, newIssue.totalCost);
-    }
-
-    // Emit Accounting Journal Entry (بهای تمام‌شده مصالح مصرفی در پروژه)
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        date: newIssue.date,
-        description: `حواله مصرف مصالح ${newIssue.issueNumber} - پروژه ${newIssue.projectName} (${newIssue.costCenter})`,
-        reference: newIssue.issueNumber,
-        items: [
-          {
-            accountCode: '۵۰۱۰۱',
-            accountName: `هزینه‌های مستقیم پروژه - مصرف مصالح (${newIssue.projectName})`,
-            debit: newIssue.totalCost,
-            credit: 0,
-          },
-          {
-            accountCode: '۱۱۱۰۱',
-            accountName: 'موجودی کالا و مصالح انبار کارگاه',
-            debit: 0,
-            credit: newIssue.totalCost,
-          },
-        ],
-      });
-    }
-
-    const contraMsg = newIssue.isSubcontractorContra
-      ? ' (مشمول تهاتر با صورت‌وضعیت پیمانکار جزء)'
-      : '';
-    showToast(`حواله خروج ${newIssue.issueNumber} ثبت و از انبار کسر شد${contraMsg}.`);
+    const result = wf.requestStoreIssue(newIssue);
+    showToast(result.message);
+    return result;
   };
 
-  // Handler: Add new Inter-site Transfer
+  const handleConfirmIssue = (issueId: string) => {
+    const result = wf.confirmStoreIssue(issueId);
+    showToast(result.message);
+    if (result.ok) setActiveIssueDoc(null);
+  };
+
+  const handleReleaseIssue = (issueId: string) => {
+    showToast(wf.releaseStoreIssue(issueId).message);
+    setActiveIssueDoc(null);
+  };
+
   const handleAddTransfer = (newTrf: InterWarehouseTransfer) => {
-    setTransfers((prev) => [newTrf, ...prev]);
-    showToast(`مجوز انتقال ${newTrf.transferNumber} صادر و وضعیت به "در مسیر حمل" تغییر یافت.`);
+    const result = wf.createTransfer(newTrf);
+    showToast(result.message);
+    return result;
   };
 
-  // Handler: Update transfer status (e.g. mark delivered)
+  // Delivery moves stock between the two warehouses and writes both kardex rows.
   const handleUpdateTransferStatus = (transferId: string, newStatus: InterWarehouseTransfer['status']) => {
-    setTransfers((prev) =>
-      prev.map((t) => (t.id === transferId ? { ...t, status: newStatus } : t))
-    );
-    showToast(`وضعیت انتقال به "${newStatus}" به‌روزرسانی شد.`);
+    showToast(wf.advanceTransfer(transferId, newStatus).message);
   };
 
-  // Handler: Add new Material to catalog
   const handleAddMaterial = (newMat: MaterialItem) => {
-    setMaterials((prev) => [newMat, ...prev]);
-    showToast(`کدینگ متریال جدید "${newMat.name}" در کاتالوگ ثبت گردید.`);
+    if (!can('inventory.manage_catalog')) return showToast('اجازه تعریف کالا را ندارید.');
+    setMaterials((prev) => [{ ...newMat, currentStock: 0, totalStockValue: 0 }, ...prev]);
+    showToast(`کدینگ متریال جدید "${newMat.name}" در کاتالوگ ثبت شد.`);
   };
 
-  // Handler: Apply Stocktake adjustment journal
+  // Stocktake: the workflow recomputes the variance from stored balances, posts it and writes kardex rows.
   const handleApplyAdjustmentJournal = (stocktakeId: string) => {
     const audit = stocktakes.find((s) => s.id === stocktakeId);
-    if (!audit) return;
-
-    const jvCode = `JV-ADJ-STK-${Math.floor(100 + Math.random() * 900)}`;
-
-    setStocktakes((prev) =>
-      prev.map((s) =>
-        s.id === stocktakeId
-          ? {
-              ...s,
-              status: 'تأیید نهایی و صدور سند تعدیل',
-              accountingAdjustmentEntryId: jvCode,
-            }
-          : s
-      )
-    );
-
-    // Apply adjustments to system stock of materials
-    audit.items.forEach((item) => {
-      setMaterials((prev) =>
-        prev.map((m) =>
-          m.id === item.materialId
-            ? {
-                ...m,
-                currentStock: item.physicalCount,
-                totalStockValue: item.physicalCount * m.averageUnitPrice,
-              }
-            : m
-        )
-      );
-    });
-
-    if (onAddJournalEntry) {
-      const isLoss = audit.netVarianceAmount < 0;
-      const absAmount = Math.abs(audit.netVarianceAmount);
-
-      onAddJournalEntry({
-        date: audit.date,
-        description: `سند تعدیل انبارگردانی ${audit.auditNumber} - ${audit.warehouseName}`,
-        reference: jvCode,
-        items: isLoss
-          ? [
-              {
-                accountCode: '۶۰۱۰۱',
-                accountName: 'کسری و اضافات انبار (هزینه غیرعملیاتی)',
-                debit: absAmount,
-                credit: 0,
-              },
-              {
-                accountCode: '۱۱۱۰۱',
-                accountName: 'موجودی کالا و مصالح انبار',
-                debit: 0,
-                credit: absAmount,
-              },
-            ]
-          : [
-              {
-                accountCode: '۱۱۱۰۱',
-                accountName: 'موجودی کالا و مصالح انبار',
-                debit: absAmount,
-                credit: 0,
-              },
-              {
-                accountCode: '۷۰۱۰۱',
-                accountName: 'اضافات انبارگردانی (سایر درآمدهای عملیاتی)',
-                debit: 0,
-                credit: absAmount,
-              },
-            ],
-      });
-    }
-
-    showToast(`سند تعدیل انبارگردانی ${jvCode} با موفقیت در حسابداری ثبت شد.`);
+    if (!audit || audit.status === 'تأیید نهایی و صدور سند تعدیل') return;
+    showToast(wf.applyStocktake(audit).message);
   };
 
-  const navTabs: { id: InventorySubTab; label: string; icon: any; count?: number }[] = [
+  const navTabs: { id: InventorySubTab; label: string; icon: LucideIcon; count?: number }[] = [
     { id: 'dashboard', label: 'پیشخوان انبار و باسکول', icon: WarehouseIcon },
     { id: 'items', label: 'کاتالوگ کالا و مصالح', icon: Package, count: materials.length },
     { id: 'receipts', label: 'رسید ورود و بارنامه (GRN)', icon: ArrowDownLeft, count: receipts.length },
@@ -499,34 +297,81 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
       )}
 
       {activeTab === 'warehouses' && (
-        <WarehousesListView
+        <div className="space-y-4">
+          <WarehousesListView warehouses={warehouses} projects={projects} currentUser={currentUser} />
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-slate-900">موجودی به تفکیک انبار (StockBalance)</h3>
+              <select
+                value={stockWarehouseId || warehouses[0]?.id || ''}
+                onChange={(e) => setStockWarehouseId(e.target.value)}
+                className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs"
+              >
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name} ({w.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <table className="w-full text-xs text-right">
+              <thead className="text-[11px] text-slate-500 border-b border-slate-100">
+                <tr>
+                  <th className="py-2">کالا</th>
+                  <th className="py-2 text-left">موجودی</th>
+                  <th className="py-2 text-left">رزرو</th>
+                  <th className="py-2 text-left">آزاد</th>
+                  <th className="py-2 text-left">ارزش (میانگین موزون)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {selectStockByWarehouse(appState, stockWarehouseId || warehouses[0]?.id || '').map((b) => (
+                  <tr key={b.materialId}>
+                    <td className="py-2">
+                      {b.material!.name} <span className="text-[10px] text-slate-400 font-mono">{b.material!.code}</span>
+                    </td>
+                    <td className="py-2 text-left font-mono">
+                      {b.qty.toLocaleString('fa-IR')} {b.material!.unit}
+                    </td>
+                    <td className="py-2 text-left font-mono text-amber-700">{b.reservedQty.toLocaleString('fa-IR')}</td>
+                    <td className="py-2 text-left font-mono text-emerald-700">{(b.qty - b.reservedQty).toLocaleString('fa-IR')}</td>
+                    <td className="py-2 text-left font-mono">{formatMoney(Math.round(b.qty * b.material!.averageUnitPrice), false)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="text-[11px] text-slate-500">
+              رزروهای فعال: {appState.stockReservations.filter((r) => r.status === 'active').length.toLocaleString('fa-IR')} ·
+              برگشت‌ها: {appState.stockReturns.length.toLocaleString('fa-IR')}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Modals (mounted only while open) */}
+      {isNewReceiptOpen && (
+        <NewGoodsReceiptModal
+          onClose={() => setIsNewReceiptOpen(false)}
+          purchaseOrders={appState.purchaseOrders}
           warehouses={warehouses}
-          projects={projects}
-          currentUser={currentUser}
+          materials={materials}
+          onSubmit={handleReceiveFromPO}
         />
       )}
 
-      {/* Interactive Modals */}
-      <NewGoodsReceiptModal
-        isOpen={isNewReceiptOpen}
-        onClose={() => setIsNewReceiptOpen(false)}
-        warehouses={warehouses}
-        materials={materials}
-        projects={projects}
-        currentUser={currentUser}
-        onSubmitReceipt={handleAddReceipt}
-      />
+      {isNewIssueOpen && (
+        <NewStoreIssueModal
+          isOpen={isNewIssueOpen}
+          onClose={() => setIsNewIssueOpen(false)}
+          warehouses={warehouses}
+          materials={materials}
+          projects={projects}
+          currentUser={currentUser}
+          onSubmitIssue={handleAddIssue}
+        />
+      )}
 
-      <NewStoreIssueModal
-        isOpen={isNewIssueOpen}
-        onClose={() => setIsNewIssueOpen(false)}
-        warehouses={warehouses}
-        materials={materials}
-        projects={projects}
-        currentUser={currentUser}
-        onSubmitIssue={handleAddIssue}
-      />
-
+      {isNewTransferOpen && (
       <NewTransferModal
         isOpen={isNewTransferOpen}
         onClose={() => setIsNewTransferOpen(false)}
@@ -535,17 +380,24 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
         currentUser={currentUser}
         onSubmitTransfer={handleAddTransfer}
       />
+      )}
 
+      {isNewMaterialOpen && (
       <NewMaterialModal
         isOpen={isNewMaterialOpen}
         onClose={() => setIsNewMaterialOpen(false)}
         currentUser={currentUser}
         onSubmitMaterial={handleAddMaterial}
       />
+      )}
 
       <InventoryDocumentModal
         receipt={activeReceiptDoc}
         issue={activeIssueDoc}
+        onConfirmIssue={handleConfirmIssue}
+        onReleaseIssue={handleReleaseIssue}
+        onReturnFromProject={(issueId, materialId, qty, reason) => showToast(wf.returnFromProject(issueId, materialId, qty, reason).message)}
+        onReturnToSupplier={(grnId, materialId, qty, reason) => showToast(wf.returnToSupplier(grnId, materialId, qty, reason).message)}
         onClose={() => {
           setActiveReceiptDoc(null);
           setActiveIssueDoc(null);

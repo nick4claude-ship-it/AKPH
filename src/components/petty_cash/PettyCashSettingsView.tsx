@@ -11,26 +11,39 @@ import {
   Tag,
 } from 'lucide-react';
 import { PettyCashCategoryItem } from '../../types';
+import { useAppState } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
+import { generateUUID } from '../../utils/ids';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { moneyUnitLabel, parseIntegerAmount } from '../../utils/money';
 
 interface PettyCashSettingsViewProps {
   categories: PettyCashCategoryItem[];
   onUpdateCategories: (categories: PettyCashCategoryItem[]) => void;
+  /** Fund ceilings and approval chains are edited on the system settings page. */
+  onOpenPolicySettings?: () => void;
 }
 
 export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
   categories,
   onUpdateCategories,
+  onOpenPolicySettings,
 }) => {
+  // Approval thresholds and the low-balance alert are the stored petty cash policy.
+  const policy = useAppState().pettyCashSettings;
+  const wf = useWorkflows();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const chain = (level: keyof typeof policy.approvalChains) => policy.approvalChains[level].join(' + ');
   const [categoryList, setCategoryList] = useState<PettyCashCategoryItem[]>(categories);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [selectedCatId, setSelectedCatId] = useState<string>(categories[0]?.id || '');
   const [newSubcategoryName, setNewSubcategoryName] = useState('');
 
   // Thresholds configuration state
-  const [thresholdLevel1, setThresholdLevel1] = useState<number>(20_000_000);
-  const [thresholdLevel2, setThresholdLevel2] = useState<number>(100_000_000);
-  const [lowBalancePercent, setLowBalancePercent] = useState<number>(25);
+  const [thresholdLevel1, setThresholdLevel1] = useState<number>(policy.siteLevelMax);
+  const [thresholdLevel2, setThresholdLevel2] = useState<number>(policy.projectLevelMax);
+  const [lowBalancePercent, setLowBalancePercent] = useState<number>(policy.lowBalancePercent);
   const [isSaved, setIsSaved] = useState(false);
 
   const selectedCategoryObj = categoryList.find((c) => c.id === selectedCatId);
@@ -38,7 +51,7 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) return;
     const newCat: PettyCashCategoryItem = {
-      id: `cat-${Date.now()}`,
+      id: generateUUID(),
       name: newCategoryName.trim(),
       subcategories: [],
     };
@@ -201,38 +214,34 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">
-                  سقف مرحله اول: تایید سرپرست کارگاه + امور مالی (تومان)
+                  سقف مرحله اول: تأیید {chain('site_manager_and_finance')} ({moneyUnitLabel()})
                 </label>
-                <input
-                  type="number"
-                  step="5000000"
+                <MoneyInput
                   value={thresholdLevel1}
-                  onChange={(e) => setThresholdLevel1(Number(e.target.value))}
+                  onValueChange={(v) => setThresholdLevel1(v)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
                 />
                 <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  کمتر از {formatCurrency(thresholdLevel1)}: نیاز به تایید مدیر مالی
+                  تا {formatCurrency(thresholdLevel1)}: تأیید {chain('site_manager_and_finance')}
                 </span>
               </div>
 
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">
-                  سقف مرحله دوم: تایید مدیر پروژه + مدیر امور مالی (تومان)
+                  سقف مرحله دوم: تأیید {chain('project_and_finance')} ({moneyUnitLabel()})
                 </label>
-                <input
-                  type="number"
-                  step="10000000"
+                <MoneyInput
                   value={thresholdLevel2}
-                  onChange={(e) => setThresholdLevel2(Number(e.target.value))}
+                  onValueChange={(v) => setThresholdLevel2(v)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
                 />
                 <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  بین {formatCurrency(thresholdLevel1)} تا {formatCurrency(thresholdLevel2)}: تایید مدیر پروژه و مدیر مالی
+                  بین {formatCurrency(thresholdLevel1)} تا {formatCurrency(thresholdLevel2)}: تأیید {chain('project_and_finance')}
                 </span>
               </div>
 
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 font-medium">
-                مبالغ بیش از {formatCurrency(thresholdLevel2)}: نیازمند امضای نهایی مدیرعامل شرکت است.
+                مبالغ بیش از {formatCurrency(thresholdLevel2)}: تأیید {chain('ceo_full')}.
               </div>
             </div>
           </div>
@@ -255,7 +264,7 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
                     min="10"
                     max="50"
                     value={lowBalancePercent}
-                    onChange={(e) => setLowBalancePercent(Number(e.target.value))}
+                    onChange={(e) => setLowBalancePercent(Math.min(100, parseIntegerAmount(e.target.value)))}
                     className="flex-1 accent-amber-500"
                   />
                   <span className="font-mono font-bold w-12 text-left tabular-nums">
@@ -268,6 +277,11 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
               </div>
 
               <div className="pt-2 space-y-2">
+                {saveError && (
+                  <p className="text-xs text-rose-700 font-bold" role="alert">
+                    {saveError}
+                  </p>
+                )}
                 {isSaved && (
                   <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 font-bold flex items-center justify-center gap-1.5 animate-in fade-in duration-200">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -277,7 +291,15 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    const result = wf.updatePettyCashSettings({
+                      ...policy,
+                      siteLevelMax: thresholdLevel1,
+                      projectLevelMax: thresholdLevel2,
+                      lowBalancePercent,
+                    });
+                    if (!result.ok) return setSaveError(result.message);
                     onUpdateCategories(categoryList);
+                    setSaveError(null);
                     setIsSaved(true);
                     setTimeout(() => setIsSaved(false), 3500);
                   }}

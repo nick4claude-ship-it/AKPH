@@ -21,6 +21,7 @@ import {
   Layers,
   Scale,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 
 interface KardexViewProps {
   materials: MaterialItem[];
@@ -107,7 +108,7 @@ export const KardexView: React.FC<KardexViewProps> = ({
               <div className="flex items-center justify-between text-slate-700">
                 <span>نرخ میانگین:</span>
                 <span className="font-bold font-mono text-indigo-700">
-                  {selectedMaterial.averageUnitPrice.toLocaleString('fa-IR')} تومان
+                  {formatMoney(selectedMaterial.averageUnitPrice)}
                 </span>
               </div>
             </div>
@@ -122,7 +123,7 @@ export const KardexView: React.FC<KardexViewProps> = ({
             <span className="text-[11px] text-slate-500 block mb-1">کل ورودی دوره</span>
             <div className="flex items-baseline justify-between">
               <span className="text-xl font-black text-emerald-700 font-mono">
-                {totalIn.toLocaleString('fa-IR')}
+                {formatMoney(totalIn, false)}
               </span>
               <span className="text-xs text-slate-400">{selectedMaterial.unit}</span>
             </div>
@@ -132,7 +133,7 @@ export const KardexView: React.FC<KardexViewProps> = ({
             <span className="text-[11px] text-slate-500 block mb-1">کل مصرف کارگاه‌ها</span>
             <div className="flex items-baseline justify-between">
               <span className="text-xl font-black text-amber-600 font-mono">
-                {totalOut.toLocaleString('fa-IR')}
+                {formatMoney(totalOut, false)}
               </span>
               <span className="text-xs text-slate-400">{selectedMaterial.unit}</span>
             </div>
@@ -142,7 +143,7 @@ export const KardexView: React.FC<KardexViewProps> = ({
             <span className="text-[11px] text-slate-500 block mb-1">مانده موجودی انبار</span>
             <div className="flex items-baseline justify-between">
               <span className="text-xl font-black text-slate-900 font-mono">
-                {currentBalance.toLocaleString('fa-IR')}
+                {formatMoney(currentBalance, false)}
               </span>
               <span className="text-xs text-slate-400">{selectedMaterial.unit}</span>
             </div>
@@ -152,10 +153,9 @@ export const KardexView: React.FC<KardexViewProps> = ({
             <span className="text-[11px] text-slate-500 block mb-1">ارزش کل موجودی</span>
             <div className="flex items-baseline justify-between">
               <span className="text-xl font-black text-indigo-700 font-mono">
-                {(selectedMaterial.totalStockValue / 1_000_000).toLocaleString('fa-IR')}
+                {formatMoneyCompact(selectedMaterial.totalStockValue)}
               </span>
-              <span className="text-xs text-slate-400">میلیون تومان</span>
-            </div>
+                          </div>
           </div>
         </div>
       )}
@@ -174,8 +174,8 @@ export const KardexView: React.FC<KardexViewProps> = ({
                 <th className="p-3 font-medium text-center bg-emerald-950/60">وارده (ورود به انبار)</th>
                 <th className="p-3 font-medium text-center bg-amber-950/60">صادره (مصرف کارگاه)</th>
                 <th className="p-3 font-medium text-center bg-indigo-950/60">مانده موجودی</th>
-                <th className="p-3 font-medium text-left">نرخ واحد (تومان)</th>
-                <th className="p-3 font-medium text-left">ارزش کل مانده (تومان)</th>
+                <th className="p-3 font-medium text-left">نرخ واحد ({moneyUnitLabel()})</th>
+                <th className="p-3 font-medium text-left">ارزش کل مانده ({moneyUnitLabel()})</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -235,11 +235,11 @@ export const KardexView: React.FC<KardexViewProps> = ({
                     </td>
 
                     <td className="p-3 text-left font-mono text-slate-700">
-                      {r.unitCost.toLocaleString('fa-IR')}
+                      {formatMoney(r.unitCost, false)}
                     </td>
 
                     <td className="p-3 text-left font-mono font-bold text-indigo-900">
-                      {r.balanceValuation.toLocaleString('fa-IR')}
+                      {formatMoney(r.balanceValuation, false)}
                     </td>
                   </tr>
                 ))

@@ -1,8 +1,0 @@
-{
-  "name": "سامانه مدیریت پیمانکاری و ساخت‌وساز - مرکز پایش مالی",
-  "description": "مرکز فرماندهی و پایش مالی پروژه‌های عمرانی و پیمانکاری EPC ویژه مدیرعامل و هیئت مدیره",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

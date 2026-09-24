@@ -17,6 +17,7 @@ import {
   DollarSign,
   Download,
 } from 'lucide-react';
+import { formatMoneyCompact } from '../../../utils/money';
 
 interface SubcontractorMatrixViewProps {
   contracts: SubcontractorContract[];
@@ -167,25 +168,25 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
                   <div>
                     <span className="text-slate-400 text-[10px] block">کل تعهدات پروژه:</span>
                     <strong className="text-amber-400">
-                      {(prjContractTotal / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(prjContractTotal)}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">کارکرد متره:</span>
                     <strong className="text-blue-400">
-                      {(prjExecutedTotal / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(prjExecutedTotal)}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">پرداخت‌شده:</span>
                     <strong className="text-emerald-400">
-                      {(prjPaidTotal / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(prjPaidTotal)}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">مانده بدهی تاییدشده:</span>
                     <strong className="text-rose-400 font-black">
-                      {(prjDebtTotal / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(prjDebtTotal)}
                     </strong>
                   </div>
                 </div>
@@ -220,26 +221,25 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
                           </td>
 
                           <td className="p-3 text-left font-black text-slate-900">
-                            {(c.contractValue / 1_000_000).toLocaleString('fa-IR')}
-                            <span className="text-[10px] text-slate-400 block font-normal">م.ت</span>
-                          </td>
+                            {formatMoneyCompact(c.contractValue)}
+                                                      </td>
 
                           <td className="p-3 text-left font-bold text-blue-700">
-                            {(c.executedValue / 1_000_000).toLocaleString('fa-IR')}
+                            {formatMoneyCompact(c.executedValue)}
                             <span className="text-[10px] text-blue-500 block font-normal">
                               {Math.round((c.executedValue / c.contractValue) * 100).toLocaleString('fa-IR')}٪ پیشرفت
                             </span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-purple-700">
-                            {(c.approvedStatementsValue / 1_000_000).toLocaleString('fa-IR')}
+                            {formatMoneyCompact(c.approvedStatementsValue)}
                             <span className="text-[10px] text-purple-500 block font-normal">
                               {Math.round((c.approvedStatementsValue / c.contractValue) * 100).toLocaleString('fa-IR')}٪ پیمان
                             </span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-emerald-700">
-                            {(c.paidValue / 1_000_000).toLocaleString('fa-IR')}
+                            {formatMoneyCompact(c.paidValue)}
                             <span className="text-[10px] text-emerald-600 block font-normal">
                               {c.approvedStatementsValue > 0
                                 ? Math.round((c.paidValue / c.approvedStatementsValue) * 100).toLocaleString('fa-IR')
@@ -249,12 +249,12 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
                           </td>
 
                           <td className="p-3 text-left font-black text-rose-700">
-                            {(c.remainingPayableValue / 1_000_000).toLocaleString('fa-IR')}
+                            {formatMoneyCompact(c.remainingPayableValue)}
                             <span className="text-[10px] text-rose-500 block font-normal">بدهی فوری</span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-teal-700">
-                            {(c.remainingContractValue / 1_000_000).toLocaleString('fa-IR')}
+                            {formatMoneyCompact(c.remainingContractValue)}
                             <span className="text-[10px] text-teal-600 block font-normal">ظرفیت کار</span>
                           </td>
 

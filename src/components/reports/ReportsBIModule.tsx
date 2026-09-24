@@ -24,6 +24,10 @@ import {
 } from 'lucide-react';
 import { Project } from '../../types';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
+import { useAppState } from '../../store/AppStore';
+import { selectReceivablesAging } from '../../store/domainSelectors';
 
 interface ReportsBIModuleProps {
   projects: Project[];
@@ -43,12 +47,18 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
   const totalReceivables = projects.reduce((acc, p) => acc + p.receivables, 0);
   const totalLiabilities = projects.reduce((acc, p) => acc + p.liabilities, 0);
 
-  // Receivables aging mock breakdown
+  // Receivables aging from approved, unpaid employer statements and their due dates.
+  const aging = selectReceivablesAging(useAppState());
+  const agingTotal = aging.reduce((a, r) => a + r.remainingClaim, 0);
+  const bucket = (label: string, color: string, test: (days: number) => boolean) => {
+    const amount = aging.filter((r) => test(r.overdueDays)).reduce((a, r) => a + r.remainingClaim, 0);
+    return { label, color, amount, percentage: agingTotal ? Math.round((amount * 1000) / agingTotal) / 10 : 0 };
+  };
   const agingBuckets = [
-    { label: 'کمتر از ۳۰ روز (جاری)', amount: Math.round(totalReceivables * 0.45), percentage: 45, color: 'bg-emerald-500' },
-    { label: '۳۰ تا ۶۰ روز', amount: Math.round(totalReceivables * 0.28), percentage: 28, color: 'bg-blue-500' },
-    { label: '۶۰ تا ۹۰ روز (نیازمند پیگیری)', amount: Math.round(totalReceivables * 0.17), percentage: 17, color: 'bg-amber-500' },
-    { label: 'بیش از ۹۰ روز (مطالبات معوق/ریسک)', amount: Math.round(totalReceivables * 0.10), percentage: 10, color: 'bg-rose-500' },
+    bucket('کمتر از ۳۰ روز (جاری)', 'bg-emerald-500', (d) => d < 30),
+    bucket('۳۰ تا ۶۰ روز', 'bg-blue-500', (d) => d >= 30 && d < 60),
+    bucket('۶۰ تا ۹۰ روز (نیازمند پیگیری)', 'bg-amber-500', (d) => d >= 60 && d < 90),
+    bucket('بیش از ۹۰ روز (مطالبات معوق/ریسک)', 'bg-rose-500', (d) => d >= 90),
   ];
 
   return (
@@ -96,8 +106,8 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">درآمد کارکرد محقق شده</span>
           <div className="text-lg font-bold text-slate-900 font-mono">
-            {formatNumber(totalApprovedRevenue)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalApprovedRevenue, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-blue-600 font-medium">صورت‌وضعیت‌های تایید شده کارفرما</span>
         </div>
@@ -105,8 +115,8 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">بهای تمام‌شده واقعی پروژه‌ها</span>
           <div className="text-lg font-bold text-slate-900 font-mono">
-            {formatNumber(totalActualCost)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalActualCost, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium">مصالح + دستمزد + ماشین‌آلات + سربار</span>
         </div>
@@ -114,17 +124,17 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">سود ناخالص عملیاتی شرکت</span>
           <div className="text-lg font-bold text-emerald-700 font-mono">
-            {formatNumber(totalGrossProfit)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalGrossProfit, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
-          <span className="text-[11px] text-emerald-600 font-medium">حاشیه سود میانگین: {averageMargin.toFixed(1)}٪</span>
+          <span className="text-[11px] text-emerald-600 font-medium">حاشیه سود میانگین: {formatPercent(averageMargin)}</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">خالص مطالبات منهای بدهی‌ها</span>
           <div className="text-lg font-bold text-indigo-700 font-mono">
-            {formatNumber(totalReceivables - totalLiabilities)}{' '}
-            <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalReceivables - totalLiabilities, false)}{' '}
+            <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-indigo-600 font-medium">شاخص سلامت نقدینگی و جریان وجوه</span>
         </div>
@@ -176,7 +186,7 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
             <h3 className="text-xs font-bold text-slate-800">
               جدول سود و زیان و عملکرد تفکیکی پروژه‌ها (P&L Breakdown)
             </h3>
-            <span className="text-xs text-slate-500 font-mono">واحد مبالغ: میلیون تومان</span>
+            <span className="text-xs text-slate-500 font-mono">واحد مبالغ: {moneyUnitLabel()}</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -204,12 +214,12 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
                         <span className="text-[10px] text-slate-400 font-mono">{p.code}</span>
                       </td>
                       <td className="py-3 px-3 font-sans text-slate-600">{p.client}</td>
-                      <td className="py-3 px-3 text-left">{formatNumber(p.contractAmount / 1_000_000)}</td>
-                      <td className="py-3 px-3 text-left text-blue-700 font-bold">{formatNumber(p.recordedRevenue / 1_000_000)}</td>
-                      <td className="py-3 px-3 text-left text-slate-700">{formatNumber(p.actualCost / 1_000_000)}</td>
-                      <td className="py-3 px-3 text-left text-emerald-700 font-bold">{formatNumber(profit / 1_000_000)}</td>
-                      <td className="py-3 px-3 text-center font-bold text-emerald-800">{margin.toFixed(1)}٪</td>
-                      <td className="py-3 px-3 text-left text-rose-700 font-bold">{formatNumber(p.receivables / 1_000_000)}</td>
+                      <td className="py-3 px-3 text-left">{formatMoney(p.contractAmount, false)}</td>
+                      <td className="py-3 px-3 text-left text-blue-700 font-bold">{formatMoney(p.recordedRevenue, false)}</td>
+                      <td className="py-3 px-3 text-left text-slate-700">{formatMoney(p.actualCost, false)}</td>
+                      <td className="py-3 px-3 text-left text-emerald-700 font-bold">{formatMoney(profit, false)}</td>
+                      <td className="py-3 px-3 text-center font-bold text-emerald-800">{formatPercent(margin)}</td>
+                      <td className="py-3 px-3 text-left text-rose-700 font-bold">{formatMoney(p.receivables, false)}</td>
                     </tr>
                   );
                 })}
@@ -293,12 +303,12 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
             </h3>
 
             <div className="space-y-3">
-              {agingBuckets.map((bucket, idx) => (
-                <div key={idx} className="space-y-1 text-xs">
+              {agingBuckets.map((bucket) => (
+                <div key={bucket.label} className="space-y-1 text-xs">
                   <div className="flex justify-between font-medium">
                     <span className="text-slate-700">{bucket.label}</span>
                     <span className="font-mono text-slate-900">
-                      {formatNumber(bucket.amount)} تومان ({bucket.percentage}٪)
+                      {formatMoney(bucket.amount)} ({formatPercent(bucket.percentage)})
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">

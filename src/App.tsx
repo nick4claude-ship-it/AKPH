@@ -3,241 +3,171 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-import { KpiCards } from './components/dashboard/KpiCards';
-import { ProjectTable } from './components/dashboard/ProjectTable';
-import { FinancialCharts } from './components/dashboard/FinancialCharts';
-import { ExpenseBreakdown } from './components/dashboard/ExpenseBreakdown';
-import { PettyCashWidget } from './components/dashboard/PettyCashWidget';
-import { PendingApprovalsWidget } from './components/dashboard/PendingApprovalsWidget';
-import { ProgressStatementsSummary } from './components/dashboard/ProgressStatementsSummary';
-import { ManagementAlerts } from './components/dashboard/ManagementAlerts';
-import { QuickActions } from './components/dashboard/QuickActions';
-import { AiAgentWidget } from './components/dashboard/AiAgentWidget';
 import { ProjectDashboardModal } from './components/project/ProjectDashboardModal';
 import { PdfReportModal } from './components/reports/PdfReportModal';
 import { GlobalSearchModal } from './components/search/GlobalSearchModal';
-import { QuickActionModal } from './components/common/QuickActionModal';
 import { DocumentViewerModal } from './components/common/DocumentViewerModal';
 import { LoginModal } from './components/auth/LoginModal';
-import { ModulePlaceholderView } from './components/modules/ModulePlaceholderView';
-import { AccountingModule } from './components/accounting/AccountingModule';
-import { PettyCashModule } from './components/petty_cash/PettyCashModule';
-import { ContractsModule } from './components/contracts/ContractsModule';
-import { InventoryModule } from './components/inventory/InventoryModule';
-import { ProcurementModule } from './components/procurement/ProcurementModule';
-import { PaymentsTreasuryModule } from './components/finance/PaymentsTreasuryModule';
-import { PartnersModule } from './components/partners/PartnersModule';
-import { PayrollModule } from './components/hr_payroll/PayrollModule';
-import { DocumentCenterModule } from './components/documents/DocumentCenterModule';
-import { ApprovalCenterModule } from './components/approvals/ApprovalCenterModule';
-import { ReportsBIModule } from './components/reports/ReportsBIModule';
-import { ProjectsModule } from './components/project/ProjectsModule';
-import { ProgressStatementsModule } from './components/statements/ProgressStatementsModule';
-import { mockBankAccounts } from './data/accountingMockData';
+import { AiAgentWidget } from './components/dashboard/AiAgentWidget';
+import { useAppState } from './store/AppStore';
+import { useCurrentUser, usePermission, useSession } from './store/session';
+import { useToastListener } from './store/toast';
+import { useApprovalActions } from './store/useApprovalActions';
+import { selectProjects, selectKpiItems } from './store/selectors';
+import { selectApprovals, selectNotifications, selectPettyFunds, selectSidebarCounts } from './store/domainSelectors';
+import { matchNav, navTrail, NavNode } from './navigation/navConfig';
+import { ApprovalItem, Project, TimeRange } from './types';
+import { CheckCircle2, RefreshCw, Filter, X, Lock } from 'lucide-react';
 
-import {
-  mockProjects,
-  mockKpis,
-  mockPettyCashItems,
-  mockPendingApprovals,
-  mockProgressStatements,
-  mockManagementAlerts,
-  currentUser as defaultUser,
-} from './data/mockData';
-import {
-  Project,
-  KpiItem,
-  PettyCash,
-  PendingApproval,
-  ProgressStatement,
-  ManagementAlert,
-  TimeRange,
-  UserProfile,
-} from './types';
-import {
-  Sparkles,
-  AlertCircle,
-  CheckCircle2,
-  RefreshCw,
-  Building2,
-  Filter,
-  Layers,
-  X,
-} from 'lucide-react';
+/** Lazily loaded module screens (one chunk per module). */
+function named<M, K extends keyof M>(loader: () => Promise<M>, key: K) {
+  type C = M[K] extends React.ComponentType<infer P> ? React.ComponentType<P> : never;
+  return lazy(() => loader().then((m) => ({ default: m[key] as unknown as C })));
+}
 
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ProjectsModule = named(() => import('./components/project/ProjectsModule'), 'ProjectsModule');
+const ContractsModule = named(() => import('./components/contracts/ContractsModule'), 'ContractsModule');
+const ProgressStatementsModule = named(() => import('./components/statements/ProgressStatementsModule'), 'ProgressStatementsModule');
+const ProcurementModule = named(() => import('./components/procurement/ProcurementModule'), 'ProcurementModule');
+const InventoryModule = named(() => import('./components/inventory/InventoryModule'), 'InventoryModule');
+const PettyCashModule = named(() => import('./components/petty_cash/PettyCashModule'), 'PettyCashModule');
+const AccountingModule = named(() => import('./components/accounting/AccountingModule'), 'AccountingModule');
+const PaymentsTreasuryModule = named(() => import('./components/finance/PaymentsTreasuryModule'), 'PaymentsTreasuryModule');
+const PartnersModule = named(() => import('./components/partners/PartnersModule'), 'PartnersModule');
+const PayrollModule = named(() => import('./components/hr_payroll/PayrollModule'), 'PayrollModule');
+const DocumentCenterModule = named(() => import('./components/documents/DocumentCenterModule'), 'DocumentCenterModule');
+const ApprovalCenterModule = named(() => import('./components/approvals/ApprovalCenterModule'), 'ApprovalCenterModule');
+const NotificationCenterPage = named(() => import('./pages/NotificationCenterPage'), 'NotificationCenterPage');
+const ReportsBIModule = named(() => import('./components/reports/ReportsBIModule'), 'ReportsBIModule');
+const SettingsPage = named(() => import('./pages/SettingsPage'), 'SettingsPage');
+
+const LoadingView = () => (
+  <div className="py-24 text-center space-y-3">
+    <RefreshCw className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
+    <p className="text-sm font-bold text-slate-700">در حال دریافت داده‌های برخط پروژه‌ها و مراکز هزینه...</p>
+    <p className="text-xs text-slate-400">همگام‌سازی دفاتر حسابداری، تنخواه‌ها و صورت‌وضعیت‌ها</p>
+  </div>
+);
+
+/** Route wrappers that pass URL parameters to the module screens. */
+const ProjectsRoute: React.FC<{ projects: Project[] }> = ({ projects }) => {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <ProjectsModule
+      projects={projects}
+      projectId={projectId}
+      onOpenProject={(id: string | null) => navigate(id ? `/projects/${id}` : '/projects')}
+      onNavigate={(path: string) => navigate(path)}
+    />
+  );
+}
+
+const PartnersRoute: React.FC<{ projects: Project[]; kind: 'clients' | 'subcontractors' | 'suppliers' }> = ({ projects, kind }) => {
+  const { counterpartyId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <PartnersModule
+      projects={projects}
+      kind={kind}
+      counterpartyId={counterpartyId}
+      onOpenProfile={(id: string | null) => navigate(id ? `/partners/${kind}/${id}` : `/partners/${kind}`)}
+      onNavigate={(path: string) => navigate(path)}
+    />
+  );
+}
+
+/** Pages that need a permission render this instead when the signed-in role lacks it. */
+const NoAccess: React.FC = () => (
+  <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm" role="alert">
+    <Lock className="w-10 h-10 text-slate-300 mx-auto" />
+    <h3 className="text-sm font-bold text-slate-900">دسترسی به این بخش برای نقش شما تعریف نشده است</h3>
+    <p className="text-xs text-slate-500">در صورت نیاز، مدیر سیستم نقش شما را در افزونه پرتال تغییر دهد.</p>
+  </div>
+);
+
+/** Sections whose writes the installed paydar-portal server already executes (the rest are read-only there). */
+const SERVER_BACKED_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications'];
+
+/** App shell: the session (user, currency, data source) is provided by main.tsx. */
 export default function App() {
-  // Navigation & Layout State
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const user = useCurrentUser();
+  const { session, switchUser, devUsers, sourceLabel, isDemoData } = useSession();
+  const { can } = usePermission();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('current_year');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
-  const [user, setUser] = useState<UserProfile>(defaultUser);
 
-  // Core Data State (Mutable for interactive actions)
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
-  const [kpis, setKpis] = useState<KpiItem[]>(mockKpis);
-  const [pettyCashList, setPettyCashList] = useState<PettyCash[]>(mockPettyCashItems);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(mockPendingApprovals);
-  const [statements, setStatements] = useState<ProgressStatement[]>(mockProgressStatements);
-  const [alerts, setAlerts] = useState<ManagementAlert[]>(mockManagementAlerts);
-  const [bankAccounts, setBankAccounts] = useState(mockBankAccounts);
+  const appState = useAppState();
+  const { approve } = useApprovalActions();
+  const projects = useMemo(() => selectProjects(appState), [appState]);
+  const sidebarCounts = useMemo(() => selectSidebarCounts(appState), [appState]);
+  const notifications = useMemo(() => selectNotifications(appState, false, session.user.id), [appState, session.user.id]);
+  const approvals = useMemo(() => selectApprovals(appState), [appState]);
+  const kpis = useMemo(() => selectKpiItems(appState), [appState]);
+  const funds = useMemo(() => selectPettyFunds(appState), [appState]);
 
-  // Modals & Drawers State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [pdfTargetProject, setPdfTargetProject] = useState<Project | null>(null);
   const [isAiAgentFloatingOpen, setIsAiAgentFloatingOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [selectedProjectForDashboard, setSelectedProjectForDashboard] = useState<Project | null>(null);
-  const [activeDocItem, setActiveDocItem] = useState<PendingApproval | null>(null);
-  const [quickActionState, setQuickActionState] = useState<{
-    key: string;
-    title: string;
-  } | null>(null);
+  const [activeApproval, setActiveApproval] = useState<ApprovalItem | null>(null);
 
-  // System States (Simulation of Empty, Loading, and Error states per requirement)
-  const [systemState, setSystemState] = useState<'normal' | 'loading' | 'empty' | 'error'>('normal');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4500);
-  };
+    setTimeout(() => setToastMessage(null), 4500);
+  }, []);
+  useToastListener(showToast);
 
-  // Filtered views if a specific project is selected in header dropdown
-  const filteredProjects = useMemo(() => {
-    if (selectedProjectId === 'all') return projects;
-    return projects.filter((p) => p.id === selectedProjectId);
-  }, [projects, selectedProjectId]);
+  /** Route element guarded by the nav node's permission. */
+  const guarded = (node: NavNode['requires'], element: React.ReactElement) => (!node || can(node) ? element : <NoAccess />);
+  const onPosted = (docNumber: string) => showToast(`سند حسابداری ${docNumber} صادر شد.`);
 
-  const filteredPettyCash = useMemo(() => {
-    if (selectedProjectId === 'all') return pettyCashList;
-    return pettyCashList.filter((p) => p.projectId === selectedProjectId);
-  }, [pettyCashList, selectedProjectId]);
-
-  const filteredApprovals = useMemo(() => {
-    if (selectedProjectId === 'all') return pendingApprovals;
-    return pendingApprovals.filter((a) => a.projectId === selectedProjectId);
-  }, [pendingApprovals, selectedProjectId]);
-
-  const filteredStatements = useMemo(() => {
-    if (selectedProjectId === 'all') return statements;
-    return statements.filter((s) => s.projectId === selectedProjectId);
-  }, [statements, selectedProjectId]);
-
-  // Approval Handlers
-  const handleApprove = (approvalId: string) => {
-    const item = pendingApprovals.find((a) => a.id === approvalId);
-    if (!item) return;
-
-    setPendingApprovals((prev) =>
-      prev.map((a) => (a.id === approvalId ? { ...a, status: 'approved' } : a))
-    );
-
-    // If it's a petty cash voucher, update usable balance in that fund
-    if (item.expenseType.includes('تنخواه')) {
-      setPettyCashList((prev) =>
-        prev.map((pc) => {
-          if (pc.projectId === item.projectId) {
-            const newPending = Math.max(0, pc.pendingExpenses - item.amount);
-            return {
-              ...pc,
-              pendingExpenses: newPending,
-              usableBalance: pc.actualBalance - newPending,
-            };
-          }
-          return pc;
-        })
-      );
-    }
-
-    showToast(`سند شماره ${item.docNumber} به مبلغ ${item.amount.toLocaleString('fa-IR')} تومان توسط ${user.name} تأیید گردید.`);
-  };
-
-  const handleReject = (approvalId: string, reason: string = 'عدم تطابق با مستندات') => {
-    const item = pendingApprovals.find((a) => a.id === approvalId);
-    if (!item) return;
-
-    setPendingApprovals((prev) =>
-      prev.map((a) => (a.id === approvalId ? { ...a, status: 'rejected' } : a))
-    );
-
-    showToast(`سند شماره ${item.docNumber} رد شد. دلیل: ${reason}`);
-  };
-
-  const handlePettyCashCharge = (petty: PettyCash) => {
-    setQuickActionState({
-      key: 'charge_petty',
-      title: `شارژ تنخواه ${petty.projectName} (${petty.holderName})`,
-    });
-  };
-
-  const handleAlertAction = (alert: ManagementAlert) => {
-    if (alert.actionType === 'petty_cash_charge' && alert.relatedProjectId) {
-      const pc = pettyCashList.find((p) => p.projectId === alert.relatedProjectId);
-      if (pc) handlePettyCashCharge(pc);
-      else setQuickActionState({ key: 'charge_petty', title: 'شارژ فوری تنخواه کارگاه' });
-    } else if (alert.actionType === 'open_approvals') {
-      const pendingEl = document.getElementById('pending-approvals-section');
-      if (pendingEl) pendingEl.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      showToast(`دستور اقدام برای هشدار «${alert.title}» اجرا شد.`);
-    }
-  };
-
-  const handleDismissAlert = (alertId: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== alertId));
-    showToast('هشدار با موفقیت از صف اعلان‌های فعال خارج شد.');
-  };
+  // Page title comes from navConfig (group › page).
+  const trail = navTrail(matchNav(location.pathname));
+  const pageTitle =
+    trail.length === 0 || trail[0].id === 'dashboard' ? 'مرکز فرماندهی و پایش مالی پروژه‌ها' : trail.map((n) => n.label).join(' › ');
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 flex text-right font-sans antialiased selection:bg-amber-100 selection:text-amber-900">
-      {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="p-1 text-slate-400 hover:text-white mr-1 cursor-pointer"
-          >
+          <button onClick={() => setToastMessage(null)} className="p-1 text-slate-400 hover:text-white mr-1 cursor-pointer">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Vertical Right Sidebar */}
       <Sidebar
-        currentTab={currentTab}
-        onSelectTab={(tab) => {
-          setCurrentTab(tab);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         user={user}
-        onOpenLogout={() => setIsLoginOpen(true)}
+        onOpenLogout={switchUser ? () => setIsLoginOpen(true) : undefined}
         onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
+        counts={sidebarCounts}
       />
 
-      {/* Main Content Viewport */}
-      <div
-        className={`flex-1 transition-all duration-300 flex flex-col min-h-screen ${
-          sidebarCollapsed ? 'mr-20' : 'mr-68'
-        }`}
-      >
-        {/* Sticky Executive Top Header */}
+      <div className={`flex-1 transition-all duration-300 flex flex-col min-h-screen ${sidebarCollapsed ? 'mr-20' : 'mr-68'}`}>
+        {isDemoData && (
+          <div className="bg-amber-400 text-slate-950 text-xs font-bold text-center py-1.5 px-4" role="status">
+            نسخه نمایشی — اطلاعات با تازه‌کردن صفحه پاک می‌شود
+          </div>
+        )}
         <Header
-          title={
-            currentTab === 'dashboard'
-              ? 'مرکز فرماندهی و پایش مالی پروژه‌ها'
-              : `ماژول: ${currentTab}`
-          }
+          title={pageTitle}
           subtitle="سامانه مدیریت جامع پیمانکاری و ساخت‌وساز · شرکت سازه گستران پارس"
           projects={projects}
           selectedProjectId={selectedProjectId}
@@ -251,384 +181,96 @@ export default function App() {
           }}
           onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
           user={user}
-          alerts={alerts}
-          onOpenAlertsModal={() => {
-            const alertsEl = document.getElementById('management-alerts-section');
-            if (alertsEl) alertsEl.scrollIntoView({ behavior: 'smooth' });
-          }}
-          onSwitchUser={() => setIsLoginOpen(true)}
+          alerts={notifications}
+          onOpenAlertsModal={() => navigate('/notifications')}
+          onSwitchUser={switchUser ? () => setIsLoginOpen(true) : undefined}
         />
 
-        {/* System State Selector Bar (For demonstrating Empty, Loading, Error states per requirement) */}
-        <div className="no-print bg-white/80 border-b border-slate-200/80 px-6 py-2 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">شبیه‌سازی وضعیت‌های سیستمی:</span>
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md">
-              <button
-                onClick={() => setSystemState('normal')}
-                className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                  systemState === 'normal' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                داده‌های فعال (Normal)
-              </button>
-              <button
-                onClick={() => setSystemState('loading')}
-                className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                  systemState === 'loading' ? 'bg-white text-blue-700 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                بارگذاری (Loading)
-              </button>
-              <button
-                onClick={() => setSystemState('empty')}
-                className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                  systemState === 'empty' ? 'bg-white text-amber-700 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                داده خالی (Empty)
-              </button>
-              <button
-                onClick={() => setSystemState('error')}
-                className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                  systemState === 'error' ? 'bg-white text-rose-700 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                خطا (Error)
-              </button>
-            </div>
-          </div>
-
-          {selectedProjectId !== 'all' && (
+        {selectedProjectId !== 'all' && (
+          <div className="no-print bg-white/80 border-b border-slate-200/80 px-6 py-2 flex items-center justify-end text-[11px] text-slate-500">
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-2 py-0.5 rounded">
               <Filter className="w-3 h-3 text-amber-600" />
               <span>فیلتر فعال روی یک پروژه</span>
-              <button
-                onClick={() => setSelectedProjectId('all')}
-                className="font-bold underline text-amber-800 cursor-pointer"
-              >
+              <button onClick={() => setSelectedProjectId('all')} className="font-bold underline text-amber-800 cursor-pointer">
                 نمایش تمام پروژه‌ها
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Dynamic Main Body Content */}
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto">
-          {/* SYSTEM STATE: LOADING */}
-          {systemState === 'loading' && (
-            <div className="py-24 text-center space-y-3">
-              <RefreshCw className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
-              <p className="text-sm font-bold text-slate-700">در حال دریافت داده‌های برخط پروژه‌ها و مراکز هزینه...</p>
-              <p className="text-xs text-slate-400">همگام‌سازی دفاتر حسابداری، تنخواه‌ها و صورت‌وضعیت‌ها</p>
+          {!isDemoData && !SERVER_BACKED_PATHS.some((p) => (p === '/' ? location.pathname === '/' : location.pathname.startsWith(p))) && (
+            <div className="px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-900 text-xs font-bold" role="status">
+              این بخش در نسخه وردپرس فعلاً فقط‌خواندنی است — ثبت و تأیید به‌زودی (نیازمند پیاده‌سازی در سرور).
             </div>
           )}
-
-          {/* SYSTEM STATE: ERROR */}
-          {systemState === 'error' && (
-            <div className="p-8 rounded-2xl bg-white border border-rose-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm">
-              <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-900">خطا در برقراری ارتباط با سرور حسابداری</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                امکان دریافت آخرین تراز آزمایشی و گردش نقدینگی وجود ندارد. لطفاً ارتباط شبکه یا سرویس پایگاه داده را بررسی نمایید.
-              </p>
-              <button
-                onClick={() => setSystemState('normal')}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 cursor-pointer"
-              >
-                تلاش مجدد و بارگذاری مجدد
-              </button>
-            </div>
-          )}
-
-          {/* SYSTEM STATE: EMPTY */}
-          {systemState === 'empty' && (
-            <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm">
-              <Building2 className="w-10 h-10 text-slate-300 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-900">هیچ پروژه‌ای در این دوره ثبت نشده است</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                هنوز پروژه یا سند مالی در بازه زمانی انتخاب‌شده وجود ندارد. می‌توانید اولین قرارداد یا هزینه را اضافه نمایید.
-              </p>
-              <button
-                onClick={() => setQuickActionState({ key: 'new_project', title: 'تعریف پروژه جدید' })}
-                className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-lg text-xs hover:bg-amber-600 cursor-pointer"
-              >
-                تعریف اولین پروژه عمرانی
-              </button>
-            </div>
-          )}
-
-          {/* SYSTEM STATE: NORMAL OPERATING DASHBOARD */}
-          {systemState === 'normal' && (
-            <>
-              {currentTab === 'dashboard' ? (
-                <>
-                  {/* 1. Quick Actions Shortcuts */}
-                  <QuickActions
-                    onTriggerAction={(key, title) => {
-                      if (key === 'view_financial_report') {
-                        setIsPdfOpen(true);
-                      } else {
-                        setQuickActionState({ key, title });
-                      }
-                    }}
-                  />
-
-                  {/* 2. Key Performance Indicators (8 Cards) */}
-                  <KpiCards
-                    kpis={kpis}
-                    onCardClick={(kpi) => {
-                      showToast(`مشاهده ریز گزارش شاخص: ${kpi.title}`);
-                    }}
-                  />
-
-                  {/* 3. Financial Charts & Expense Breakdown (2 Columns) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <FinancialCharts
-                      timeRange={timeRange}
-                      onChangeTimeRange={(r) => setTimeRange(r)}
-                    />
-                    <ExpenseBreakdown />
-                  </div>
-
-                  {/* 4. Projects Financial Overview Modern Table */}
-                  <ProjectTable
-                    projects={filteredProjects}
-                    onSelectProject={(project) => setSelectedProjectForDashboard(project)}
-                  />
-
-                  {/* 5. Petty Cash & Pending Approvals (CEO priority sections) */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <PettyCashWidget
-                      items={filteredPettyCash}
-                      onChargeClick={handlePettyCashCharge}
-                      onViewAllClick={() => setCurrentTab('petty_cash')}
-                    />
-
-                    <div id="pending-approvals-section">
-                      <PendingApprovalsWidget
-                        approvals={filteredApprovals}
-                        onApprove={handleApprove}
-                        onReject={handleReject}
-                        onViewDoc={(doc) => setActiveDocItem(doc)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 6. Progress Statements Summary & Management Alerts */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <ProgressStatementsSummary
-                      statements={filteredStatements}
-                      onOpenStatementsModule={() => setCurrentTab('statements')}
-                      onSelectStatement={(st) => {
-                        showToast(`انتخاب صورت‌وضعیت: ${st.number}`);
-                      }}
-                    />
-
-                    <div id="management-alerts-section">
-                      <ManagementAlerts
-                        alerts={alerts}
-                        onActionClick={handleAlertAction}
-                        onDismiss={handleDismissAlert}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 7. Inline AI Assistant Panel at Dashboard bottom */}
-                  <div className="pt-2">
-                    <AiAgentWidget
-                      isOpen={true}
-                      isFloating={false}
+          <Suspense fallback={<LoadingView />}>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <DashboardPage
                       projects={projects}
-                      pettyCashList={pettyCashList}
-                      pendingApprovals={pendingApprovals}
+                      selectedProjectId={selectedProjectId}
+                      timeRange={timeRange}
+                      onChangeTimeRange={setTimeRange}
+                      onOpenProject={(p) => setSelectedProjectForDashboard(p)}
+                      onOpenReport={() => setIsPdfOpen(true)}
+                      onViewApproval={(a) => setActiveApproval(a)}
+                      onToast={showToast}
                     />
-                  </div>
-                </>
-              ) : currentTab === 'projects' ? (
-                /* Phase 1 & Architecture Point 2: Dedicated Projects Module */
-                <ProjectsModule
-                  projects={projects}
-                  onSelectProject={(id) => {
-                    setSelectedProjectId(id);
-                  }}
-                  onNavigateToTab={(tab) => setCurrentTab(tab)}
+                  }
                 />
-              ) : currentTab === 'contracts' ? (
-                /* Phase 3 & Architecture Point 3: Dedicated Contracts Module */
-                <ContractsModule
-                  projects={projects}
-                  bankAccounts={bankAccounts}
-                  currentUser={user}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند حسابداری با موفقیت صادر شد: ${entry.description}`);
-                  }}
-                  onUpdateBankBalance={(bankId, amount, type) => {
-                    setBankAccounts((prev) =>
-                      prev.map((b) =>
-                        b.id === bankId
-                          ? { ...b, balance: type === 'debit' ? b.balance + amount : b.balance - amount }
-                          : b
-                      )
-                    );
-                    showToast(`تراکنش بانکی ثبت و مانده حساب به‌روزرسانی شد.`);
-                  }}
-                />
-              ) : currentTab === 'statements' ? (
-                /* Phase 4 & Architecture Point 4: Progress Statements Module (Client & Subcontractor) */
-                <ProgressStatementsModule
-                  projects={projects}
-                  onOpenNewClientStatement={() => showToast('فرم ثبت صورت‌وضعیت جدید کارفرما')}
-                  onOpenNewSubcontractorStatement={() => showToast('فرم ثبت صورت‌وضعیت جدید پیمانکار جزء')}
-                />
-              ) : currentTab === 'procurement' ? (
-                /* Phase 5 & Architecture Point 5: Procurement Module (PR -> RFQ -> PO -> GRN -> Invoice) */
-                <ProcurementModule
-                  projects={projects}
-                  currentUser={user}
-                  onUpdateProjectCost={(projectId: string, amount: number) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`بهای تمام‌شده پروژه افزایش یافت: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
-                  onAddJournalEntry={(entry: any) => {
-                    showToast(`سند حسابداری فاکتور خرید صادر گردید: ${entry.description}`);
-                  }}
-                />
-              ) : currentTab === 'inventory' ? (
-                /* Phase 6 & Architecture Point 6: Warehouse, Materials & Inventory Module */
-                <InventoryModule
-                  currentUser={user}
-                  projects={projects}
-                  onUpdateProjectCost={(projectId, amount) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`هزینه مصالح به پروژه اضافه شد: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند انبارداری در حسابداری صادر شد: ${entry.description}`);
-                  }}
-                />
-              ) : currentTab === 'petty_cash' ? (
-                /* Phase 7 & Architecture Point 7: Petty Cash Module */
-                <PettyCashModule
-                  currentUser={user}
-                  projects={projects}
-                  bankAccounts={bankAccounts}
-                  onUpdateProjectCost={(projectId, amount) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`هزینه پروژه به روزرسانی شد: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
-                  onUpdateBankBalance={(bankAccountId, newBalance) => {
-                    setBankAccounts((prev) =>
-                      prev.map((b) => (b.id === bankAccountId ? { ...b, balance: newBalance } : b))
-                    );
-                  }}
-                />
-              ) : currentTab === 'finance' ? (
-                /* Phase 8 & Architecture Point 9: Treasury & Payments Module */
-                <PaymentsTreasuryModule
-                  projects={projects}
-                  bankAccounts={bankAccounts}
-                  currentUser={user}
-                  onUpdateBankBalance={(bankId: string, amount: number, type: 'credit' | 'debit') => {
-                    setBankAccounts((prev) =>
-                      prev.map((b) =>
-                        b.id === bankId
-                          ? { ...b, balance: type === 'debit' ? b.balance + amount : Math.max(0, b.balance - amount) }
-                          : b
-                      )
-                    );
-                    showToast(`پرداخت به مبلغ ${amount.toLocaleString('fa-IR')} تومان انجام و مانده بانک به‌روزرسانی شد.`);
-                  }}
-                />
-              ) : currentTab === 'accounting' ? (
-                /* Phase 2 & Architecture Point 8: Full Enterprise Accounting Engine */
-                <AccountingModule currentUser={user} />
-              ) : currentTab === 'partners' ? (
-                /* Phase 9 & Architecture Points 11 & 12: Stakeholders & Partners Directory */
-                <PartnersModule
-                  projects={projects}
-                  onOpenClientContract={(id) => setCurrentTab('contracts')}
-                  onOpenSubcontractorContract={(id) => setCurrentTab('contracts')}
-                />
-              ) : currentTab === 'payroll' ? (
-                /* Phase 10 & Architecture Point 13: HR & Payroll Engine */
-                <PayrollModule
-                  projects={projects}
-                  currentUser={user}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند حسابداری حقوق و دستمزد ماهانه صادر گردید.`);
-                  }}
-                  onAddPaymentRequest={(req) => {
-                    showToast(`دستور پرداخت حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.`);
-                  }}
-                />
-              ) : currentTab === 'documents' ? (
-                /* Phase 11 & Architecture Point 14: Unified Document Management DMS */
-                <DocumentCenterModule projects={projects} />
-              ) : currentTab === 'approvals' ? (
-                /* Phase 11 & Architecture Point 15: Executive Approvals Center */
-                <ApprovalCenterModule
-                  projects={projects}
-                  currentUser={user}
-                  onItemApproved={(item) => {
-                    showToast(`درخواست ${item.docNumber} با موفقیت توسط مدیریت تایید و ابلاغ شد.`);
-                  }}
-                  onItemRejected={(item, reason) => {
-                    showToast(`درخواست ${item.docNumber} جهت اصلاح عودت داده شد.`);
-                  }}
-                />
-              ) : currentTab === 'reports' ? (
-                /* Phase 12 & Architecture Point 17: BI & Executive Analytics */
-                <ReportsBIModule projects={projects} />
-              ) : (
-                /* Fallback View */
-                <ModulePlaceholderView
-                  moduleId={currentTab}
-                  onBackToDashboard={() => setCurrentTab('dashboard')}
-                  projects={projects}
-                  pettyCashList={pettyCashList}
-                  statements={statements}
-                />
-              )}
-            </>
-          )}
+                <Route path="/projects" element={<ProjectsRoute projects={projects} />} />
+                <Route path="/projects/:projectId" element={<ProjectsRoute projects={projects} />} />
+                <Route path="/contracts" element={<Navigate to="/contracts/client" replace />} />
+                <Route path="/contracts/client" element={<ContractsModule key="client" mode="client" projects={projects} currentUser={user} onPosted={onPosted} onToast={showToast} />} />
+                <Route path="/contracts/subcontract" element={<ContractsModule key="sub" mode="subcontractor" projects={projects} currentUser={user} onPosted={onPosted} onToast={showToast} />} />
+                <Route path="/statements" element={<Navigate to="/statements/client" replace />} />
+                <Route path="/statements/client" element={<ProgressStatementsModule key="client" tab="client_statements" projects={projects} onToast={showToast} />} />
+                <Route path="/statements/subcontractor" element={<ProgressStatementsModule key="sub" tab="subcontractor_statements" projects={projects} onToast={showToast} />} />
+                <Route path="/procurement" element={<ProcurementModule projects={projects} currentUser={user} onToast={showToast} />} />
+                <Route path="/inventory" element={<InventoryModule projects={projects} currentUser={user} />} />
+                <Route path="/petty-cash" element={<PettyCashModule projects={projects} currentUser={user} onToast={showToast} />} />
+                <Route path="/finance" element={<Navigate to="/finance/accounting" replace />} />
+                <Route path="/finance/accounting" element={guarded('journal.create', <AccountingModule currentUser={user} />)} />
+                <Route path="/finance/payments" element={guarded('payment_request.create', <PaymentsTreasuryModule key="pay" tab="payment_requests" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/finance/receipts" element={guarded('receipt.record', <PaymentsTreasuryModule key="rec" tab="receipts" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/finance/banks" element={guarded('payment.execute', <PaymentsTreasuryModule key="bank" tab="bank_accounts" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/finance/cash" element={guarded('payment.execute', <PaymentsTreasuryModule key="cash" tab="cash_desks" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/partners" element={<Navigate to="/partners/clients" replace />} />
+                <Route path="/partners/clients" element={<PartnersRoute key="c" projects={projects} kind="clients" />} />
+                <Route path="/partners/clients/:counterpartyId" element={<PartnersRoute key="cp" projects={projects} kind="clients" />} />
+                <Route path="/partners/subcontractors" element={<PartnersRoute key="s" projects={projects} kind="subcontractors" />} />
+                <Route path="/partners/subcontractors/:counterpartyId" element={<PartnersRoute key="sp" projects={projects} kind="subcontractors" />} />
+                <Route path="/partners/suppliers" element={<PartnersRoute key="u" projects={projects} kind="suppliers" />} />
+                <Route path="/partners/suppliers/:counterpartyId" element={<PartnersRoute key="up" projects={projects} kind="suppliers" />} />
+                <Route path="/payroll" element={guarded('payroll.approve', <PayrollModule projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/documents" element={<DocumentCenterModule projects={projects} />} />
+                <Route path="/approvals" element={<ApprovalCenterModule onToast={showToast} />} />
+                <Route path="/notifications" element={<NotificationCenterPage />} />
+                <Route path="/reports" element={<ReportsBIModule projects={projects} />} />
+                <Route path="/ai" element={<AiAgentWidget isOpen={true} isFloating={false} />} />
+                <Route path="/settings" element={guarded('settings.manage', <SettingsPage onToast={showToast} />)} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+          </Suspense>
         </main>
 
-        {/* Corporate Clean Footer */}
         <footer className="no-print mt-auto py-4 px-6 border-t border-slate-200 bg-white/60 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            سامانه جامع مدیریت پروژه‌ها و حسابداری پیمانکاری ·{' '}
-            <strong className="text-slate-700">شرکت سازه گستران پارس</strong>
+            سامانه جامع مدیریت پروژه‌ها و حسابداری پیمانکاری · <strong className="text-slate-700">شرکت سازه گستران پارس</strong>
           </div>
           <div className="flex items-center gap-3 text-[11px] font-mono">
-            <span>فاز اول: داشبورد مدیریتی</span>
+            <span>عملیات ← تأیید ← رویداد مالی ← حسابداری</span>
             <span>·</span>
-            <span className="text-amber-700 font-bold">فاز دوم: ماژول حسابداری دوبل پیمانکاری</span>
-            <span>·</span>
-            <span className="text-emerald-700 font-bold">هسته متصل و پایدار</span>
+            <span className={isDemoData ? 'text-amber-700 font-bold' : 'text-emerald-700 font-bold'}>
+              {sourceLabel} · واحد پول: {session.currency === 'rial' ? 'ریال' : 'تومان'}
+            </span>
           </div>
         </footer>
       </div>
 
-      {/* Dedicated Project Dashboard Modal */}
       <ProjectDashboardModal
         project={selectedProjectForDashboard}
         onClose={() => setSelectedProjectForDashboard(null)}
@@ -638,7 +280,6 @@ export default function App() {
         }}
       />
 
-      {/* PDF Export Printable Dossier Modal */}
       <PdfReportModal
         isOpen={isPdfOpen}
         onClose={() => {
@@ -647,62 +288,45 @@ export default function App() {
         }}
         projects={projects}
         kpis={kpis}
-        pettyCashList={pettyCashList}
-        statements={statements}
+        pettyFunds={funds}
+        statements={appState.clientStatements}
         targetProject={pdfTargetProject}
       />
 
-      {/* Global Multi-Entity Search Modal */}
       <GlobalSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         projects={projects}
-        approvals={pendingApprovals}
-        statements={statements}
-        pettyCashList={pettyCashList}
-        onSelectProject={(p) => setSelectedProjectForDashboard(p)}
-        onSelectApproval={(a) => setActiveDocItem(a)}
-        onSelectStatement={(s) => showToast(`مشاهده جزئیات ${s.number}`)}
+        approvals={approvals}
+        statements={appState.clientStatements}
+        pettyFunds={funds}
+        onSelectProject={(p) => navigate(`/projects/${p.id}`)}
+        onSelectApproval={(a) => setActiveApproval(a)}
+        onSelectStatement={() => navigate('/statements/client')}
       />
 
-      {/* Quick Action Modal */}
-      <QuickActionModal
-        actionKey={quickActionState?.key || null}
-        actionTitle={quickActionState?.title || null}
-        onClose={() => setQuickActionState(null)}
-        projects={projects}
-        pettyCashList={pettyCashList}
-        onSuccess={(msg) => showToast(msg)}
-      />
-
-      {/* Document Viewer Modal for Approvals */}
       <DocumentViewerModal
-        item={activeDocItem}
-        onClose={() => setActiveDocItem(null)}
-        onApprove={(id) => handleApprove(id)}
-      />
-
-      {/* Login & User Role Switcher Modal */}
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        currentUser={user}
-        onSelectUser={(u) => {
-          setUser(u);
-          showToast(`کاربر جاری به «${u.name}» (${u.role}) تغییر یافت.`);
+        item={activeApproval}
+        onClose={() => setActiveApproval(null)}
+        onApprove={() => {
+          if (activeApproval) showToast(approve(activeApproval).message);
+          setActiveApproval(null);
         }}
       />
 
-      {/* Floating AI Agent Widget (When opened from Header or Sidebar pill) */}
-      {isAiAgentFloatingOpen && (
-        <AiAgentWidget
-          isOpen={isAiAgentFloatingOpen}
-          onClose={() => setIsAiAgentFloatingOpen(false)}
-          isFloating={true}
-          projects={projects}
-          pettyCashList={pettyCashList}
-          pendingApprovals={pendingApprovals}
+      {isLoginOpen && switchUser && devUsers && (
+        <LoginModal
+          onClose={() => setIsLoginOpen(false)}
+          currentUser={user}
+          users={devUsers}
+          onSelectUser={(u) => {
+            switchUser(u.id);
+          }}
         />
+      )}
+
+      {isAiAgentFloatingOpen && (
+        <AiAgentWidget isOpen={isAiAgentFloatingOpen} onClose={() => setIsAiAgentFloatingOpen(false)} isFloating={true} />
       )}
     </div>
   );
