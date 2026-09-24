@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CreditCard,
   ArrowDownLeft,
@@ -39,32 +40,52 @@ import {
   CashDesk,
   mockTreasuryChecks,
 } from '../../data/paymentsTreasuryMockData';
-import { useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
-import { payableTypeForRequest } from '../../store/paymentRequests';
+import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
+import { buildPaymentRequest } from '../../store/paymentRequests';
+import { selectPaymentSchedule } from '../../store/domainSelectors';
 import { toPersianDate } from '../../utils/date';
+import { TreasuryReceiptsTab } from './TreasuryReceiptsTab';
+import { PaymentScheduleTab } from './PaymentScheduleTab';
+
+export type TreasuryTab = 'payment_requests' | 'receipts' | 'bank_accounts' | 'checks' | 'cash_desks' | 'liquidity_calendar';
+const TAB_PATHS: Partial<Record<TreasuryTab, string>> = {
+  payment_requests: '/finance/payments',
+  receipts: '/finance/receipts',
+  bank_accounts: '/finance/banks',
+  cash_desks: '/finance/cash',
+};
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 
 interface PaymentsTreasuryModuleProps {
+  /** Initial tab from the route (payments, receipts, banks, cash). */
+  tab: TreasuryTab;
   projects: Project[];
   currentUser: UserProfile;
-  onPosted?: (docNumber: string) => void;
+  onToast: (msg: string) => void;
 }
 
 export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
+  tab,
   projects,
   currentUser,
-  onPosted,
+  onToast,
 }) => {
-  const [activeTab, setActiveTab] = useState<'payment_requests' | 'receipts' | 'bank_accounts' | 'checks' | 'cash_desks' | 'liquidity_calendar'>('payment_requests');
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const sourceFilter = params.get('source');
+  const wf = useWorkflows();
+  const appState = useAppState();
+  const schedule = useMemo(() => selectPaymentSchedule(appState), [appState]);
+  const [innerTab, setInnerTab] = useState<TreasuryTab>(tab);
+  const activeTab = innerTab;
+  // Routed tabs change the URL (so links and Back work); checks and schedule are in-page tabs.
+  const setActiveTab = (t: TreasuryTab) => (TAB_PATHS[t] && t !== tab ? navigate(TAB_PATHS[t]!) : setInnerTab(t));
 
-  const postFinancialEvent = usePostFinancialEvent();
   const [paymentRequests, setPaymentRequests] = useStoreSlice('paymentRequests');
   const [checks, setChecks] = useState<TreasuryCheck[]>(mockTreasuryChecks);
   const [cashDesks] = useStoreSlice('cashDesks');
   const [bankAccounts] = useStoreSlice('bankAccounts');
-  const [, setVendorInvoices] = useStoreSlice('vendorInvoices');
-  const [, setSubcontractorStatements] = useStoreSlice('subcontractorStatements');
-  const [, setSubcontractorContracts] = useStoreSlice('subcontractorContracts');
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,7 +94,9 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
   // Modal state for paying a request
   const [selectedRequestForPay, setSelectedRequestForPay] = useState<PaymentRequest | null>(null);
-  const [paymentBankId, setPaymentBankId] = useState(bankAccounts[0]?.id || '');
+  // No default account: the payer account (bank or cash desk) must be chosen explicitly.
+  const [paymentSourceId, setPaymentSourceId] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentTrackingNo, setPaymentTrackingNo] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
 
@@ -81,7 +104,9 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [newRequestBeneficiary, setNewRequestBeneficiary] = useState('');
   const [newRequestAmount, setNewRequestAmount] = useState('');
-  const [newRequestSource, setNewRequestSource] = useState<any>('صورت‌وضعیت پیمانکار جزء');
+  // Requests for statements, invoices, payroll and petty cash are created by their modules; only
+  // payments without a source document can be entered manually here.
+  const [newRequestSource, setNewRequestSource] = useState<any>('سایر هزینه‌های عمومی');
   const [newRequestProject, setNewRequestProject] = useState(projects[0]?.id || '');
   const [newRequestDueDate, setNewRequestDueDate] = useState('۱۴۰۳/۰۷/۱۵');
 
@@ -100,127 +125,28 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
     .filter((c) => c.status === 'در جریان وصول/سررسید' && c.checkType === 'صادره (پرداختی)')
     .reduce((acc, c) => acc + c.amount, 0);
 
-  // Approve payment request handler
-  const handleApproveRequest = (reqId: string) => {
-    setPaymentRequests((prev) =>
-      prev.map((r) =>
-        r.id === reqId
-          ? {
-              ...r,
-              status: 'تأیید مدیرعامل',
-              approvedBy: `${currentUser.name} (${currentUser.role})`,
-              approvedDate: '۱۴۰۳/۰۷/۰۳',
-            }
-          : r
-      )
-    );
+  const handleApproveRequest = (reqId: string) => onToast(wf.approvePaymentRequest(reqId).message);
+  const handleRejectRequest = (reqId: string) => onToast(wf.rejectPaymentRequest(reqId, 'رد توسط خزانه‌داری').message);
+
+  const openPayment = (req: PaymentRequest) => {
+    setSelectedRequestForPay(req);
+    setPaymentSourceId('');
+    setPaymentAmount(String(req.remainingAmount));
   };
 
-  // Reject payment request handler
-  const handleRejectRequest = (reqId: string) => {
-    setPaymentRequests((prev) =>
-      prev.map((r) => (r.id === reqId ? { ...r, status: 'رد شده' } : r))
-    );
-  };
-
-  // Execute payment transaction
+  // Execute payment: posting (with balance control) and source-document update happen in the workflow.
   const handleExecutePayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequestForPay) return;
-
-    const bank = bankAccounts.find((b) => b.id === paymentBankId) || bankAccounts[0];
-    const req = selectedRequestForPay;
-    const amount = req.remainingAmount;
-    const paymentDate = toPersianDate(new Date());
-    const trackingNumber = paymentTrackingNo || `TRK-${Date.now().toString().slice(-6)}`;
-
-    // The bank balance and the settled payable change only through this posting (Dr payable / Cr bank).
-    const posting = postFinancialEvent(
-      {
-        type: 'TREASURY_PAYMENT',
-        sourceModule: 'treasury',
-        sourceId: req.id,
-        projectId: req.projectId,
-        costCenterId: req.costCenterId,
-        counterpartyId: req.counterpartyId || '',
-        amount,
-        date: paymentDate,
-        details: {
-          docNumber: req.requestNumber,
-          payableType: payableTypeForRequest(req),
-          bankAccountId: bank.id,
-          bankName: bank.bankName,
-          pettyCashId: req.sourceType === 'شارژ و تسویه تنخواه' ? req.sourceRefId : undefined,
-          pettyCashTitle: req.sourceType === 'شارژ و تسویه تنخواه' ? req.beneficiaryName : undefined,
-          trackingNumber,
-        },
-      },
-      { submitter: currentUser.name }
-    );
-    if (!posting.ok) return;
-
-    setPaymentRequests((prev) =>
-      prev.map((r) =>
-        r.id === req.id
-          ? {
-              ...r,
-              status: 'پرداخت شده',
-              paidAmount: r.paidAmount + amount,
-              remainingAmount: 0,
-              payerBankAccountId: bank.id,
-              payerBankAccountName: `${bank.bankName} - ${bank.accountNumber}`,
-              paymentDate,
-              trackingNumber,
-              journalEntryId: posting.event?.docNumber,
-              notes: paymentNotes || r.notes,
-            }
-          : r
-      )
-    );
-
-    // Reflect the settlement on the operational source document.
-    if (!posting.duplicate) {
-      if (req.sourceType === 'فاکتور خرید تأمین‌کننده') {
-        setVendorInvoices((prev) =>
-          prev.map((inv) => {
-            if (inv.id !== req.sourceRefId) return inv;
-            const paidAmount = inv.paidAmount + amount;
-            const remainingBalance = Math.max(0, inv.totalAmount - paidAmount);
-            return { ...inv, paidAmount, remainingBalance, status: remainingBalance === 0 ? 'پرداخت شده' : 'پرداخت ناقص' };
-          })
-        );
-      } else if (req.sourceType === 'صورت‌وضعیت پیمانکار جزء') {
-        let contractId: string | undefined;
-        setSubcontractorStatements((prev) =>
-          prev.map((st) => {
-            if (st.id !== req.sourceRefId) return st;
-            contractId = st.subcontractorContractId;
-            const remainingPayable = Math.max(0, st.remainingPayable - amount);
-            return {
-              ...st,
-              paidAmount: st.paidAmount + amount,
-              remainingPayable,
-              status: remainingPayable === 0 ? 'paid' : st.status,
-              paymentDate,
-              paymentRefNumber: trackingNumber,
-              payingBankId: bank.id,
-              payingBankTitle: bank.bankName,
-            };
-          })
-        );
-        if (contractId) {
-          setSubcontractorContracts((prev) =>
-            prev.map((c) =>
-              c.id === contractId
-                ? { ...c, paidValue: c.paidValue + amount, remainingPayableValue: Math.max(0, c.remainingPayableValue - amount) }
-                : c
-            )
-          );
-        }
-      }
-      if (posting.event?.docNumber) onPosted?.(posting.event.docNumber);
-    }
-
+    const [kind, id] = paymentSourceId.split(':');
+    const result = wf.executePayment(selectedRequestForPay.id, {
+      bankAccountId: kind === 'bank' ? id : undefined,
+      cashDeskId: kind === 'cash' ? id : undefined,
+      amount: Number(paymentAmount.replace(/[^\d]/g, '')),
+      trackingNumber: paymentTrackingNo || undefined,
+    });
+    onToast(result.message);
+    if (!result.ok) return;
     setSelectedRequestForPay(null);
     setPaymentTrackingNo('');
     setPaymentNotes('');
@@ -234,32 +160,22 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
     const proj = projects.find((p) => p.id === newRequestProject) || projects[0];
 
-    const newReq: PaymentRequest = {
-      id: `pr-${Date.now()}`,
-      requestNumber: `PR-1403-${paymentRequests.length + 701}`,
-      sourceType: newRequestSource,
-      sourceRefId: `REF-${Date.now().toString().slice(-4)}`,
-      sourceRefNumber: `DOC-${Date.now().toString().slice(-4)}`,
-      date: '۱۴۰۳/۰۷/۰۳',
-      dueDate: newRequestDueDate,
-      projectId: proj.id,
-      projectName: proj.name,
-      costCenterId: 'CC-GEN',
-      beneficiaryName: newRequestBeneficiary,
-      beneficiaryType: 'پیمانکار جزء',
-      beneficiaryAccount: {
-        bankName: 'بانک عامل طرف حساب',
-        shebaNumber: 'IR000000000000000000000000',
-        accountNumber: '---',
+    const newReq: PaymentRequest = buildPaymentRequest(
+      paymentRequests,
+      {
+        sourceType: newRequestSource,
+        sourceRefId: `manual-${Date.now()}`,
+        sourceRefNumber: 'بدون سند مبدأ',
+        projectId: proj.id,
+        projectName: proj.name,
+        costCenterId: '',
+        beneficiaryName: newRequestBeneficiary,
+        beneficiaryType: newRequestSource === 'حق بیمه و مالیات' ? 'سازمان تامین اجتماعی' : 'تأمین‌کننده',
+        totalAmount: amt,
+        dueDate: newRequestDueDate,
       },
-      totalAmount: amt,
-      approvedAmount: amt,
-      paidAmount: 0,
-      remainingAmount: amt,
-      priority: 'عادی',
-      status: 'در انتظار تأیید مالی',
-    };
-
+      toPersianDate(new Date())
+    );
     setPaymentRequests((prev) => [newReq, ...prev]);
     setIsNewRequestModalOpen(false);
     setNewRequestBeneficiary('');
@@ -267,6 +183,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   };
 
   const filteredRequests = paymentRequests.filter((r) => {
+    if (sourceFilter && r.sourceRefId !== sourceFilter) return false;
     if (selectedStatus !== 'all' && r.status !== selectedStatus) return false;
     if (selectedProjectId !== 'all' && r.projectId !== selectedProjectId) return false;
     if (searchQuery.trim()) {
@@ -383,6 +300,36 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <span>کارتابل درخواست‌های پرداخت (Payables)</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-800 text-amber-300">
             {paymentRequests.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('liquidity_calendar')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'liquidity_calendar'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5 text-rose-400" />
+          <span>برنامه پرداخت</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+            {schedule.rows.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('receipts')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'receipts'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+          }`}
+        >
+          <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
+          <span>دریافت‌ها</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+            {appState.receipts.length}
           </span>
         </button>
 
@@ -574,7 +521,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
                             {(req.status === 'تأیید مدیرعامل' || req.status === 'در صف پرداخت خزانه') && (
                               <button
-                                onClick={() => setSelectedRequestForPay(req)}
+                                onClick={() => openPayment(req)}
                                 className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
                               >
                                 <CreditCard className="w-3 h-3" />
@@ -599,6 +546,13 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           </div>
         </div>
       )}
+
+      {activeTab === 'receipts' && <TreasuryReceiptsTab onToast={onToast} />}
+
+      {activeTab === 'liquidity_calendar' && <PaymentScheduleTab schedule={schedule} onPay={(req) => {
+        setInnerTab('payment_requests');
+        openPayment(req);
+      }} />}
 
       {/* Tab 2: Bank Accounts & Reconciliation */}
       {activeTab === 'bank_accounts' && (
@@ -814,7 +768,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 <span>{selectedRequestForPay.projectName}</span>
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-200 text-sm">
-                <span className="font-bold text-slate-700">مبلغ پرداخت:</span>
+                <span className="font-bold text-slate-700">مانده قابل پرداخت:</span>
                 <strong className="text-amber-800 font-mono font-bold">
                   {formatNumber(selectedRequestForPay.remainingAmount)} تومان
                 </strong>
@@ -823,18 +777,41 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
             <form onSubmit={handleExecutePayment} className="space-y-4 text-xs">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">حساب بانکی مبدأ (پرداخت‌کننده):</label>
+                <label className="block font-medium text-slate-700 mb-1">حساب بانکی یا صندوق پرداخت‌کننده:</label>
                 <select
-                  value={paymentBankId}
-                  onChange={(e) => setPaymentBankId(e.target.value)}
+                  value={paymentSourceId}
+                  onChange={(e) => setPaymentSourceId(e.target.value)}
+                  required
                   className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs focus:outline-none focus:border-amber-500"
                 >
-                  {bankAccounts.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.bankName} - {b.accountNumber} (موجودی: {formatCurrencyCompact(b.balance)})
-                    </option>
-                  ))}
+                  <option value="">— انتخاب حساب پرداخت —</option>
+                  <optgroup label="حساب‌های بانکی">
+                    {bankAccounts.filter((b) => b.status === 'فعال').map((b) => (
+                      <option key={b.id} value={`bank:${b.id}`}>
+                        {b.bankName} - {b.accountNumber} (موجودی: {formatCurrencyCompact(b.balance)})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="صندوق‌ها">
+                    {cashDesks.map((c) => (
+                      <option key={c.id} value={`cash:${c.id}`}>
+                        {c.title} (موجودی: {formatCurrencyCompact(c.balance)})
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">مبلغ پرداخت (تا سقف مانده؛ پرداخت جزئی مجاز است):</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value.replace(/[^\d]/g, ''))}
+                  required
+                  className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:border-amber-500"
+                />
               </div>
 
               <div>
@@ -902,12 +879,9 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   onChange={(e) => setNewRequestSource(e.target.value)}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
                 >
-                  <option value="صورت‌وضعیت پیمانکار جزء">صورت‌وضعیت پیمانکار جزء</option>
-                  <option value="فاکتور خرید تأمین‌کننده">فاکتور خرید تأمین‌کننده</option>
-                  <option value="شارژ و تسویه تنخواه">شارژ و تسویه تنخواه</option>
-                  <option value="حقوق و دستمزد ماهانه">حقوق و دستمزد ماهانه</option>
-                  <option value="پیش‌پرداخت خرید">پیش‌پرداخت خرید</option>
                   <option value="سایر هزینه‌های عمومی">سایر هزینه‌های عمومی</option>
+                  <option value="پیش‌پرداخت خرید">پیش‌پرداخت خرید</option>
+                  <option value="حق بیمه و مالیات">حق بیمه و مالیات</option>
                 </select>
               </div>
 

@@ -4,7 +4,7 @@
  */
 
 import { AppState } from './types';
-import { JournalEntry, KpiItem, PettyCash, Project, ProgressStatement, StatementStatus } from '../types';
+import { JournalEntry, KpiItem, Project } from '../types';
 import { CLIENT_APPROVED_STATUSES } from './initialState';
 
 /**
@@ -282,70 +282,4 @@ export function selectExpenseCategoryTotals(state: AppState, projectId: string =
   })).filter((c) => c.amount > 0);
 }
 
-const toFa = (n: number) => n.toLocaleString('fa-IR');
 
-/** شمارنده‌های منوی کناری. */
-export function selectSidebarCounts(state: AppState): Record<string, string> {
-  return {
-    projects: toFa(state.projects.length),
-    contracts: toFa(state.contracts.length + state.subcontractorContracts.length),
-    statements: toFa(state.clientStatements.length + state.subcontractorStatements.length),
-    inventory: toFa(state.materials.length),
-    petty_cash: toFa(state.pettyCashAccounts.filter((a) => a.status === 'active').length),
-  };
-}
-
-/** خلاصه صورت‌وضعیت‌های کارفرما برای داشبورد، جستجو و گزارش؛ از همان رکوردهای صورت‌وضعیت تفصیلی. */
-export function selectStatementSummaries(state: AppState): ProgressStatement[] {
-  return state.clientStatements.map((s) => {
-    const approved = CLIENT_APPROVED_STATUSES.includes(s.status);
-    const approvedAmount = approved ? s.approvedNetPayable ?? s.netPayable : 0;
-    const receivables = Math.max(0, approvedAmount - s.receivedAmount);
-    let status: StatementStatus = 'در انتظار بررسی کارفرما';
-    if (s.status === 'paid' || (approved && receivables === 0)) status = 'تسویه شده';
-    else if (approved && s.overdueDays > 0) status = 'معوق';
-    else if (approved) status = 'تأیید نهایی کارفرما';
-    else if (s.status === 'approved_by_consultant' || s.status === 'submitted_to_employer') status = 'تأیید اولیه نظارت';
-    const contract = state.contracts.find((c) => c.id === s.contractId);
-    return {
-      id: s.id,
-      number: s.statementNumber,
-      projectId: s.projectId,
-      projectName: s.projectName,
-      costCenterId: s.costCenterId || contract?.costCenterId || '',
-      counterpartyId: s.counterpartyId || contract?.counterpartyId || '',
-      client: s.client,
-      submittedAmount: s.netPayable,
-      approvedAmount,
-      receivedAmount: s.receivedAmount,
-      receivables,
-      overdueAmount: s.overdueDays > 0 ? receivables : 0,
-      submissionDate: s.preparationDate,
-      dueDate: s.dueDate,
-      status,
-    };
-  });
-}
-
-/** خلاصه تنخواه‌ها برای داشبورد؛ از همان حساب‌های تنخواه ماژول تنخواه. */
-export function selectPettyCashSummaries(state: AppState): PettyCash[] {
-  return state.pettyCashAccounts.map((a) => {
-    const lastExpense = state.pettyCashExpenses.find((e) => e.pettyCashId === a.id);
-    const ratio = a.ceilingLimit > 0 ? a.usableBalance / a.ceilingLimit : 1;
-    return {
-      id: a.id,
-      code: a.code,
-      holderName: a.holderName,
-      projectName: a.projectName,
-      projectId: a.projectId,
-      actualBalance: a.actualBalance,
-      pendingExpenses: a.pendingExpenses,
-      usableBalance: a.usableBalance,
-      ceilingLimit: a.ceilingLimit,
-      lastTransactionDate: lastExpense?.date || a.lastReplenishmentDate,
-      lastTransactionDesc: lastExpense?.description || 'شارژ تنخواه',
-      status: a.usableBalance <= a.minBalanceWarning / 2 ? 'critical' : a.usableBalance <= a.minBalanceWarning || ratio < 0.2 ? 'warning' : 'normal',
-      bankAccount: a.sourceBankAccountTitle,
-    };
-  });
-}

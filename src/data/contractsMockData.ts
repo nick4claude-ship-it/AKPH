@@ -12,9 +12,24 @@ import {
   AdvancePaymentRecord,
   PriceAdjustment,
   StatementPayment,
-  ContractDocument,
   ContractAuditLog,
 } from '../types';
+
+/** Seed format of legacy per-contract attachments; migrated into the document center by the store. */
+export interface SeedContractDocument {
+  id: string;
+  contractId?: string;
+  statementId?: string;
+  fileName: string;
+  fileType: 'قرارداد اولیه' | 'الحاقیه' | 'صورت‌جلسه کارگاهی' | 'فایل اکسل متره' | 'نقشه فنی' | 'سند تأییدیه' | 'مکاتبات';
+  version: string;
+  uploadDate: string;
+  uploaderName: string;
+  fileSize: string;
+  downloadUrl?: string;
+}
+
+export type SeedDetailedStatement = DetailedProgressStatement & { attachments: SeedContractDocument[] };
 
 export const mockContracts: Contract[] = [
   {
@@ -398,7 +413,7 @@ export const mockContractBOQ: ContractBOQItem[] = [
   },
 ];
 
-export const mockDetailedStatements: DetailedProgressStatement[] = [
+export const mockDetailedStatements: SeedDetailedStatement[] = [
   {
     id: 'stm-01',
     statementNumber: 'صورت‌وضعیت موقت شماره ۰۱',
@@ -1104,7 +1119,7 @@ export const mockStatementPayments: StatementPayment[] = [
   },
 ];
 
-export const mockContractDocuments: ContractDocument[] = [
+export const mockContractDocuments: SeedContractDocument[] = [
   {
     id: 'cd-01',
     contractId: 'cnt-01',

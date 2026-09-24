@@ -17,6 +17,8 @@ import {
   Check,
 } from 'lucide-react';
 import { PettyCashExpense, User as AppUser } from '../../types';
+import { useAppState } from '../../store/AppStore';
+import { selectDocumentsFor } from '../../store/domainSelectors';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
 interface PettyCashApprovalsViewProps {
@@ -65,6 +67,9 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
   // Auto-select first item if none selected
   const activeExpense =
     expenses.find((e) => e.id === selectedExpenseId) || displayedList[0] || null;
+  // Invoice images live in the document center, linked to the expense.
+  const appState = useAppState();
+  const activeDocs = activeExpense ? selectDocumentsFor(appState, 'petty_cash_expense', activeExpense.id) : [];
 
   const handleApprove = () => {
     if (!activeExpense) return;
@@ -341,20 +346,20 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       پیش‌نمایش تصویر فاکتور و مدارک پیوست:
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      {activeExpense.attachments.length} پیوست
+                      {activeDocs.length} پیوست
                     </span>
                   </div>
 
                   <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex flex-col items-center justify-center min-h-[220px]">
-                    {activeExpense.attachments[0]?.url ? (
+                    {activeDocs[0]?.url ? (
                       <div className="relative group w-full flex justify-center">
                         <img
-                          src={activeExpense.attachments[0].url}
+                          src={activeDocs[0].url}
                           alt="Invoice Scan"
                           className="max-h-56 rounded-lg object-contain border border-slate-200 shadow-2xs"
                         />
                         <a
-                          href={activeExpense.attachments[0].url}
+                          href={activeDocs[0].url}
                           target="_blank"
                           rel="noreferrer"
                           className="absolute bottom-2 bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
@@ -366,10 +371,10 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       <div className="text-center py-6 text-slate-400">
                         <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                         <span className="text-xs font-medium">
-                          {activeExpense.attachments[0]?.name || 'فایل فاکتور بارگذاری شده'}
+                          {activeDocs[0]?.fileName || 'فاکتوری در مرکز اسناد پیوست نشده است'}
                         </span>
                         <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                          ({activeExpense.attachments[0]?.size || '1.1 MB'})
+                          ({activeDocs[0]?.fileSize || '-'})
                         </div>
                       </div>
                     )}

@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Contract,
   ContractBOQItem,
@@ -11,11 +12,8 @@ import {
   ContractAmendment,
   AdvancePaymentRecord,
   PriceAdjustment,
-  StatementPayment,
-  ContractDocument,
   ContractAuditLog,
   Project,
-  BankAccount,
   UserProfile,
   ContractsMainViewMode,
   SubcontractorContract,
@@ -55,7 +53,6 @@ import { StatementDetailAndPrintModal } from './StatementDetailAndPrintModal';
 import { NewStatementModal } from './NewStatementModal';
 import { NewContractModal } from './NewContractModal';
 import { NewAmendmentModal } from './NewAmendmentModal';
-import { RecordReceiptModal } from './RecordReceiptModal';
 import { DeductionsEngineView } from './DeductionsEngineView';
 import { AdjustmentsEngineView } from './AdjustmentsEngineView';
 import { PaymentsReceivablesView } from './PaymentsReceivablesView';
@@ -66,14 +63,12 @@ import {
   mockAmendments,
   mockAdvancePayments,
   mockPriceAdjustments,
-  mockContractDocuments,
   mockContractAuditLogs,
 } from '../../data/contractsMockData';
-import { useAppState, useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
-import { clientStatementApprovedEvent, subcontractorStatementApprovedEvent } from '../../store/events';
-import { buildPaymentRequest } from '../../store/paymentRequests';
-import { generateUUID } from '../../utils/ids';
-import { toPersianDate } from '../../utils/date';
+import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
+import { selectStatementPayments } from '../../store/domainSelectors';
+import { selectContractFiles } from './contractFiles';
 import { SubcontractorDashboard } from './subcontractors/SubcontractorDashboard';
 import { SubcontractorStatementsListView } from './subcontractors/SubcontractorStatementsListView';
 import { SubcontractorContractsListView } from './subcontractors/SubcontractorContractsListView';
@@ -81,13 +76,15 @@ import { SubcontractorApprovalsQueue } from './subcontractors/SubcontractorAppro
 import { SubcontractorMatrixView } from './subcontractors/SubcontractorMatrixView';
 import { NewSubcontractorStatementModal } from './subcontractors/NewSubcontractorStatementModal';
 import { NewSubcontractorContractModal } from './subcontractors/NewSubcontractorContractModal';
-import { SubcontractorPaymentModal } from './subcontractors/SubcontractorPaymentModal';
 import { SubcontractorStatementDetailModal } from './subcontractors/SubcontractorStatementDetailModal';
 
 interface ContractsModuleProps {
+  /** Client (inbound revenue) and subcontract (outbound) contracts are separate pages. */
+  mode: ContractsMainViewMode;
   projects: Project[];
   currentUser: UserProfile;
   onPosted?: (docNumber: string) => void;
+  onToast?: (msg: string) => void;
 }
 
 export type ContractsSubTab =
@@ -103,16 +100,22 @@ export type ContractsSubTab =
   | 'documents';
 
 export const ContractsModule: React.FC<ContractsModuleProps> = ({
+  mode,
   projects,
   currentUser,
   onPosted,
+  onToast,
 }) => {
-  const { bankAccounts } = useAppState();
-  const postFinancialEvent = usePostFinancialEvent();
-  const [, setPaymentRequests] = useStoreSlice('paymentRequests');
-  const [, setReceipts] = useStoreSlice('receipts');
-  // Top-Level Mode: 'client' (مطالبات از کارفرما) vs 'subcontractor' (تعهدات پیمانکاران جزء)
-  const [mainMode, setMainMode] = useState<ContractsMainViewMode>('client');
+  const appState = useAppState();
+  const wf = useWorkflows();
+  const navigate = useNavigate();
+  const toast = (r: { ok: boolean; message: string; docNumber?: string }) => {
+    onToast?.(r.message);
+    if (r.ok && r.docNumber) onPosted?.(r.docNumber);
+  };
+  // Top-level mode comes from the route: /contracts/client or /contracts/subcontract.
+  const mainMode = mode;
+  const setMainMode = (m: ContractsMainViewMode) => navigate(m === 'client' ? '/contracts/client' : '/contracts/subcontract');
 
   // Client Section States
   const [activeTab, setActiveTab] = useState<ContractsSubTab>('dashboard');
@@ -122,8 +125,9 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   const [amendments, setAmendments] = useState<ContractAmendment[]>(mockAmendments);
   const [advancePayments, setAdvancePayments] = useState<AdvancePaymentRecord[]>(mockAdvancePayments);
   const [adjustments, setAdjustments] = useState<PriceAdjustment[]>(mockPriceAdjustments);
-  const [payments, setPayments] = useStoreSlice('statementPayments');
-  const [documents, setDocuments] = useState<ContractDocument[]>(mockContractDocuments);
+  // Receipts and documents are single records in their own layers; contracts only view them.
+  const payments = useMemo(() => selectStatementPayments(appState), [appState]);
+  const documents = useMemo(() => selectContractFiles(appState), [appState]);
   const [auditLogs, setAuditLogs] = useState<ContractAuditLog[]>(mockContractAuditLogs);
 
   // Subcontractor Section States
@@ -137,8 +141,6 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   const [isNewSubContractOpen, setIsNewSubContractOpen] = useState(false);
   const [isNewSubStatementOpen, setIsNewSubStatementOpen] = useState(false);
   const [contractForNewSubStatement, setContractForNewSubStatement] = useState<SubcontractorContract | null>(null);
-  const [isSubPaymentOpen, setIsSubPaymentOpen] = useState(false);
-  const [statementForPayment, setStatementForPayment] = useState<SubcontractorProgressStatement | null>(null);
   const [isSubStatementDetailOpen, setIsSubStatementDetailOpen] = useState(false);
 
   // Client Selected entities for modals / detail views
@@ -151,7 +153,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   const [contractForNewStatement, setContractForNewStatement] = useState<Contract | null>(null);
   const [isNewAmendmentOpen, setIsNewAmendmentOpen] = useState(false);
   const [contractForNewAmendment, setContractForNewAmendment] = useState<Contract | null>(null);
-  const [isRecordReceiptOpen, setIsRecordReceiptOpen] = useState(false);
+  const setIsRecordReceiptOpen = (_open: boolean) => navigate('/finance/receipts');
 
   // ---------------- Subcontractor Handlers ----------------
   const handleSelectSubContract = (subContract: SubcontractorContract) => {
@@ -186,196 +188,23 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     );
   };
 
+  // Workflow steps run in the store's workflow service (same code as the approval center).
   const handleUpdateSubStatementStatus = (
     statementId: string,
     newStatus: SubcontractorStatementWorkflowStatus,
     comment?: string
   ) => {
-    const current = subStatements.find((s) => s.id === statementId);
-    if (!current) return;
-
-    const updated: SubcontractorProgressStatement = {
-      ...current,
-      status: newStatus,
-      workflowHistory: [
-        ...current.workflowHistory,
-        {
-          date: '۱۴۰۳/۰۷/۰۳',
-          time: '۱۴:۳۰',
-          user: currentUser.name,
-          role: currentUser.role,
-          fromStatus: current.status,
-          toStatus: newStatus,
-          action: `تغییر وضعیت به ${newStatus}`,
-          comment: comment || 'تأیید مرحله در گردش کار',
-        },
-      ],
-    };
-
-    if (newStatus === 'site_review') {
-      updated.siteReviewNote = comment || updated.siteReviewNote;
-      updated.siteReviewerName = currentUser.name;
-      updated.siteReviewDate = '۱۴۰۳/۰۷/۰۳';
-    } else if (newStatus === 'pm_approved') {
-      updated.pmApprovalNote = comment || updated.pmApprovalNote;
-      updated.pmApproverName = currentUser.name;
-      updated.pmApprovalDate = '۱۴۰۳/۰۷/۰۳';
-    } else if (newStatus === 'management_approved') {
-      updated.managementApprovalNote = comment || updated.managementApprovalNote;
-      updated.managementApproverName = currentUser.name;
-      updated.managementApprovalDate = '۱۴۰۳/۰۷/۰۳';
-
-      // CEO approval is the financial trigger: Dr project cost / Cr subcontractor payable and deductions.
-      const posting = postFinancialEvent(subcontractorStatementApprovedEvent(updated), { submitter: currentUser.name });
-      if (!posting.ok) return;
-      updated.projectExpenseRecordId = posting.event?.docNumber;
-
-      if (!posting.duplicate) {
-        setSubContracts((prevContracts) =>
-          prevContracts.map((c) =>
-            c.id === current.subcontractorContractId
-              ? {
-                  ...c,
-                  approvedStatementsValue: c.approvedStatementsValue + current.netPayable,
-                  remainingPayableValue: c.remainingPayableValue + current.netPayable,
-                }
-              : c
-          )
-        );
-        const remaining = current.netPayable - current.paidAmount;
-        if (remaining > 0) {
-          setPaymentRequests((prev) => [
-            buildPaymentRequest(
-              prev,
-              {
-                sourceType: 'صورت‌وضعیت پیمانکار جزء',
-                sourceRefId: current.id,
-                sourceRefNumber: current.statementNumber,
-                projectId: current.projectId,
-                projectName: current.projectName,
-                costCenterId: current.costCenterId,
-                counterpartyId: current.counterpartyId,
-                beneficiaryName: current.subcontractorName,
-                beneficiaryType: 'پیمانکار جزء',
-                totalAmount: remaining,
-              },
-              toPersianDate(new Date())
-            ),
-            ...prev,
-          ]);
-        }
-        if (posting.event?.docNumber) onPosted?.(posting.event.docNumber);
-      }
-    }
-
-    setSubStatements((prev) => prev.map((s) => (s.id === statementId ? updated : s)));
-    if (selectedSubStatement?.id === statementId) {
-      setSelectedSubStatement(updated);
-    }
+    const result =
+      newStatus === 'returned_for_revision' || newStatus === 'rejected'
+        ? wf.returnSubcontractorStatement(statementId, comment || 'نیاز به اصلاح متره', newStatus === 'rejected')
+        : wf.advanceSubcontractorStatement(statementId, comment);
+    toast(result);
+    if (selectedSubStatement?.id === statementId) setSelectedSubStatement(null);
   };
 
-  const handleConfirmSubPayment = (
-    statement: SubcontractorProgressStatement,
-    amount: number,
-    bankId: string,
-    method: 'حواله بانکی پایا/ساتنا' | 'چک صیادی' | 'صندوق تنخواه کارگاه' | 'تهاتر مصالح',
-    refNumber: string,
-    date: string
-  ) => {
-    const expenseRecordId = `EXP-${statement.projectId.toUpperCase()}-${Date.now().toString().slice(-5)}`;
-    const selectedBank = bankAccounts.find((b) => b.id === bankId);
-
-    // 1. Update Subcontractor statement status
-    const newRemaining = Math.max(0, statement.remainingPayable - amount);
-    const updatedStatement: SubcontractorProgressStatement = {
-      ...statement,
-      status: newRemaining === 0 ? 'paid' : statement.status,
-      paidAmount: statement.paidAmount + amount,
-      remainingPayable: newRemaining,
-      paymentDate: date,
-      paymentMethod: method,
-      paymentRefNumber: refNumber,
-      payingBankId: bankId,
-      payingBankTitle: selectedBank?.bankName || 'بانک',
-      projectExpenseRecordId: expenseRecordId,
-      workflowHistory: [
-        ...statement.workflowHistory,
-        {
-          date,
-          time: '۱۵:۰۰',
-          user: currentUser.name,
-          role: currentUser.role,
-          fromStatus: statement.status,
-          toStatus: newRemaining === 0 ? 'paid' : statement.status,
-          action: `واریز وجه و صدور سند ثبت هزینه پروژه ${expenseRecordId}`,
-          comment: `واریز مبلغ ${amount.toLocaleString('fa-IR')} تومان به پیمانکار (${method}) - رهگیری: ${refNumber}`,
-        },
-      ],
-    };
-
-    setSubStatements((prev) =>
-      prev.map((s) => (s.id === statement.id ? updatedStatement : s))
-    );
-
-    // 2. Update Subcontractor Contract metrics
-    setSubContracts((prev) =>
-      prev.map((c) => {
-        if (c.id === statement.subcontractorContractId) {
-          return {
-            ...c,
-            paidValue: c.paidValue + amount,
-            remainingPayableValue: Math.max(0, c.remainingPayableValue - amount),
-          };
-        }
-        return c;
-      })
-    );
-
-    if (selectedSubStatement?.id === statement.id) {
-      setSelectedSubStatement(updatedStatement);
-    }
-
-    // 3. Payment belongs to the financial layer only: Dr subcontractor payable / Cr bank.
-    //    The project cost was already recognised when the statement was approved.
-    const posting = postFinancialEvent(
-      {
-        type: 'TREASURY_PAYMENT',
-        sourceModule: 'treasury',
-        sourceId: expenseRecordId,
-        projectId: statement.projectId,
-        costCenterId: statement.costCenterId,
-        counterpartyId: statement.counterpartyId,
-        amount,
-        date,
-        details: {
-          docNumber: statement.statementNumber,
-          payableType: 'subcontractor',
-          bankAccountId: bankId,
-          bankName: selectedBank?.bankName,
-          trackingNumber: refNumber,
-        },
-      },
-      { submitter: currentUser.name }
-    );
-    if (posting.ok && !posting.duplicate) {
-      setPaymentRequests((prev) =>
-        prev.map((r) =>
-          r.sourceType === 'صورت‌وضعیت پیمانکار جزء' && r.sourceRefId === statement.id && r.status !== 'پرداخت شده'
-            ? {
-                ...r,
-                paidAmount: r.paidAmount + amount,
-                remainingAmount: Math.max(0, r.remainingAmount - amount),
-                status: r.remainingAmount - amount <= 0 ? 'پرداخت شده' : r.status,
-                payerBankAccountId: bankId,
-                paymentDate: date,
-                trackingNumber: refNumber,
-                journalEntryId: posting.event?.docNumber,
-              }
-            : r
-        )
-      );
-      if (posting.event?.docNumber) onPosted?.(posting.event.docNumber);
-    }
+  // Payment happens only in treasury: open the payment queue for this statement.
+  const openSubPayment = (statement: SubcontractorProgressStatement) => {
+    navigate(`/finance/payments?source=${statement.id}`);
   };
 
   // ---------------- Client Handlers ----------------
@@ -438,128 +267,23 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     }
   };
 
-  const handleSavePaymentReceipt = (
-    newPayment: StatementPayment,
-    updatedStatement: DetailedProgressStatement,
-    updatedContract: Contract,
-    destinationBankId?: string
-  ) => {
-    setPayments([newPayment, ...payments]);
-    setStatements(statements.map((s) => (s.id === updatedStatement.id ? updatedStatement : s)));
-    setContracts(contracts.map((c) => (c.id === updatedContract.id ? updatedContract : c)));
-    if (selectedStatement?.id === updatedStatement.id) {
-      setSelectedStatement(updatedStatement);
-    }
-    if (selectedContract?.id === updatedContract.id) {
-      setSelectedContract(updatedContract);
-    }
-
-    // Receipt is posted in the financial layer: Dr bank / Cr receivables.
-    const bank = bankAccounts.find((b) => b.id === destinationBankId) || bankAccounts[0];
-    const posting = postFinancialEvent(
-      {
-        type: 'TREASURY_RECEIPT',
-        sourceModule: 'treasury',
-        sourceId: newPayment.id,
-        projectId: updatedContract.projectId,
-        costCenterId: updatedStatement.costCenterId || updatedContract.costCenterId,
-        counterpartyId: updatedStatement.counterpartyId || updatedContract.counterpartyId,
-        amount: newPayment.amount,
-        date: newPayment.date,
-        details: {
-          docNumber: newPayment.statementNumber,
-          bankAccountId: bank?.id,
-          bankName: bank?.bankName || newPayment.destinationBank,
-          trackingNumber: newPayment.referenceNumber,
-        },
-      },
-      { submitter: currentUser.name }
-    );
-    if (posting.ok && !posting.duplicate && posting.event) {
-      setPayments((prev) => prev.map((p) => (p.id === newPayment.id ? { ...p, journalEntryId: posting.event!.docNumber } : p)));
-      setReceipts((prev) => [
-        {
-          id: generateUUID(),
-          docNumber: posting.event!.docNumber!,
-          date: newPayment.date,
-          amount: newPayment.amount,
-          counterpartyId: posting.event!.counterpartyId,
-          costCenterId: posting.event!.costCenterId,
-          payer: updatedContract.employer,
-          receiver: bank?.bankName || newPayment.destinationBank,
-          projectId: updatedContract.projectId,
-          projectName: updatedContract.projectName,
-          destinationAccount: bank ? `${bank.bankName} - ${bank.accountNumber}` : newPayment.destinationBank,
-          method: newPayment.method === 'چک صیادی' ? 'چک صیادی' : newPayment.method === 'حواله ساتنا/پایا' ? 'حواله بانکی' : 'تهاتر',
-          trackingNumber: newPayment.referenceNumber,
-          description: `وصول ${newPayment.statementNumber} - پیمان ${updatedContract.code}`,
-          journalEntryId: posting.event!.journalEntryId,
-          status: 'وصول شده',
-        },
-        ...prev,
-      ]);
-      onPosted?.(posting.event.docNumber!);
-    }
-  };
-
-  // Employer approval is the financial trigger for a client statement.
-  const postClientStatement = (statement: DetailedProgressStatement): string | undefined => {
-    const contract = contracts.find((c) => c.id === statement.contractId);
-    const posting = postFinancialEvent(
-      clientStatementApprovedEvent(
-        statement,
-        statement.costCenterId || contract?.costCenterId || '',
-        statement.counterpartyId || contract?.counterpartyId || ''
-      ),
-      { submitter: currentUser.name }
-    );
-    if (!posting.ok) return undefined;
-    if (!posting.duplicate && posting.event?.docNumber) onPosted?.(posting.event.docNumber);
-    return posting.event?.docNumber;
-  };
-
   const handleUpdateStatementStatus = (statementId: string, newStatus: any, reason?: string) => {
-    const target = statements.find((s) => s.id === statementId);
-    const accountingDoc =
-      target && newStatus === 'approved_by_employer' ? postClientStatement(target) : undefined;
-    if (target && newStatus === 'approved_by_employer' && !accountingDoc) return;
-    setStatements(
-      statements.map((s) => {
-        if (s.id === statementId) {
-          const updated: DetailedProgressStatement = {
-            ...s,
-            status: newStatus,
-            accountingJournalEntryId: accountingDoc || s.accountingJournalEntryId,
-            rejectionReason: reason || s.rejectionReason,
-            workflowHistory: [
-              ...s.workflowHistory,
-              {
-                date: '۱۴۰۳/۰۷/۰۳',
-                time: '۱۲:۳۰',
-                user: currentUser.name,
-                role: currentUser.role,
-                fromStatus: s.status,
-                toStatus: newStatus,
-                action: `تغییر وضعیت به ${newStatus}`,
-                comment: reason,
-              },
-            ],
-          };
-          if (selectedStatement?.id === statementId) {
-            setSelectedStatement(updated);
-          }
-          return updated;
-        }
-        return s;
-      })
-    );
+    const result =
+      newStatus === 'returned_for_correction' || newStatus === 'rejected'
+        ? wf.returnClientStatement(statementId, reason || 'نیاز به اصلاح')
+        : wf.advanceClientStatement(statementId, reason);
+    toast(result);
+    const updated = appState.clientStatements.find((s) => s.id === statementId);
+    if (selectedStatement?.id === statementId && updated) setSelectedStatement(null);
   };
 
+  // Employer approval posts the receivable automatically; this only reports the existing document.
   const handleIssueAccountingEntryForStatement = (statement: DetailedProgressStatement) => {
-    if (statement.status !== 'approved_by_employer') return;
-    const docNumber = postClientStatement(statement);
-    if (!docNumber) return;
-    setStatements((prev) => prev.map((s) => (s.id === statement.id ? { ...s, accountingJournalEntryId: docNumber } : s)));
+    onToast?.(
+      statement.accountingJournalEntryId
+        ? `سند مطالبات ${statement.accountingJournalEntryId} هنگام تأیید کارفرما صادر شده است.`
+        : 'سند مطالبات پس از ثبت تأیید کارفرما به‌صورت خودکار صادر می‌شود.'
+    );
   };
 
   // Subcontractor Pending Counts
@@ -793,6 +517,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
           {activeTab === 'documents' && (
             <ContractDocumentsView
               contracts={contracts}
+              onUpload={() => navigate('/documents')}
               documents={documents}
               currentUser={currentUser}
             />
@@ -885,10 +610,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
               onOpenNewStatement={(c) => handleOpenNewSubStatement(c)}
               onOpenNewContract={() => setIsNewSubContractOpen(true)}
               onGoToApprovals={() => setSubTab('approvals')}
-              onPayStatement={(stm) => {
-                setStatementForPayment(stm);
-                setIsSubPaymentOpen(true);
-              }}
+              onPayStatement={(stm) => openSubPayment(stm)}
             />
           )}
 
@@ -902,10 +624,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                 setIsSubStatementDetailOpen(true);
               }}
               onOpenNewStatement={() => handleOpenNewSubStatement()}
-              onPayStatement={(stm) => {
-                setStatementForPayment(stm);
-                setIsSubPaymentOpen(true);
-              }}
+              onPayStatement={(stm) => openSubPayment(stm)}
             />
           )}
 
@@ -929,10 +648,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                 setIsSubStatementDetailOpen(true);
               }}
               onUpdateStatus={handleUpdateSubStatementStatus}
-              onPayStatement={(stm) => {
-                setStatementForPayment(stm);
-                setIsSubPaymentOpen(true);
-              }}
+              onPayStatement={(stm) => openSubPayment(stm)}
             />
           )}
 
@@ -950,6 +666,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
       {/* =========================================================================
           SUBCONTRACTOR MODALS
           ========================================================================= */}
+      {isNewSubStatementOpen && (
       <NewSubcontractorStatementModal
         isOpen={isNewSubStatementOpen}
         onClose={() => setIsNewSubStatementOpen(false)}
@@ -958,7 +675,9 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         currentUser={currentUser}
         onSave={handleSaveSubStatement}
       />
+      )}
 
+      {isNewSubContractOpen && (
       <NewSubcontractorContractModal
         isOpen={isNewSubContractOpen}
         onClose={() => setIsNewSubContractOpen(false)}
@@ -966,18 +685,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         currentUser={currentUser}
         onSave={handleSaveSubContract}
       />
-
-      <SubcontractorPaymentModal
-        isOpen={isSubPaymentOpen}
-        onClose={() => {
-          setIsSubPaymentOpen(false);
-          setStatementForPayment(null);
-        }}
-        statement={statementForPayment}
-        bankAccounts={bankAccounts}
-        currentUser={currentUser}
-        onConfirmPayment={handleConfirmSubPayment}
-      />
+      )}
 
       <SubcontractorStatementDetailModal
         isOpen={isSubStatementDetailOpen}
@@ -988,10 +696,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         statement={selectedSubStatement}
         currentUser={currentUser}
         onUpdateStatus={handleUpdateSubStatementStatus}
-        onOpenPaymentModal={(stm) => {
-          setStatementForPayment(stm);
-          setIsSubPaymentOpen(true);
-        }}
+        onOpenPaymentModal={(stm) => openSubPayment(stm)}
       />
 
       {/* =========================================================================
@@ -1036,16 +741,6 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         />
       )}
 
-      {isRecordReceiptOpen && (
-        <RecordReceiptModal
-          statements={statements}
-          contracts={contracts}
-          bankAccounts={bankAccounts}
-          currentUser={currentUser}
-          onClose={() => setIsRecordReceiptOpen(false)}
-          onSavePayment={handleSavePaymentReceipt}
-        />
-      )}
     </div>
   );
 };

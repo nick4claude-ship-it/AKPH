@@ -1,32 +1,10 @@
-import React from 'react';
-import {
-  LayoutDashboard,
-  Building2,
-  Calculator,
-  Coins,
-  FileText,
-  Warehouse,
-  ShoppingCart,
-  BarChart3,
-  CheckSquare,
-  Users,
-  Award,
-  FolderLock,
-  Settings,
-  ChevronRight,
-  ChevronLeft,
-  LogOut,
-  Sparkles,
-  CreditCard,
-  Briefcase,
-  ShieldCheck,
-  FileSpreadsheet,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles } from 'lucide-react';
 import { UserProfile } from '../../types';
+import { navConfig, navChildren, navPath, matchNav, navTrail, NavNode } from '../../navigation/navConfig';
 
 interface SidebarProps {
-  currentTab: string;
-  onSelectTab: (tab: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   user: UserProfile;
@@ -35,26 +13,7 @@ interface SidebarProps {
   counts?: Record<string, string>;
 }
 
-export const navItems = [
-  { id: 'dashboard', label: 'داشبورد مدیریتی', icon: LayoutDashboard, badge: 'زنده' },
-  { id: 'projects', label: 'مدیریت پروژه‌ها', icon: Building2 },
-  { id: 'contracts', label: 'قراردادها (کارفرما و جزء)', icon: Briefcase },
-  { id: 'statements', label: 'صورت‌وضعیت‌ها', icon: FileSpreadsheet },
-  { id: 'procurement', label: 'بازرگانی و تدارکات', icon: ShoppingCart },
-  { id: 'inventory', label: 'انبارداری و مصالح', icon: Warehouse },
-  { id: 'petty_cash', label: 'تنخواه گردان کارگاه‌ها', icon: Coins },
-  { id: 'finance', label: 'خزانه‌داری و پرداخت‌ها', icon: CreditCard },
-  { id: 'accounting', label: 'حسابداری مالی', icon: Calculator },
-  { id: 'partners', label: 'شرکا و ذینفعان', icon: Users },
-  { id: 'payroll', label: 'پرسنل و حقوق دستمزد', icon: Award },
-  { id: 'documents', label: 'مرکز اسناد یکپارچه', icon: FolderLock },
-  { id: 'approvals', label: 'کارتابل مصوبات مدیریت', icon: ShieldCheck, badge: 'فوری' },
-  { id: 'reports', label: 'هوش تجاری و گزارشات', icon: BarChart3 },
-];
-
 export const Sidebar: React.FC<SidebarProps> = ({
-  currentTab,
-  onSelectTab,
   collapsed,
   onToggleCollapse,
   user,
@@ -62,6 +21,81 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAiAgent,
   counts = {},
 }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTrail = navTrail(matchNav(location.pathname)).map((n) => n.id);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+
+  // Keep the group of the current page expanded, including after Back/Forward navigation.
+  useEffect(() => {
+    const group = activeTrail[0];
+    if (group && navChildren(group).length) setOpen((o) => (o[group] ? o : { ...o, [group]: true }));
+  }, [location.pathname]);
+
+  const go = (node: NavNode) => {
+    navigate(navPath(node.id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const renderItem = (item: NavNode, depth: number) => {
+    const Icon = item.icon;
+    const children = navChildren(item.id).filter((c) => !c.hidden);
+    const isGroup = children.length > 0;
+    const inTrail = activeTrail.includes(item.id);
+    const isActive = inTrail && (!isGroup || collapsed);
+    const count = item.countKey ? counts[item.countKey] : undefined;
+    const expanded = isGroup && !collapsed && (open[item.id] ?? false);
+
+    return (
+      <div key={item.id}>
+        <button
+          onClick={() => {
+            if (isGroup && !collapsed) {
+              setOpen((o) => ({ ...o, [item.id]: !expanded }));
+              if (!expanded && !inTrail) go(item);
+            } else {
+              go(item);
+            }
+          }}
+          title={collapsed ? item.label : undefined}
+          aria-expanded={isGroup ? expanded : undefined}
+          aria-current={isActive ? 'page' : undefined}
+          className={`w-full flex items-center gap-3 px-3 ${depth ? 'py-2 pr-8 text-[11px]' : 'py-2.5 text-xs'} rounded-lg font-medium transition-colors cursor-pointer text-right group ${
+            isActive
+              ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+              : inTrail
+                ? 'text-white bg-slate-800/60'
+                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+          } ${collapsed ? 'justify-center px-0' : ''}`}
+        >
+          <Icon
+            className={`${depth ? 'w-3.5 h-3.5' : 'w-4 h-4'} shrink-0 ${
+              isActive ? 'text-slate-950' : inTrail ? 'text-amber-400' : 'text-slate-400 group-hover:text-amber-400'
+            }`}
+          />
+
+          {!collapsed && (
+            <div className="flex items-center justify-between w-full truncate">
+              <span className="truncate">{item.label}</span>
+              <span className="flex items-center gap-1.5">
+                {item.badge && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/20 text-emerald-300">
+                    {item.badge}
+                  </span>
+                )}
+                {count && !isActive && <span className="text-[11px] text-slate-400 font-mono">{count}</span>}
+                {isGroup && (
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                )}
+              </span>
+            </div>
+          )}
+        </button>
+        {expanded && <div className="mt-1 space-y-1">{children.map((c) => renderItem(c, depth + 1))}</div>}
+      </div>
+    );
+  };
+
   return (
     <aside
       className={`fixed top-0 right-0 z-30 h-screen bg-slate-900 text-slate-200 border-l border-slate-800 transition-all duration-300 flex flex-col justify-between select-none ${
@@ -122,47 +156,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Navigation List */}
+        {/* Navigation List (built from navConfig) */}
         <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-270px)] scrollbar-thin">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectTab(item.id)}
-                title={collapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-right group ${
-                  isActive
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                } ${collapsed ? 'justify-center px-0' : ''}`}
-              >
-                <Icon
-                  className={`w-4 h-4 shrink-0 ${
-                    isActive ? 'text-slate-950' : 'text-slate-400 group-hover:text-amber-400'
-                  }`}
-                />
-
-                {!collapsed && (
-                  <div className="flex items-center justify-between w-full truncate">
-                    <span className="truncate">{item.label}</span>
-                    {item.badge && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/20 text-emerald-300">
-                        {item.badge}
-                      </span>
-                    )}
-                    {counts[item.id] && !isActive && (
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        {counts[item.id]}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+          {navConfig.filter((n) => !n.parent && !n.hidden).map((n) => renderItem(n, 0))}
         </nav>
       </div>
 

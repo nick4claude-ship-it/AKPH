@@ -54,6 +54,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
   const [isSubcontractorContra, setIsSubcontractorContra] = useState(true);
   const [subcontractorDeductionRef, setSubcontractorDeductionRef] = useState('کسر مصالح تحویلی در صورت‌وضعیت دوره جاری');
   const [receivedByCrewLeaderName, setReceivedByCrewLeaderName] = useState('');
+  // Request mode reserves the stock; the issue is confirmed later from the voucher.
+  const [reserveOnly, setReserveOnly] = useState(false);
 
   // Items
   const [items, setItems] = useState<StoreIssueItem[]>([
@@ -166,8 +168,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
       receivedByCrewLeaderName: receivedByCrewLeaderName.trim() || 'سرپرست اکیپ اجرایی',
       items,
       totalCost,
-      status: 'خروج قطعی از انبار',
-      accountingJournalEntryId: `JV-ISSUE-1403-${randomNum}`,
+      status: reserveOnly ? 'درخواست اولیه' : 'خروج قطعی از انبار',
     };
 
     onSubmitIssue(newIssue);
@@ -429,12 +430,16 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
               انصراف
             </button>
 
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+              <input type="checkbox" checked={reserveOnly} onChange={(e) => setReserveOnly(e.target.checked)} />
+              فقط رزرو کالا (خروج پس از تأیید)
+            </label>
             <button
               type="submit"
               className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
             >
               <ArrowUpRight className="w-4 h-4" />
-              <span>تأیید حواله و ثبت خروج از انبار</span>
+              <span>{reserveOnly ? 'ثبت درخواست و رزرو کالا' : 'تأیید حواله و ثبت خروج از انبار'}</span>
             </button>
           </div>
         </form>

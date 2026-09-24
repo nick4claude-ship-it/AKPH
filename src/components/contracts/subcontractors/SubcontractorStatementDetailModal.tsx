@@ -55,14 +55,18 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
     switch (status) {
       case 'submitted':
         return 0;
-      case 'site_review':
+      case 'measured':
         return 1;
-      case 'pm_approved':
+      case 'site_review':
         return 2;
-      case 'management_approved':
+      case 'pm_approved':
         return 3;
-      case 'paid':
+      case 'finance_approved':
+        return 4;
+      case 'management_approved':
         return 5;
+      case 'paid':
+        return 7;
       default:
         return 0;
     }
@@ -71,12 +75,13 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
   const currentStep = getWorkflowStepIndex(statement.status);
 
   const steps = [
-    { title: '۱. ثبت کار انجام‌شده', desc: 'پیمانکار جزء' },
-    { title: '۲. بررسی کارگاه', desc: 'سرپرست کارگاه' },
-    { title: '۳. تأیید مدیر پروژه', desc: 'مدیر پروژه' },
-    { title: '۴. تأیید مدیریت', desc: 'مدیرعامل / مالی' },
-    { title: '۵. پرداخت و تسویه', desc: 'امور مالی' },
-    { title: '۶. ثبت هزینه پروژه', desc: 'سند دوبل حسابداری' },
+    { title: '۱. کارکرد', desc: 'پیمانکار جزء' },
+    { title: '۲. اندازه‌گیری', desc: 'سرپرست کارگاه' },
+    { title: '۳. تأیید کارگاه', desc: 'سرپرست کارگاه' },
+    { title: '۴. تأیید مدیر پروژه', desc: 'مدیر پروژه' },
+    { title: '۵. تأیید مالی', desc: 'مدیر مالی' },
+    { title: '۶. تأیید مدیرعامل', desc: 'ثبت بدهی و درخواست پرداخت' },
+    { title: '۷. پرداخت', desc: 'فقط در خزانه' },
   ];
 
   return (

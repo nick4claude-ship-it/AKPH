@@ -1,20 +1,28 @@
 import React from 'react';
-import { PettyCash } from '../../types';
+import { PettyCashAccount, PETTY_CASH_FUND_LABELS } from '../../types';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 import { Coins, AlertCircle, CheckCircle2, AlertTriangle, PlusCircle, ArrowUpRight } from 'lucide-react';
 
 interface PettyCashWidgetProps {
-  items: PettyCash[];
-  onChargeClick: (pettyCash: PettyCash) => void;
+  items: PettyCashAccount[];
+  onChargeClick: (fund: PettyCashAccount) => void;
   onViewAllClick: () => void;
+  /** Share of the ceiling below which a fund needs replenishment (from stored settings). */
+  lowBalancePercent: number;
 }
+
+type FundHealth = 'normal' | 'warning' | 'critical';
 
 export const PettyCashWidget: React.FC<PettyCashWidgetProps> = ({
   items,
   onChargeClick,
   onViewAllClick,
+  lowBalancePercent,
 }) => {
-  const getStatusBadge = (status: PettyCash['status'], usableBalance: number) => {
+  const health = (f: PettyCashAccount): FundHealth =>
+    f.usableBalance <= 0 ? 'critical' : f.usableBalance <= f.ceilingLimit * (lowBalancePercent / 100) ? 'warning' : 'normal';
+
+  const getStatusBadge = (status: FundHealth, usableBalance: number) => {
     if (usableBalance < 0 || status === 'critical') {
       return (
         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
@@ -65,8 +73,8 @@ export const PettyCashWidget: React.FC<PettyCashWidgetProps> = ({
       {/* Petty Cash Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
         {items.map((item) => {
-          const isCritical = item.usableBalance < 0 || item.status === 'critical';
-          const isWarning = item.status === 'warning';
+          const isCritical = health(item) === 'critical';
+          const isWarning = health(item) === 'warning';
 
           return (
             <div
@@ -92,7 +100,7 @@ export const PettyCashWidget: React.FC<PettyCashWidgetProps> = ({
                     مسئول: <strong className="text-slate-700 font-medium">{item.holderName}</strong>
                   </div>
                 </div>
-                <div>{getStatusBadge(item.status, item.usableBalance)}</div>
+                <div>{getStatusBadge(health(item), item.usableBalance)}</div>
               </div>
 
               {/* Balances Display - Strict formula matching prompt */}
@@ -125,8 +133,8 @@ export const PettyCashWidget: React.FC<PettyCashWidgetProps> = ({
 
               {/* Bottom: Last Transaction & Charge Action */}
               <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
-                <div className="truncate max-w-[200px]" title={item.lastTransactionDesc}>
-                  آخرین: {item.lastTransactionDesc}
+                <div className="truncate max-w-[200px]" title={PETTY_CASH_FUND_LABELS[item.fundType]}>
+                  {PETTY_CASH_FUND_LABELS[item.fundType]} · آخرین شارژ: {item.lastReplenishmentDate}
                 </div>
                 <button
                   onClick={() => onChargeClick(item)}

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { PendingApproval } from '../../types';
+import { ApprovalItem } from '../../types';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { CheckCircle2, XCircle, FileText, AlertCircle, Clock, Eye, Check, X } from 'lucide-react';
 
 interface PendingApprovalsWidgetProps {
-  approvals: PendingApproval[];
+  approvals: ApprovalItem[];
   onApprove: (id: string) => void;
   onReject: (id: string, reason?: string) => void;
-  onViewDoc: (item: PendingApproval) => void;
+  onViewDoc: (item: ApprovalItem) => void;
 }
 
 export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
@@ -19,7 +19,7 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const pendingList = approvals.filter((a) => a.status === 'pending');
+  const pendingList = approvals;
 
   const handleConfirmReject = (id: string) => {
     onReject(id, rejectReason || 'عدم تطابق با مستندات پیوست');
@@ -63,9 +63,9 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                 <th className="py-2.5 px-3">شماره سند</th>
                 <th className="py-2.5 px-3">پروژه و مرکز هزینه</th>
                 <th className="py-2.5 px-3">ثبت‌کننده و طرف حساب</th>
-                <th className="py-2.5 px-3">نوع هزینه / سرفصل</th>
+                <th className="py-2.5 px-3">نوع رکورد / مرحله</th>
                 <th className="py-2.5 px-3 text-left">مبلغ کل هزینه</th>
-                <th className="py-2.5 px-3 text-left">پرداخت / بدهی</th>
+                <th className="py-2.5 px-3 text-left">مرحله / پیوست</th>
                 <th className="py-2.5 px-3 text-center">تاریخ</th>
                 <th className="py-2.5 px-3 text-center">مستند</th>
                 <th className="py-2.5 px-3 text-center">دستور مدیرعامل</th>
@@ -83,25 +83,25 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                   <td className="py-3 px-3">
                     <div className="font-bold text-slate-900">{item.projectName}</div>
                     <div className="text-[11px] text-slate-500 truncate max-w-44">
-                      {item.costCenter}
+                      {item.costCenterName || '-'}
                     </div>
                   </td>
 
                   {/* Submitter & Counterparty */}
                   <td className="py-3 px-3">
-                    <div className="text-slate-800 font-medium">{item.submitter}</div>
+                    <div className="text-slate-800 font-medium">{item.requester}</div>
                     <div className="text-[11px] text-slate-500 truncate max-w-36">
-                      فروشنده: {item.counterparty}
+                      طرف حساب: {item.counterpartyName || '-'}
                     </div>
                   </td>
 
                   {/* Expense Type & Classification */}
                   <td className="py-3 px-3">
-                    <span className="font-medium text-slate-800">{item.expenseType}</span>
+                    <span className="font-medium text-slate-800">{item.moduleLabel}</span>
                     <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                      <span className="text-amber-700 font-semibold">{item.category}</span>
+                      <span className="text-amber-700 font-semibold">{item.stage}</span>
                       <span>·</span>
-                      <span>{item.costClassification}</span>
+                      <span>{item.classification}</span>
                     </div>
                   </td>
 
@@ -112,12 +112,10 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
 
                   {/* Payment vs Debt (Expense != Payment principle) */}
                   <td className="py-3 px-3 font-mono tabular-nums text-left text-[11px]">
-                    <div className="text-emerald-700">پرداختی: {formatCurrencyCompact(item.paymentAmount)}</div>
-                    {item.pendingLiability > 0 && (
-                      <div className="text-rose-600 font-medium">
-                        بدهی: {formatCurrencyCompact(item.pendingLiability)}
-                      </div>
-                    )}
+                    <div className="text-slate-500">تأییدکننده: {item.approverRole}</div>
+                    <div className={item.documentCount ? 'text-emerald-700' : 'text-rose-600 font-medium'}>
+                      {item.documentCount ? `${item.documentCount.toLocaleString('fa-IR')} سند پیوست` : 'بدون سند پیوست'}
+                    </div>
                   </td>
 
                   {/* Date */}

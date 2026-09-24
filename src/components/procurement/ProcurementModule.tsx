@@ -36,37 +36,33 @@ import { NewRequisitionModal } from './NewRequisitionModal';
 import { NewPurchaseOrderModal } from './NewPurchaseOrderModal';
 import { NewSupplierModal } from './NewSupplierModal';
 import { PurchaseOrderPrintModal } from './PurchaseOrderPrintModal';
-import { useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
-import { vendorInvoiceEvent } from '../../store/events';
-import { buildPaymentRequest } from '../../store/paymentRequests';
-import { toPersianDate } from '../../utils/date';
+import { useStoreSlice } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
 import {
   mockSuppliers,
-  mockRequisitions,
   mockRfqs,
 } from '../../data/procurementMockData';
 
 interface ProcurementModuleProps {
   projects: Project[];
   currentUser: UserProfile;
-  onPosted?: (docNumber: string) => void;
+  onToast: (msg: string) => void;
 }
 
 export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   projects,
   currentUser,
-  onPosted,
+  onToast,
 }) => {
+  const wf = useWorkflows();
   const [activeTab, setActiveTab] = useState<ProcurementSubTab>('dashboard');
 
   // Procurement Core State
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>(mockRequisitions);
+  const [requisitions, setRequisitions] = useStoreSlice('purchaseRequisitions');
   const [rfqs, setRfqs] = useState<RequestForQuotation[]>(mockRfqs);
-  const postFinancialEvent = usePostFinancialEvent();
   const [orders, setOrders] = useStoreSlice('purchaseOrders');
   const [invoices, setInvoices] = useStoreSlice('vendorInvoices');
-  const [paymentRequests, setPaymentRequests] = useStoreSlice('paymentRequests');
 
   // Modals state
   const [isNewRequisitionOpen, setIsNewRequisitionOpen] = useState(false);
@@ -75,46 +71,9 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   const [orderForPrint, setOrderForPrint] = useState<PurchaseOrder | null>(null);
 
   // Handlers
-  const handleApproveRequisition = (
-    reqId: string,
-    level: 'site' | 'project' | 'procurement' | 'finance'
-  ) => {
-    setRequisitions((prev) =>
-      prev.map((r) => {
-        if (r.id !== reqId) return r;
-        const newApprovals = { ...r.approvals };
-        if (level === 'site') {
-          newApprovals.siteSupervisor = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۱',
-            signedBy: currentUser.name,
-          };
-        } else if (level === 'project') {
-          newApprovals.projectManager = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۲',
-            signedBy: currentUser.name,
-          };
-        } else if (level === 'procurement') {
-          newApprovals.procurementManager = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۳',
-            signedBy: currentUser.name,
-          };
-        } else if (level === 'finance') {
-          newApprovals.financialDirector = {
-            approved: true,
-            date: '۱۴۰۳/۰۷/۰۴',
-            signedBy: currentUser.name,
-          };
-        }
-        return {
-          ...r,
-          approvals: newApprovals,
-          status: level === 'finance' ? 'تأیید نهایی مالی/مدیرعامل' : r.status,
-        };
-      })
-    );
+  // Approval chain (site → project → procurement → finance/CEO) is enforced by the workflow service.
+  const handleApproveRequisition = (reqId: string, _level: 'site' | 'project' | 'procurement' | 'finance') => {
+    onToast(wf.approveRequisition(reqId).message);
   };
 
   const handleConvertToRfq = (req: PurchaseRequisition) => {
@@ -223,65 +182,12 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
     );
   };
 
-  // Invoice approval posts Dr GRNI + VAT / Cr supplier payable. Project cost is not touched here:
-  // stocked materials reach the project only when they are issued from the warehouse.
-  const handleApproveInvoice = (invoiceId: string) => {
-    const targetInvoice = invoices.find((inv) => inv.id === invoiceId);
-    if (!targetInvoice) return;
+  // Invoice approval posts Dr GRNI + VAT / Cr supplier payable and queues a treasury payment request.
+  // Project cost is not touched here: stocked materials reach the project only when issued.
+  const handleApproveInvoice = (invoiceId: string) => onToast(wf.approveVendorInvoice(invoiceId).message);
 
-    const posting = postFinancialEvent(vendorInvoiceEvent(targetInvoice), { submitter: currentUser.name });
-    if (!posting.ok) {
-      console.error(posting.error);
-      return;
-    }
-
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoiceId
-          ? {
-              ...inv,
-              status: inv.paidAmount > 0 ? inv.status : 'تأیید تطبیق سه‌جانبه',
-              accountingEntryNumber: posting.event?.docNumber,
-              threeWayMatching: {
-                ...inv.threeWayMatching,
-                status: 'تأیید نهایی مالی',
-              },
-            }
-          : inv
-      )
-    );
-    if (!posting.duplicate && posting.event?.docNumber) onPosted?.(posting.event.docNumber);
-  };
-
-  // Settlement is requested from treasury; the invoice's paid amount changes when treasury pays.
-  const handleRecordPayment = (invoiceId: string, amount: number) => {
-    const inv = invoices.find((i) => i.id === invoiceId);
-    if (!inv || amount <= 0) return;
-    const alreadyRequested = paymentRequests.some(
-      (r) => r.sourceType === 'فاکتور خرید تأمین‌کننده' && r.sourceRefId === inv.id && r.status !== 'رد شده' && r.status !== 'پرداخت شده'
-    );
-    if (alreadyRequested) return;
-    setPaymentRequests((prev) => [
-      buildPaymentRequest(
-        prev,
-        {
-          sourceType: 'فاکتور خرید تأمین‌کننده',
-          sourceRefId: inv.id,
-          sourceRefNumber: inv.invoiceNumber,
-          projectId: inv.projectId,
-          projectName: inv.projectName,
-          costCenterId: inv.costCenterId || '',
-          counterpartyId: inv.counterpartyId || inv.supplierId,
-          beneficiaryName: inv.supplierName,
-          beneficiaryType: 'تأمین‌کننده',
-          totalAmount: amount,
-          dueDate: inv.dueDate,
-        },
-        toPersianDate(new Date())
-      ),
-      ...prev,
-    ]);
-  };
+  // Settlement happens in treasury; the request was queued on approval.
+  const handleRecordPayment = (_invoiceId: string, _amount: number) => undefined;
 
   const tabs = [
     { id: 'dashboard', label: 'داشبورد زنجیره تأمین', icon: Layers },

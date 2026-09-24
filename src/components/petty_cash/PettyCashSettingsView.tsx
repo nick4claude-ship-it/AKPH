@@ -11,26 +11,32 @@ import {
   Tag,
 } from 'lucide-react';
 import { PettyCashCategoryItem } from '../../types';
+import { useStoreSlice } from '../../store/AppStore';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
 interface PettyCashSettingsViewProps {
   categories: PettyCashCategoryItem[];
   onUpdateCategories: (categories: PettyCashCategoryItem[]) => void;
+  /** Fund ceilings and approval chains are edited on the system settings page. */
+  onOpenPolicySettings?: () => void;
 }
 
 export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
   categories,
   onUpdateCategories,
+  onOpenPolicySettings,
 }) => {
+  // Approval thresholds and the low-balance alert are the stored petty cash policy.
+  const [policy, setPolicy] = useStoreSlice('pettyCashSettings');
   const [categoryList, setCategoryList] = useState<PettyCashCategoryItem[]>(categories);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [selectedCatId, setSelectedCatId] = useState<string>(categories[0]?.id || '');
   const [newSubcategoryName, setNewSubcategoryName] = useState('');
 
   // Thresholds configuration state
-  const [thresholdLevel1, setThresholdLevel1] = useState<number>(20_000_000);
-  const [thresholdLevel2, setThresholdLevel2] = useState<number>(100_000_000);
-  const [lowBalancePercent, setLowBalancePercent] = useState<number>(25);
+  const [thresholdLevel1, setThresholdLevel1] = useState<number>(policy.siteLevelMax);
+  const [thresholdLevel2, setThresholdLevel2] = useState<number>(policy.projectLevelMax);
+  const [lowBalancePercent, setLowBalancePercent] = useState<number>(policy.lowBalancePercent);
   const [isSaved, setIsSaved] = useState(false);
 
   const selectedCategoryObj = categoryList.find((c) => c.id === selectedCatId);
@@ -278,6 +284,9 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
                   type="button"
                   onClick={() => {
                     onUpdateCategories(categoryList);
+                    if (thresholdLevel1 < thresholdLevel2) {
+                      setPolicy((p) => ({ ...p, siteLevelMax: thresholdLevel1, projectLevelMax: thresholdLevel2, lowBalancePercent }));
+                    }
                     setIsSaved(true);
                     setTimeout(() => setIsSaved(false), 3500);
                   }}

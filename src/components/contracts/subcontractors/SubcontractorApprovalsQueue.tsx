@@ -53,11 +53,12 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
   // Categorize statements by workflow stage
-  const siteReviewQueue = statements.filter(
-    (s) => s.status === 'submitted' || s.status === 'site_review'
-  );
-  const pmReviewQueue = statements.filter((s) => s.status === 'site_review'); // or statements submitted directly for PM
-  const pmApprovedQueue = statements.filter((s) => s.status === 'pm_approved');
+  // Site stage: work recorded → measurement → site approval.
+  const siteReviewQueue = statements.filter((s) => s.status === 'submitted' || s.status === 'measured');
+  // PM stage: site-approved statements.
+  const pmReviewQueue = statements.filter((s) => s.status === 'site_review');
+  // Management stage: financial approval then CEO approval.
+  const pmApprovedQueue = statements.filter((s) => s.status === 'pm_approved' || s.status === 'finance_approved');
   const managementApprovedQueue = statements.filter(
     (s) => s.status === 'management_approved' && s.remainingPayable > 0
   );

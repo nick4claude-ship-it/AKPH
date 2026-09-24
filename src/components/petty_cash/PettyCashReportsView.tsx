@@ -20,6 +20,8 @@ import {
   PettyCashReconciliation,
   Project,
 } from '../../types';
+import { useAppState } from '../../store/AppStore';
+import { documentCount } from '../../store/domainSelectors';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
 interface PettyCashReportsViewProps {
@@ -37,6 +39,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
   reconciliations,
   projects,
 }) => {
+  const appState = useAppState();
   const [selectedReportType, setSelectedReportType] = useState<
     'statement' | 'project_category' | 'missing_docs' | 'rejected' | 'reconciliation_sheet'
   >('statement');
@@ -53,7 +56,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
   );
 
   const missingDocsExpenses = expenses.filter(
-    (e) => !e.invoiceNumber || e.attachments.length === 0
+    (e) => !e.invoiceNumber || !documentCount(appState, 'petty_cash_expense', e.id)
   );
 
   const rejectedExpenses = expenses.filter((e) => e.status === 'rejected');

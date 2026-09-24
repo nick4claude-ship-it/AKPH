@@ -93,11 +93,25 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
             ثبت اولیه پیمانکار
           </span>
         );
+      case 'measured':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
+            <Clock className="w-3 h-3 text-sky-700" />
+            اندازه‌گیری شد
+          </span>
+        );
+      case 'finance_approved':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-100 text-teal-900 border border-teal-300">
+            <CheckSquare className="w-3 h-3 text-teal-700" />
+            تأیید مالی (منتظر مدیرعامل)
+          </span>
+        );
       case 'site_review':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
             <Clock className="w-3 h-3 text-amber-700" />
-            در حال بررسی کارگاه
+            تأیید کارگاه
           </span>
         );
       case 'pm_approved':
@@ -111,7 +125,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
             <ShieldCheck className="w-3 h-3 text-purple-700" />
-            تأیید مدیریت (آماده پرداخت)
+            تأیید مدیرعامل (بدهی ثبت شد)
           </span>
         );
       case 'paid':

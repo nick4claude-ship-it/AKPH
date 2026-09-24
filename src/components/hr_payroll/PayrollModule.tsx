@@ -26,7 +26,7 @@ import {
   Building2,
   X,
 } from 'lucide-react';
-import { Project, UserProfile, PaymentRequest } from '../../types';
+import { Project, UserProfile } from '../../types';
 import {
   Employee,
   MonthlyTimesheet,
@@ -34,29 +34,29 @@ import {
   mockEmployees,
   mockTimesheets,
 } from '../../data/hrPayrollMockData';
-import { useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
-import { payrollApprovedEvent } from '../../store/events';
-import { payrollPeriodId } from '../../store/initialState';
-import { buildPaymentRequest } from '../../store/paymentRequests';
-import { toPersianDate } from '../../utils/date';
+import { useStoreSlice } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
+import { useNavigate } from 'react-router-dom';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 
 interface PayrollModuleProps {
   projects: Project[];
   currentUser: UserProfile;
+  onToast: (msg: string) => void;
 }
 
 export const PayrollModule: React.FC<PayrollModuleProps> = ({
   projects,
   currentUser,
+  onToast,
 }) => {
+  const wf = useWorkflows();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'payroll_slips' | 'employees' | 'timesheets'>('payroll_slips');
 
   const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
   const [timesheets, setTimesheets] = useState<MonthlyTimesheet[]>(mockTimesheets);
-  const postFinancialEvent = usePostFinancialEvent();
-  const [slips, setSlips] = useStoreSlice('payrollSlips');
-  const [, setPaymentRequests] = useStoreSlice('paymentRequests');
+  const [slips] = useStoreSlice('payrollSlips');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,63 +81,16 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   const totalIncomeTax = slips.reduce((acc, s) => acc + s.incomeTaxDeduction, 0);
   const totalCompanyLaborCost = slips.reduce((acc, s) => acc + s.totalCostForCompany, 0);
 
-  // Financial approval of the month's calculated slips posts one payroll entry:
-  // Dr salary cost per cost center / Cr salaries payable, insurance, tax and staff loans.
+  // Financial approval of the month's calculated slips posts one payroll entry
+  // (Dr salary cost per cost center / Cr salaries, insurance, tax, loans) and queues the net pay in treasury.
   const handleGenerateAccountingEntry = () => {
-    const pending = slips.filter((s) => s.monthYear === selectedMonth && s.status === 'محاسبه شده');
-    if (pending.length === 0) {
-      showNotification('سند حقوق و دستمزد این دوره قبلاً صادر شده است.', 'info');
-      return;
-    }
-    const batchId = `${payrollPeriodId(selectedMonth)}:${pending.map((s) => s.id).sort().join(',')}`;
-    const posting = postFinancialEvent(payrollApprovedEvent(batchId, selectedMonth, pending), {
-      submitter: currentUser.name,
-    });
-    if (!posting.ok) {
-      showNotification(`صدور سند حقوق انجام نشد: ${posting.error}`, 'info');
-      return;
-    }
-    const ids = new Set(pending.map((s) => s.id));
-    setSlips((prev) =>
-      prev.map((s) => (ids.has(s.id) ? { ...s, status: 'تأیید مالی', journalEntryId: posting.event?.docNumber } : s))
-    );
-    showNotification(`سند حسابداری حقوق ${posting.event?.docNumber} با تفکیک هزینه‌های مستقیم پروژه و سربار صادر گردید.`);
+    const result = wf.approvePayrollPeriod(selectedMonth);
+    showNotification(result.message, result.ok ? 'success' : 'info');
+    onToast(result.message);
   };
 
-  // Net salaries of approved slips are sent to treasury; the payment itself is posted there.
-  const handleGeneratePaymentBatch = () => {
-    const approved = slips.filter((s) => s.monthYear === selectedMonth && s.status === 'تأیید مالی');
-    const total = approved.reduce((acc, s) => acc + s.netPayableSalary, 0);
-    if (total <= 0) {
-      showNotification('فیش تأییدشده‌ای برای ارسال به خزانه در این دوره وجود ندارد.', 'info');
-      return;
-    }
-    const batchId = `${payrollPeriodId(selectedMonth)}:${approved.map((s) => s.id).sort().join(',')}`;
-    let request: PaymentRequest | undefined;
-    setPaymentRequests((prev) => {
-      request = buildPaymentRequest(
-        prev,
-        {
-          sourceType: 'حقوق و دستمزد ماهانه',
-          sourceRefId: batchId,
-          sourceRefNumber: `لیست حقوق ${selectedMonth}`,
-          projectId: '',
-          projectName: 'ستاد مرکزی و کارگاه‌ها',
-          costCenterId: '',
-          beneficiaryName: 'بانک عامل - فایل پایا واریز گروهی پرسنل',
-          beneficiaryType: 'پرسنل',
-          totalAmount: total,
-        },
-        toPersianDate(new Date())
-      );
-      return [request, ...prev];
-    });
-    const ids = new Set(approved.map((s) => s.id));
-    setSlips((prev) =>
-      prev.map((s) => (ids.has(s.id) ? { ...s, status: 'صادر شده جهت پرداخت', paymentRequestId: request?.id } : s))
-    );
-    showNotification('دستور پرداخت گروهی خالص حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.');
-  };
+  // Net pay is paid only in treasury, from the request created on approval.
+  const handleGeneratePaymentBatch = () => navigate('/finance/payments');
 
   const filteredSlips = slips.filter((s) => {
     if (selectedProjectId !== 'all' && s.projectId !== selectedProjectId) return false;
@@ -201,14 +154,14 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>صدور سند حسابداری حقوق</span>
+            <span>تأیید مالی حقوق و صدور سند</span>
           </button>
           <button
             onClick={handleGeneratePaymentBatch}
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
           >
             <CreditCard className="w-3.5 h-3.5" />
-            <span>ارسال دستور پرداخت به خزانه</span>
+            <span>مشاهده درخواست پرداخت در خزانه</span>
           </button>
         </div>
       </div>

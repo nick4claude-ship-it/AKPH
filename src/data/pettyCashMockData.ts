@@ -15,12 +15,15 @@ import {
   PettyCashReplenishmentRequest,
   PettyCashReconciliation,
   PettyCashCategoryItem,
+  PettyCashAttachment,
+  PettyCashSettings,
 } from '../types';
 
 // ==================== 1. PETTY CASH ACCOUNTS (تنخواه‌گردان‌ها) ====================
 export const initialPettyCashAccounts: PettyCashAccount[] = [
   {
     id: 'pc-101',
+    fundType: 'site_supervisor',
     code: 'TC-PRJ101',
     title: 'تنخواه کارگاه برج تجاری رونیکا',
     holderName: 'مهندس محمدرضا شایان‌پور',
@@ -45,7 +48,56 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     notes: 'کارت تنخواه شماره ۶۱۰۴-۳۳۷۸-۹۰۱۲-۴۴۹۱ نزد بانک ملت به نام کارگاه',
   },
   {
+    id: 'pc-101-pm',
+    fundType: 'project_manager',
+    code: 'TC-PRJ101-PM',
+    title: 'تنخواه مدیر پروژه برج رونیکا',
+    holderName: 'مهندس سارا کاظمی',
+    holderRole: 'مدیر پروژه',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری رونیکا',
+    costCenterId: 'cc-prj101-01',
+    costCenterName: 'کارگاه برج رونیکا',
+    ceilingLimit: 300_000_000,
+    minBalanceWarning: 60_000_000,
+    actualBalance: 180_000_000,
+    pendingExpenses: 0,
+    usableBalance: 180_000_000,
+    sourceBankAccountId: 'bank-1',
+    sourceBankAccountTitle: 'بانک ملت - مرکزی میرداماد',
+    startDate: '۱۴۰۳/۰۱/۱۵',
+    status: 'active',
+    monthlySpent: 0,
+    lastReplenishmentDate: '۱۴۰۳/۰۶/۱۰',
+    lastReplenishmentAmount: 100_000_000,
+  },
+  {
+    id: 'pc-101-buy',
+    fundType: 'procurement',
+    code: 'TC-PRJ101-BUY',
+    title: 'تنخواه خرید برج رونیکا',
+    holderName: 'آقای رضا امینی (کارپرداز)',
+    holderRole: 'کارپرداز',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری رونیکا',
+    costCenterId: 'cc-prj101-02',
+    costCenterName: 'کارگاه تأسیسات برج رونیکا',
+    ceilingLimit: 150_000_000,
+    minBalanceWarning: 40_000_000,
+    actualBalance: 35_000_000,
+    pendingExpenses: 0,
+    usableBalance: 35_000_000,
+    sourceBankAccountId: 'bank-1',
+    sourceBankAccountTitle: 'بانک ملت - مرکزی میرداماد',
+    startDate: '۱۴۰۳/۰۲/۰۱',
+    status: 'active',
+    monthlySpent: 0,
+    lastReplenishmentDate: '۱۴۰۳/۰۶/۰۵',
+    lastReplenishmentAmount: 50_000_000,
+  },
+  {
     id: 'pc-102',
+    fundType: 'site_supervisor',
     code: 'TC-PRJ102',
     title: 'تنخواه کارگاه تقاطع بزرگراه فجر',
     holderName: 'مهندس بهمن کاظمی',
@@ -71,6 +123,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
   },
   {
     id: 'pc-103',
+    fundType: 'project_manager',
     code: 'TC-PRJ103',
     title: 'تنخواه کارگاه بیمارستان البرز',
     holderName: 'مهندس احسان صادقی',
@@ -96,6 +149,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
   },
   {
     id: 'pc-104',
+    fundType: 'site_supervisor',
     code: 'TC-PRJ104',
     title: 'تنخواه کارگاه مسکونی نیلوفر',
     holderName: 'مهندس وحید پورحسینی',
@@ -121,6 +175,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
   },
   {
     id: 'pc-hq',
+    fundType: 'headquarters',
     code: 'TC-HQ01',
     title: 'تنخواه تدارکات ستاد مرکزی تهران',
     holderName: 'آقای مجتبی رحمانی',
@@ -147,7 +202,10 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
 ];
 
 // ==================== 2. PETTY CASH EXPENSES (هزینه‌های ثبت‌شده) ====================
-export const initialPettyCashExpenses: PettyCashExpense[] = [
+/** Seed format with inline attachments; the store moves them into the document center. */
+export type SeedPettyCashExpense = PettyCashExpense & { attachments: PettyCashAttachment[] };
+
+export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
   {
     id: 'exp-101',
     expenseNumber: 'EXP-1403-0214',
@@ -798,4 +856,22 @@ export const initialPettyCashCategories: PettyCashCategoryItem[] = [
 ];
 
 export const mockPettyCashAccounts: PettyCashAccount[] = isDev() ? initialPettyCashAccounts : [];
-export const mockPettyCashExpenses: PettyCashExpense[] = isDev() ? initialPettyCashExpenses : [];
+/** Stored petty cash policy (editable in Settings). */
+export const initialPettyCashSettings: PettyCashSettings = {
+  fundLimits: {
+    project_manager: { ceiling: 300_000_000, minBalanceWarning: 60_000_000, maxSingleExpense: 100_000_000 },
+    site_supervisor: { ceiling: 250_000_000, minBalanceWarning: 50_000_000, maxSingleExpense: 50_000_000 },
+    procurement: { ceiling: 150_000_000, minBalanceWarning: 40_000_000, maxSingleExpense: 80_000_000 },
+    headquarters: { ceiling: 120_000_000, minBalanceWarning: 30_000_000, maxSingleExpense: 40_000_000 },
+  },
+  siteLevelMax: 20_000_000,
+  projectLevelMax: 100_000_000,
+  approvalChains: {
+    site_manager_and_finance: ['سرپرست کارگاه', 'مدیر مالی'],
+    project_and_finance: ['مدیر پروژه', 'مدیر مالی'],
+    ceo_full: ['مدیر پروژه', 'مدیر مالی', 'مدیرعامل'],
+  },
+  lowBalancePercent: 25,
+};
+
+export const mockPettyCashExpenses: SeedPettyCashExpense[] = isDev() ? initialPettyCashExpenses : [];

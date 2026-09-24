@@ -241,7 +241,6 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
           action: targetStatus === 'draft' ? 'ایجاد پیش‌نویس صورت‌وضعیت کارگاه' : 'ارسال مستقیم به مهندس مشاور',
         },
       ],
-      attachments: [],
     };
 
     onSaveStatement(newStatement);

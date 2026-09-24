@@ -83,12 +83,12 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
   const totalStatementsGross = filteredStatements.reduce((sum, s) => sum + s.grossAmount, 0);
 
   // 2. در انتظار بررسی (کارگاه)
-  const pendingSiteReview = filteredStatements.filter((s) => s.status === 'submitted' || s.status === 'site_review');
+  const pendingSiteReview = filteredStatements.filter((s) => s.status === 'submitted' || s.status === 'measured' || s.status === 'site_review');
   const pendingSiteReviewCount = pendingSiteReview.length;
   const pendingSiteReviewAmount = pendingSiteReview.reduce((sum, s) => sum + s.netPayable, 0);
 
   // 3. در انتظار تأیید مدیریت (و مدیر پروژه)
-  const pendingManagementReview = filteredStatements.filter((s) => s.status === 'pm_approved');
+  const pendingManagementReview = filteredStatements.filter((s) => s.status === 'pm_approved' || s.status === 'finance_approved');
   const pendingManagementReviewCount = pendingManagementReview.length;
   const pendingManagementReviewAmount = pendingManagementReview.reduce((sum, s) => sum + s.netPayable, 0);
 

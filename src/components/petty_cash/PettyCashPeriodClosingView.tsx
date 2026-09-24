@@ -12,6 +12,8 @@ import {
   Unlock,
 } from 'lucide-react';
 import { PettyCashAccount, PettyCashExpense, User } from '../../types';
+import { useAppState } from '../../store/AppStore';
+import { documentCount } from '../../store/domainSelectors';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
 interface PettyCashPeriodClosingViewProps {
@@ -25,6 +27,7 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
   expenses,
   currentUser,
 }) => {
+  const appState = useAppState();
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
   const [closingPeriod, setClosingPeriod] = useState('شهریور ۱۴۰۳');
@@ -40,7 +43,7 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
   const missingDocsExpenses = expenses.filter(
     (e) =>
       e.pettyCashId === selectedAccount?.id &&
-      (!e.invoiceNumber || e.attachments.length === 0)
+      (!e.invoiceNumber || !documentCount(appState, 'petty_cash_expense', e.id))
   );
 
   const canClose = accountPendingExpenses.length === 0 && missingDocsExpenses.length === 0;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Project, KpiItem, PettyCash, ProgressStatement } from '../../types';
+import { Project, KpiItem, PettyCashAccount, DetailedProgressStatement } from '../../types';
 import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
 import { toPersianDate, getCurrentFiscalYear } from '../../utils/date';
 import { X, Printer, Download, Building2, CheckCircle2 } from 'lucide-react';
@@ -9,8 +9,8 @@ interface PdfReportModalProps {
   onClose: () => void;
   projects: Project[];
   kpis: KpiItem[];
-  pettyCashList: PettyCash[];
-  statements: ProgressStatement[];
+  pettyFunds: PettyCashAccount[];
+  statements: DetailedProgressStatement[];
   targetProject?: Project | null;
 }
 
@@ -19,8 +19,8 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
   onClose,
   projects,
   kpis,
-  pettyCashList,
-  statements,
+  pettyFunds: _pettyFunds,
+  statements: _statements,
   targetProject,
 }) => {
   if (!isOpen) return null;

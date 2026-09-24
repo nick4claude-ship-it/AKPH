@@ -58,7 +58,7 @@ function buildContext(state: AppState, event: FinancialEvent): PostingContext {
 export function preparePosting(
   state: AppState,
   input: FinancialEventInput,
-  options: { submitter?: string } = {}
+  options: { submitter?: string; checkBalances?: boolean } = {}
 ): PostingResult {
   const existing = findPostedEvent(state, input);
   if (existing) {
@@ -107,6 +107,11 @@ export function preparePosting(
       };
     }
 
+    if (options.checkBalances !== false) {
+      const shortage = findCashShortage(state, rows);
+      if (shortage) return { ok: false, duplicate: false, error: shortage };
+    }
+
     const submitter = options.submitter || 'سیستم ثبت خودکار';
     const docNumber = getNextSequentialDocNumber(
       state.journalEntries.map((j) => j.docNumber),
@@ -152,6 +157,33 @@ export function preparePosting(
   } catch (err: any) {
     return { ok: false, duplicate: false, error: err?.message || String(err) };
   }
+}
+
+/** Cash control: a posting may not take a bank account, cash desk or petty cash fund below zero. */
+function findCashShortage(state: AppState, rows: JournalEntryRow[]): string | null {
+  const net = new Map<string, number>();
+  for (const r of rows) {
+    if (![ACCOUNTS.bank, ACCOUNTS.cashDesk, ACCOUNTS.pettyCash].includes(r.accountCode as any) || !r.subledgerCode) continue;
+    const key = `${r.accountCode}|${r.subledgerCode}`;
+    net.set(key, (net.get(key) || 0) + r.debit - r.credit);
+  }
+  for (const [key, change] of net) {
+    if (change >= 0) continue;
+    const [code, id] = key.split('|');
+    const holder =
+      code === ACCOUNTS.bank
+        ? state.bankAccounts.find((b) => b.id === id)
+        : code === ACCOUNTS.cashDesk
+          ? state.cashDesks.find((c) => c.id === id)
+          : state.pettyCashAccounts.find((p) => p.id === id);
+    if (!holder) continue;
+    const available = 'actualBalance' in holder ? holder.actualBalance : holder.balance;
+    const name = 'bankName' in holder ? holder.bankName : holder.title;
+    if (available + change < 0) {
+      return `[PostingEngine] موجودی «${name}» کافی نیست: موجودی ${available.toLocaleString('fa-IR')} و مبلغ برداشت ${(-change).toLocaleString('fa-IR')} تومان.`;
+    }
+  }
+  return null;
 }
 
 /**
@@ -226,7 +258,7 @@ export function postFinancialEventToState(
   input: FinancialEventInput,
   options: { submitter?: string; syncBalances?: boolean } = {}
 ): { state: AppState; result: PostingResult } {
-  const result = preparePosting(state, input, options);
+  const result = preparePosting(state, input, { ...options, checkBalances: options.syncBalances !== false });
   if (!result.ok || result.duplicate || !result.event || !result.entry) return { state, result };
   return { state: applyPosting(state, result.event, result.entry, options), result };
 }

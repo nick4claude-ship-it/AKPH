@@ -106,6 +106,10 @@ export function useAppDispatch() {
   return useStoreContext().dispatch;
 }
 
+export function useGetState(): () => AppState {
+  return useStoreContext().getState;
+}
+
 export function usePostFinancialEvent(): PostFinancialEvent {
   return useStoreContext().postFinancialEvent;
 }

@@ -70,8 +70,10 @@ export const ACCOUNTS = {
   subInsurance: '21602',
   subOtherDeductions: '21603',
   bankSuspense: '21701',
+  clientAdvances: '21301',
   contractRevenue: '41101',
   stocktakeGain: '41301',
+  otherIncome: '41302',
   materialsCost: '51101',
   siteLaborCost: '51201',
   subcontractorCost: '51301',
@@ -396,10 +398,15 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
     };
   },
 
-  // دریافت خزانه: بدهکار بانک / بستانکار مطالبات.
+  // دریافت: بدهکار بانک / بستانکار مطالبات (صورت‌وضعیت)، پیش‌دریافت یا سایر درآمدها.
   TREASURY_RECEIPT: (e, ctx) => {
     const bankAccountId = requireDetail<string>(e, 'bankAccountId');
     const ref = e.details?.docNumber || e.sourceId;
+    const receiptType: 'statement' | 'advance' | 'other_income' = e.details?.receiptType || 'statement';
+    const creditCode =
+      receiptType === 'advance' ? ACCOUNTS.clientAdvances : receiptType === 'other_income' ? ACCOUNTS.otherIncome : ACCOUNTS.receivables;
+    const creditLabel =
+      receiptType === 'advance' ? 'پیش‌دریافت از' : receiptType === 'other_income' ? 'درآمد متفرقه از' : 'کاهش مطالبات';
     return {
       entryType: 'دریافت',
       title: `دریافت ${ref} از ${ctx.counterpartyName}`,
@@ -408,8 +415,48 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
           subledgerCode: bankAccountId,
           subledgerName: e.details?.bankName,
         }),
-        row(ctx, ACCOUNTS.receivables, `کاهش مطالبات ${ctx.counterpartyName} بابت ${ref}`, 0, e.amount, {
+        row(ctx, creditCode, `${creditLabel} ${ctx.counterpartyName} بابت ${ref}`, 0, e.amount, {
           ...partyTags(e, ctx),
+          projectId: e.projectId || undefined,
+          projectName: ctx.projectName,
+        }),
+      ],
+    };
+  },
+
+  // برگشت کالا از پروژه به انبار: بدهکار موجودی / بستانکار بهای پروژه (به بهای حواله اصلی).
+  STORE_RETURN: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    const inv = { subledgerCode: e.details?.warehouseId, subledgerName: e.details?.warehouseName };
+    return {
+      entryType: 'انبارداری',
+      title: `برگشت کالا از پروژه به انبار ${ref}`,
+      rows: [
+        row(ctx, ACCOUNTS.inventory, `ورود مجدد کالای برگشتی ${ref}`, e.amount, 0, { ...projectTags(e, ctx), ...inv }),
+        row(ctx, ACCOUNTS.materialsCost, `کاهش بهای مصالح پروژه بابت برگشت ${ref}`, 0, e.amount, projectTags(e, ctx)),
+      ],
+    };
+  },
+
+  // برگشت کالا به تأمین‌کننده: بدهکار کالای فاکتورنشده (یا بستانکاران اگر فاکتور ثبت شده) / بستانکار موجودی.
+  PURCHASE_RETURN: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
+    const invoiced = Boolean(e.details?.invoiced);
+    return {
+      entryType: 'انبارداری',
+      title: `برگشت از خرید ${ref} به ${ctx.counterpartyName}`,
+      rows: [
+        row(
+          ctx,
+          invoiced ? ACCOUNTS.supplierPayables : ACCOUNTS.grniClearing,
+          `${invoiced ? 'کاهش بدهی' : 'کاهش کالای فاکتورنشده'} ${ctx.counterpartyName} بابت برگشت ${ref}`,
+          e.amount,
+          0,
+          { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName }
+        ),
+        row(ctx, ACCOUNTS.inventory, `خروج کالای مرجوعی ${ref} از انبار`, 0, e.amount, {
+          subledgerCode: e.details?.warehouseId,
+          subledgerName: e.details?.warehouseName,
           projectId: e.projectId || undefined,
           projectName: ctx.projectName,
         }),

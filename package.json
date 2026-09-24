@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:posting": "tsx scripts/posting-scenario.ts"
+    "test:posting": "tsx scripts/posting-scenario.ts",
+    "test:workflows": "tsx scripts/workflow-scenarios.ts",
+    "test": "tsx scripts/posting-scenario.ts && tsx scripts/workflow-scenarios.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

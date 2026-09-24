@@ -91,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => onSelectProject(e.target.value)}
               className="bg-transparent border-none text-xs text-slate-800 font-medium focus:outline-none cursor-pointer pr-1 pl-4"
             >
-              <option value="all">تمام پروژه‌ها (۵ پروژه فعال)</option>
+              <option value="all">تمام پروژه‌ها ({projects.length.toLocaleString('fa-IR')} پروژه)</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.code} - {p.name}

@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { Sparkles, Send, Bot, User, CornerDownLeft, RefreshCw, X, MessageSquare, ArrowRight } from 'lucide-react';
-import { Project, PettyCash, PendingApproval } from '../../types';
 import { formatCurrencyCompact } from '../../utils/formatters';
+import { useAppState } from '../../store/AppStore';
+import { useCurrentUser } from '../../store/session';
+import { answerManagementQuery, AssistantAnswer } from '../../store/assistant';
 
 interface AiAgentWidgetProps {
   isOpen?: boolean;
   onClose?: () => void;
   isFloating?: boolean;
-  projects: Project[];
-  pettyCashList: PettyCash[];
-  pendingApprovals: PendingApproval[];
 }
 
 interface Message {
@@ -21,11 +20,11 @@ interface Message {
 }
 
 export const samplePrompts = [
-  'وضعیت مالی پروژه‌های فعال را بررسی کن.',
-  'بیشترین هزینه این ماه مربوط به کدام پروژه بوده؟',
+  'وضعیت پروژه رونیکا را بگو.',
+  'بیشترین هزینه مربوط به کدام پروژه است؟',
   'کدام پروژه بیشترین مطالبات را دارد؟',
-  'هزینه‌های تنخواه این ماه را خلاصه کن.',
-  'کدام فاکتورها هنوز تأیید نشده‌اند؟',
+  'وضعیت تنخواه‌ها را خلاصه کن.',
+  'چه مواردی در انتظار تأیید است؟',
   'وضعیت سود و زیان شرکت را گزارش کن.',
 ];
 
@@ -33,97 +32,21 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
   isOpen = true,
   onClose,
   isFloating = false,
-  projects,
-  pettyCashList,
-  pendingApprovals,
 }) => {
+  const appState = useAppState();
+  const user = useCurrentUser();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'm1',
       sender: 'ai',
-      text: 'سلام مهندس رادمنش. من دستیار هوشمند مرکز فرماندهی و پایش مالی شرکت سازه گستران پارس هستم. داده‌های زنده ۵ پروژه فعال، تنخواه‌ها، صورت‌وضعیت‌ها و کارتابل تاییدیه را تحلیل می‌کنم. چه کمکی از دست من برمی‌آید؟',
+      text: `سلام ${user.name}. من دستیار هوشمند مدیریت هستم و پاسخ‌ها را مستقیماً از داده‌های پروژه‌ها، حسابداری، قراردادها، تدارکات، تنخواه، صورت‌وضعیت‌ها و انبار محاسبه می‌کنم. مثلاً بپرسید: «وضعیت پروژه رونیکا را بگو».`,
       time: 'هم‌اکنون',
     },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
-  const generateAnswer = (query: string): { text: string; dataPoints?: { label: string; value: string }[] } => {
-    const q = query.trim().toLowerCase();
-
-    if (q.includes('مطالبات') || q.includes('بیشترین مطالبات')) {
-      const sortedByRec = [...projects].sort((a, b) => b.receivables - a.receivables);
-      const top = sortedByRec[0];
-      const second = sortedByRec[1];
-      return {
-        text: `بر اساس آخرین پایش حساب‌ها، بیشترین مطالبات وصول‌نشده مربوط به پروژه «${top.name}» با مبلغ ${formatCurrencyCompact(top.receivables)} است. دومین پروژه پرمطالبه «${second.name}» به کارفرمایی شرکت سرمایه‌گذاری تابان با ${formatCurrencyCompact(second.receivables)} است. پیشنهاد می‌شود وصول مطالبات فاز البرز و صورت‌وضعیت شماره ۸ فجر تسریع گردد.`,
-        dataPoints: [
-          { label: top.name, value: formatCurrencyCompact(top.receivables) },
-          { label: second.name, value: formatCurrencyCompact(second.receivables) },
-          { label: 'مجموع مطالبات معوق', value: '۴.۲ میلیارد تومان' },
-        ],
-      };
-    }
-
-    if (q.includes('بیشترین هزینه') || q.includes('هزینه این ماه')) {
-      const sortedByCost = [...projects].sort((a, b) => b.cost - a.cost);
-      const topCost = sortedByCost[0];
-      return {
-        text: `بیشترین هزینه ثبت‌شده در دوره جاری مربوط به پروژه «${topCost.name}» با مجموع هزینه تمام‌شده ${formatCurrencyCompact(topCost.cost)} است که عمده آن صرف خرید آرماتوربندی، بتن‌ریزی سازه و سقف‌ها شده است.`,
-        dataPoints: [
-          { label: 'پروژه پرهزینه', value: topCost.name },
-          { label: 'بهای تمام‌شده', value: formatCurrencyCompact(topCost.cost) },
-          { label: 'حاشیه سود پروژه', value: `${topCost.profitMargin}٪` },
-        ],
-      };
-    }
-
-    if (q.includes('تنخواه') || q.includes('تنخواه گردان')) {
-      const criticalPetty = pettyCashList.filter((p) => p.usableBalance < 0 || p.status === 'critical');
-      return {
-        text: `در حال حاضر ۴ تنخواه فعال در کارگاه‌ها پایش می‌شوند. تنخواه کارگاه «مجتمع مسکونی نیلوفر» به سرپرستی مهندس پورحسینی به دلیل هزینه‌های نظافت و نصبیات پایانی دچار کسری موجودی منفی ۴ میلیون تومان گردیده و نیازمند شارژ فوری است. موجودی قابل مصرف کل تنخواه‌ها ۲۸۷ میلیون تومان می‌باشد.`,
-        dataPoints: [
-          { label: 'موجودی کل تنخواه‌ها', value: '۲۸۷ میلیون تومان' },
-          { label: 'هزینه‌های در انتظار تایید تنخواه', value: '۸۹.۵ میلیون تومان' },
-          { label: 'تنخواه‌های نیازمند شارژ', value: '۲ کارگاه' },
-        ],
-      };
-    }
-
-    if (q.includes('فاکتور') || q.includes('تأیید') || q.includes('تایید نشده')) {
-      const pendingCount = pendingApprovals.filter((p) => p.status === 'pending').length;
-      return {
-        text: `در حال حاضر تعداد ${pendingCount} سند و فاکتور به ارزش مجموعاً ۹۶۴ میلیون تومان در کارتابل تاییدیه شما قرار دارد. بزرگترین سند مربوط به خرید ۳۰ تن قیر پلیمری پروژه تقاطع فجر به مبلغ ۵۲۰ میلیون تومان (با ۳۲۰ میلیون پیش‌پرداخت نقدی) از شرکت نفت پاسارگاد است.`,
-        dataPoints: [
-          { label: 'اسناد در انتظار', value: `${pendingCount} فقره سند` },
-          { label: 'ارزش کل اسناد', value: '۹۶۴ میلیون تومان' },
-          { label: 'بزرگترین سند', value: 'پالایش نفت پاسارگاد (۵۲۰ م.ت)' },
-        ],
-      };
-    }
-
-    if (q.includes('سود و زیان') || q.includes('سود')) {
-      return {
-        text: `وضعیت کل شرکت بسیار مثبت است: درآمد ثبتی ۴۱۰.۵ میلیارد تومان در برابر ۳۴۰.۳ میلیارد تومان هزینه، که منجر به سود عملیاتی ۷۰.۲ میلیارد تومان با حاشیه سود میانگین ۱۷.۱٪ شده است. سودآوری نسبت به دوره قبل رشد ۲۵.۳٪ را نشان می‌دهد.`,
-        dataPoints: [
-          { label: 'درآمد کل شرکت', value: '۴۱۰.۵ میلیارد تومان' },
-          { label: 'هزینه کل تمام‌شده', value: '۳۴۰.۳ میلیارد تومان' },
-          { label: 'سود ناخالص عملیاتی', value: '۷۰.۲ میلیارد تومان' },
-          { label: 'میانگین حاشیه سود', value: '۱۷.۱ درصد' },
-        ],
-      };
-    }
-
-    // Default general project overview
-    return {
-      text: `تمام ۵ پروژه فعال دارای پیشرفت فیزیکی منظم هستند. پروژه مسکونی نیلوفر در آستانه تحویل موقت (۹۴٪) است و برج رونیکا با حاشیه سود ۲۰.۵٪ سودآورترین پروژه جاری است. تنها ریسک اصلی، مطالبات معوق شهرداری در پروژه تقاطع بزرگراه فجر است.`,
-      dataPoints: [
-        { label: 'پروژه‌های فعال', value: '۵ پروژه' },
-        { label: 'بالاترین حاشیه سود', value: 'برج رونیکا (۲۰.۵٪)' },
-        { label: 'نزدیک به تحویل', value: 'مجتمع نیلوفر (۹۴٪)' },
-      ],
-    };
-  };
+  const generateAnswer = (query: string): AssistantAnswer => answerManagementQuery(appState, query);
 
   const handleSend = (textToSend?: string) => {
     const text = textToSend || inputValue;

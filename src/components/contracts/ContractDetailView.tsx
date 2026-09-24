@@ -10,10 +10,10 @@ import {
   DetailedProgressStatement,
   ContractAmendment,
   StatementPayment,
-  ContractDocument,
   ContractAuditLog,
   UserProfile,
 } from '../../types';
+import { ContractFile } from './contractFiles';
 import {
   Building2,
   Calendar,
@@ -44,7 +44,7 @@ interface ContractDetailViewProps {
   statements: DetailedProgressStatement[];
   amendments: ContractAmendment[];
   payments: StatementPayment[];
-  documents: ContractDocument[];
+  documents: ContractFile[];
   auditLogs: ContractAuditLog[];
   currentUser: UserProfile;
   onBack: () => void;

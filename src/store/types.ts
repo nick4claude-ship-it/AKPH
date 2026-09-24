@@ -9,7 +9,6 @@ import {
   Counterparty,
   Contract,
   DetailedProgressStatement,
-  StatementPayment,
   SubcontractorContract,
   SubcontractorProgressStatement,
   FinancialEvent,
@@ -18,7 +17,14 @@ import {
   BankAccount,
   ReceiptRecord,
   PaymentRecord,
-  SystemDocument,
+  AppDocument,
+  PettyCashSettings,
+  PettyCashReplenishment,
+  PettyCashReplenishmentRequest,
+  PurchaseRequisition,
+  StockBalance,
+  StockReservation,
+  StockReturn,
   PettyCashAccount,
   PettyCashExpense,
   PurchaseOrder,
@@ -29,8 +35,6 @@ import {
   Warehouse,
   BankReconciliationItem,
   PayrollSlip,
-  PendingApproval,
-  ManagementAlert,
   PaymentRequest,
 } from '../types';
 import type { CashDesk } from '../data/paymentsTreasuryMockData';
@@ -44,7 +48,6 @@ export interface AppState {
   counterparties: Counterparty[];
   contracts: Contract[];
   clientStatements: DetailedProgressStatement[];
-  statementPayments: StatementPayment[];
   subcontractorContracts: SubcontractorContract[];
   subcontractorStatements: SubcontractorProgressStatement[];
   financialEvents: FinancialEvent[];
@@ -54,20 +57,27 @@ export interface AppState {
   cashDesks: CashDesk[];
   pettyCashAccounts: PettyCashAccount[];
   pettyCashExpenses: PettyCashExpense[];
+  pettyCashReplenishments: PettyCashReplenishment[];
+  pettyCashRequests: PettyCashReplenishmentRequest[];
+  pettyCashSettings: PettyCashSettings;
   paymentRequests: PaymentRequest[];
   receipts: ReceiptRecord[];
   payments: PaymentRecord[];
-  documents: SystemDocument[];
+  documents: AppDocument[];
   bankReconciliations: BankReconciliationItem[];
+  purchaseRequisitions: PurchaseRequisition[];
   purchaseOrders: PurchaseOrder[];
   vendorInvoices: VendorInvoice[];
   goodsReceipts: GoodsReceiptNote[];
   storeIssues: StoreIssueVoucher[];
   materials: MaterialItem[];
   warehouses: Warehouse[];
+  stockBalances: StockBalance[];
+  stockReservations: StockReservation[];
+  stockReturns: StockReturn[];
   payrollSlips: PayrollSlip[];
-  pendingApprovals: PendingApproval[];
-  alerts: ManagementAlert[];
+  /** Only dismissals are stored; notifications themselves are computed from data. */
+  dismissedNotificationIds: string[];
 }
 
 export type SliceKey = keyof AppState;

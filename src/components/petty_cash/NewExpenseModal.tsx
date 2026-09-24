@@ -19,6 +19,7 @@ import {
   PettyCashCategoryItem,
   Project,
   User,
+  AppDocument,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
@@ -33,7 +34,8 @@ interface NewExpenseModalProps {
   existingExpenses: PettyCashExpense[];
   currentUser: User;
   preselectedAccountId?: string;
-  onSaveExpense: (expense: PettyCashExpense) => void;
+  /** Validation (fund limits, balance) and approval level are decided by the workflow service. */
+  onSaveExpense: (expense: PettyCashExpense, attachments: Omit<AppDocument, 'links'>[]) => { ok: boolean; message: string };
 }
 
 export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
@@ -150,17 +152,6 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
     if (!targetAccount) return;
 
-    // Multi-level approval logic:
-    // < 20M: Site Manager -> Finance
-    // 20M - 100M: Project Manager -> Finance Manager
-    // > 100M: Project Manager -> Finance Manager -> CEO
-    let approvalLevel: 'site_manager_and_finance' | 'project_and_finance' | 'ceo_full' =
-      'site_manager_and_finance';
-    if (amount > 100_000_000) {
-      approvalLevel = 'ceo_full';
-    } else if (amount > 20_000_000) {
-      approvalLevel = 'project_and_finance';
-    }
 
     const expNumber = getNextSequentialDocNumber(
       existingExpenses.map((e) => e.expenseNumber),
@@ -187,10 +178,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       invoiceDate,
       description,
       paymentMethod,
-      attachments,
+      costCenterId: targetAccount.costCenterId,
       status: 'pending_approval',
-      approvalLevelRequired: approvalLevel,
-      currentApprovalStep: 'مدیر مالی',
+      // Set from the stored thresholds and approval chains when the workflow accepts the expense.
+      approvalLevelRequired: 'site_manager_and_finance',
+      currentApprovalStep: 'سرپرست کارگاه',
       approvalHistory: [
         {
           level: 'ثبت اولیه',
@@ -213,7 +205,29 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       accountingAccountName: `هزینه ${selectedCategory} کارگاهی`,
     };
 
-    onSaveExpense(newExpense);
+    // Attachments are archived in the document center and linked to the expense.
+    const docs: Omit<AppDocument, 'links'>[] = attachments.map((a) => ({
+      id: generateUUID(),
+      title: `فاکتور ${invoiceNumber || expNumber} - ${description}`,
+      type: 'فاکتور هزینه تنخواه',
+      fileName: a.name,
+      docNumber: invoiceNumber || expNumber,
+      date: invoiceDate || date,
+      fileFormat: a.type === 'image' ? 'JPG' : 'PDF',
+      fileSize: a.size || '-',
+      version: '1.0',
+      status: 'معتبر و جاری',
+      confidentiality: 'عادی',
+      registeredBy: currentUser.name,
+      tags: ['تنخواه', selectedCategory],
+      description,
+      url: a.url,
+    }));
+    const result = onSaveExpense(newExpense, docs);
+    if (!result.ok) {
+      setFormError(result.message);
+      return;
+    }
     onClose();
   };
 

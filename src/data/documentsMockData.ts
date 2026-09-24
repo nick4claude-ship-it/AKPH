@@ -13,20 +13,10 @@ const isDev = (): boolean => {
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type DocumentCategory =
-  | 'قرارداد اصلی کارفرما'
-  | 'قرارداد پیمانکار جزء'
-  | 'صورت‌وضعیت کارفرما'
-  | 'صورت‌وضعیت پیمانکار جزء'
-  | 'فاکتور خرید تأمین‌کننده'
-  | 'نامه و مکاتبات رسمی'
-  | 'صورتجلسه کارگاهی'
-  | 'نقشه اجرایی و ازبیلت'
-  | 'گزارش کنترل کیفیت و آزمایشگاه'
-  | 'ضمانت‌نامه بانکی'
-  | 'رسید و سند مالی';
+import type { DocumentCategory } from '../types';
 
-export interface SystemDocument {
+/** Seed format of the legacy document register; converted to linked Documents in the store. */
+export interface SeedDocument {
   id: string;
   docNumber: string;
   title: string;
@@ -53,7 +43,7 @@ export interface SystemDocument {
   description: string;
 }
 
-const rawSystemDocuments: SystemDocument[] = [
+const rawSystemDocuments: SeedDocument[] = [
   {
     id: 'doc-001',
     costCenterId: 'cc-prj101-01',
@@ -254,4 +244,4 @@ const rawSystemDocuments: SystemDocument[] = [
   },
 ];
 
-export const mockSystemDocuments: SystemDocument[] = isDev() ? rawSystemDocuments : [];
+export const mockSystemDocuments: SeedDocument[] = isDev() ? rawSystemDocuments : [];

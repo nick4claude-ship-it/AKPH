@@ -311,6 +311,7 @@ export const mockChartOfAccounts: AccountNode[] = [
             turnoverCredit: 0,
             children: [
               { code: '41301', title: 'اضافات انبارگردانی', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+              { code: '41302', title: 'سایر درآمدهای متفرقه', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
         ],

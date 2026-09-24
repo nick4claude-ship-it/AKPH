@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { GoodsReceiptNote, StoreIssueVoucher } from '../../types';
 import {
   X,
@@ -21,14 +21,28 @@ interface InventoryDocumentModalProps {
   receipt: GoodsReceiptNote | null;
   issue: StoreIssueVoucher | null;
   onClose: () => void;
+  /** Warehouse operations on the document (reservation, confirmation, returns). */
+  onConfirmIssue?: (issueId: string) => void;
+  onReleaseIssue?: (issueId: string) => void;
+  onReturnFromProject?: (issueId: string, materialId: string, qty: number, reason: string) => void;
+  onReturnToSupplier?: (grnId: string, materialId: string, qty: number, reason: string) => void;
 }
 
 export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
   receipt,
   issue,
   onClose,
+  onConfirmIssue,
+  onReleaseIssue,
+  onReturnFromProject,
+  onReturnToSupplier,
 }) => {
+  const [returnMaterialId, setReturnMaterialId] = useState('');
+  const [returnQty, setReturnQty] = useState('');
+  const [returnReason, setReturnReason] = useState('');
   if (!receipt && !issue) return null;
+  const lines = receipt ? receipt.items.map((i) => ({ id: i.materialId, name: i.materialName, qty: i.acceptedQty })) : issue!.items.map((i) => ({ id: i.materialId, name: i.materialName, qty: i.issuedQty }));
+  const canReturn = receipt ? Boolean(onReturnToSupplier) : issue?.status === 'خروج قطعی از انبار' && Boolean(onReturnFromProject);
 
   const handlePrint = () => {
     window.print();
@@ -59,6 +73,48 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        {/* Warehouse operations */}
+        <div className="px-6 py-3 border-b border-slate-200 bg-white flex flex-wrap items-center gap-2 text-xs no-print">
+          {issue && issue.status !== 'خروج قطعی از انبار' && (
+            <>
+              <span className="text-amber-700 font-bold">کالای این حواله رزرو شده است.</span>
+              <button onClick={() => onConfirmIssue?.(issue.id)} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold cursor-pointer">
+                تأیید خروج و ثبت هزینه پروژه
+              </button>
+              <button onClick={() => onReleaseIssue?.(issue.id)} className="px-3 py-1.5 rounded-lg border border-slate-300 cursor-pointer">
+                لغو و آزادسازی رزرو
+              </button>
+            </>
+          )}
+          {canReturn && (
+            <>
+              <span className="font-bold text-slate-700">{receipt ? 'برگشت به تأمین‌کننده:' : 'برگشت کالا از پروژه به انبار:'}</span>
+              <select value={returnMaterialId} onChange={(e) => setReturnMaterialId(e.target.value)} className="p-1.5 rounded border border-slate-300">
+                <option value="">— کالا —</option>
+                {lines.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} ({l.qty.toLocaleString('fa-IR')})
+                  </option>
+                ))}
+              </select>
+              <input value={returnQty} onChange={(e) => setReturnQty(e.target.value.replace(/[^\d.]/g, ''))} placeholder="مقدار" className="w-20 p-1.5 rounded border border-slate-300 font-mono" />
+              <input value={returnReason} onChange={(e) => setReturnReason(e.target.value)} placeholder="علت" className="w-40 p-1.5 rounded border border-slate-300" />
+              <button
+                disabled={!returnMaterialId || !Number(returnQty)}
+                onClick={() => {
+                  const why = returnReason || (receipt ? 'مغایرت کیفی' : 'مازاد مصرف');
+                  if (receipt) onReturnToSupplier?.(receipt.id, returnMaterialId, Number(returnQty), why);
+                  else onReturnFromProject?.(issue!.id, returnMaterialId, Number(returnQty), why);
+                  setReturnQty('');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold disabled:opacity-40 cursor-pointer"
+              >
+                ثبت برگشت
+              </button>
+            </>
+          )}
         </div>
 
         {/* Printable Official Document Body */}

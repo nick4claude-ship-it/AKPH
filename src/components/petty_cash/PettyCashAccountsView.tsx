@@ -25,6 +25,8 @@ import {
   Project,
   BankAccount,
 } from '../../types';
+import { PettyCashFundType } from '../../types';
+import { useAppState } from '../../store/AppStore';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { generateUUID } from '../../utils/ids';
 
@@ -55,6 +57,7 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
   onOpenReplenish,
   onOpenReplenishRequest,
 }) => {
+  const { costCenters } = useAppState();
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
 
@@ -68,7 +71,7 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
     projectId: projects[0]?.id || '',
     ceilingLimit: 100_000_000,
     minBalanceWarning: 30_000_000,
-    sourceBankAccountId: bankAccounts[0]?.id || '',
+    sourceBankAccountId: '',
     startDate: '۱۴۰۳/۰۷/۰۱',
     notes: '',
   });
@@ -93,8 +96,19 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
     const linkedProject = projects.find((p) => p.id === formData.projectId);
     const linkedBank = bankAccounts.find((b) => b.id === formData.sourceBankAccountId);
 
+    // One project can hold several funds; the holder role decides the fund type and its stored limits.
+    const fundType: PettyCashFundType =
+      formData.holderRole === 'مدیر پروژه'
+        ? 'project_manager'
+        : formData.holderRole === 'مسئول خرید و کارپرداز'
+          ? 'procurement'
+          : formData.holderRole === 'واحد اداری و ستادی'
+            ? 'headquarters'
+            : 'site_supervisor';
+    const costCenter = costCenters.find((c) => c.projectId === formData.projectId && c.type === 'کارگاه پروژه');
     const newAccount: PettyCashAccount = {
       id: generateUUID(),
+      fundType,
       code: formData.code,
       title: formData.title,
       holderName: formData.holderName,
@@ -102,8 +116,8 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
       holderPhone: formData.holderPhone,
       projectId: formData.projectId,
       projectName: linkedProject ? linkedProject.name : 'ستاد مرکزی',
-      costCenterId: `cc-${formData.projectId}`,
-      costCenterName: `مرکز هزینه ${formData.title}`,
+      costCenterId: costCenter?.id || '',
+      costCenterName: costCenter?.name || 'ستاد مرکزی',
       ceilingLimit: Number(formData.ceilingLimit),
       minBalanceWarning: Number(formData.minBalanceWarning),
       actualBalance: 0,
