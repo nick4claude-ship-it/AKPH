@@ -91,7 +91,7 @@ export function emptyState(): AppState {
     pettyCashReconciliations: [],
     pettyCashCategories: [],
     financeSettings: DEFAULT_FINANCE_SETTINGS,
-    dismissedNotificationIds: [],
+    dismissedNotificationIds: {},
   };
 }
 

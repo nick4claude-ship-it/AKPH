@@ -263,7 +263,8 @@ export function selectPaymentSchedule(state: AppState): { rows: ScheduledPayment
 // Notification center (computed; only dismissals are stored)
 // =============================================================================
 
-export function selectNotifications(state: AppState, includeDismissed = false): ManagementAlert[] {
+/** Alerts computed from data; `userId` hides what that user dismissed. */
+export function selectNotifications(state: AppState, includeDismissed = false, userId?: string): ManagementAlert[] {
   const out: ManagementAlert[] = [];
   const t = todayIndex();
   const todayStr = toPersianDate(new Date());
@@ -373,7 +374,7 @@ export function selectNotifications(state: AppState, includeDismissed = false): 
   }
 
   const rank = { critical: 0, warning: 1, info: 2 } as const;
-  const dismissed = new Set(state.dismissedNotificationIds);
+  const dismissed = new Set(userId ? state.dismissedNotificationIds[userId] || [] : []);
   return out.filter((n) => includeDismissed || !dismissed.has(n.id)).sort((a, b) => rank[a.priority] - rank[b.priority]);
 }
 

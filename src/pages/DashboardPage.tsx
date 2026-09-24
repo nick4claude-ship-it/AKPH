@@ -20,6 +20,8 @@ import { selectKpiItems, selectMonthlyFinancialTrend, selectExpenseCategoryTotal
 import { selectApprovals, selectNotifications, selectPettyFunds } from '../store/domainSelectors';
 import { useApprovalActions } from '../store/useApprovalActions';
 import { ApprovalItem, Project, TimeRange } from '../types';
+import { useDismissedNotifications } from '../store/notifications';
+import { useCurrentUser } from '../store/session';
 
 /** Where each dashboard quick action is performed; the dashboard itself records nothing. */
 const QUICK_ACTION_PATHS: Record<string, string> = {
@@ -56,7 +58,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 }) => {
   const state = useAppState();
   const navigate = useNavigate();
-  const [, setDismissed] = useStoreSlice('dismissedNotificationIds');
+  const [, setDismissed] = useDismissedNotifications();
+  const user = useCurrentUser();
   const { approve, reject } = useApprovalActions();
   const inScope = <T extends { projectId?: string }>(rows: T[]) =>
     selectedProjectId === 'all' ? rows : rows.filter((r) => r.projectId === selectedProjectId);
@@ -65,7 +68,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const trend = useMemo(() => selectMonthlyFinancialTrend(state, 7, selectedProjectId), [state, selectedProjectId]);
   const expenses = useMemo(() => selectExpenseCategoryTotals(state, selectedProjectId), [state, selectedProjectId]);
   const approvals = useMemo(() => inScope(selectApprovals(state)), [state, selectedProjectId]);
-  const notifications = useMemo(() => inScope(selectNotifications(state).map((n) => ({ ...n, projectId: n.relatedProjectId }))), [state, selectedProjectId]);
+  const notifications = useMemo(() => inScope(selectNotifications(state, false, user.id).map((n) => ({ ...n, projectId: n.relatedProjectId }))), [state, selectedProjectId, user.id]);
   const funds = useMemo(() => inScope(selectPettyFunds(state).filter((f) => f.status === 'active')), [state, selectedProjectId]);
   const statements = inScope(state.clientStatements);
   const visibleProjects = selectedProjectId === 'all' ? projects : projects.filter((p) => p.id === selectedProjectId);

@@ -6,6 +6,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import { AppAction, AppState, FinancialEventInput, PostingResult, SliceKey, SliceUpdater } from './types';
 import { applyPosting, preparePosting } from './postingEngine';
+import { SaveQueue } from './saveQueue';
 import type { DataSource, StoreChange } from '../api/types';
 import { isFinalJournalEntry } from '../api/types';
 import type { JournalEntry, UserProfile } from '../types';
@@ -58,40 +59,7 @@ function isServerAllowed(action: AppAction): boolean {
 
 const AppStoreContext = createContext<AppStoreValue | null>(null);
 
-type Row = Record<string, unknown> & { id?: string };
-
-/**
- * Differences between two committed states (demo data source only). A change to a final journal entry is
- * never saved: final entries are immutable and corrected only by a reversal entry.
- */
-export function diffStates(prev: AppState, next: AppState): StoreChange[] {
-  const changes: StoreChange[] = [];
-  for (const key of Object.keys(next) as SliceKey[]) {
-    const a = prev[key] as unknown;
-    const b = next[key] as unknown;
-    if (a === b) continue;
-    if (!Array.isArray(b) || !(b as Row[]).every((r) => r && typeof r === 'object' && typeof r.id === 'string')) {
-      changes.push({ slice: key, replaceWith: b });
-      continue;
-    }
-    const before = new Map(((a as Row[]) || []).map((r) => [r.id as string, r]));
-    let upserted = (b as Row[]).filter((r) => before.get(r.id as string) !== r);
-    if (key === 'journalEntries') {
-      upserted = upserted.filter((r) => {
-        const old = before.get(r.id as string) as JournalEntry | undefined;
-        if (old && isFinalJournalEntry(old)) {
-          console.error(`[Ledger] سند قطعی ${old.docNumber} قابل ویرایش نیست؛ اصلاح فقط با سند معکوس ممکن است.`);
-          return false;
-        }
-        return true;
-      });
-    }
-    const nextIds = new Set((b as Row[]).map((r) => r.id as string));
-    const removedIds = [...before.keys()].filter((id) => !nextIds.has(id));
-    if (upserted.length || removedIds.length) changes.push({ slice: key, upserted, removedIds });
-  }
-  return changes;
-}
+export { diffStates } from './saveQueue';
 
 /** Slices that only hold per-browser UI state; they may change locally even when the server owns the data. */
 const LOCAL_ONLY_SLICES: ReadonlySet<SliceKey> = new Set<SliceKey>(['dismissedNotificationIds']);
@@ -119,27 +87,36 @@ export const AppStoreProvider: React.FC<{
   const onSyncErrorRef = useRef(onSyncError);
   onSyncErrorRef.current = onSyncError;
 
-  const flush = useCallback(async () => {
-    if (!dataSource?.saveChanges) return;
-    const target = latest.current;
-    const changes = diffStates(lastSaved.current, target);
-    lastSaved.current = target;
-    try {
-      if (changes.length) await dataSource.saveChanges(changes);
-    } catch (err) {
-      const farsi = (err as { farsiMessage?: string })?.farsiMessage;
-      onSyncErrorRef.current?.(farsi || 'ذخیره تغییرات در سرور انجام نشد.');
-    }
-  }, [dataSource]);
+  // One queue per provider: saves are serial, confirmed before they count, retried, and rolled back on failure.
+  const queue = useRef<SaveQueue | null>(null);
+  if (!queue.current && dataSource?.saveChanges) {
+    const save = dataSource.saveChanges.bind(dataSource);
+    queue.current = new SaveQueue({
+      save,
+      getSaved: () => lastSaved.current,
+      setSaved: (s) => {
+        lastSaved.current = s;
+      },
+      getLatest: () => latest.current,
+      rollback: (to, err) => {
+        latest.current = to;
+        lastSaved.current = to;
+        commit(to);
+        const farsi = (err as { farsiMessage?: string })?.farsiMessage;
+        onSyncErrorRef.current?.(`${farsi || 'ذخیره تغییرات در سرور انجام نشد.'} تغییرات ذخیره‌نشده برگردانده شد.`);
+      },
+    });
+  }
+  const flush = useCallback(() => queue.current?.flush(), []);
 
   // Saves are batched per tick: one handler that touches several slices produces one round-trip.
   const scheduleSave = useCallback(() => {
-    if (!dataSource || saveTimer.current !== null) return;
+    if (!queue.current || saveTimer.current !== null) return;
     saveTimer.current = window.setTimeout(() => {
       saveTimer.current = null;
       flush();
     }, 0);
-  }, [dataSource, flush]);
+  }, [flush]);
 
   const dispatch = useCallback(
     (action: AppAction) => {

@@ -109,7 +109,7 @@ export default function App() {
   const { approve } = useApprovalActions();
   const projects = useMemo(() => selectProjects(appState), [appState]);
   const sidebarCounts = useMemo(() => selectSidebarCounts(appState), [appState]);
-  const notifications = useMemo(() => selectNotifications(appState), [appState]);
+  const notifications = useMemo(() => selectNotifications(appState, false, session.user.id), [appState, session.user.id]);
   const approvals = useMemo(() => selectApprovals(appState), [appState]);
   const kpis = useMemo(() => selectKpiItems(appState), [appState]);
   const funds = useMemo(() => selectPettyFunds(appState), [appState]);
@@ -161,6 +161,11 @@ export default function App() {
       />
 
       <div className={`flex-1 transition-all duration-300 flex flex-col min-h-screen ${sidebarCollapsed ? 'mr-20' : 'mr-68'}`}>
+        {isDemoData && (
+          <div className="bg-amber-400 text-slate-950 text-xs font-bold text-center py-1.5 px-4" role="status">
+            نسخه نمایشی — اطلاعات با تازه‌کردن صفحه پاک می‌شود
+          </div>
+        )}
         <Header
           title={pageTitle}
           subtitle="سامانه مدیریت جامع پیمانکاری و ساخت‌وساز · شرکت سازه گستران پارس"

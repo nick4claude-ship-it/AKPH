@@ -10,6 +10,7 @@ import { useAppState, useStoreSlice } from '../store/AppStore';
 import { selectNotifications } from '../store/domainSelectors';
 import { NotificationKind, AlertPriority } from '../types';
 import { formatCurrencyCompact } from '../utils/formatters';
+import { useDismissedNotifications } from '../store/notifications';
 
 const KIND_LABELS: Record<NotificationKind, string> = {
   low_stock: 'موجودی پایین انبار',
@@ -31,7 +32,7 @@ const PRIORITY_STYLE: Record<AlertPriority, { icon: typeof Info; box: string; ba
 export const NotificationCenterPage: React.FC = () => {
   const state = useAppState();
   const navigate = useNavigate();
-  const [dismissed, setDismissed] = useStoreSlice('dismissedNotificationIds');
+  const [dismissed, setDismissed] = useDismissedNotifications();
   const [kind, setKind] = useState<NotificationKind | 'all'>('all');
   const [showDismissed, setShowDismissed] = useState(false);
 

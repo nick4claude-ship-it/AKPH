@@ -113,7 +113,8 @@ export interface AppState {
   pettyCashCategories: PettyCashCategoryItem[];
   financeSettings: FinanceSettings;
   /** Only dismissals are stored; notifications themselves are computed from data. */
-  dismissedNotificationIds: string[];
+  /** Notifications each user has dismissed (per user id). */
+  dismissedNotificationIds: Record<string, string[]>;
 }
 
 export type SliceKey = keyof AppState;
