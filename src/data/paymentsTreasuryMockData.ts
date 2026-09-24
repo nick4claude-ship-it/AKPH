@@ -1,0 +1,349 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export type PaymentSourceType =
+  | 'صورت‌وضعیت پیمانکار جزء'
+  | 'فاکتور خرید تأمین‌کننده'
+  | 'شارژ و تسویه تنخواه'
+  | 'حقوق و دستمزد ماهانه'
+  | 'پیش‌پرداخت خرید'
+  | 'حق بیمه و مالیات'
+  | 'سایر هزینه‌های عمومی';
+
+export type PaymentMethodType =
+  | 'حواله ساتنا'
+  | 'حواله پایا'
+  | 'چک صیادی بانکی'
+  | 'کارت به کارت'
+  | 'صندوق نقد'
+  | 'تهاتر ملکی/خدماتی';
+
+export interface PaymentRequest {
+  id: string;
+  requestNumber: string;
+  sourceType: PaymentSourceType;
+  sourceRefId: string; // e.g. statement id, po id, invoice id
+  sourceRefNumber: string;
+  date: string;
+  dueDate: string;
+  projectId: string;
+  projectName: string;
+  costCenterId: string;
+  beneficiaryName: string; // دریافت‌کننده وجه
+  beneficiaryType: 'پیمانکار جزء' | 'تأمین‌کننده' | 'مسئول تنخواه' | 'پرسنل' | 'سازمان تامین اجتماعی' | 'سازمان امور مالیاتی';
+  beneficiaryAccount: {
+    bankName: string;
+    shebaNumber: string;
+    accountNumber: string;
+  };
+  totalAmount: number;
+  approvedAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  priority: 'فوری / بحرانی' | 'عادی' | 'پایین';
+  status: 'پیش‌نویس' | 'در انتظار تأیید مالی' | 'تأیید مدیرعامل' | 'در صف پرداخت خزانه' | 'پرداخت شده' | 'رد شده';
+  approvedBy?: string;
+  approvedDate?: string;
+  paymentMethod?: PaymentMethodType;
+  payerBankAccountId?: string;
+  payerBankAccountName?: string;
+  paymentDate?: string;
+  trackingNumber?: string;
+  journalEntryId?: string;
+  notes?: string;
+}
+
+export interface TreasuryCheck {
+  id: string;
+  checkType: 'صادره (پرداختی)' | 'وارده (دریافتی)';
+  sayadNumber: string; // شناسه صیاد ۱۶ رقمی
+  checkNumber: string;
+  bankName: string;
+  branch: string;
+  amount: number;
+  issueDate: string;
+  dueDate: string;
+  drawer: string; // صادرکننده
+  payee: string; // در وجه
+  projectId?: string;
+  projectName?: string;
+  relatedDocNumber?: string;
+  status: 'در جریان وصول/سررسید' | 'پاس شده و تسویه' | 'برگشت خورده' | 'ابطال شده' | 'واگذار شده';
+  clearedDate?: string;
+}
+
+export interface CashDesk {
+  id: string;
+  code: string;
+  title: string;
+  keeperName: string;
+  projectId: string;
+  projectName: string;
+  balance: number;
+  ceilingLimit: number;
+  location: string;
+  lastAuditDate: string;
+}
+
+export const mockPaymentRequests: PaymentRequest[] = [
+  {
+    id: 'pr-101',
+    requestNumber: 'PR-1403-0701',
+    sourceType: 'صورت‌وضعیت پیمانکار جزء',
+    sourceRefId: 'sub-st-01',
+    sourceRefNumber: 'SUB-ST-RONIKA-03',
+    date: '۱۴۰۳/۰۶/۲۸',
+    dueDate: '۱۴۰۳/۰۷/۱۰',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    costCenterId: 'CC-101',
+    beneficiaryName: 'شرکت آرمان بتن سازه (پیمانکار اسکلت)',
+    beneficiaryType: 'پیمانکار جزء',
+    beneficiaryAccount: {
+      bankName: 'بانک ملت',
+      shebaNumber: 'IR890120000000004819203948',
+      accountNumber: '4819203948',
+    },
+    totalAmount: 480_000_000,
+    approvedAmount: 480_000_000,
+    paidAmount: 300_000_000,
+    remainingAmount: 180_000_000,
+    priority: 'عادی',
+    status: 'در صف پرداخت خزانه',
+    approvedBy: 'مهندس محمدرضا رادمنش (مدیرعامل)',
+    approvedDate: '۱۴۰۳/۰۷/۰۱',
+    paymentMethod: 'حواله ساتنا',
+    payerBankAccountId: 'bnk-01',
+    payerBankAccountName: 'بانک ملت - جاری مرکزی (جام)',
+    notes: 'قسط اول به مبلغ ۳۰۰ میلیون تومان واریز شد. مانده ۱۸۰ میلیون تومان طبق تفاهم‌نامه پرداخت شود.',
+  },
+  {
+    id: 'pr-102',
+    requestNumber: 'PR-1403-0702',
+    sourceType: 'فاکتور خرید تأمین‌کننده',
+    sourceRefId: 'inv-101',
+    sourceRefNumber: 'INV-1403-091',
+    date: '۱۴۰۳/۰۶/۲۵',
+    dueDate: '۱۴۰۳/۰۷/۰۵',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    costCenterId: 'CC-101',
+    beneficiaryName: 'شرکت سهامی ذوب‌آهن اصفهان',
+    beneficiaryType: 'تأمین‌کننده',
+    beneficiaryAccount: {
+      bankName: 'بانک تجارت',
+      shebaNumber: 'IR450180000000001849204812',
+      accountNumber: '1849204812',
+    },
+    totalAmount: 1_250_000_000,
+    approvedAmount: 1_250_000_000,
+    paidAmount: 0,
+    remainingAmount: 1_250_000_000,
+    priority: 'فوری / بحرانی',
+    status: 'تأیید مدیرعامل',
+    approvedBy: 'مهندس محمدرضا رادمنش (مدیرعامل)',
+    approvedDate: '۱۴۰۳/۰۷/۰۲',
+    paymentMethod: 'چک صیادی بانکی',
+    notes: 'خرید ۳۵ تن میلگرد A3 سایز ۲۰ و ۲۲. حواله بارگیری مشروط به تسویه است.',
+  },
+  {
+    id: 'pr-103',
+    requestNumber: 'PR-1403-0703',
+    sourceType: 'شارژ و تسویه تنخواه',
+    sourceRefId: 'pc-03',
+    sourceRefNumber: 'PC-NILOUFAR-004',
+    date: '۱۴۰۳/۰۷/۰۱',
+    dueDate: '۱۴۰۳/۰۷/۰۲',
+    projectId: 'prj-103',
+    projectName: 'مجتمع مسکونی نیلوفر (۱۲۰ واحدی)',
+    costCenterId: 'CC-103',
+    beneficiaryName: 'مهندس مهران پورحسینی (تنخواه‌دار کارگاه)',
+    beneficiaryType: 'مسئول تنخواه',
+    beneficiaryAccount: {
+      bankName: 'بانک پاسارگاد',
+      shebaNumber: 'IR720540000000003849102948',
+      accountNumber: '3849102948',
+    },
+    totalAmount: 30_000_000,
+    approvedAmount: 30_000_000,
+    paidAmount: 0,
+    remainingAmount: 30_000_000,
+    priority: 'فوری / بحرانی',
+    status: 'در انتظار تأیید مالی',
+    paymentMethod: 'کارت به کارت',
+    notes: 'شارژ فوری کارگاه به دلیل اتمام نقدینگی و خرید اتصالات پایانی تاسیسات.',
+  },
+  {
+    id: 'pr-104',
+    requestNumber: 'PR-1403-0704',
+    sourceType: 'حقوق و دستمزد ماهانه',
+    sourceRefId: 'pay-005',
+    sourceRefNumber: 'PAY-140306-BATCH',
+    date: '۱۴۰۳/۰۶/۳۰',
+    dueDate: '۱۴۰۳/۰۷/۰۵',
+    projectId: 'all',
+    projectName: 'کلیه پروژه‌ها و ستاد',
+    costCenterId: 'CC-HQ-100',
+    beneficiaryName: 'بانک رفاه کارگران (لیست حقوق پرسنل)',
+    beneficiaryType: 'پرسنل',
+    beneficiaryAccount: {
+      bankName: 'بانک رفاه کارگران',
+      shebaNumber: 'IR130130000000009182039481',
+      accountNumber: '9182039481',
+    },
+    totalAmount: 435_000_000,
+    approvedAmount: 435_000_000,
+    paidAmount: 435_000_000,
+    remainingAmount: 0,
+    priority: 'فوری / بحرانی',
+    status: 'پرداخت شده',
+    approvedBy: 'مهندس محمدرضا رادمنش (مدیرعامل)',
+    approvedDate: '۱۴۰۳/۰۶/۳۱',
+    paymentMethod: 'حواله پایا',
+    payerBankAccountId: 'bnk-01',
+    payerBankAccountName: 'بانک ملت - جاری مرکزی (جام)',
+    paymentDate: '۱۴۰۳/۰۷/۰۱',
+    trackingNumber: 'PAYA-891029481',
+    journalEntryId: 'DOC-1403-092',
+    notes: 'واریز گروهی حقوق شهریورماه پرسنل دفتر مرکزی و سرپرستان کارگاه.',
+  },
+  {
+    id: 'pr-105',
+    requestNumber: 'PR-1403-0705',
+    sourceType: 'صورت‌وضعیت پیمانکار جزء',
+    sourceRefId: 'sub-st-02',
+    sourceRefNumber: 'SUB-ST-FAJR-02',
+    date: '۱۴۰۳/۰۷/۰۲',
+    dueDate: '۱۴۰۳/۰۷/۱۵',
+    projectId: 'prj-102',
+    projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
+    costCenterId: 'CC-102',
+    beneficiaryName: 'پیمانکاری برق و تاسیسات نیروگستر',
+    beneficiaryType: 'پیمانکار جزء',
+    beneficiaryAccount: {
+      bankName: 'بانک صادرات',
+      shebaNumber: 'IR320190000000009281039481',
+      accountNumber: '9281039481',
+    },
+    totalAmount: 185_000_000,
+    approvedAmount: 185_000_000,
+    paidAmount: 0,
+    remainingAmount: 185_000_000,
+    priority: 'عادی',
+    status: 'در انتظار تأیید مالی',
+    notes: 'صورت‌وضعیت کابل‌کشی و روشنایی پل اصلی تقاطع فجر.',
+  },
+];
+
+export const mockTreasuryChecks: TreasuryCheck[] = [
+  {
+    id: 'chk-01',
+    checkType: 'صادره (پرداختی)',
+    sayadNumber: '3109482910394812',
+    checkNumber: '891048',
+    bankName: 'بانک ملت',
+    branch: 'مرکزی',
+    amount: 1_200_000_000,
+    issueDate: '۱۴۰۳/۰۶/۱۰',
+    dueDate: '۱۴۰۳/۰۷/۲۰',
+    drawer: 'شرکت سازه گستران پارس',
+    payee: 'شرکت سهامی ذوب‌آهن اصفهان',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    relatedDocNumber: 'PO-1403-088',
+    status: 'در جریان وصول/سررسید',
+  },
+  {
+    id: 'chk-02',
+    checkType: 'صادره (پرداختی)',
+    sayadNumber: '3109482910394813',
+    checkNumber: '891049',
+    bankName: 'بانک ملت',
+    branch: 'مرکزی',
+    amount: 450_000_000,
+    issueDate: '۱۴۰۳/۰۶/۱۵',
+    dueDate: '۱۴۰۳/۰۷/۱۵',
+    drawer: 'شرکت سازه گستران پارس',
+    payee: 'شرکت سیمان تهران',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    relatedDocNumber: 'PO-1403-092',
+    status: 'در جریان وصول/سررسید',
+  },
+  {
+    id: 'chk-03',
+    checkType: 'وارده (دریافتی)',
+    sayadNumber: '7829104928193847',
+    checkNumber: '394810',
+    bankName: 'بانک شهر',
+    branch: 'شهرداری مرکز',
+    amount: 4_500_000_000,
+    issueDate: '۱۴۰۳/۰۶/۲۰',
+    dueDate: '۱۴۰۳/۰۷/۳۰',
+    drawer: 'معاونت مالی و اقتصاد شهری شهرداری تهران',
+    payee: 'شرکت سازه گستران پارس',
+    projectId: 'prj-102',
+    projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
+    relatedDocNumber: 'ST-FAJR-07',
+    status: 'در جریان وصول/سررسید',
+  },
+  {
+    id: 'chk-04',
+    checkType: 'وارده (دریافتی)',
+    sayadNumber: '8920193847102938',
+    checkNumber: '192847',
+    bankName: 'بانک پاسارگاد',
+    branch: 'ساعی',
+    amount: 8_000_000_000,
+    issueDate: '۱۴۰۳/۰۵/۲۵',
+    dueDate: '۱۴۰۳/۰۶/۲۵',
+    drawer: 'شرکت سرمایه‌گذاری تابان',
+    payee: 'شرکت سازه گستران پارس',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    relatedDocNumber: 'ST-RONIKA-06',
+    status: 'پاس شده و تسویه',
+    clearedDate: '۱۴۰۳/۰۶/۲۶',
+  },
+];
+
+export const mockCashDesks: CashDesk[] = [
+  {
+    id: 'csh-01',
+    code: 'CSH-HQ',
+    title: 'صندوق نقدی دفتر مرکزی',
+    keeperName: 'آقای اصغر مرادی (مسئول تنخواه ستادی)',
+    projectId: 'all',
+    projectName: 'دفتر مرکزی',
+    balance: 85_000_000,
+    ceilingLimit: 100_000_000,
+    location: 'ساختمان مرکزی، طبقه سوم، اتاق مالی',
+    lastAuditDate: '۱۴۰۳/۰۶/۳۱',
+  },
+  {
+    id: 'csh-02',
+    code: 'CSH-RONIKA',
+    title: 'صندوق نقدی کارگاه برج رونیکا',
+    keeperName: 'مهندس وحید اکبری',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    balance: 42_000_000,
+    ceilingLimit: 80_000_000,
+    location: 'کانکس سرپرستی کارگاه رونیکا',
+    lastAuditDate: '۱۴۰۳/۰۶/۳۱',
+  },
+  {
+    id: 'csh-03',
+    code: 'CSH-FAJR',
+    title: 'صندوق کارگاه تقاطع فجر',
+    keeperName: 'مهندس کاظمی',
+    projectId: 'prj-102',
+    projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
+    balance: 38_000_000,
+    ceilingLimit: 60_000_000,
+    location: 'دفتر فنی کارگاه فجر',
+    lastAuditDate: '۱۴۰۳/۰۶/۲۸',
+  },
+];

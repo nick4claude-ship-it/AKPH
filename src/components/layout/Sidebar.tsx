@@ -17,6 +17,10 @@ import {
   ChevronLeft,
   LogOut,
   Sparkles,
+  CreditCard,
+  Briefcase,
+  ShieldCheck,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { UserProfile } from '../../types';
 
@@ -32,18 +36,19 @@ interface SidebarProps {
 
 export const navItems = [
   { id: 'dashboard', label: 'داشبورد مدیریتی', icon: LayoutDashboard, badge: 'زنده' },
-  { id: 'projects', label: 'پروژه‌ها', icon: Building2, count: '۵' },
-  { id: 'accounting', label: 'حسابداری', icon: Calculator },
-  { id: 'petty_cash', label: 'تنخواه گردان', icon: Coins, count: '۴' },
-  { id: 'statements', label: 'قرارداد و صورت‌وضعیت', icon: FileText, count: '۳' },
+  { id: 'projects', label: 'مدیریت پروژه‌ها', icon: Building2, count: '۵' },
+  { id: 'contracts', label: 'قراردادها (کارفرما و جزء)', icon: Briefcase, count: '۱۱' },
+  { id: 'statements', label: 'صورت‌وضعیت‌ها', icon: FileSpreadsheet, count: '۹' },
+  { id: 'procurement', label: 'بازرگانی و تدارکات', icon: ShoppingCart },
   { id: 'inventory', label: 'انبارداری و مصالح', icon: Warehouse, count: '۶' },
-  { id: 'procurement', label: 'خرید و تأمین‌کنندگان', icon: ShoppingCart },
-  { id: 'reports', label: 'گزارش‌ها', icon: BarChart3 },
-  { id: 'forms', label: 'فرم‌ها و چک‌لیست‌ها', icon: CheckSquare },
-  { id: 'payroll', label: 'حقوق و دستمزد', icon: Users },
-  { id: 'performance', label: 'سیستم عملکرد', icon: Award },
-  { id: 'documents', label: 'مدیریت اسناد', icon: FolderLock },
-  { id: 'settings', label: 'تنظیمات سامانه', icon: Settings },
+  { id: 'petty_cash', label: 'تنخواه گردان کارگاه‌ها', icon: Coins, count: '۴' },
+  { id: 'finance', label: 'خزانه‌داری و پرداخت‌ها', icon: CreditCard },
+  { id: 'accounting', label: 'حسابداری مالی', icon: Calculator },
+  { id: 'partners', label: 'شرکا و ذینفعان', icon: Users },
+  { id: 'payroll', label: 'پرسنل و حقوق دستمزد', icon: Award },
+  { id: 'documents', label: 'مرکز اسناد یکپارچه', icon: FolderLock },
+  { id: 'approvals', label: 'کارتابل مصوبات مدیریت', icon: ShieldCheck, badge: 'فوری' },
+  { id: 'reports', label: 'هوش تجاری و گزارشات', icon: BarChart3 },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({

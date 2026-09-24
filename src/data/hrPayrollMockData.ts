@@ -1,0 +1,589 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface Employee {
+  id: string;
+  personnelCode: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  nationalCode: string;
+  birthDate: string;
+  phone: string;
+  email: string;
+  role: string;
+  department: 'فنی و مهندسی' | 'مالی و اداری' | 'اجرایی کارگاه' | 'تدارکات و انبار' | 'مدیریت و کنترل پروژه' | 'HSE و ایمنی';
+  assignedProjectId: string;
+  assignedProjectName: string;
+  costCenterId: string;
+  hireDate: string;
+  contractType: 'پیمانی تمام‌وقت' | 'قراردادی موقت' | 'ساعتی/مشاوره‌ای' | 'کارگری روزمزد';
+  baseSalary: number; // حقوق پایه ماهانه
+  housingAllowance: number; // حق مسکن
+  foodAllowance: number; // بن خواروبار
+  childAllowance: number; // حق اولاد
+  specialSkillAllowance: number; // حق تخصص و کارگاهی
+  childrenCount: number;
+  maritalStatus: 'متاهل' | 'مجرد';
+  bankAccount: {
+    bankName: string;
+    shebaNumber: string;
+    accountNumber: string;
+  };
+  insuranceNumber: string;
+  status: 'فعال' | 'مرخصی بدون حقوق' | 'تسویه شده';
+}
+
+export interface MonthlyTimesheet {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  monthYear: string; // e.g. ۱۴۰۳/۰۶
+  projectId: string;
+  standardWorkDays: number;
+  actualWorkDays: number;
+  absentDays: number;
+  paidLeaveDays: number;
+  overtimeHours: number;
+  nightWorkHours: number;
+  holidayWorkHours: number;
+  missionDays: number;
+  status: 'تأیید سرپرست کارگاه' | 'تأیید مدیر پروژه' | 'تأیید منابع انسانی';
+}
+
+export interface PayrollSlip {
+  id: string;
+  slipNumber: string;
+  monthYear: string;
+  employeeId: string;
+  employeeName: string;
+  personnelCode: string;
+  role: string;
+  department: string;
+  projectId: string;
+  projectName: string;
+  costCenterId: string;
+  issueDate: string;
+
+  // Carried over
+  actualWorkDays: number;
+  overtimeHours: number;
+
+  // Earnings (مزایا و ناخالص حقوق)
+  baseSalaryGross: number;
+  housingAllowance: number;
+  foodAllowance: number;
+  childAllowance: number;
+  specialSkillAllowance: number;
+  overtimePay: number;
+  missionPay: number;
+  grossTotalSalary: number; // جمع ناخالص دریافتی
+
+  // Deductions (کسورات قانونی و اختیاری)
+  workerInsuranceDeduction: number; // سهم کارگر ۷٪
+  incomeTaxDeduction: number; // مالیات حقوق
+  loanDeduction: number; // مساعده یا وام پرسنلی
+  disciplinaryDeduction: number;
+  totalDeductions: number; // جمع کسورات
+
+  // Net Pay (خالص پرداختی)
+  netPayableSalary: number;
+
+  // Employer Contributions (سهم کارفرما برای سند حسابداری)
+  employerInsuranceContribution: number; // سهم کارفرما ۲۳٪ (۲۰٪ تامین اجتماعی + ۳٪ بیمه بیکاری)
+  totalCostForCompany: number; // هزینه تمام‌شده پرسنل برای پروژه (Gross + Employer Insurance)
+
+  // Financial status
+  status: 'محاسبه شده' | 'تأیید مالی' | 'صادر شده جهت پرداخت' | 'پرداخت شده';
+  journalEntryId?: string;
+  paymentRequestId?: string;
+}
+
+export const mockEmployees: Employee[] = [
+  {
+    id: 'emp-001',
+    personnelCode: 'EMP-1001',
+    firstName: 'محمدرضا',
+    lastName: 'رادمنش',
+    fullName: 'مهندس محمدرضا رادمنش',
+    nationalCode: '۰۰۶۲۹۱۸۴۷۱',
+    birthDate: '۱۳۵۲/۰۴/۱۵',
+    phone: '۰۹۱۲۱۱۱۰۰۹۹',
+    email: 'm.radmanesh@pars-structures.ir',
+    role: 'مدیرعامل و عضو هیئت مدیره',
+    department: 'مدیریت و کنترل پروژه',
+    assignedProjectId: 'all',
+    assignedProjectName: 'دفتر مرکزی و ستاد',
+    costCenterId: 'CC-HQ-100',
+    hireDate: '۱۳۹۵/۰۱/۰۱',
+    contractType: 'پیمانی تمام‌وقت',
+    baseSalary: 65_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 10_000_000,
+    specialSkillAllowance: 40_000_000,
+    childrenCount: 2,
+    maritalStatus: 'متاهل',
+    bankAccount: {
+      bankName: 'بانک ملت',
+      shebaNumber: 'IR890120000000003891048102',
+      accountNumber: '3891048102',
+    },
+    insuranceNumber: '48291039',
+    status: 'فعال',
+  },
+  {
+    id: 'emp-002',
+    personnelCode: 'EMP-1002',
+    firstName: 'هادی',
+    lastName: 'صمدیان',
+    fullName: 'دکتر هادی صمدیان',
+    nationalCode: '۰۰۷۱۸۲۹۳۸۱',
+    birthDate: '۱۳۵۸/۰۸/۲۲',
+    phone: '۰۹۱۲۲۲۲۹۹۳۳',
+    email: 'h.samadian@pars-structures.ir',
+    role: 'مدیر مالی و اداری',
+    department: 'مالی و اداری',
+    assignedProjectId: 'all',
+    assignedProjectName: 'دفتر مرکزی و ستاد',
+    costCenterId: 'CC-HQ-100',
+    hireDate: '۱۳۹۷/۰۳/۰۱',
+    contractType: 'پیمانی تمام‌وقت',
+    baseSalary: 45_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 5_000_000,
+    specialSkillAllowance: 25_000_000,
+    childrenCount: 1,
+    maritalStatus: 'متاهل',
+    bankAccount: {
+      bankName: 'بانک تجارت',
+      shebaNumber: 'IR450180000000004928103948',
+      accountNumber: '4928103948',
+    },
+    insuranceNumber: '59281029',
+    status: 'فعال',
+  },
+  {
+    id: 'emp-003',
+    personnelCode: 'EMP-1003',
+    firstName: 'کیارش',
+    lastName: 'نادری',
+    fullName: 'مهندس کیارش نادری',
+    nationalCode: '۰۰۵۳۹۱۸۲۷۳',
+    birthDate: '۱۳۶۳/۱۱/۱۰',
+    phone: '۰۹۱۲۳۳۳۴۴۵۵',
+    email: 'k.naderi@pars-structures.ir',
+    role: 'مدیر پروژه برج رونیکا',
+    department: 'فنی و مهندسی',
+    assignedProjectId: 'prj-101',
+    assignedProjectName: 'برج تجاری-اداری رونیکا',
+    costCenterId: 'CC-101',
+    hireDate: '۱۴۰۰/۰۲/۱۵',
+    contractType: 'پیمانی تمام‌وقت',
+    baseSalary: 38_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 5_000_000,
+    specialSkillAllowance: 20_000_000,
+    childrenCount: 1,
+    maritalStatus: 'متاهل',
+    bankAccount: {
+      bankName: 'بانک صادرات',
+      shebaNumber: 'IR320190000000001928471029',
+      accountNumber: '1928471029',
+    },
+    insuranceNumber: '68291034',
+    status: 'فعال',
+  },
+  {
+    id: 'emp-004',
+    personnelCode: 'EMP-1004',
+    firstName: 'بهمن',
+    lastName: 'کاظمی',
+    fullName: 'مهندس بهمن کاظمی',
+    nationalCode: '۰۳۸۱۷۲۹۳۸۱',
+    birthDate: '۱۳۶۵/۰۲/۰۵',
+    phone: '۰۹۱۲۵۵۵۶۶۷۷',
+    email: 'b.kazemi@pars-structures.ir',
+    role: 'مدیر پروژه تقاطع بزرگراه فجر',
+    department: 'اجرایی کارگاه',
+    assignedProjectId: 'prj-102',
+    assignedProjectName: 'تقاطع غیرهمسطح بزرگراه فجر',
+    costCenterId: 'CC-102',
+    hireDate: '۱۴۰۱/۰۷/۱۰',
+    contractType: 'پیمانی تمام‌وقت',
+    baseSalary: 35_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 10_000_000,
+    specialSkillAllowance: 18_000_000,
+    childrenCount: 2,
+    maritalStatus: 'متاهل',
+    bankAccount: {
+      bankName: 'بانک ملی',
+      shebaNumber: 'IR170170000000004928193847',
+      accountNumber: '4928193847',
+    },
+    insuranceNumber: '79182930',
+    status: 'فعال',
+  },
+  {
+    id: 'emp-005',
+    personnelCode: 'EMP-1005',
+    firstName: 'وحید',
+    lastName: 'اکبری',
+    fullName: 'مهندس وحید اکبری',
+    nationalCode: '۰۴۵۲۹۱۸۲۷۴',
+    birthDate: '۱۳۶۹/۰۶/۱۸',
+    phone: '۰۹۱۲۷۷۷۸۸۹۹',
+    email: 'v.akbari@pars-structures.ir',
+    role: 'سرپرست کارگاه و تنخواه‌دار رونیکا',
+    department: 'اجرایی کارگاه',
+    assignedProjectId: 'prj-101',
+    assignedProjectName: 'برج تجاری-اداری رونیکا',
+    costCenterId: 'CC-101',
+    hireDate: '۱۴۰۱/۰۹/۰۱',
+    contractType: 'قراردادی موقت',
+    baseSalary: 28_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 0,
+    specialSkillAllowance: 12_000_000,
+    childrenCount: 0,
+    maritalStatus: 'مجرد',
+    bankAccount: {
+      bankName: 'بانک سپه',
+      shebaNumber: 'IR560150000000009182736451',
+      accountNumber: '9182736451',
+    },
+    insuranceNumber: '89102834',
+    status: 'فعال',
+  },
+  {
+    id: 'emp-006',
+    personnelCode: 'EMP-1006',
+    firstName: 'سعید',
+    lastName: 'طاهری',
+    fullName: 'مهندس سعید طاهری',
+    nationalCode: '۰۰۳۲۹۱۸۲۷۴',
+    birthDate: '۱۳۷۰/۰۱/۳۰',
+    phone: '۰۹۱۲۸۸۸۹۹۰۰',
+    email: 's.taheri@pars-structures.ir',
+    role: 'سرپرست کارگاه ایستگاه گاز البرز',
+    department: 'اجرایی کارگاه',
+    assignedProjectId: 'prj-104',
+    assignedProjectName: 'خط انتقال گاز و ایستگاه تقلیل فشار البرز',
+    costCenterId: 'CC-104',
+    hireDate: '۱۴۰۲/۰۱/۱۵',
+    contractType: 'قراردادی موقت',
+    baseSalary: 27_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 5_000_000,
+    specialSkillAllowance: 14_000_000,
+    childrenCount: 1,
+    maritalStatus: 'متاهل',
+    bankAccount: {
+      bankName: 'بانک ملت',
+      shebaNumber: 'IR890120000000008492019384',
+      accountNumber: '8492019384',
+    },
+    insuranceNumber: '90192847',
+    status: 'فعال',
+  },
+  {
+    id: 'emp-007',
+    personnelCode: 'EMP-1007',
+    firstName: 'مهران',
+    lastName: 'پورحسینی',
+    fullName: 'مهندس مهران پورحسینی',
+    nationalCode: '۰۳۲۱۹۲۸۴۷۱',
+    birthDate: '۱۳۶۶/۰۹/۱۲',
+    phone: '۰۹۱۲۴۴۴۱۱۲۲',
+    email: 'm.pourhosseini@pars-structures.ir',
+    role: 'سرپرست کارگاه مجتمع نیلوفر',
+    department: 'اجرایی کارگاه',
+    assignedProjectId: 'prj-103',
+    assignedProjectName: 'مجتمع مسکونی نیلوفر (۱۲۰ واحدی)',
+    costCenterId: 'CC-103',
+    hireDate: '۱۴۰۱/۰۲/۰۱',
+    contractType: 'قراردادی موقت',
+    baseSalary: 26_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 5_000_000,
+    specialSkillAllowance: 10_000_000,
+    childrenCount: 1,
+    maritalStatus: 'متاهل',
+    bankAccount: {
+      bankName: 'بانک پاسارگاد',
+      shebaNumber: 'IR720540000000003849102948',
+      accountNumber: '3849102948',
+    },
+    insuranceNumber: '81920394',
+    status: 'فعال',
+  },
+];
+
+export const mockTimesheets: MonthlyTimesheet[] = [
+  {
+    id: 'ts-01',
+    employeeId: 'emp-003',
+    employeeName: 'مهندس کیارش نادری',
+    monthYear: '۱۴۰۳/۰۶',
+    projectId: 'prj-101',
+    standardWorkDays: 30,
+    actualWorkDays: 30,
+    absentDays: 0,
+    paidLeaveDays: 0,
+    overtimeHours: 42,
+    nightWorkHours: 8,
+    holidayWorkHours: 16,
+    missionDays: 2,
+    status: 'تأیید منابع انسانی',
+  },
+  {
+    id: 'ts-02',
+    employeeId: 'emp-004',
+    employeeName: 'مهندس بهمن کاظمی',
+    monthYear: '۱۴۰۳/۰۶',
+    projectId: 'prj-102',
+    standardWorkDays: 30,
+    actualWorkDays: 30,
+    absentDays: 0,
+    paidLeaveDays: 0,
+    overtimeHours: 48,
+    nightWorkHours: 18,
+    holidayWorkHours: 24,
+    missionDays: 0,
+    status: 'تأیید منابع انسانی',
+  },
+  {
+    id: 'ts-03',
+    employeeId: 'emp-005',
+    employeeName: 'مهندس وحید اکبری',
+    monthYear: '۱۴۰۳/۰۶',
+    projectId: 'prj-101',
+    standardWorkDays: 30,
+    actualWorkDays: 30,
+    absentDays: 0,
+    paidLeaveDays: 0,
+    overtimeHours: 54,
+    nightWorkHours: 12,
+    holidayWorkHours: 16,
+    missionDays: 0,
+    status: 'تأیید منابع انسانی',
+  },
+  {
+    id: 'ts-04',
+    employeeId: 'emp-006',
+    employeeName: 'مهندس سعید طاهری',
+    monthYear: '۱۴۰۳/۰۶',
+    projectId: 'prj-104',
+    standardWorkDays: 30,
+    actualWorkDays: 28,
+    absentDays: 0,
+    paidLeaveDays: 2,
+    overtimeHours: 35,
+    nightWorkHours: 0,
+    holidayWorkHours: 8,
+    missionDays: 4,
+    status: 'تأیید منابع انسانی',
+  },
+  {
+    id: 'ts-05',
+    employeeId: 'emp-007',
+    employeeName: 'مهندس مهران پورحسینی',
+    monthYear: '۱۴۰۳/۰۶',
+    projectId: 'prj-103',
+    standardWorkDays: 30,
+    actualWorkDays: 30,
+    absentDays: 0,
+    paidLeaveDays: 0,
+    overtimeHours: 28,
+    nightWorkHours: 0,
+    holidayWorkHours: 8,
+    missionDays: 0,
+    status: 'تأیید منابع انسانی',
+  },
+];
+
+export const mockPayrollSlips: PayrollSlip[] = [
+  {
+    id: 'pay-001',
+    slipNumber: 'PAY-140306-001',
+    monthYear: '۱۴۰۳/۰۶',
+    employeeId: 'emp-001',
+    employeeName: 'مهندس محمدرضا رادمنش',
+    personnelCode: 'EMP-1001',
+    role: 'مدیرعامل',
+    department: 'مدیریت و کنترل پروژه',
+    projectId: 'all',
+    projectName: 'دفتر مرکزی و ستاد',
+    costCenterId: 'CC-HQ-100',
+    issueDate: '۱۴۰۳/۰۶/۳۱',
+    actualWorkDays: 30,
+    overtimeHours: 0,
+    baseSalaryGross: 65_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 10_000_000,
+    specialSkillAllowance: 40_000_000,
+    overtimePay: 0,
+    missionPay: 0,
+    grossTotalSalary: 138_000_000,
+    workerInsuranceDeduction: 6_930_000, // ۷٪ سقف بیمه
+    incomeTaxDeduction: 14_200_000,
+    loanDeduction: 0,
+    disciplinaryDeduction: 0,
+    totalDeductions: 21_130_000,
+    netPayableSalary: 116_870_000,
+    employerInsuranceContribution: 22_770_000, // ۲۳٪
+    totalCostForCompany: 160_770_000,
+    status: 'پرداخت شده',
+    journalEntryId: 'DOC-1403-091',
+    paymentRequestId: 'PR-1403-06-01',
+  },
+  {
+    id: 'pay-002',
+    slipNumber: 'PAY-140306-002',
+    monthYear: '۱۴۰۳/۰۶',
+    employeeId: 'emp-002',
+    employeeName: 'دکتر هادی صمدیان',
+    personnelCode: 'EMP-1002',
+    role: 'مدیر مالی',
+    department: 'مالی و اداری',
+    projectId: 'all',
+    projectName: 'دفتر مرکزی و ستاد',
+    costCenterId: 'CC-HQ-100',
+    issueDate: '۱۴۰۳/۰۶/۳۱',
+    actualWorkDays: 30,
+    overtimeHours: 15,
+    baseSalaryGross: 45_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 5_000_000,
+    specialSkillAllowance: 25_000_000,
+    overtimePay: 5_800_000,
+    missionPay: 0,
+    grossTotalSalary: 98_800_000,
+    workerInsuranceDeduction: 6_200_000,
+    incomeTaxDeduction: 8_400_000,
+    loanDeduction: 5_000_000,
+    disciplinaryDeduction: 0,
+    totalDeductions: 19_600_000,
+    netPayableSalary: 79_200_000,
+    employerInsuranceContribution: 20_370_000,
+    totalCostForCompany: 119_170_000,
+    status: 'پرداخت شده',
+    journalEntryId: 'DOC-1403-091',
+    paymentRequestId: 'PR-1403-06-02',
+  },
+  {
+    id: 'pay-003',
+    slipNumber: 'PAY-140306-003',
+    monthYear: '۱۴۰۳/۰۶',
+    employeeId: 'emp-003',
+    employeeName: 'مهندس کیارش نادری',
+    personnelCode: 'EMP-1003',
+    role: 'مدیر پروژه رونیکا',
+    department: 'فنی و مهندسی',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    costCenterId: 'CC-101',
+    issueDate: '۱۴۰۳/۰۶/۳۱',
+    actualWorkDays: 30,
+    overtimeHours: 42,
+    baseSalaryGross: 38_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 5_000_000,
+    specialSkillAllowance: 20_000_000,
+    overtimePay: 12_800_000,
+    missionPay: 4_000_000,
+    grossTotalSalary: 102_800_000,
+    workerInsuranceDeduction: 5_800_000,
+    incomeTaxDeduction: 9_100_000,
+    loanDeduction: 0,
+    disciplinaryDeduction: 0,
+    totalDeductions: 14_900_000,
+    netPayableSalary: 87_900_000,
+    employerInsuranceContribution: 19_060_000,
+    totalCostForCompany: 121_860_000,
+    status: 'پرداخت شده',
+    journalEntryId: 'DOC-1403-092',
+    paymentRequestId: 'PR-1403-06-03',
+  },
+  {
+    id: 'pay-004',
+    slipNumber: 'PAY-140306-004',
+    monthYear: '۱۴۰۳/۰۶',
+    employeeId: 'emp-004',
+    employeeName: 'مهندس بهمن کاظمی',
+    personnelCode: 'EMP-1004',
+    role: 'مدیر پروژه تقاطع فجر',
+    department: 'اجرایی کارگاه',
+    projectId: 'prj-102',
+    projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
+    costCenterId: 'CC-102',
+    issueDate: '۱۴۰۳/۰۶/۳۱',
+    actualWorkDays: 30,
+    overtimeHours: 48,
+    baseSalaryGross: 35_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 10_000_000,
+    specialSkillAllowance: 18_000_000,
+    overtimePay: 13_500_000,
+    missionPay: 0,
+    grossTotalSalary: 99_500_000,
+    workerInsuranceDeduction: 5_500_000,
+    incomeTaxDeduction: 8_500_000,
+    loanDeduction: 0,
+    disciplinaryDeduction: 0,
+    totalDeductions: 14_000_000,
+    netPayableSalary: 85_500_000,
+    employerInsuranceContribution: 18_070_000,
+    totalCostForCompany: 117_570_000,
+    status: 'پرداخت شده',
+    journalEntryId: 'DOC-1403-092',
+    paymentRequestId: 'PR-1403-06-04',
+  },
+  {
+    id: 'pay-005',
+    slipNumber: 'PAY-140306-005',
+    monthYear: '۱۴۰۳/۰۶',
+    employeeId: 'emp-005',
+    employeeName: 'مهندس وحید اکبری',
+    personnelCode: 'EMP-1005',
+    role: 'سرپرست کارگاه رونیکا',
+    department: 'اجرایی کارگاه',
+    projectId: 'prj-101',
+    projectName: 'برج تجاری-اداری رونیکا',
+    costCenterId: 'CC-101',
+    issueDate: '۱۴۰۳/۰۶/۳۱',
+    actualWorkDays: 30,
+    overtimeHours: 54,
+    baseSalaryGross: 28_000_000,
+    housingAllowance: 9_000_000,
+    foodAllowance: 14_000_000,
+    childAllowance: 0,
+    specialSkillAllowance: 12_000_000,
+    overtimePay: 12_100_000,
+    missionPay: 0,
+    grossTotalSalary: 75_100_000,
+    workerInsuranceDeduction: 4_400_000,
+    incomeTaxDeduction: 4_800_000,
+    loanDeduction: 0,
+    disciplinaryDeduction: 0,
+    totalDeductions: 9_200_000,
+    netPayableSalary: 65_900_000,
+    employerInsuranceContribution: 14_460_000,
+    totalCostForCompany: 89_560_000,
+    status: 'صادر شده جهت پرداخت',
+    paymentRequestId: 'PR-1403-06-05',
+  },
+];

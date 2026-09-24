@@ -27,6 +27,15 @@ import { AccountingModule } from './components/accounting/AccountingModule';
 import { PettyCashModule } from './components/petty_cash/PettyCashModule';
 import { ContractsModule } from './components/contracts/ContractsModule';
 import { InventoryModule } from './components/inventory/InventoryModule';
+import { ProcurementModule } from './components/procurement/ProcurementModule';
+import { PaymentsTreasuryModule } from './components/finance/PaymentsTreasuryModule';
+import { PartnersModule } from './components/partners/PartnersModule';
+import { PayrollModule } from './components/hr_payroll/PayrollModule';
+import { DocumentCenterModule } from './components/documents/DocumentCenterModule';
+import { ApprovalCenterModule } from './components/approvals/ApprovalCenterModule';
+import { ReportsBIModule } from './components/reports/ReportsBIModule';
+import { ProjectsModule } from './components/project/ProjectsModule';
+import { ProgressStatementsModule } from './components/statements/ProgressStatementsModule';
 import { mockBankAccounts } from './data/accountingMockData';
 
 import {
@@ -436,11 +445,82 @@ export default function App() {
                     />
                   </div>
                 </>
-              ) : currentTab === 'accounting' ? (
-                /* Phase 2: Full Enterprise Accounting Module */
-                <AccountingModule currentUser={user} />
+              ) : currentTab === 'projects' ? (
+                /* Phase 1 & Architecture Point 2: Dedicated Projects Module */
+                <ProjectsModule
+                  projects={projects}
+                  onSelectProject={(id) => {
+                    setSelectedProjectId(id);
+                  }}
+                  onNavigateToTab={(tab) => setCurrentTab(tab)}
+                />
+              ) : currentTab === 'contracts' ? (
+                /* Phase 3 & Architecture Point 3: Dedicated Contracts Module */
+                <ContractsModule
+                  projects={projects}
+                  bankAccounts={bankAccounts}
+                  currentUser={user}
+                  onAddJournalEntry={(entry) => {
+                    showToast(`سند حسابداری با موفقیت صادر شد: ${entry.description}`);
+                  }}
+                  onUpdateBankBalance={(bankId, amount, type) => {
+                    setBankAccounts((prev) =>
+                      prev.map((b) =>
+                        b.id === bankId
+                          ? { ...b, balance: type === 'debit' ? b.balance + amount : b.balance - amount }
+                          : b
+                      )
+                    );
+                    showToast(`تراکنش بانکی ثبت و مانده حساب به‌روزرسانی شد.`);
+                  }}
+                />
+              ) : currentTab === 'statements' ? (
+                /* Phase 4 & Architecture Point 4: Progress Statements Module (Client & Subcontractor) */
+                <ProgressStatementsModule
+                  projects={projects}
+                  onOpenNewClientStatement={() => showToast('فرم ثبت صورت‌وضعیت جدید کارفرما')}
+                  onOpenNewSubcontractorStatement={() => showToast('فرم ثبت صورت‌وضعیت جدید پیمانکار جزء')}
+                />
+              ) : currentTab === 'procurement' ? (
+                /* Phase 5 & Architecture Point 5: Procurement Module (PR -> RFQ -> PO -> GRN -> Invoice) */
+                <ProcurementModule
+                  projects={projects}
+                  currentUser={user}
+                  onUpdateProjectCost={(projectId, amount) => {
+                    setProjects((prev) =>
+                      prev.map((p) =>
+                        p.id === projectId
+                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
+                          : p
+                      )
+                    );
+                    showToast(`بهای تمام‌شده پروژه افزایش یافت: +${amount.toLocaleString('fa-IR')} تومان`);
+                  }}
+                  onAddJournalEntry={(entry) => {
+                    showToast(`سند حسابداری فاکتور خرید صادر گردید: ${entry.description}`);
+                  }}
+                />
+              ) : currentTab === 'inventory' ? (
+                /* Phase 6 & Architecture Point 6: Warehouse, Materials & Inventory Module */
+                <InventoryModule
+                  currentUser={user}
+                  projects={projects}
+                  onUpdateProjectCost={(projectId, amount) => {
+                    setProjects((prev) =>
+                      prev.map((p) =>
+                        p.id === projectId
+                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
+                          : p
+                      )
+                    );
+                    showToast(`هزینه مصالح به پروژه اضافه شد: +${amount.toLocaleString('fa-IR')} تومان`);
+                  }}
+                  onAddJournalEntry={(entry) => {
+                    showToast(`سند انبارداری در حسابداری صادر شد: ${entry.description}`);
+                  }}
+                />
               ) : currentTab === 'petty_cash' ? (
-                /* Phase 3: Full Enterprise Petty Cash Management Module */
+                /* Phase 7 & Architecture Point 7: Petty Cash Module */
                 <PettyCashModule
                   currentUser={user}
                   projects={projects}
@@ -461,47 +541,64 @@ export default function App() {
                     );
                   }}
                 />
-              ) : currentTab === 'statements' || currentTab === 'contracts' ? (
-                /* Phase 4: Full Enterprise Contracts & Progress Statements Module */
-                <ContractsModule
+              ) : currentTab === 'finance' ? (
+                /* Phase 8 & Architecture Point 9: Treasury & Payments Module */
+                <PaymentsTreasuryModule
                   projects={projects}
                   bankAccounts={bankAccounts}
-                  currentUser={user}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند حسابداری با موفقیت صادر شد: ${entry.description}`);
-                  }}
-                  onUpdateBankBalance={(bankId, amount, type) => {
+                  onExecutePayment={(request, bankId) => {
                     setBankAccounts((prev) =>
                       prev.map((b) =>
                         b.id === bankId
-                          ? { ...b, balance: type === 'debit' ? b.balance + amount : b.balance - amount }
+                          ? { ...b, balance: Math.max(0, b.balance - request.totalAmount) }
                           : b
                       )
                     );
-                    showToast(`تراکنش بانکی ثبت و مانده حساب به‌روزرسانی شد.`);
+                    showToast(`پرداخت به مبلغ ${request.totalAmount.toLocaleString('fa-IR')} تومان انجام و مانده بانک کسر شد.`);
                   }}
                 />
-              ) : currentTab === 'inventory' ? (
-                /* Phase 5: Full Enterprise Warehouse, Materials & Site Inventory Module */
-                <InventoryModule
-                  currentUser={user}
+              ) : currentTab === 'accounting' ? (
+                /* Phase 2 & Architecture Point 8: Full Enterprise Accounting Engine */
+                <AccountingModule currentUser={user} />
+              ) : currentTab === 'partners' ? (
+                /* Phase 9 & Architecture Points 11 & 12: Stakeholders & Partners Directory */
+                <PartnersModule
                   projects={projects}
-                  onUpdateProjectCost={(projectId, amount) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`هزینه مصالح به پروژه اضافه شد: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
+                  onOpenClientContract={(id) => setCurrentTab('contracts')}
+                  onOpenSubcontractorContract={(id) => setCurrentTab('contracts')}
+                />
+              ) : currentTab === 'payroll' ? (
+                /* Phase 10 & Architecture Point 13: HR & Payroll Engine */
+                <PayrollModule
+                  projects={projects}
+                  currentUser={user}
                   onAddJournalEntry={(entry) => {
-                    showToast(`سند انبارداری در حسابداری صادر شد: ${entry.description}`);
+                    showToast(`سند حسابداری حقوق و دستمزد ماهانه صادر گردید.`);
+                  }}
+                  onAddPaymentRequest={(req) => {
+                    showToast(`دستور پرداخت حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.`);
                   }}
                 />
+              ) : currentTab === 'documents' ? (
+                /* Phase 11 & Architecture Point 14: Unified Document Management DMS */
+                <DocumentCenterModule projects={projects} />
+              ) : currentTab === 'approvals' ? (
+                /* Phase 11 & Architecture Point 15: Executive Approvals Center */
+                <ApprovalCenterModule
+                  projects={projects}
+                  currentUser={user}
+                  onItemApproved={(item) => {
+                    showToast(`درخواست ${item.docNumber} با موفقیت توسط مدیریت تایید و ابلاغ شد.`);
+                  }}
+                  onItemRejected={(item, reason) => {
+                    showToast(`درخواست ${item.docNumber} جهت اصلاح عودت داده شد.`);
+                  }}
+                />
+              ) : currentTab === 'reports' ? (
+                /* Phase 12 & Architecture Point 17: BI & Executive Analytics */
+                <ReportsBIModule projects={projects} />
               ) : (
-                /* Independent Modules Placeholder Architecture View */
+                /* Fallback View */
                 <ModulePlaceholderView
                   moduleId={currentTab}
                   onBackToDashboard={() => setCurrentTab('dashboard')}
