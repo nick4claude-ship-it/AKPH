@@ -87,7 +87,7 @@ export function goodsReceiptEvent(g: GoodsReceiptNote): FinancialEventInput {
 }
 
 /** فاکتور خرید: مبلغ کالا (بدون ارزش افزوده) حساب موقت رسید انبار را می‌بندد. */
-export function vendorInvoiceEvent(inv: VendorInvoice): FinancialEventInput {
+export function vendorInvoiceEvent(inv: VendorInvoice, receiptValue?: number): FinancialEventInput {
   const subtotal = inv.totalAmount - inv.vatAmount;
   return {
     type: 'VENDOR_INVOICE',
@@ -98,7 +98,8 @@ export function vendorInvoiceEvent(inv: VendorInvoice): FinancialEventInput {
     counterpartyId: inv.counterpartyId || inv.supplierId,
     amount: inv.totalAmount,
     date: inv.invoiceDate,
-    details: { docNumber: inv.invoiceNumber, subtotal, vatAmount: inv.vatAmount, grnId: inv.grnId },
+    // receiptValue: value of the goods receipt this invoice clears (the GRNI balance); the difference is a price variance.
+    details: { docNumber: inv.invoiceNumber, subtotal, vatAmount: inv.vatAmount, grnId: inv.grnId, receiptValue: receiptValue ?? subtotal },
   };
 }
 

@@ -15,7 +15,8 @@
     "test:money": "node scripts/run-ts.mjs scripts/money-schema.ts",
     "test:numbering": "node scripts/run-ts.mjs scripts/dates-numbering.ts",
     "test:duties": "node scripts/run-ts.mjs scripts/duties-access.ts",
-    "test": "npm run test:money && npm run test:numbering && npm run test:duties && npm run test:posting && npm run test:workflows && npm run test:api"
+    "test:rules": "node scripts/run-ts.mjs scripts/posting-rules.ts",
+    "test": "npm run test:money && npm run test:numbering && npm run test:duties && npm run test:rules && npm run test:posting && npm run test:workflows && npm run test:api"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

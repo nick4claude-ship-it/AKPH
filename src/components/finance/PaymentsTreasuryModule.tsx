@@ -105,6 +105,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   // Requests for statements, invoices, payroll and petty cash are created by their modules; only
   // payments without a source document can be entered manually here.
   const [newRequestSource, setNewRequestSource] = useState<PaymentRequest['sourceType']>('سایر هزینه‌های عمومی');
+  const [newRequestLiability, setNewRequestLiability] = useState<'insurance' | 'vat' | 'payroll' | 'withholding'>('insurance');
   const [newRequestProject, setNewRequestProject] = useState(projects[0]?.id || '');
   const [newRequestDueDate, setNewRequestDueDate] = useState(() => toPersianDate(new Date()));
 
@@ -171,7 +172,15 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
       projectName: proj.name,
       costCenterId: '',
       beneficiaryName: newRequestBeneficiary.trim(),
-      beneficiaryType: newRequestSource === 'حق بیمه و مالیات' ? 'سازمان تامین اجتماعی' : 'تأمین‌کننده',
+      beneficiaryType:
+        newRequestSource === 'حق بیمه و مالیات'
+          ? newRequestLiability === 'insurance'
+            ? 'سازمان تامین اجتماعی'
+            : 'سازمان امور مالیاتی'
+          : newRequestSource === 'پیش‌پرداخت پیمانکار جزء'
+            ? 'پیمانکار جزء'
+            : 'تأمین‌کننده',
+      taxKind: newRequestSource === 'حق بیمه و مالیات' && newRequestLiability !== 'insurance' ? newRequestLiability : undefined,
       totalAmount: newRequestAmount,
       dueDate: newRequestDueDate,
     });
@@ -891,9 +900,26 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 >
                   <option value="سایر هزینه‌های عمومی">سایر هزینه‌های عمومی</option>
                   <option value="پیش‌پرداخت خرید">پیش‌پرداخت خرید</option>
+                  <option value="پیش‌پرداخت پیمانکار جزء">پیش‌پرداخت پیمانکار جزء</option>
                   <option value="حق بیمه و مالیات">حق بیمه و مالیات</option>
                 </select>
               </div>
+
+              {newRequestSource === 'حق بیمه و مالیات' && (
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">نوع بدهی:</label>
+                  <select
+                    value={newRequestLiability}
+                    onChange={(e) => setNewRequestLiability(e.target.value as typeof newRequestLiability)}
+                    className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  >
+                    <option value="insurance">حق بیمه (تأمین اجتماعی)</option>
+                    <option value="vat">ارزش افزوده فروش</option>
+                    <option value="payroll">مالیات حقوق</option>
+                    <option value="withholding">مالیات تکلیفی پیمانکاران</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block font-medium text-slate-700 mb-1">نام طرف حساب / ذینفع دریافت وجه:</label>

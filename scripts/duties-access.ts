@@ -98,7 +98,7 @@ const period = 'd-1405/06';
   assert.ok(state.payrollSlips.filter((s) => s.monthYear === period).every((s) => s.approvedById === ACC2.id));
 }
 
-const pr = wf.createPaymentRequest(env(ACC), { sourceType: 'حق بیمه و مالیات', sourceRefId: 'd-pr', sourceRefNumber: 'd', projectId: '', projectName: '', costCenterId: '', beneficiaryName: 'اداره مالیات', beneficiaryType: 'سازمان امور مالیاتی', totalAmount: 1_000_000 });
+const pr = wf.createPaymentRequest(env(ACC), { sourceType: 'حق بیمه و مالیات', sourceRefId: 'd-pr', sourceRefNumber: 'd', projectId: '', projectName: '', costCenterId: '', beneficiaryName: 'اداره مالیات', beneficiaryType: 'سازمان امور مالیاتی', taxKind: 'vat', totalAmount: 1_000_000 });
 ok('درخواست پرداخت', pr);
 denied('تأیید درخواست توسط درخواست‌کننده', wf.approvePaymentRequest(env(ACC), pr.id!), /خودتان/);
 ok('تأیید درخواست توسط مدیر ارشد', wf.approvePaymentRequest(env(CEO), pr.id!));

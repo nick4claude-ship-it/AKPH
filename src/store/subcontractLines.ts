@@ -86,6 +86,12 @@ export function validateSubcontractorStatement(
     const cap = line ? line.contractQuantity : i.contractQuantity;
     if (committed > cap) return `جمع مقدار «${i.description}» (${committed}) از مقدار قرارداد (${cap}) بیشتر است.`;
   }
+  // Gross is the sum of quantity × rate of the period (each row and the total).
+  for (const i of statement.items) {
+    if (i.currentAmount !== i.currentQuantity * i.unitRate) return `مبلغ ردیف «${i.description}» باید برابر مقدار × نرخ (${i.currentQuantity * i.unitRate}) باشد.`;
+  }
+  const computedGross = statement.items.reduce((a, i) => a + i.currentQuantity * i.unitRate, 0);
+  if (statement.grossAmount !== computedGross) return `مبلغ ناخالص صورت‌وضعیت (${statement.grossAmount}) با جمع مقدار × نرخ ردیف‌ها (${computedGross}) برابر نیست.`;
   const remainingAdvance = subcontractRemainingAdvance(state, contract.id, statement.id);
   if (statement.deductions.advancePaymentDeduction > remainingAdvance) return 'کسر پیش‌پرداخت از مانده پیش‌پرداخت قرارداد بیشتر است.';
   if (statement.totalDeductions > statement.grossAmount) return 'جمع کسورات از مبلغ ناخالص بیشتر است.';

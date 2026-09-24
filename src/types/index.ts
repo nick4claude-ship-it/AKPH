@@ -1608,6 +1608,8 @@ export interface VendorInvoice {
   totalAmount: number;
   paidAmount: number;
   remainingBalance: number;
+  /** Value (with VAT) of goods returned after the invoice; already deducted from remainingBalance. */
+  returnedAmount?: number;
   registeredById?: string;
   approvedById?: string;
   status: 'در حال تطبیق' | 'تأیید تطبیق سه‌جانبه' | 'پرداخت شده' | 'پرداخت ناقص' | 'دارای مغایرت و متوقف';
@@ -1646,7 +1648,8 @@ export type FinancialEventType =
   | 'PURCHASE_RETURN'
   | 'BANK_RECONCILIATION_MATCH'
   | 'JOURNAL_REVERSAL'
-  | 'FISCAL_YEAR_CLOSE';
+  | 'FISCAL_YEAR_CLOSE'
+  | 'INVENTORY_TRANSFER';
 
 export type FinancialEventModule =
   | 'procurement'
@@ -1674,7 +1677,8 @@ export interface FinancialEvent {
    * may pick another day inside an open fiscal year.
    */
   postingDate?: string;
-  status: 'draft' | 'posted' | 'rejected';
+  /** 'reversed': its entry was reversed together with the source operation; it can be posted again. */
+  status: 'draft' | 'posted' | 'rejected' | 'reversed';
   details?: Record<string, any>;
   journalEntryId?: string;
   docNumber?: string;
@@ -1687,6 +1691,7 @@ export type PaymentSourceType =
   | 'حقوق و دستمزد ماهانه'
   | 'پیش‌پرداخت خرید'
   | 'حق بیمه و مالیات'
+  | 'پیش‌پرداخت پیمانکار جزء'
   | 'سایر هزینه‌های عمومی';
 
 export type PaymentMethodType =
@@ -1722,6 +1727,8 @@ export interface PaymentRequest {
   remainingAmount: number;
   priority: 'فوری / بحرانی' | 'عادی' | 'پایین';
   status: 'پیش‌نویس' | 'در انتظار تأیید مالی' | 'تأیید مدیر ارشد' | 'در صف پرداخت خزانه' | 'پرداخت شده' | 'رد شده';
+  /** Tax payments: which liability is settled (VAT on sales, payroll tax, subcontractor withholding). */
+  taxKind?: 'vat' | 'payroll' | 'withholding';
   approvedBy?: string;
   approvedById?: string;
   approvedDate?: string;

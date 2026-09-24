@@ -25,6 +25,7 @@ import {
   PurchaseRequisition,
   PettyCashSettings,
   PettyCashReconciliation,
+  FinancialEvent,
   JournalEntry,
 } from '../types';
 import { AppState, FinancialEventInput, SliceKey, SliceUpdater, PostingResult } from './types';
@@ -45,7 +46,7 @@ import { checkPermission, PETTY_STEP_ACTION, UserAction, ActionContext } from '.
 import { formatMoney, formatInt } from '../utils/money';
 import { toPersianDigits } from '../utils/formatters';
 import { generateUUID, nextDocNumber, tryFiscalYearOf } from '../utils/ids';
-import { finalizeManualEntry, reversedEntryIds } from './postingEngine';
+import { finalizeManualEntry, findAccountNode, reversedEntryIds } from './postingEngine';
 import {
   journalContext,
   paymentApprovalContext,
@@ -58,7 +59,7 @@ import {
   vendorInvoiceContext,
 } from './approvalContext';
 import { ACCOUNTS } from './postingRules';
-import { dayIndex, toPersianDate, toPersianTime } from '../utils/date';
+import { dayIndex, getCurrentFiscalYear, jalaliYearEnd, toPersianDate, toPersianTime } from '../utils/date';
 
 /**
  * سرویس‌های گردش‌کار: هر اقدام تجاری (تأیید، پرداخت، دریافت، رسید، حواله...) فقط این‌جا پیاده شده است.
@@ -202,7 +203,13 @@ export function advanceClientStatement(env: WorkflowEnv, id: string, comment?: s
       env.set('contracts', (prev) =>
         prev.map((c) =>
           c.id === contract.id
-            ? { ...c, approvedBilledValue: c.approvedBilledValue + approvedNet, receivableValue: c.receivableValue + approvedNet }
+            ? {
+                ...c,
+                billedValue: c.billedValue + s.grossAmount,
+                executedValue: Math.max(c.executedValue, c.billedValue + s.grossAmount),
+                approvedBilledValue: c.approvedBilledValue + approvedNet,
+                receivableValue: c.receivableValue + approvedNet,
+              }
             : c
         )
       );
@@ -366,10 +373,8 @@ export function createClientStatement(env: WorkflowEnv, statement: DetailedProgr
     statement = { ...statement, workflowHistory: [historyEntry(env, statement.status, statement.status, 'ایجاد صورت‌وضعیت')] };
   }
   statement = stampCreator(env, statement);
+  // The contract's billed/executed values change only when the statement is approved (not in draft).
   env.set('clientStatements', (prev) => [statement, ...prev]);
-  env.set('contracts', (prev) =>
-    prev.map((c) => (c.id === contract.id ? { ...c, billedValue: c.billedValue + statement.grossAmount, executedValue: Math.max(c.executedValue, c.billedValue + statement.grossAmount) } : c))
-  );
   return ok(`صورت‌وضعیت «${statement.statementNumber}» ثبت شد.`, { id: statement.id });
 }
 
@@ -397,14 +402,8 @@ export function createSubcontractorStatement(env: WorkflowEnv, statement: Subcon
     statement = { ...statement, workflowHistory: [historyEntry(env, statement.status, statement.status, 'ثبت کارکرد')] };
   }
   statement = stampCreator(env, statement);
+  // The contract's executed value rises only when the statement is finally approved.
   env.set('subcontractorStatements', (prev) => [statement, ...prev]);
-  env.set('subcontractorContracts', (prev) =>
-    prev.map((c) => {
-      if (c.id !== statement.subcontractorContractId) return c;
-      const executedValue = c.executedValue + statement.grossAmount;
-      return { ...c, executedValue, remainingContractValue: Math.max(0, c.contractValue - executedValue) };
-    })
-  );
   return ok(`صورت‌وضعیت «${statement.statementNumber}» ثبت و برای اندازه‌گیری ارسال شد.`, { id: statement.id });
 }
 
@@ -440,7 +439,13 @@ export function advanceSubcontractorStatement(env: WorkflowEnv, id: string, comm
       env.set('subcontractorContracts', (prev) =>
         prev.map((c) =>
           c.id === s.subcontractorContractId
-            ? { ...c, approvedStatementsValue: c.approvedStatementsValue + s.netPayable, remainingPayableValue: c.remainingPayableValue + s.netPayable }
+            ? {
+                ...c,
+                executedValue: c.executedValue + s.grossAmount,
+                remainingContractValue: Math.max(0, c.contractValue - (c.executedValue + s.grossAmount)),
+                approvedStatementsValue: c.approvedStatementsValue + s.netPayable,
+                remainingPayableValue: c.remainingPayableValue + s.netPayable,
+              }
             : c
         )
       );
@@ -535,7 +540,7 @@ export function submitPettyCashExpense(env: WorkflowEnv, expense: PettyCashExpen
     ...expense,
     submitterName: env.user.name,
     submitterId: env.user.id,
-    expenseNumber: expense.expenseNumber && !taken.includes(expense.expenseNumber) ? expense.expenseNumber : nextDocNumber(taken, 'EXP', expense.date),
+    expenseNumber: nextDocNumber(taken, 'EXP', expense.date),
     status: 'pending_approval',
     approvalLevelRequired: level,
     currentApprovalStep: chain[0],
@@ -687,7 +692,11 @@ export function approveVendorInvoice(env: WorkflowEnv, id: string): WorkflowResu
   const deny = guard(env, 'vendor_invoice.approve', vendorInvoiceContext(inv));
   if (deny) return deny;
   if (!inv.grnId) return fail('فاکتور بدون رسید انبار قابل تأیید نیست.');
-  const posting = env.post(vendorInvoiceEvent(inv), { submitter: env.user.name });
+  if (inv.status === 'دارای مغایرت و متوقف') return fail('فاکتور دارای مغایرت و متوقف است؛ ابتدا مغایرت را رفع کنید.');
+  if (inv.status !== 'در حال تطبیق') return fail('این فاکتور در انتظار تأیید نیست.');
+  const grn = env.getState().goodsReceipts.find((g) => g.id === inv.grnId);
+  if (!grn) return fail('رسید انبار فاکتور یافت نشد.');
+  const posting = env.post(vendorInvoiceEvent(inv, grn.totalAmount), { submitter: env.user.name });
   if (!posting.ok) return postingFailure(posting);
   env.set('vendorInvoices', (prev) =>
     prev.map((i) =>
@@ -824,6 +833,12 @@ export function executePayment(env: WorkflowEnv, requestId: string, input: Payme
   const pettyRequest = req.sourceType === 'شارژ و تسویه تنخواه' ? state.pettyCashRequests.find((q) => q.id === req.sourceRefId) : undefined;
   const pettyFund = pettyRequest ? state.pettyCashAccounts.find((a) => a.id === pettyRequest.pettyCashId) : undefined;
 
+  let payableType: string;
+  try {
+    payableType = payableTypeForRequest(req);
+  } catch (err) {
+    return fail((err as Error).message);
+  }
   const posting = env.post(
     {
       type: 'TREASURY_PAYMENT',
@@ -836,7 +851,7 @@ export function executePayment(env: WorkflowEnv, requestId: string, input: Payme
       date,
       details: {
         docNumber: req.requestNumber,
-        payableType: payableTypeForRequest(req),
+        payableType,
         bankAccountId: bank?.id,
         cashDeskId: desk?.id,
         bankName: bank?.bankName || desk?.title,
@@ -990,6 +1005,12 @@ export function createManualJournalEntry(env: WorkflowEnv, entry: JournalEntry):
   const debit = rows.reduce((a, r) => a + r.debit, 0);
   const credit = rows.reduce((a, r) => a + r.credit, 0);
   if (rows.length < 2 || debit !== credit || debit === 0) return fail('سند نامتوازن است: جمع بدهکار و بستانکار باید برابر و بیش از صفر باشد.');
+  // Only posting (leaf) accounts: a group or control account with sub-accounts is refused.
+  for (const r of rows) {
+    const node = findAccountNode(state.chartOfAccounts, r.accountCode);
+    if (!node) return fail(`کد حساب «${r.accountCode}» در کدینگ وجود ندارد.`);
+    if (node.children && node.children.length) return fail(`حساب «${node.code} - ${node.title}» حساب گروهی است؛ فقط حساب‌های معین/تفصیلی بدون زیرحساب قابل ثبت‌اند.`);
+  }
   const saved: JournalEntry = {
     ...entry,
     id: entry.id || generateUUID(),
@@ -1037,6 +1058,17 @@ export function reverseJournalEntry(env: WorkflowEnv, id: string, reason: string
   if (original.reversedFromDocId) return fail('سند معکوس را نمی‌توان دوباره معکوس کرد.');
   if (reversedEntryIds(state).has(original.id)) return fail('این سند قبلاً معکوس شده است.');
   if (!reason.trim()) return fail('علت صدور سند معکوس را وارد کنید.');
+  if (original.type === 'بستن حساب‌ها') return fail('سند اختتامیه سال قابل معکوس‌کردن نیست.');
+
+  // An automatic entry is reversed only together with its source operation, which is reopened so the
+  // correct entry can be posted again. Sources that cannot be reopened are corrected in their own module.
+  const sourceEvent = state.financialEvents.find((e) => e.journalEntryId === original.id && e.status === 'posted' && e.type !== 'JOURNAL_REVERSAL');
+  let reopen: (() => void) | null = null;
+  if (sourceEvent) {
+    const plan = reopenSourcePlan(env, sourceEvent, original.docNumber, reason);
+    if (typeof plan === 'string') return fail(plan);
+    reopen = plan;
+  }
 
   const posting = env.post(
     {
@@ -1072,7 +1104,117 @@ export function reverseJournalEntry(env: WorkflowEnv, id: string, reason: string
   );
   if (!posting.ok) return postingFailure(posting);
   if (posting.duplicate) return fail('این سند قبلاً معکوس شده است.');
-  return ok(`سند معکوس ${posting.event?.docNumber} برای سند ${original.docNumber} صادر شد.`, { docNumber: posting.event?.docNumber });
+  if (sourceEvent && reopen) {
+    env.set('financialEvents', (prev) => prev.map((e) => (e.id === sourceEvent.id ? { ...e, status: 'reversed' } : e)));
+    reopen();
+  }
+  return ok(
+    `سند معکوس ${posting.event?.docNumber} برای سند ${original.docNumber} صادر شد${sourceEvent ? '؛ عملیات منبع برای ثبت مجدد باز شد' : ''}.`,
+    { docNumber: posting.event?.docNumber }
+  );
+}
+
+/**
+ * What reversing an automatic entry does to its source: a reopen function, or the reason it is not allowed.
+ * Only sources with nothing paid or received against them can be reopened.
+ */
+function reopenSourcePlan(env: WorkflowEnv, event: FinancialEvent, docNumber: string, reason: string): (() => void) | string {
+  const state = env.getState();
+  const cancelRequests = (sourceRefId: string) =>
+    env.set('paymentRequests', (prev) =>
+      prev.map((r) => (r.sourceRefId === sourceRefId && r.status !== 'رد شده' ? { ...r, status: 'رد شده', remainingAmount: 0, notes: `لغو با معکوس سند ${docNumber}: ${reason}` } : r))
+    );
+  const requestsPaid = (sourceRefId: string) => state.paymentRequests.some((r) => r.sourceRefId === sourceRefId && r.paidAmount > 0);
+  switch (event.type) {
+    case 'CLIENT_STATEMENT_APPROVED': {
+      const s = state.clientStatements.find((x) => x.id === event.sourceId);
+      if (!s) return 'صورت‌وضعیت منبع یافت نشد.';
+      if (s.receivedAmount > 0) return 'برای این صورت‌وضعیت وجه دریافت شده است؛ ابتدا دریافت را برگشت بزنید.';
+      const net = s.approvedNetPayable ?? s.netPayable;
+      return () => {
+        env.set('clientStatements', (prev) =>
+          prev.map((x) =>
+            x.id === s.id
+              ? {
+                  ...x,
+                  status: 'approved_by_consultant',
+                  approvedNetPayable: undefined,
+                  accountingJournalEntryId: undefined,
+                  workflowHistory: [...x.workflowHistory, historyEntry(env, x.status, 'approved_by_consultant', `معکوس سند ${docNumber}`, reason)],
+                }
+              : x
+          )
+        );
+        env.set('contracts', (prev) =>
+          prev.map((c) =>
+            c.id === s.contractId
+              ? {
+                  ...c,
+                  billedValue: Math.max(0, c.billedValue - s.grossAmount),
+                  approvedBilledValue: Math.max(0, c.approvedBilledValue - net),
+                  receivableValue: Math.max(0, c.receivableValue - net),
+                }
+              : c
+          )
+        );
+      };
+    }
+    case 'SUBCONTRACTOR_STATEMENT_APPROVED': {
+      const s = state.subcontractorStatements.find((x) => x.id === event.sourceId);
+      if (!s) return 'صورت‌وضعیت منبع یافت نشد.';
+      if (s.paidAmount > 0 || requestsPaid(s.id)) return 'به پیمانکار پرداخت انجام شده است؛ ابتدا پرداخت را برگشت بزنید.';
+      return () => {
+        env.set('subcontractorStatements', (prev) =>
+          prev.map((x) =>
+            x.id === s.id
+              ? { ...x, status: 'finance_approved', projectExpenseRecordId: undefined, workflowHistory: [...x.workflowHistory, historyEntry(env, x.status, 'finance_approved', `معکوس سند ${docNumber}`, reason)] }
+              : x
+          )
+        );
+        env.set('subcontractorContracts', (prev) =>
+          prev.map((c) =>
+            c.id === s.subcontractorContractId
+              ? {
+                  ...c,
+                  executedValue: Math.max(0, c.executedValue - s.grossAmount),
+                  remainingContractValue: Math.min(c.contractValue, c.remainingContractValue + s.grossAmount),
+                  approvedStatementsValue: Math.max(0, c.approvedStatementsValue - s.netPayable),
+                  remainingPayableValue: Math.max(0, c.remainingPayableValue - s.netPayable),
+                }
+              : c
+          )
+        );
+        cancelRequests(s.id);
+      };
+    }
+    case 'VENDOR_INVOICE': {
+      const inv = state.vendorInvoices.find((x) => x.id === event.sourceId);
+      if (!inv) return 'فاکتور منبع یافت نشد.';
+      if (inv.paidAmount > 0 || requestsPaid(inv.id)) return 'برای این فاکتور پرداخت انجام شده است؛ ابتدا پرداخت را برگشت بزنید.';
+      return () => {
+        env.set('vendorInvoices', (prev) =>
+          prev.map((x) =>
+            x.id === inv.id
+              ? { ...x, status: 'در حال تطبیق', accountingEntryNumber: undefined, approvedById: undefined, threeWayMatching: { ...x.threeWayMatching, status: 'در انتظار رسید انبار' } }
+              : x
+          )
+        );
+        cancelRequests(inv.id);
+      };
+    }
+    case 'PAYROLL_APPROVED': {
+      if (requestsPaid(event.sourceId)) return 'حقوق این دوره پرداخت شده است؛ ابتدا پرداخت را برگشت بزنید.';
+      const slipIds = new Set<string>((event.details?.slipIds as string[]) || []);
+      return () => {
+        env.set('payrollSlips', (prev) =>
+          prev.map((x) => (slipIds.has(x.id) ? { ...x, status: 'محاسبه شده', journalEntryId: undefined, paymentRequestId: undefined, approvedById: undefined } : x))
+        );
+        cancelRequests(event.sourceId);
+      };
+    }
+    default:
+      return `این سند خودکار از عملیات ${event.type} صادر شده است؛ اصلاح آن فقط با برگشت همان عملیات در ماژول مربوط ممکن است (مثلاً برگشت کالا یا برگشت پرداخت).`;
+  }
 }
 
 /**
@@ -1084,7 +1226,13 @@ export function closeFiscalYear(env: WorkflowEnv, year: number): WorkflowResult 
   const deny = guard(env, 'fiscal.close');
   if (deny) return deny;
   if (state.financeSettings.closedFiscalYears.includes(year)) return fail(`سال مالی ${toPersianDigits(year)} قبلاً بسته شده است.`);
-  const inYear = state.journalEntries.filter((j) => tryFiscalYearOf(j.date) === year);
+  // Only a past year, and years in order: every earlier year with entries must already be closed.
+  if (year >= getCurrentFiscalYear()) return fail(`سال مالی ${toPersianDigits(year)} هنوز تمام نشده است؛ فقط سال‌های گذشته بسته می‌شوند.`);
+  const earlierOpen = [...new Set(state.journalEntries.map((j) => tryFiscalYearOf(j.date)).filter((y): y is number => y !== null && y < year))]
+    .filter((y) => !state.financeSettings.closedFiscalYears.includes(y))
+    .sort();
+  if (earlierOpen.length) return fail(`ابتدا سال مالی ${toPersianDigits(earlierOpen[0])} را ببندید؛ سال‌ها به ترتیب بسته می‌شوند.`);
+  const inYear = state.journalEntries.filter((j) => tryFiscalYearOf(j.date) === year && j.type !== 'بستن حساب‌ها');
   const pending = inYear.filter((j) => j.status === 'در انتظار تأیید' || j.status === 'پیش‌نویس');
   if (pending.length) return fail(`${fa(pending.length)} سند در انتظار تأیید در این سال وجود دارد؛ ابتدا تعیین تکلیف کنید.`);
 
@@ -1125,7 +1273,9 @@ export function closeFiscalYear(env: WorkflowEnv, year: number): WorkflowResult 
         costCenterId: '',
         counterpartyId: '',
         amount: rows.reduce((a, r) => a + r.debit, 0),
-        date: `${year}/12/29`,
+        // Dated on the real last day of the year (12/30 in a leap year), in that year's series.
+        date: jalaliYearEnd(year),
+        postingDate: jalaliYearEnd(year),
         details: { fiscalYear: year, rows },
       },
       { submitter: env.user.name }
@@ -1227,7 +1377,8 @@ export function reconcilePettyCash(
   const totalApprovedExpenses = state.pettyCashExpenses
     .filter((e) => e.pettyCashId === fund.id && (e.status === 'approved' || e.status === 'accounting_posted') && inPeriod(e.date))
     .reduce((a, e) => a + e.amount, 0);
-  const expectedBalance = fund.actualBalance;
+  // Cash in hand = book balance − expenses already paid out of the fund but not yet approved/booked.
+  const expectedBalance = fund.actualBalance - fund.pendingExpenses;
   const discrepancy = input.actualCountedCash - expectedBalance;
   if (discrepancy !== 0 && !input.discrepancyReason?.trim()) return fail('علت مغایرت را وارد کنید.');
 
@@ -1277,7 +1428,7 @@ export function reconcilePettyCash(
     pettyCashTitle: fund.title,
     periodStartDate: input.periodStartDate,
     periodEndDate: input.periodEndDate,
-    openingBalance: expectedBalance - totalReplenishments + totalApprovedExpenses,
+    openingBalance: fund.actualBalance - totalReplenishments + totalApprovedExpenses,
     totalReplenishments,
     totalApprovedExpenses,
     expectedBalance,
@@ -1587,7 +1738,8 @@ export function requestStoreIssue(env: WorkflowEnv, issue: StoreIssueVoucher): W
       return fail(`موجودی آزاد ${name} در این انبار ${fa(free)} است؛ جمع درخواست ${fa(qty)}.`);
     }
   }
-  const number = issue.issueNumber || nextDocNumber(state.storeIssues.map((v) => v.issueNumber), 'SIV', issue.date);
+  // The number is always issued here; a number sent by the client is ignored.
+  const number = nextDocNumber(state.storeIssues.map((v) => v.issueNumber), 'SIV', issue.date);
   // The requester never confirms their own issue: a voucher marked "final" still waits for another user.
   const saved: StoreIssueVoucher = {
     ...issue,
@@ -1750,7 +1902,15 @@ export function returnToSupplier(env: WorkflowEnv, grnId: string, materialId: st
   if (!Number.isSafeInteger(qty) || qty <= 0 || qty > acceptedQty - alreadyReturned) return fail(`حداکثر مقدار قابل برگشت ${fa(acceptedQty - alreadyReturned)} است.`);
   if (qty > availableQty(state, grn.warehouseId, materialId)) return fail('موجودی آزاد انبار برای برگشت کافی نیست.');
 
-  const invoiced = state.vendorInvoices.some((i) => i.grnId === grnId && ['تأیید تطبیق سه‌جانبه', 'پرداخت شده', 'پرداخت ناقص'].includes(i.status));
+  const invoice = state.vendorInvoices.find((i) => i.grnId === grnId && ['تأیید تطبیق سه‌جانبه', 'پرداخت شده', 'پرداخت ناقص'].includes(i.status));
+  const invoiced = Boolean(invoice);
+  // The supplier is credited at the purchase price; stock leaves at the current weighted average, so the
+  // average of what stays does not change (and can never be pushed to zero). The difference is a price variance.
+  const average = state.materials.find((m) => m.id === materialId)?.averageUnitPrice ?? unitCost;
+  const supplierValue = qty * unitCost;
+  const inventoryValue = Math.round(qty * average);
+  const invoiceNet = invoice ? invoice.totalAmount - invoice.vatAmount : 0;
+  const vatAmount = invoice && invoiceNet > 0 ? Math.round((supplierValue * invoice.vatAmount) / invoiceNet) : 0;
   const ret: StockReturn = {
     id: generateUUID(),
     returnNumber: nextDocNumber(state.stockReturns.map((r) => r.returnNumber), 'RET', today()),
@@ -1763,7 +1923,7 @@ export function returnToSupplier(env: WorkflowEnv, grnId: string, materialId: st
     materialId,
     qty,
     unitCost,
-    totalCost: qty * unitCost,
+    totalCost: supplierValue,
     reason,
   };
   const posting = env.post(
@@ -1774,21 +1934,41 @@ export function returnToSupplier(env: WorkflowEnv, grnId: string, materialId: st
       projectId: grn.projectId,
       costCenterId: grn.costCenterId || '',
       counterpartyId: grn.counterpartyId || grn.supplierId || '',
-      amount: ret.totalCost,
+      amount: supplierValue,
       date: ret.date,
-      details: { docNumber: ret.returnNumber, invoiced, warehouseId: grn.warehouseId, warehouseName: grn.warehouseName },
+      details: { docNumber: ret.returnNumber, invoiced, vatAmount, inventoryValue, warehouseId: grn.warehouseId, warehouseName: grn.warehouseName },
     },
     { submitter: env.user.name }
   );
   if (!posting.ok) return postingFailure(posting);
   ret.journalEntryId = posting.event?.docNumber;
   env.set('stockReturns', (prev) => [ret, ...prev]);
-  // Goods leave at their purchase price, so the average of what stays is recomputed.
-  revalue(env, materialId, -qty, -ret.totalCost);
   adjustStock(env, grn.warehouseId, materialId, -qty);
   writeKardex(env, [
-    { materialId, warehouseId: grn.warehouseId, docType: 'برگشت به تأمین‌کننده', docNumber: ret.returnNumber, date: ret.date, counterparty: grn.supplierName, inQty: 0, outQty: qty, unitCost },
+    { materialId, warehouseId: grn.warehouseId, docType: 'برگشت به تأمین‌کننده', docNumber: ret.returnNumber, date: ret.date, counterparty: grn.supplierName, inQty: 0, outQty: qty, unitCost: average },
   ]);
+  if (invoice) {
+    // After the invoice: what we owe the supplier (and its payment request) shrinks by the returned value with VAT.
+    const credit = supplierValue + vatAmount;
+    env.set('vendorInvoices', (prev) =>
+      prev.map((i) => (i.id === invoice.id ? { ...i, remainingBalance: Math.max(0, i.remainingBalance - credit), returnedAmount: (i.returnedAmount || 0) + credit } : i))
+    );
+    env.set('paymentRequests', (prev) =>
+      prev.map((r) => {
+        if (r.sourceRefId !== invoice.id || r.status === 'رد شده') return r;
+        const remainingAmount = Math.max(0, r.remainingAmount - credit);
+        const total = r.paidAmount + remainingAmount;
+        return {
+          ...r,
+          totalAmount: total,
+          approvedAmount: Math.min(r.approvedAmount, total),
+          remainingAmount,
+          status: remainingAmount === 0 ? (r.paidAmount > 0 ? 'پرداخت شده' : 'رد شده') : r.status,
+          notes: `${r.notes ? `${r.notes} — ` : ''}کاهش ${money(credit)} بابت برگشت از خرید ${ret.returnNumber}`,
+        };
+      })
+    );
+  }
   return ok(`برگشت از خرید ${ret.returnNumber} ثبت و سند ${posting.event?.docNumber} صادر شد.`, { docNumber: posting.event?.docNumber });
 }
 
@@ -1808,7 +1988,7 @@ export function createTransfer(env: WorkflowEnv, t: InterWarehouseTransfer): Wor
   }
   const saved: InterWarehouseTransfer = {
     ...t,
-    transferNumber: t.transferNumber || nextDocNumber(state.interTransfers.map((x) => x.transferNumber), 'TRF', t.date),
+    transferNumber: nextDocNumber(state.interTransfers.map((x) => x.transferNumber), 'TRF', t.date),
     items: t.items.map((i) => {
       const unitCost = state.materials.find((m) => m.id === i.materialId)?.averageUnitPrice ?? i.unitCost;
       return { ...i, unitCost, totalCost: i.quantity * unitCost };
@@ -1843,12 +2023,40 @@ export function advanceTransfer(env: WorkflowEnv, transferId: string, status: In
       return fail(`موجودی آزاد ${name} در انبار مبدأ ${fa(free)} است و انتقال ${fa(qty)} ممکن نیست.`);
     }
   }
+  const date = today();
+  const unitCostOf = (materialId: string) => state.materials.find((m) => m.id === materialId)?.averageUnitPrice || 0;
+  // Inventory is kept per warehouse (subledger): the move is posted at weighted-average cost.
+  const value = [...perMaterial].reduce((a, [materialId, { qty }]) => a + Math.round(qty * unitCostOf(materialId)), 0);
+  let docNumber: string | undefined;
+  if (value > 0) {
+    const posting = env.post(
+      {
+        type: 'INVENTORY_TRANSFER',
+        sourceModule: 'inventory',
+        sourceId: t.id,
+        projectId: t.sourceProjectId || '',
+        costCenterId: '',
+        counterpartyId: '',
+        amount: value,
+        date,
+        details: {
+          docNumber: t.transferNumber,
+          sourceWarehouseId: t.sourceWarehouseId,
+          sourceWarehouseName: t.sourceWarehouseName,
+          targetWarehouseId: t.targetWarehouseId,
+          targetWarehouseName: t.targetWarehouseName,
+          targetProjectId: t.targetProjectId,
+        },
+      },
+      { submitter: env.user.name }
+    );
+    if (!posting.ok) return postingFailure(posting);
+    docNumber = posting.event?.docNumber;
+  }
   for (const [materialId, { qty }] of perMaterial) {
     adjustStock(env, t.sourceWarehouseId, materialId, -qty);
     adjustStock(env, t.targetWarehouseId, materialId, qty);
   }
-  const date = today();
-  const unitCostOf = (materialId: string) => state.materials.find((m) => m.id === materialId)?.averageUnitPrice || 0;
   writeKardex(env, [
     ...[...perMaterial].map(([materialId, { qty }]) => ({
       materialId, warehouseId: t.sourceWarehouseId, docType: 'انتقال خروجی' as const, docNumber: t.transferNumber, date,
@@ -1860,7 +2068,7 @@ export function advanceTransfer(env: WorkflowEnv, transferId: string, status: In
     })),
   ]);
   env.set('interTransfers', (prev) => prev.map((x) => (x.id === transferId ? { ...x, status } : x)));
-  return ok(`انتقال ${t.transferNumber} تحویل شد؛ موجودی هر دو انبار و کاردکس به‌روز شد.`);
+  return ok(`انتقال ${t.transferNumber} تحویل شد؛ موجودی هر دو انبار و کاردکس به‌روز شد${docNumber ? ` و سند ${docNumber} صادر شد` : ''}.`, { docNumber });
 }
 
 /**
@@ -1885,9 +2093,12 @@ export function applyStocktake(env: WorkflowEnv, audit: StocktakeAudit): Workflo
   const short = lines.find((l) => l.physical < l.reserved);
   if (short) return fail('شمارش فیزیکی از مقدار رزروشده کمتر است؛ ابتدا حواله‌های رزروشده را تعیین تکلیف کنید.');
   const netVarianceAmount = lines.reduce((a, l) => a + l.variance * l.unitCost, 0);
+  // Shortages and surpluses of different materials are never netted: each goes to its own account.
+  const loss = lines.reduce((a, l) => a + Math.max(0, -l.variance) * l.unitCost, 0);
+  const gain = lines.reduce((a, l) => a + Math.max(0, l.variance) * l.unitCost, 0);
 
   let docNumber: string | undefined;
-  if (netVarianceAmount !== 0) {
+  if (loss + gain > 0) {
     const posting = env.post(
       {
         type: 'STOCKTAKE_ADJUSTMENT',
@@ -1896,9 +2107,9 @@ export function applyStocktake(env: WorkflowEnv, audit: StocktakeAudit): Workflo
         projectId: warehouse.projectId || '',
         costCenterId: '',
         counterpartyId: '',
-        amount: Math.abs(netVarianceAmount),
+        amount: loss + gain,
         date: audit.date,
-        details: { docNumber: audit.auditNumber, direction: netVarianceAmount < 0 ? 'loss' : 'gain', warehouseId: audit.warehouseId, warehouseName: audit.warehouseName },
+        details: { docNumber: audit.auditNumber, loss, gain, warehouseId: audit.warehouseId, warehouseName: audit.warehouseName },
       },
       { submitter: env.user.name }
     );

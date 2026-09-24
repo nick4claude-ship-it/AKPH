@@ -174,7 +174,9 @@ export const mockChartOfAccounts: AccountNode[] = [
             turnoverCredit: 38_100_000_000,
             children: [
               { code: '21201', title: 'بیمه پرداختنی سازمان تأمین اجتماعی (ماده ۳۸ و پرسنل)', level: 'تفصیلی', nature: 'بستانکار', balance: 14_200_000_000, turnoverDebit: 8_000_000_000, turnoverCredit: 22_200_000_000 },
-              { code: '21202', title: 'مالیات تکلیفی و ارزش افزوده پرداختنی', level: 'تفصیلی', nature: 'بستانکار', balance: 9_900_000_000, turnoverDebit: 6_000_000_000, turnoverCredit: 15_900_000_000 },
+              { code: '21202', title: 'ارزش افزوده فروش پرداختنی', level: 'تفصیلی', nature: 'بستانکار', balance: 9_900_000_000, turnoverDebit: 6_000_000_000, turnoverCredit: 15_900_000_000 },
+              { code: '21203', title: 'مالیات حقوق پرداختنی (ماده ۸۶)', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+              { code: '21204', title: 'مالیات تکلیفی مکسوره از پیمانکاران', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
           {
@@ -298,6 +300,7 @@ export const mockChartOfAccounts: AccountNode[] = [
             turnoverCredit: 388_000_000_000,
             children: [
               { code: '41101', title: 'درآمد تأییدشده کارکرد پروژه‌های عمرانی', level: 'تفصیلی', nature: 'بستانکار', balance: 388_000_000_000, turnoverDebit: 0, turnoverCredit: 388_000_000_000 },
+              { code: '41102', title: 'مصالح تحویلی کارفرما (کسر درآمد پیمان)', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
           { code: '412', title: 'درآمد حاصل از تعدیل نرخ پیمان و مابه‌التفاوت مصالح', level: 'معین', nature: 'بستانکار', balance: 22_500_000_000, turnoverDebit: 0, turnoverCredit: 22_500_000_000 },
@@ -346,6 +349,7 @@ export const mockChartOfAccounts: AccountNode[] = [
             turnoverCredit: 0,
             children: [
               { code: '51101', title: 'مصالح مصرفی پای کار و انبار کارگاه', level: 'تفصیلی', nature: 'بدهکار', balance: 138_000_000_000, turnoverDebit: 138_000_000_000, turnoverCredit: 0 },
+              { code: '51102', title: 'مغایرت قیمت خرید مصالح (فاکتور با رسید)', level: 'تفصیلی', nature: 'دوگانه', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
           {

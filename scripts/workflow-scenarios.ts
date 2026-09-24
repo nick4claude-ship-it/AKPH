@@ -15,7 +15,7 @@ import * as wf from '../src/store/workflows';
 import { AppState, SliceKey } from '../src/store/types';
 import { UserProfile, StoreIssueVoucher, InterWarehouseTransfer, StocktakeAudit } from '../src/types';
 import { getNextSequentialDocNumber, DOC_SEQUENCE_DIGITS } from '../src/utils/ids';
-import { parseIntegerAmount, parseMoneyInput } from '../src/utils/money';
+import { normalizeDigits, parseIntegerAmount, parseMoneyInput } from '../src/utils/money';
 import { toPersianDate } from '../src/utils/date';
 import { can } from '../src/utils/permissions';
 
@@ -256,8 +256,17 @@ denied('معکوس دوباره همان سند', wf.reverseJournalEntry(env(ACC
 denied('معکوس سند معکوس', wf.reverseJournalEntry(env(ACC), reversal.id, 'x'));
 
 const lastYear = 1403;
-ok(`بستن سال مالی ${lastYear}`, wf.closeFiscalYear(env(CEO), lastYear));
+denied('بستن سال بدون بستن سال‌های قبل', wf.closeFiscalYear(env(CEO), lastYear));
+denied('بستن سال جاری', wf.closeFiscalYear(env(CEO), 1405));
+const firstYear = Math.min(...state.journalEntries.map((j) => Number(normalizeDigits(j.date).slice(0, 4))));
+for (let y = firstYear; y < lastYear; y++) ok(`بستن سال مالی ${y}`, wf.closeFiscalYear(env(CEO), y));
+const closeResult = wf.closeFiscalYear(env(CEO), lastYear);
+ok(`بستن سال مالی ${lastYear}`, closeResult);
 assert.ok(state.financeSettings.closedFiscalYears.includes(lastYear));
+const closing = state.journalEntries.find((j) => j.docNumber === closeResult.docNumber)!;
+assert.ok(closing.docNumber.startsWith('ACC-1403-'), 'closing entry in its own year series');
+assert.equal(normalizeDigits(closing.date), '1403/12/30', '1403 is a leap year: closed on 12/30');
+denied('معکوس سند اختتامیه', wf.reverseJournalEntry(env(ACC), closing.id, 'x'));
 denied('ثبت سند در سال بسته', wf.createManualJournalEntry(env(ACC), { ...original, id: '', date: '۱۴۰۳/۰۵/۰۱', status: 'پیش‌نویس' }));
 denied('بستن دوباره همان سال', wf.closeFiscalYear(env(CEO), lastYear));
 

@@ -74,12 +74,14 @@ function sumBalances(
 ): Balances {
   const b: Balances = { revenue: 0, cost: 0, receivables: 0, liabilities: 0, cash: 0 };
   for (const entry of entries) {
+    // The year-end closing entry only moves results to retained earnings; it is not revenue or cost.
+    const closing = entry.type === 'بستن حساب‌ها';
     for (const row of entry.rows) {
       if (!filter(row)) continue;
       const code = row.accountCode;
       const dr = row.debit - row.credit;
-      if (isRevenue(code)) b.revenue -= dr;
-      if (opts.projectScope ? isProjectCost(code) : isCost(code)) b.cost += dr;
+      if (!closing && isRevenue(code)) b.revenue -= dr;
+      if (!closing && (opts.projectScope ? isProjectCost(code) : isCost(code))) b.cost += dr;
       if (isReceivable(code)) b.receivables += dr;
       if (opts.projectScope ? isProjectLiability(code) : isCurrentLiability(code)) b.liabilities -= dr;
       if (isCash(code)) b.cash += dr;

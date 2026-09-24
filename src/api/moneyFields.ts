@@ -39,7 +39,7 @@ export const MONEY_FIELDS: ReadonlySet<string> = new Set([
   'totalPayments', 'totalPrice', 'totalPurchasesAmount', 'totalQuoteAmount', 'totalReceipts', 'totalReplenishments',
   'totalStockValue', 'totalValuation', 'totalVatAmount', 'turnoverCredit', 'turnoverDebit', 'unclearedChecksAmount',
   'unitCost', 'unitPrice', 'unitRate', 'usableBalance', 'varianceAmount', 'vatAmount', 'workAmountCurrent',
-  'workerInsuranceDeduction',
+  'workerInsuranceDeduction', 'returnedAmount',
 ]);
 
 /** Numeric fields that are not money. */

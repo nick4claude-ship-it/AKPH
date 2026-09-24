@@ -51,12 +51,23 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [finals]);
 
-  const sumBy = (prefix: RegExp) => trial.filter((t) => prefix.test(t.code)).reduce((a, t) => a + t.balance, 0);
-  const revenue = -sumBy(/^4/);
-  const directCost = sumBy(/^5/);
-  const financialCost = sumBy(/^62/);
-  const overhead = sumBy(/^6/) - financialCost;
-  const netProfit = revenue - directCost - overhead - financialCost;
+  const sumBy = (prefix: RegExp, rows: { code: string; balance: number }[] = trial) => rows.filter((t) => prefix.test(t.code)).reduce((a, t) => a + t.balance, 0);
+  // Income statement: the year-end closing entry moves results to retained earnings and is not a result itself.
+  const pnlTrial = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const j of finals) {
+      if (j.type === 'بستن حساب‌ها') continue;
+      for (const r of j.rows) map.set(r.accountCode, (map.get(r.accountCode) || 0) + r.debit - r.credit);
+    }
+    return [...map].map(([code, balance]) => ({ code, balance }));
+  }, [finals]);
+  const revenue = -sumBy(/^4/, pnlTrial);
+  const directCost = sumBy(/^5/, pnlTrial);
+  const financialCost = sumBy(/^62/, pnlTrial);
+  const overhead = sumBy(/^6/, pnlTrial) - financialCost;
+  const incomeStatementProfit = revenue - directCost - overhead - financialCost;
+  // Balance sheet: profit of years not yet closed (closed years are already in retained earnings).
+  const netProfit = -sumBy(/^[456]/);
   const assets = sumBy(/^1/);
   const liabilities = -sumBy(/^2/);
   const equity = -sumBy(/^3/);
@@ -80,7 +91,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
           ['بهای تمام‌شده مستقیم', d(-directCost)],
           ['هزینه‌های عمومی و اداری', d(-overhead)],
           ['هزینه‌های مالی', d(-financialCost)],
-          ['سود (زیان) خالص', d(netProfit)],
+          ['سود (زیان) خالص', d(incomeStatementProfit)],
         ]);
       case 'balance_sheet':
         return downloadCsv('balance-sheet', ['شرح', `مبلغ (${unit})`], [
@@ -272,7 +283,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
             {row('سود ناخالص', revenue - directCost, 'bg-slate-50 px-2 rounded-lg font-bold')}
             {row('کسر می‌شود: هزینه‌های عمومی و اداری', -overhead, 'text-slate-600 pr-4')}
             {row('کسر می‌شود: هزینه‌های مالی', -financialCost, 'text-slate-600 pr-4')}
-            {row('سود (زیان) خالص دوره', netProfit, 'bg-amber-50 px-3 rounded-xl border border-amber-200 font-extrabold text-sm text-amber-950')}
+            {row('سود (زیان) خالص دوره', incomeStatementProfit, 'bg-amber-50 px-3 rounded-xl border border-amber-200 font-extrabold text-sm text-amber-950')}
           </div>
         </div>
       )}

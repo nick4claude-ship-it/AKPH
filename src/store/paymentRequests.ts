@@ -6,7 +6,10 @@
 import { PaymentRequest } from '../types';
 import { generateUUID, nextDocNumber } from '../utils/ids';
 
-/** Maps a treasury payment request to the payable account role it settles (see PAYABLE_ACCOUNTS). */
+/**
+ * Maps a treasury payment request to the payable account role it settles (see PAYABLE_ACCOUNTS).
+ * An unknown source type is an error: it is never booked to a general expense account by default.
+ */
 export function payableTypeForRequest(req: PaymentRequest): string {
   switch (req.sourceType) {
     case 'صورت‌وضعیت پیمانکار جزء':
@@ -17,12 +20,18 @@ export function payableTypeForRequest(req: PaymentRequest): string {
       return 'petty_cash';
     case 'حقوق و دستمزد ماهانه':
       return 'payroll';
+    case 'پیش‌پرداخت پیمانکار جزء':
+      return 'subcontractor_advance';
     case 'پیش‌پرداخت خرید':
-      return 'advance';
+      return req.beneficiaryType === 'پیمانکار جزء' ? 'subcontractor_advance' : 'advance';
     case 'حق بیمه و مالیات':
-      return req.beneficiaryType === 'سازمان امور مالیاتی' ? 'tax' : 'insurance';
-    default:
+      if (req.beneficiaryType !== 'سازمان امور مالیاتی') return 'insurance';
+      if (!req.taxKind) throw new Error(`نوع مالیات درخواست ${req.requestNumber} (ارزش افزوده، حقوق یا تکلیفی پیمانکاران) مشخص نیست.`);
+      return `tax_${req.taxKind}`;
+    case 'سایر هزینه‌های عمومی':
       return 'general_expense';
+    default:
+      throw new Error(`نوع درخواست پرداخت «${String(req.sourceType)}» حساب تعریف‌شده ندارد.`);
   }
 }
 
@@ -30,7 +39,7 @@ export type NewPaymentRequestInput = Pick<
   PaymentRequest,
   'sourceType' | 'sourceRefId' | 'sourceRefNumber' | 'projectId' | 'projectName' | 'costCenterId' | 'beneficiaryName' | 'beneficiaryType' | 'totalAmount'
 > &
-  Partial<Pick<PaymentRequest, 'counterpartyId' | 'dueDate' | 'date' | 'priority' | 'notes' | 'beneficiaryAccount'>>;
+  Partial<Pick<PaymentRequest, 'counterpartyId' | 'dueDate' | 'date' | 'priority' | 'notes' | 'beneficiaryAccount' | 'taxKind'>>;
 
 /** Builds a new payment request for the treasury queue; payment itself happens only in treasury. */
 export function buildPaymentRequest(existing: PaymentRequest[], input: NewPaymentRequestInput, today: string): PaymentRequest {

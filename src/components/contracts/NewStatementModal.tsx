@@ -105,6 +105,8 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
   const [advanceRate, setAdvanceRate] = useState<number>(selectedContract?.advancePaymentPercentage || 0);
   const [retentionRate, setRetentionRate] = useState<number>(selectedContract?.retentionPercentage || 0);
   const [insuranceRate, setInsuranceRate] = useState<number>(5);
+  // Withholding tax the employer deducts from the statement (booked as a prepaid tax asset, 11305).
+  const [withholdingTaxRate, setWithholdingTaxRate] = useState<number>(0);
   const [materialDeduction, setMaterialDeduction] = useState<number>(0);
 
   // Calculations (ids are assigned only when the statement is saved)
@@ -158,6 +160,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
     const adv = Math.min(roundRial((baseBeforeVat * advanceRate) / 100), remainingAdvance);
     const ret = roundRial((baseBeforeVat * retentionRate) / 100);
     const ins = roundRial((baseBeforeVat * insuranceRate) / 100);
+    const tax = roundRial((baseBeforeVat * withholdingTaxRate) / 100);
 
     return [
       {
@@ -188,6 +191,15 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         calculatedAmount: ins,
       },
       {
+        id: 'ded-tax',
+        title: `مالیات تکلیفی مکسوره کارفرما (${withholdingTaxRate}٪)`,
+        type: 'tax',
+        mode: 'percentage',
+        rate: withholdingTaxRate,
+        baseAmount: baseBeforeVat,
+        calculatedAmount: tax,
+      },
+      {
         id: 'ded-mat',
         title: 'کسورات مصالح و آب و برق کارگاهی کارفرما',
         type: 'materials',
@@ -197,7 +209,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         calculatedAmount: materialDeduction,
       },
     ].filter((d) => d.calculatedAmount > 0) as DeductionItem[];
-  }, [baseBeforeVat, advanceRate, retentionRate, insuranceRate, materialDeduction, remainingAdvance]);
+  }, [baseBeforeVat, advanceRate, retentionRate, insuranceRate, withholdingTaxRate, materialDeduction, remainingAdvance]);
 
   const totalDeductions = useMemo(() => {
     return deductionsList.reduce((sum, d) => sum + d.calculatedAmount, 0);
@@ -215,7 +227,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
       return setFormError('مرکز هزینه یا کارفرمای این قرارداد تعریف نشده است؛ ابتدا قرارداد را تکمیل کنید.');
     }
     if (baseBeforeVat <= 0) return setFormError('کارکرد این دوره صفر است؛ مقدار حداقل یک ردیف را وارد کنید.');
-    if ([advanceRate, retentionRate, insuranceRate].some((r) => r > 100)) return setFormError('درصد کسورات نمی‌تواند بیش از ۱۰۰ باشد.');
+    if ([advanceRate, retentionRate, insuranceRate, withholdingTaxRate].some((r) => r > 100)) return setFormError('درصد کسورات نمی‌تواند بیش از ۱۰۰ باشد.');
     if (totalDeductions > grossAmount) return setFormError('جمع کسورات از مبلغ ناخالص بیشتر است.');
 
     const now = new Date();
@@ -570,6 +582,18 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
                   <IntegerInput
                     value={insuranceRate}
                     onValueChange={(v) => setInsuranceRate(Math.min(100, v))}
+                    className="w-20 p-1.5 rounded border border-slate-300 bg-white text-center font-bold"
+                  />
+                  <span>٪</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 mb-1">درصد مالیات تکلیفی (کسر کارفرما):</label>
+                <div className="flex items-center gap-1">
+                  <IntegerInput
+                    value={withholdingTaxRate}
+                    onValueChange={(v) => setWithholdingTaxRate(Math.min(100, v))}
                     className="w-20 p-1.5 rounded border border-slate-300 bg-white text-center font-bold"
                   />
                   <span>٪</span>

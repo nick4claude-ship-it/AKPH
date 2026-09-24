@@ -59,7 +59,8 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
   const inPeriod = (d: string) => (dayIndex(d) || 0) >= start;
 
   // Expected balance is the fund's book balance; the period's movements explain how it was reached.
-  const expectedBalance = selectedAccount?.actualBalance ?? 0;
+  // Cash that should be in hand: book balance minus expenses paid out but still awaiting approval.
+  const expectedBalance = (selectedAccount?.actualBalance ?? 0) - (selectedAccount?.pendingExpenses ?? 0);
   const accountReplenishmentsSum = replenishments
     .filter((r) => r.pettyCashId === selectedAccount?.id && inPeriod(r.date))
     .reduce((sum, r) => sum + r.amount, 0);
@@ -71,7 +72,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
         inPeriod(e.date)
     )
     .reduce((sum, e) => sum + e.amount, 0);
-  const openingBalance = expectedBalance - accountReplenishmentsSum + accountApprovedExpensesSum;
+  const openingBalance = (selectedAccount?.actualBalance ?? 0) - accountReplenishmentsSum + accountApprovedExpensesSum;
 
   // Actual physical counted cash input
   const [actualCountedCash, setActualCountedCash] = useState<number>(expectedBalance);
@@ -143,7 +144,8 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                 value={selectedAccountId}
                 onChange={(e) => {
                   setSelectedAccountId(e.target.value);
-                  setActualCountedCash(accounts.find((a) => a.id === e.target.value)?.actualBalance ?? 0);
+                  const acc = accounts.find((a) => a.id === e.target.value);
+                  setActualCountedCash((acc?.actualBalance ?? 0) - (acc?.pendingExpenses ?? 0));
                 }}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >

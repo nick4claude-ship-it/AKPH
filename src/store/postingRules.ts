@@ -63,7 +63,9 @@ export const ACCOUNTS = {
   supplierPayables: '21101',
   subcontractorPayables: '21102',
   insurancePayable: '21201',
-  taxAndVatPayable: '21202',
+  salesVatPayable: '21202',
+  payrollTaxPayable: '21203',
+  subcontractorWithholdingTax: '21204',
   grniClearing: '21401',
   salaryPayable: '21501',
   subRetention: '21601',
@@ -73,9 +75,11 @@ export const ACCOUNTS = {
   retainedEarnings: '33',
   clientAdvances: '21301',
   contractRevenue: '41101',
+  clientSuppliedMaterials: '41102',
   stocktakeGain: '41301',
   otherIncome: '41302',
   materialsCost: '51101',
+  purchasePriceVariance: '51102',
   siteLaborCost: '51201',
   subcontractorCost: '51301',
   hqSalaryCost: '61101',
@@ -90,7 +94,7 @@ export const CLIENT_DEDUCTION_ACCOUNTS: Record<DeductionType, string> = {
   retention: '11301', // سپرده حسن انجام کار نزد کارفرما
   insurance: '11302', // سپرده بیمه ماده ۳۸ نزد کارفرما
   tax: '11305', // مالیات تکلیفی مکسوره توسط کارفرما
-  materials: '11306', // کسورات مصالح تحویلی کارفرما
+  materials: '41102', // مصالح تحویلی کارفرما: کسر درآمد پیمان (نه دارایی)
   vat: '11307', // ارزش افزوده مکسوره نزد کارفرما
   penalties: '62301', // جرائم تأخیر
   on_account: '21302', // علی‌الحساب‌های دریافتی قبلی
@@ -101,7 +105,7 @@ export const CLIENT_DEDUCTION_ACCOUNTS: Record<DeductionType, string> = {
 export const SUBCONTRACTOR_DEDUCTION_ACCOUNTS: Record<string, string> = {
   retention: '21601',
   insurance: '21602',
-  tax: '21202',
+  tax: '21204', // مالیات تکلیفی مکسوره از پیمانکار (بدهی به سازمان امور مالیاتی)
   advance_payment: '11402',
   penalty: '21603',
   other: '21603',
@@ -113,10 +117,13 @@ export const PAYABLE_ACCOUNTS: Record<string, string> = {
   subcontractor: '21102',
   payroll: '21501',
   insurance: '21201',
-  tax: '21202',
+  tax_vat: '21202',
+  tax_payroll: '21203',
+  tax_withholding: '21204',
   petty_cash: '11103',
   advance: '11401', // پیش‌پرداخت خرید
-  general_expense: '612', // سایر هزینه‌های عمومی و ستادی بدون تعهد قبلی
+  subcontractor_advance: '11402', // پیش‌پرداخت پیمانکار جزء (همان حسابی که استهلاک از آن کسر می‌شود)
+  general_expense: '612', // فقط برای «سایر هزینه‌های عمومی» صریح؛ نوع ناشناخته خطاست
 };
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -173,28 +180,20 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
     ],
   }),
 
-  // فاکتور خرید: بدهکار کالای دریافتی فاکتورنشده و ارزش‌افزوده / بستانکار پرداختنی تأمین‌کننده.
+  // فاکتور خرید: حساب کالای فاکتورنشده به ارزش رسید انبار بسته می‌شود؛ اختلاف قیمت فاکتور با رسید به
+  // حساب مغایرت قیمت خرید؛ ارزش‌افزوده خرید جدا؛ بستانکار پرداختنی تأمین‌کننده (جمع فاکتور).
   VENDOR_INVOICE: (e, ctx) => {
     const subtotal = requireDetail<number>(e, 'subtotal');
     const vat = e.details?.vatAmount ?? 0;
+    const receiptValue: number = e.details?.receiptValue ?? subtotal;
+    const variance = subtotal - receiptValue;
     const ref = e.details?.docNumber || e.sourceId;
-    const rows = [
-      row(ctx, ACCOUNTS.grniClearing, `تسویه کالای دریافتی فاکتورنشده با فاکتور ${ref}`, subtotal, 0, {
-        ...partyTags(e, ctx),
-        projectId: e.projectId || undefined,
-        projectName: ctx.projectName,
-      }),
-    ];
-    if (vat > 0) {
-      rows.push(row(ctx, ACCOUNTS.purchaseVat, `ارزش افزوده خرید فاکتور ${ref}`, vat, 0, partyTags(e, ctx)));
-    }
-    rows.push(
-      row(ctx, ACCOUNTS.supplierPayables, `بستانکاری ${ctx.counterpartyName} بابت فاکتور ${ref}`, 0, subtotal + vat, {
-        ...partyTags(e, ctx),
-        projectId: e.projectId || undefined,
-        projectName: ctx.projectName,
-      })
-    );
+    const party = { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName };
+    const rows = [row(ctx, ACCOUNTS.grniClearing, `تسویه کالای دریافتی فاکتورنشده (ارزش رسید) با فاکتور ${ref}`, receiptValue, 0, party)];
+    if (variance > 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `مغایرت قیمت فاکتور ${ref} با رسید انبار`, variance, 0, projectTags(e, ctx)));
+    if (vat > 0) rows.push(row(ctx, ACCOUNTS.purchaseVat, `ارزش افزوده خرید فاکتور ${ref}`, vat, 0, partyTags(e, ctx)));
+    rows.push(row(ctx, ACCOUNTS.supplierPayables, `بستانکاری ${ctx.counterpartyName} بابت فاکتور ${ref}`, 0, subtotal + vat, party));
+    if (variance < 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `مغایرت قیمت فاکتور ${ref} با رسید انبار`, 0, -variance, projectTags(e, ctx)));
     return { entryType: 'خرید', title: `فاکتور خرید ${ref} - ${ctx.counterpartyName}`, rows };
   },
 
@@ -247,7 +246,7 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
       row(ctx, ACCOUNTS.contractRevenue, `درآمد کارکرد مصوب صورت‌وضعیت ${ref}`, 0, e.amount - vat, projectTags(e, ctx))
     );
     if (vat > 0) {
-      rows.push(row(ctx, ACCOUNTS.taxAndVatPayable, `ارزش افزوده فروش صورت‌وضعیت ${ref}`, 0, vat, partyTags(e, ctx)));
+      rows.push(row(ctx, ACCOUNTS.salesVatPayable, `ارزش افزوده فروش صورت‌وضعیت ${ref}`, 0, vat, partyTags(e, ctx)));
     }
     return { entryType: 'صورت وضعیت', title: `شناسایی درآمد صورت‌وضعیت ${ref} - ${ctx.counterpartyName}`, rows };
   },
@@ -314,7 +313,7 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
       rows.push(row(ctx, ACCOUNTS.insurancePayable, `بیمه سهم کارگر و کارفرما دوره ${period}`, 0, credits.insurance));
     }
     if (credits.tax > 0) {
-      rows.push(row(ctx, ACCOUNTS.taxAndVatPayable, `مالیات حقوق دوره ${period}`, 0, credits.tax));
+      rows.push(row(ctx, ACCOUNTS.payrollTaxPayable, `مالیات حقوق دوره ${period}`, 0, credits.tax));
     }
     if ((credits.loans ?? 0) > 0) {
       rows.push(row(ctx, ACCOUNTS.loansToStaff, `کسر اقساط مساعده پرسنل دوره ${period}`, 0, credits.loans!));
@@ -440,27 +439,49 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
     };
   },
 
-  // برگشت کالا به تأمین‌کننده: بدهکار کالای فاکتورنشده (یا بستانکاران اگر فاکتور ثبت شده) / بستانکار موجودی.
+  // برگشت کالا به تأمین‌کننده: قبل از فاکتور ← کالای فاکتورنشده؛ بعد از فاکتور ← بستانکاران با ارزش‌افزوده
+  // و برگشت ارزش‌افزوده خرید. بستانکار موجودی به بهای خروج.
   PURCHASE_RETURN: (e, ctx) => {
     const ref = e.details?.docNumber || e.sourceId;
     const invoiced = Boolean(e.details?.invoiced);
+    const vat: number = invoiced ? e.details?.vatAmount ?? 0 : 0;
+    const inventoryValue: number = e.details?.inventoryValue ?? e.amount;
+    const variance = e.amount - inventoryValue;
+    const party = { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName };
+    const inv = { subledgerCode: e.details?.warehouseId, subledgerName: e.details?.warehouseName, projectId: e.projectId || undefined, projectName: ctx.projectName };
+    const rows = [
+      row(
+        ctx,
+        invoiced ? ACCOUNTS.supplierPayables : ACCOUNTS.grniClearing,
+        `${invoiced ? 'کاهش بدهی' : 'کاهش کالای فاکتورنشده'} ${ctx.counterpartyName} بابت برگشت ${ref}`,
+        e.amount + vat,
+        0,
+        party
+      ),
+      row(ctx, ACCOUNTS.inventory, `خروج کالای مرجوعی ${ref} از انبار به بهای میانگین`, 0, inventoryValue, inv),
+    ];
+    if (vat > 0) rows.push(row(ctx, ACCOUNTS.purchaseVat, `برگشت ارزش افزوده خرید بابت مرجوعی ${ref}`, 0, vat, partyTags(e, ctx)));
+    if (variance > 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `اختلاف قیمت خرید و میانگین موجودی مرجوعی ${ref}`, 0, variance, projectTags(e, ctx)));
+    if (variance < 0) rows.push(row(ctx, ACCOUNTS.purchasePriceVariance, `اختلاف قیمت خرید و میانگین موجودی مرجوعی ${ref}`, -variance, 0, projectTags(e, ctx)));
+    return { entryType: 'انبارداری', title: `برگشت از خرید ${ref} به ${ctx.counterpartyName}`, rows };
+  },
+
+  // انتقال بین انبارها: بدهکار موجودی انبار مقصد / بستانکار موجودی انبار مبدأ (زیرحساب هر انبار)، به بهای میانگین.
+  INVENTORY_TRANSFER: (e, ctx) => {
+    const ref = e.details?.docNumber || e.sourceId;
     return {
       entryType: 'انبارداری',
-      title: `برگشت از خرید ${ref} به ${ctx.counterpartyName}`,
+      title: `انتقال بین انبارها ${ref}`,
       rows: [
-        row(
-          ctx,
-          invoiced ? ACCOUNTS.supplierPayables : ACCOUNTS.grniClearing,
-          `${invoiced ? 'کاهش بدهی' : 'کاهش کالای فاکتورنشده'} ${ctx.counterpartyName} بابت برگشت ${ref}`,
-          e.amount,
-          0,
-          { ...partyTags(e, ctx), projectId: e.projectId || undefined, projectName: ctx.projectName }
-        ),
-        row(ctx, ACCOUNTS.inventory, `خروج کالای مرجوعی ${ref} از انبار`, 0, e.amount, {
-          subledgerCode: e.details?.warehouseId,
-          subledgerName: e.details?.warehouseName,
+        row(ctx, ACCOUNTS.inventory, `ورود کالای انتقالی ${ref} به ${e.details?.targetWarehouseName || ''}`.trim(), e.amount, 0, {
+          subledgerCode: requireDetail<string>(e, 'targetWarehouseId'),
+          subledgerName: e.details?.targetWarehouseName,
+          projectId: e.details?.targetProjectId || undefined,
+        }),
+        row(ctx, ACCOUNTS.inventory, `خروج کالای انتقالی ${ref} از ${e.details?.sourceWarehouseName || ''}`.trim(), 0, e.amount, {
+          subledgerCode: requireDetail<string>(e, 'sourceWarehouseId'),
+          subledgerName: e.details?.sourceWarehouseName,
           projectId: e.projectId || undefined,
-          projectName: ctx.projectName,
         }),
       ],
     };
@@ -468,23 +489,22 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
 
   // تعدیل انبارگردانی: کسری ← هزینه کسری / موجودی؛ اضافی ← موجودی / سایر درآمدها.
   STOCKTAKE_ADJUSTMENT: (e, ctx) => {
-    const direction = requireDetail<'loss' | 'gain'>(e, 'direction');
     const ref = e.details?.docNumber || e.sourceId;
     const inv = { subledgerCode: e.details?.warehouseId, subledgerName: e.details?.warehouseName };
-    return {
-      entryType: 'انبارداری',
-      title: `سند تعدیل انبارگردانی ${ref}`,
-      rows:
-        direction === 'loss'
-          ? [
-              row(ctx, ACCOUNTS.stocktakeLoss, `کسری انبارگردانی ${ref}`, e.amount, 0, projectTags(e, ctx)),
-              row(ctx, ACCOUNTS.inventory, `کاهش موجودی بابت کسری ${ref}`, 0, e.amount, inv),
-            ]
-          : [
-              row(ctx, ACCOUNTS.inventory, `افزایش موجودی بابت اضافات ${ref}`, e.amount, 0, inv),
-              row(ctx, ACCOUNTS.stocktakeGain, `اضافات انبارگردانی ${ref}`, 0, e.amount, projectTags(e, ctx)),
-            ],
-    };
+    // Legacy events carry a single direction; new ones carry loss and gain separately (never netted).
+    const loss: number = e.details?.loss ?? (e.details?.direction === 'loss' ? e.amount : 0);
+    const gain: number = e.details?.gain ?? (e.details?.direction === 'gain' ? e.amount : 0);
+    if (loss + gain !== e.amount) throw new Error(`[PostingEngine] جمع کسری و اضافه انبارگردانی ${ref} با مبلغ رویداد برابر نیست.`);
+    const rows: PostingRow[] = [];
+    if (loss > 0) {
+      rows.push(row(ctx, ACCOUNTS.stocktakeLoss, `کسری انبارگردانی ${ref}`, loss, 0, projectTags(e, ctx)));
+      rows.push(row(ctx, ACCOUNTS.inventory, `کاهش موجودی بابت کسری ${ref}`, 0, loss, inv));
+    }
+    if (gain > 0) {
+      rows.push(row(ctx, ACCOUNTS.inventory, `افزایش موجودی بابت اضافات ${ref}`, gain, 0, inv));
+      rows.push(row(ctx, ACCOUNTS.stocktakeGain, `اضافات انبارگردانی ${ref}`, 0, gain, projectTags(e, ctx)));
+    }
+    return { entryType: 'انبارداری', title: `سند تعدیل انبارگردانی ${ref}`, rows };
   },
 
   // مغایرت بانکی: واریز فاقد سند ← بانک / واریز نامشخص؛ برداشت فاقد سند ← کارمزد بانکی / بانک.

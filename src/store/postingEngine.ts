@@ -192,6 +192,7 @@ export const EVENT_PERMISSIONS: Record<FinancialEventType, UserAction[]> = {
   BANK_RECONCILIATION_MATCH: ['journal.create'],
   JOURNAL_REVERSAL: ['journal.reverse'],
   FISCAL_YEAR_CLOSE: ['fiscal.close'],
+  INVENTORY_TRANSFER: ['inventory.transfer'],
 };
 
 function eventPermissionError(actor: UserProfile, input: FinancialEventInput): string | null {
@@ -359,6 +360,8 @@ export function finalizeManualEntry(
   if (debit !== credit || debit <= 0) return { ok: false, error: 'سند نامتوازن است و قابل تأیید نیست.' };
   const unknown = entry.rows.find((r) => !findAccountNode(state.chartOfAccounts, r.accountCode));
   if (unknown) return { ok: false, error: `کد حساب «${unknown.accountCode}» در کدینگ وجود ندارد.` };
+  const group = entry.rows.find((r) => findAccountNode(state.chartOfAccounts, r.accountCode)?.children?.length);
+  if (group) return { ok: false, error: `حساب «${group.accountCode}» حساب گروهی است و در سند دستی قابل ثبت نیست.` };
   const shortage = findCashShortage(state, entry.rows);
   if (shortage) return { ok: false, error: shortage.replace('[PostingEngine] ', '') };
 
