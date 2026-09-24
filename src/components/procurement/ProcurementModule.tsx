@@ -47,6 +47,7 @@ import {
 interface ProcurementModuleProps {
   projects: Project[];
   currentUser: UserProfile;
+  onUpdateProjectCost?: (projectId: string, amount: number) => void;
   onAddJournalEntry?: (entry: any) => void;
   onAddPaymentRequest?: (request: any) => void;
 }
@@ -54,6 +55,7 @@ interface ProcurementModuleProps {
 export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   projects,
   currentUser,
+  onUpdateProjectCost,
   onAddJournalEntry,
   onAddPaymentRequest,
 }) => {
@@ -238,16 +240,21 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
     );
 
     const targetInvoice = invoices.find((inv) => inv.id === invoiceId);
-    if (targetInvoice && onAddPaymentRequest) {
-      onAddPaymentRequest({
-        sourceType: 'فاکتور خرید تأمین‌کننده',
-        sourceRefId: targetInvoice.id,
-        sourceRefNumber: targetInvoice.invoiceNumber,
-        projectId: targetInvoice.projectId,
-        projectName: targetInvoice.projectName,
-        beneficiaryName: targetInvoice.supplierName,
-        totalAmount: targetInvoice.totalAmount,
-      });
+    if (targetInvoice) {
+      if (onUpdateProjectCost) {
+        onUpdateProjectCost(targetInvoice.projectId, targetInvoice.totalAmount);
+      }
+      if (onAddPaymentRequest) {
+        onAddPaymentRequest({
+          sourceType: 'فاکتور خرید تأمین‌کننده',
+          sourceRefId: targetInvoice.id,
+          sourceRefNumber: targetInvoice.invoiceNumber,
+          projectId: targetInvoice.projectId,
+          projectName: targetInvoice.projectName,
+          beneficiaryName: targetInvoice.supplierName,
+          totalAmount: targetInvoice.totalAmount,
+        });
+      }
     }
   };
 

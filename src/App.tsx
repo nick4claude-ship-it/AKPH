@@ -486,7 +486,7 @@ export default function App() {
                 <ProcurementModule
                   projects={projects}
                   currentUser={user}
-                  onUpdateProjectCost={(projectId, amount) => {
+                  onUpdateProjectCost={(projectId: string, amount: number) => {
                     setProjects((prev) =>
                       prev.map((p) =>
                         p.id === projectId
@@ -496,7 +496,7 @@ export default function App() {
                     );
                     showToast(`بهای تمام‌شده پروژه افزایش یافت: +${amount.toLocaleString('fa-IR')} تومان`);
                   }}
-                  onAddJournalEntry={(entry) => {
+                  onAddJournalEntry={(entry: any) => {
                     showToast(`سند حسابداری فاکتور خرید صادر گردید: ${entry.description}`);
                   }}
                 />
@@ -546,15 +546,16 @@ export default function App() {
                 <PaymentsTreasuryModule
                   projects={projects}
                   bankAccounts={bankAccounts}
-                  onExecutePayment={(request, bankId) => {
+                  currentUser={user}
+                  onUpdateBankBalance={(bankId: string, amount: number, type: 'credit' | 'debit') => {
                     setBankAccounts((prev) =>
                       prev.map((b) =>
                         b.id === bankId
-                          ? { ...b, balance: Math.max(0, b.balance - request.totalAmount) }
+                          ? { ...b, balance: type === 'debit' ? b.balance + amount : Math.max(0, b.balance - amount) }
                           : b
                       )
                     );
-                    showToast(`پرداخت به مبلغ ${request.totalAmount.toLocaleString('fa-IR')} تومان انجام و مانده بانک کسر شد.`);
+                    showToast(`پرداخت به مبلغ ${amount.toLocaleString('fa-IR')} تومان انجام و مانده بانک به‌روزرسانی شد.`);
                   }}
                 />
               ) : currentTab === 'accounting' ? (
