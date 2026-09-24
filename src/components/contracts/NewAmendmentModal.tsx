@@ -6,6 +6,11 @@
 import React, { useState } from 'react';
 import { Contract, ContractAmendment, AmendmentType, UserProfile } from '../../types';
 import { X, Plus, FileText, Calendar, DollarSign } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
+import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { generateUUID } from '../../utils/ids';
+import { getRelativePersianDate } from '../../utils/date';
 
 interface NewAmendmentModalProps {
   contract: Contract;
@@ -20,23 +25,24 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
   onClose,
   onSaveAmendment,
 }) => {
-  const [number, setNumber] = useState('الحاقیه شماره ۲');
+  const [number, setNumber] = useState('');
   const [type, setType] = useState<AmendmentType>('افزایش مبلغ');
-  const [date, setDate] = useState('۱۴۰۳/۰۶/۲۰');
-  const [amount, setAmount] = useState<number>(1_500_000_000);
-  const [extendedDays, setExtendedDays] = useState<number>(60);
-  const [description, setDescription] = useState(
-    'افزایش احجام عملیات خاکی و بتن‌ریزی طبق دستورکار مهندس مشاور و تأییدیه کارفرما'
-  );
-  const [status, setStatus] = useState<any>('تأیید شده');
+  const [date, setDate] = useState(() => getRelativePersianDate(0));
+  const [amount, setAmount] = useState<number>(0);
+  const [extendedDays, setExtendedDays] = useState<number>(0);
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<ContractAmendment['status']>('تأیید شده');
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const changePercentage = (amount / contract.initialValue) * 100;
+  const changePercentage = contract.initialValue > 0 ? (amount / contract.initialValue) * 100 : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!number.trim()) return setFormError('شماره الحاقیه را وارد کنید.');
+    if (amount <= 0 && extendedDays <= 0) return setFormError('مبلغ یا مدت تمدید الحاقیه را وارد کنید.');
 
     const newAmd: ContractAmendment = {
-      id: `amd-${Date.now()}`,
+      id: generateUUID(),
       contractId: contract.id,
       number,
       type,
@@ -72,8 +78,8 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="ثبت الحاقیه، متمم یا تغییر مقادیر پیمان" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in duration-150">
+      
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold">
@@ -110,7 +116,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
               <label className="block text-slate-700 font-bold mb-1">نوع تغییر:</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as any)}
+                onChange={(e) => setType(e.target.value as AmendmentType)}
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white"
               >
                 <option value="افزایش مبلغ">افزایش مبلغ (تا سقف ۲۵٪)</option>
@@ -125,11 +131,10 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">مبلغ اثر مالی (تومان):</label>
-              <input
-                type="number"
+              <label className="block text-slate-700 font-bold mb-1">مبلغ اثر مالی ({moneyUnitLabel()}):</label>
+              <MoneyInput
                 value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
+                onValueChange={(v) => setAmount(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono font-bold"
                 required
               />
@@ -140,10 +145,9 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">تمدید مدت (روز):</label>
-              <input
-                type="number"
+              <IntegerInput
                 value={extendedDays}
-                onChange={(e) => setExtendedDays(Number(e.target.value))}
+                onValueChange={(v) => setExtendedDays(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono"
               />
             </div>
@@ -164,7 +168,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             <label className="block text-slate-700 font-bold mb-1">وضعیت ابلاغ و تصویب:</label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as ContractAmendment['status'])}
               className="w-full p-2 rounded-lg border border-slate-300 bg-white"
             >
               <option value="تأیید شده">تأیید و ابلاغ شده کارفرما (به‌روزرسانی سقف پیمان)</option>
@@ -188,13 +192,18 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
 
           <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-950">
             <strong>اثر سیستمی:</strong> در صورت انتخاب «تأیید شده»، مبلغ سقف پیمان از{' '}
-            <span className="font-mono font-bold">{(contract.currentValue / 1_000_000_000).toFixed(2)}</span> به{' '}
+            <span className="font-mono font-bold">{formatMoneyCompact(contract.currentValue)}</span> به{' '}
             <span className="font-mono font-bold text-emerald-800">
-              {((contract.currentValue + amount) / 1_000_000_000).toFixed(2)} میلیارد تومان
+              {formatMoneyCompact((contract.currentValue + amount))}
             </span>{' '}
             افزایش خواهد یافت.
           </div>
 
+          {formError && (
+            <p className="text-xs text-rose-700 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
           <div className="pt-4 border-t border-slate-200 flex justify-end gap-2">
             <button
               type="button"
@@ -211,7 +220,6 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Landmark,
   Wallet,
@@ -17,6 +17,7 @@ import {
   PieChart,
 } from 'lucide-react';
 import {
+  AccountingSubTab,
   BankAccount,
   CashDesk,
   JournalEntry,
@@ -25,20 +26,26 @@ import {
   AccountsReceivableItem,
   AccountsPayableItem,
 } from '../../types';
-import { formatCurrencyCompact, formatNumber, formatPercent } from '../../utils/formatters';
+import { formatCurrencyCompact, formatInt, formatPercent } from '../../utils/formatters';
+import { moneyUnitLabel } from '../../utils/money';
+import type { Balances, CashFlowPoint } from '../../store/selectors';
 
 interface AccountingDashboardViewProps {
   bankAccounts: BankAccount[];
   cashDesks: CashDesk[];
+  pettyCashTotal: number;
   journalEntries: JournalEntry[];
   receipts: ReceiptRecord[];
   payments: PaymentRecord[];
   receivables: AccountsReceivableItem[];
   payables: AccountsPayableItem[];
-  onOpenNewDoc: () => void;
-  onOpenNewReceipt: () => void;
-  onOpenNewPayment: () => void;
-  onNavigateToTab: (tab: any) => void;
+  /** Company-wide ledger totals (final entries). */
+  ledger: Balances;
+  cashFlow: CashFlowPoint[];
+  onOpenNewDoc?: () => void;
+  /** Receipts and payments are entered in treasury, not in accounting. */
+  onOpenTreasury: (path: '/finance/receipts' | '/finance/payments') => void;
+  onNavigateToTab: (tab: AccountingSubTab) => void;
 }
 
 export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = ({
@@ -49,17 +56,17 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
   payments,
   receivables,
   payables,
+  pettyCashTotal,
+  ledger,
+  cashFlow,
   onOpenNewDoc,
-  onOpenNewReceipt,
-  onOpenNewPayment,
+  onOpenTreasury,
   onNavigateToTab,
 }) => {
-  const [cashFlowRange, setCashFlowRange] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
-
-  // Calculations
+  // Every figure below comes from the store: balances, the ledger and the aging lists.
   const totalBankBalance = bankAccounts.reduce((sum, b) => sum + b.balance, 0);
   const totalCashBalance = cashDesks.reduce((sum, c) => sum + c.balance, 0);
-  const totalPettyCash = 287_000_000; // From petty cash module
+  const totalPettyCash = pettyCashTotal;
   const totalLiquidity = totalBankBalance + totalCashBalance + totalPettyCash;
 
   const totalReceipts = receipts.reduce((sum, r) => sum + r.amount, 0);
@@ -70,26 +77,17 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
 
   const pendingDocsCount = journalEntries.filter((j) => j.status === 'در انتظار تأیید').length;
 
-  const periodRevenue = 410_500_000_000;
-  const periodExpense = 340_300_000_000;
+  const periodRevenue = ledger.revenue;
+  const periodExpense = ledger.cost;
   const periodProfit = periodRevenue - periodExpense;
-  const profitMargin = (periodProfit / periodRevenue) * 100;
+  const profitMargin = periodRevenue > 0 ? (periodProfit / periodRevenue) * 100 : 0;
+  const pct = (part: number) => (periodRevenue > 0 ? Math.max(0, Math.min(100, (part / periodRevenue) * 100)) : 0);
 
-  // Monthly Cash Flow data (Receipts vs Payments)
-  const cashFlowData = [
-    { period: 'فروردین', receipt: 28_000_000_000, payment: 22_000_000_000 },
-    { period: 'اردیبهشت', receipt: 34_000_000_000, payment: 29_500_000_000 },
-    { period: 'خرداد', receipt: 42_000_000_000, payment: 36_000_000_000 },
-    { period: 'تیر', receipt: 48_500_000_000, payment: 41_200_000_000 },
-    { period: 'مرداد', receipt: 55_000_000_000, payment: 46_000_000_000 },
-    { period: 'شهریور', receipt: 62_500_000_000, payment: 49_800_000_000 },
-  ];
+  const cashFlowData = cashFlow;
+  const maxCashFlow = Math.max(1, ...cashFlowData.flatMap((d) => [d.receipt, d.payment]));
+  const netCashFlow = cashFlowData.reduce((a, d) => a + d.receipt - d.payment, 0);
 
-  const maxCashFlow = Math.max(
-    ...cashFlowData.flatMap((d) => [d.receipt, d.payment])
-  );
-
-  const kpis = [
+  const kpis: { title: string; value: number; subtitle: string; icon: typeof Wallet; color: string; actionTab: AccountingSubTab; isCount?: boolean }[] = [
     {
       title: 'مانده کل نقدینگی شرکت',
       value: totalLiquidity,
@@ -165,7 +163,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
     {
       title: 'اسناد در انتظار تأیید',
       value: pendingDocsCount,
-      subtitle: 'نیازمند بررسی مدیر مالی و مدیرعامل',
+      subtitle: 'نیازمند تأیید حسابدار یا مدیر ارشد',
       icon: FileSpreadsheet,
       color: 'text-rose-700 bg-rose-50',
       isCount: true,
@@ -185,26 +183,28 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {onOpenNewDoc && (
+            <button
+              onClick={onOpenNewDoc}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer shadow-2xs"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>ثبت سند حسابداری جدید</span>
+            </button>
+          )}
           <button
-            onClick={onOpenNewDoc}
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer shadow-2xs"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>ثبت سند حسابداری جدید</span>
-          </button>
-          <button
-            onClick={onOpenNewReceipt}
+            onClick={() => onOpenTreasury('/finance/receipts')}
             className="flex items-center gap-1.5 bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
             <ArrowDownLeft className="w-3.5 h-3.5 text-teal-600" />
-            <span>ثبت دریافت وجه / چک</span>
+            <span>دریافت‌ها در خزانه</span>
           </button>
           <button
-            onClick={onOpenNewPayment}
+            onClick={() => onOpenTreasury('/finance/payments')}
             className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
             <ArrowUpRight className="w-3.5 h-3.5 text-rose-600" />
-            <span>ثبت پرداخت و تادیه</span>
+            <span>پرداخت‌ها در خزانه</span>
           </button>
           <button
             onClick={() => onNavigateToTab('financial_reports')}
@@ -218,11 +218,11 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
 
       {/* 10 Key Performance Indicators (KPI Cards) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {kpis.map((kpi, idx) => {
+        {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
             <button
-              key={idx}
+              key={kpi.title}
               onClick={() => onNavigateToTab(kpi.actionTab)}
               className="p-3.5 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-xs transition-all text-right cursor-pointer group"
             >
@@ -237,7 +237,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
 
               <div className="text-base font-extrabold text-slate-900 font-mono tabular-nums">
                 {kpi.isCount ? (
-                  <span>{kpi.value} سند</span>
+                  <span>{formatInt(kpi.value)} سند</span>
                 ) : (
                   <span>{formatCurrencyCompact(kpi.value)}</span>
                 )}
@@ -265,32 +265,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
               </p>
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px]">
-              <button
-                onClick={() => setCashFlowRange('monthly')}
-                className={`px-2 py-0.5 rounded cursor-pointer ${
-                  cashFlowRange === 'monthly' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                ماهانه
-              </button>
-              <button
-                onClick={() => setCashFlowRange('quarterly')}
-                className={`px-2 py-0.5 rounded cursor-pointer ${
-                  cashFlowRange === 'quarterly' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                فصلی
-              </button>
-              <button
-                onClick={() => setCashFlowRange('yearly')}
-                className={`px-2 py-0.5 rounded cursor-pointer ${
-                  cashFlowRange === 'yearly' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                سالانه
-              </button>
-            </div>
+            <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">۶ ماه آخر دفاتر</span>
           </div>
 
           {/* Chart Legend */}
@@ -303,7 +278,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
               <span className="w-3 h-3 rounded-xs bg-rose-600" />
               <span>پرداخت‌های نقدی (Payments)</span>
             </div>
-            <div className="mr-auto font-mono text-[10px] text-slate-400">واحد: میلیارد تومان</div>
+            <div className="mr-auto font-mono text-[10px] text-slate-400">واحد: {moneyUnitLabel()}</div>
           </div>
 
           {/* SVG Multi-Bar Visualization */}
@@ -318,23 +293,25 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
                     <div
                       style={{ height: `${recHeight}%` }}
                       className="w-1/2 max-w-6 bg-emerald-600 group-hover:bg-emerald-500 rounded-t-sm transition-all"
-                      title={`دریافت ${d.period}: ${formatCurrencyCompact(d.receipt)}`}
+                      title={`دریافت ${d.label}: ${formatCurrencyCompact(d.receipt)}`}
                     />
                     <div
                       style={{ height: `${payHeight}%` }}
                       className="w-1/2 max-w-6 bg-rose-600 group-hover:bg-rose-500 rounded-t-sm transition-all"
-                      title={`پرداخت ${d.period}: ${formatCurrencyCompact(d.payment)}`}
+                      title={`پرداخت ${d.label}: ${formatCurrencyCompact(d.payment)}`}
                     />
                   </div>
-                  <span className="mt-2 text-[10px] font-sans text-slate-600">{d.period}</span>
+                  <span className="mt-2 text-[10px] font-sans text-slate-600">{d.label}</span>
                 </div>
               );
             })}
           </div>
 
           <div className="mt-3 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>مازاد تراز نقدینگی ۶ ماه اخیر: <strong>+۳۳.۷ میلیارد تومان</strong></span>
-            <span className="text-emerald-700 font-bold font-mono">وضعیت نقدینگی مطلوب</span>
+            <span>
+              خالص جریان نقد ۶ ماه اخیر: <strong>{formatCurrencyCompact(netCashFlow)}</strong>
+            </span>
+            <span className={`font-bold font-mono ${netCashFlow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{netCashFlow >= 0 ? 'ورودی بیش از خروجی' : 'خروجی بیش از ورودی'}</span>
           </div>
         </div>
 
@@ -371,7 +348,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
                     className="bg-slate-700 h-2.5 rounded-full"
-                    style={{ width: `${(periodExpense / periodRevenue) * 100}%` }}
+                    style={{ width: `${pct(periodExpense)}%` }}
                   />
                 </div>
               </div>
@@ -384,7 +361,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
                     className="bg-amber-500 h-2.5 rounded-full"
-                    style={{ width: `${(periodProfit / periodRevenue) * 100}%` }}
+                    style={{ width: `${pct(periodProfit)}%` }}
                   />
                 </div>
               </div>

@@ -30,6 +30,7 @@ import {
   Bell,
   type LucideIcon,
 } from 'lucide-react';
+import type { UserAction } from '../utils/permissions';
 
 /**
  * پیکربندی واحد منوی کناری و مسیرها. هر گره فقط والد خود را می‌شناسد؛
@@ -47,6 +48,8 @@ export interface NavNode {
   badge?: string;
   /** Routed page that is reached from the header rather than the sidebar. */
   hidden?: boolean;
+  /** The page is shown (and routable) only for users who may perform this action. */
+  requires?: UserAction;
 }
 
 export const navConfig: NavNode[] = [
@@ -66,27 +69,33 @@ export const navConfig: NavNode[] = [
   { id: 'petty_cash', label: 'تنخواه', icon: Coins, path: '/petty-cash', countKey: 'petty_cash' },
 
   { id: 'finance', label: 'مالی', icon: Landmark },
-  { id: 'finance.accounting', parent: 'finance', label: 'حسابداری', icon: Calculator, path: '/finance/accounting' },
-  { id: 'finance.payments', parent: 'finance', label: 'پرداخت‌ها', icon: CreditCard, path: '/finance/payments', countKey: 'payments' },
-  { id: 'finance.receipts', parent: 'finance', label: 'دریافت‌ها', icon: ArrowDownLeft, path: '/finance/receipts' },
-  { id: 'finance.banks', parent: 'finance', label: 'بانک‌ها', icon: Landmark, path: '/finance/banks' },
-  { id: 'finance.cash', parent: 'finance', label: 'صندوق', icon: Wallet, path: '/finance/cash' },
+  { id: 'finance.accounting', parent: 'finance', label: 'حسابداری', icon: Calculator, path: '/finance/accounting', requires: 'journal.create' },
+  { id: 'finance.payments', parent: 'finance', label: 'پرداخت‌ها', icon: CreditCard, path: '/finance/payments', countKey: 'payments', requires: 'payment_request.create' },
+  { id: 'finance.receipts', parent: 'finance', label: 'دریافت‌ها', icon: ArrowDownLeft, path: '/finance/receipts', requires: 'receipt.record' },
+  { id: 'finance.banks', parent: 'finance', label: 'بانک‌ها', icon: Landmark, path: '/finance/banks', requires: 'payment.execute' },
+  { id: 'finance.cash', parent: 'finance', label: 'صندوق', icon: Wallet, path: '/finance/cash', requires: 'payment.execute' },
 
   { id: 'partners', label: 'طرف‌های حساب', icon: Users },
   { id: 'partners.clients', parent: 'partners', label: 'کارفرمایان', icon: UserCheck, path: '/partners/clients' },
   { id: 'partners.subcontractors', parent: 'partners', label: 'پیمانکاران جزء', icon: HardHat, path: '/partners/subcontractors' },
   { id: 'partners.suppliers', parent: 'partners', label: 'تأمین‌کنندگان', icon: Truck, path: '/partners/suppliers' },
 
-  { id: 'payroll', label: 'منابع انسانی و حقوق', icon: Award, path: '/payroll' },
+  { id: 'payroll', label: 'منابع انسانی و حقوق', icon: Award, path: '/payroll', requires: 'payroll.approve' },
   { id: 'documents', label: 'اسناد', icon: FolderLock, path: '/documents' },
   { id: 'approvals', label: 'تأییدات', icon: ShieldCheck, path: '/approvals', countKey: 'approvals' },
   { id: 'notifications', label: 'مرکز اعلان‌ها', icon: Bell, path: '/notifications', hidden: true },
   { id: 'reports', label: 'گزارش‌ها', icon: BarChart3, path: '/reports' },
-  { id: 'ai', label: 'دستیار هوشمند', icon: Sparkles, path: '/ai' },
-  { id: 'settings', label: 'تنظیمات', icon: Settings, path: '/settings' },
+  { id: 'ai', label: 'دستیار (نسخه نمایشی)', icon: Sparkles, path: '/ai' },
+  { id: 'settings', label: 'تنظیمات', icon: Settings, path: '/settings', requires: 'settings.manage' },
 ];
 
 export const navById = (id: string) => navConfig.find((n) => n.id === id);
+
+/** Visible nodes for a permission check: a group stays visible while any of its children is. */
+export function visibleNav(allowed: (action: UserAction) => boolean): NavNode[] {
+  const own = navConfig.filter((n) => !n.requires || allowed(n.requires));
+  return own.filter((n) => n.path || own.some((c) => c.parent === n.id));
+}
 export const navChildren = (id?: string) => navConfig.filter((n) => n.parent === id);
 
 /** Path of a node; group nodes resolve to their first child. */

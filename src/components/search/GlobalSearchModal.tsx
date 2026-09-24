@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Project, ApprovalItem, DetailedProgressStatement, PettyCashAccount } from '../../types';
 import { formatCurrencyCompact } from '../../utils/formatters';
 import { Search, Building2, FileText, UserCheck, Coins, Receipt, X, ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -88,8 +89,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     matchedPettyCash.length;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-20">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+    <Dialog onClose={onClose} label="جستجوی سراسری" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-20" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+      
         {/* Search Input Bar */}
         <div className="p-4 border-b border-slate-200 flex items-center gap-3 bg-slate-50/60">
           <Search className="w-5 h-5 text-amber-500 shrink-0" />
@@ -302,7 +303,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           </div>
           <span className="font-mono text-slate-400">Ctrl + K</span>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

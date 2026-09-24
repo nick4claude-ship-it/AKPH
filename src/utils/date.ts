@@ -182,3 +182,11 @@ export function getRelativePersianDate(daysOffset: number = 0): string {
 export function formatDocumentYearCode(prefix: string): string {
   return `${prefix}-${getCurrentFiscalYear()}`;
 }
+
+/** Sortable day index of a Jalali 'YYYY/MM/DD' date (NaN when unparseable). */
+export function dayIndex(date?: string): number {
+  const m = (date || '').replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (!m) return NaN;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return y * 365 + (mo <= 6 ? (mo - 1) * 31 : 186 + (mo - 7) * 30) + d;
+}

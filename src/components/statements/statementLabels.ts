@@ -27,7 +27,7 @@ export const SUB_STATUS_LABELS: Record<SubcontractorStatementWorkflowStatus, str
   site_review: 'تأیید کارگاه',
   pm_approved: 'تأیید مدیر پروژه',
   finance_approved: 'تأیید مالی',
-  management_approved: 'تأیید مدیرعامل — بدهی',
+  management_approved: 'تأیید مدیر ارشد — بدهی',
   paid: 'پرداخت‌شده',
   rejected: 'رد شده',
   returned_for_revision: 'برگشت جهت اصلاح',
@@ -35,7 +35,7 @@ export const SUB_STATUS_LABELS: Record<SubcontractorStatementWorkflowStatus, str
 
 /** Workflow steps as defined by the architecture document. */
 export const CLIENT_FLOW_STEPS = ['اندازه‌گیری', 'صورت‌وضعیت', 'تأیید مشاور', 'تأیید کارفرما', 'مطالبات', 'دریافت'];
-export const SUB_FLOW_STEPS = ['کارکرد', 'اندازه‌گیری', 'تأیید کارگاه', 'تأیید مدیر پروژه', 'تأیید مالی', 'تأیید مدیرعامل', 'بدهی', 'پرداخت'];
+export const SUB_FLOW_STEPS = ['کارکرد', 'اندازه‌گیری', 'تأیید کارگاه', 'تأیید مدیر پروژه', 'تأیید مالی', 'تأیید مدیر ارشد', 'بدهی', 'پرداخت'];
 
 export function clientFlowIndex(status: StatementWorkflowStatus, remaining: number): number {
   switch (status) {

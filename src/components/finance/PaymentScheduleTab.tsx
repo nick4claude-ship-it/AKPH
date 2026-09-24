@@ -8,6 +8,7 @@ import { CalendarClock, AlertTriangle, CheckCircle2, CreditCard } from 'lucide-r
 import { PaymentRequest } from '../../types';
 import { ScheduledPayment } from '../../store/domainSelectors';
 import { formatNumber } from '../../utils/formatters';
+import { formatMoney } from '../../utils/money';
 
 interface PaymentScheduleTabProps {
   schedule: { rows: ScheduledPayment[]; availableCash: number };
@@ -25,20 +26,20 @@ export const PaymentScheduleTab: React.FC<PaymentScheduleTabProps> = ({ schedule
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">نقدینگی در دسترس</span>
-          <div className="text-lg font-bold text-emerald-700 font-mono">{formatNumber(schedule.availableCash)}</div>
+          <div className="text-lg font-bold text-emerald-700 font-mono">{formatMoney(schedule.availableCash, false)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">جمع تعهدات باز</span>
-          <div className="text-lg font-bold text-slate-900 font-mono">{formatNumber(total)}</div>
+          <div className="text-lg font-bold text-slate-900 font-mono">{formatMoney(total, false)}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">سررسید گذشته</span>
-          <div className="text-lg font-bold text-rose-700 font-mono">{formatNumber(overdue.reduce((a, r) => a + r.request.remainingAmount, 0))}</div>
+          <div className="text-lg font-bold text-rose-700 font-mono">{formatMoney(overdue.reduce((a, r) => a + r.request.remainingAmount, 0), false)}</div>
           <span className="text-[11px] text-slate-400">{overdue.length.toLocaleString('fa-IR')} فقره</span>
         </div>
         <div className={`p-4 rounded-xl border ${gap > 0 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
           <span className="text-xs text-slate-600">{gap > 0 ? 'کسری نقدینگی برای کل تعهدات' : 'مازاد نقدینگی پس از تعهدات'}</span>
-          <div className={`text-lg font-bold font-mono ${gap > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatNumber(Math.abs(gap))}</div>
+          <div className={`text-lg font-bold font-mono ${gap > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(Math.abs(gap), false)}</div>
         </div>
       </div>
 
@@ -74,8 +75,8 @@ export const PaymentScheduleTab: React.FC<PaymentScheduleTabProps> = ({ schedule
                 </td>
                 <td className="py-2.5 px-3">{r.beneficiaryName}</td>
                 <td className="py-2.5 px-3 text-[11px]">{r.status}</td>
-                <td className="py-2.5 px-3 text-left font-mono font-bold">{formatNumber(r.remainingAmount)}</td>
-                <td className="py-2.5 px-3 text-left font-mono text-slate-500">{formatNumber(cumulative)}</td>
+                <td className="py-2.5 px-3 text-left font-mono font-bold">{formatMoney(r.remainingAmount, false)}</td>
+                <td className="py-2.5 px-3 text-left font-mono text-slate-500">{formatMoney(cumulative, false)}</td>
                 <td className="py-2.5 px-3">
                   {coveredByCash ? (
                     <span className="inline-flex items-center gap-1 text-emerald-700">
@@ -88,7 +89,7 @@ export const PaymentScheduleTab: React.FC<PaymentScheduleTabProps> = ({ schedule
                   )}
                 </td>
                 <td className="py-2.5 px-3">
-                  {(r.status === 'تأیید مدیرعامل' || r.status === 'در صف پرداخت خزانه') && (
+                  {(r.status === 'تأیید مدیر ارشد' || r.status === 'در صف پرداخت خزانه') && (
                     <button
                       onClick={() => onPay(r)}
                       className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500 text-slate-950 text-[11px] font-bold cursor-pointer"

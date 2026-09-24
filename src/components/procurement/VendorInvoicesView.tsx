@@ -15,6 +15,9 @@ import {
   Calculator,
 } from 'lucide-react';
 import { VendorInvoice, Project } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
 
 interface VendorInvoicesViewProps {
   invoices: VendorInvoice[];
@@ -156,19 +159,19 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
                       </span>
                       {inv.threeWayMatching.qtyVarianceAmount > 0 && (
                         <span className="text-[9px] text-rose-600 font-bold">
-                          کسر {inv.threeWayMatching.qtyVarianceAmount.toLocaleString('fa-IR')} ت مغایرت
+                          کسر {formatMoney(inv.threeWayMatching.qtyVarianceAmount)} مغایرت
                         </span>
                       )}
                     </div>
                   </td>
 
                   <td className="py-3.5 px-4 text-left font-mono font-bold text-slate-900">
-                    {inv.totalAmount.toLocaleString('fa-IR')} تومان
+                    {formatMoney(inv.totalAmount)}
                   </td>
 
                   <td className="py-3.5 px-4 text-left font-mono font-bold">
                     <span className={inv.remainingBalance > 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                      {inv.remainingBalance.toLocaleString('fa-IR')} تومان
+                      {formatMoney(inv.remainingBalance)}
                     </span>
                   </td>
 
@@ -199,8 +202,8 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
 
       {/* 3-Way Matching Interactive Inspection Modal */}
       {activeInvoiceForDetail && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <Dialog onClose={() => setActiveInvoiceForDetail(null)} label="پانل تطبیق سه‌جانبه فاکتور" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          
             <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -279,29 +282,29 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
               <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/60 space-y-2">
                 <div className="flex justify-between items-center text-slate-600">
                   <span>بهای خالص کالا:</span>
-                  <span className="font-mono font-bold text-slate-900">{activeInvoiceForDetail.subtotal.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold text-slate-900">{formatMoney(activeInvoiceForDetail.subtotal)}</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>مالیات بر ارزش افزوده (۱۰٪):</span>
-                  <span className="font-mono font-bold text-slate-900">{activeInvoiceForDetail.vatAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span>مالیات بر ارزش افزوده ({formatPercent(activeInvoiceForDetail.subtotal ? (activeInvoiceForDetail.vatAmount * 100) / activeInvoiceForDetail.subtotal : 0)}):</span>
+                  <span className="font-mono font-bold text-slate-900">{formatMoney(activeInvoiceForDetail.vatAmount)}</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-600">
                   <span>هزینه حمل و تخلیه:</span>
-                  <span className="font-mono font-bold text-slate-900">{activeInvoiceForDetail.shippingCost.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold text-slate-900">{formatMoney(activeInvoiceForDetail.shippingCost)}</span>
                 </div>
                 <div className="border-t border-slate-200 pt-2 flex justify-between items-center font-black text-slate-900 text-sm">
                   <span>مجموع ناخالص فاکتور:</span>
                   <span className="font-mono text-indigo-700 text-base">
-                    {activeInvoiceForDetail.totalAmount.toLocaleString('fa-IR')} تومان
+                    {formatMoney(activeInvoiceForDetail.totalAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-emerald-700 font-bold pt-1">
                   <span>مبلغ پرداخت‌شده قبلی (پیش‌پرداخت/حواله):</span>
-                  <span className="font-mono">{activeInvoiceForDetail.paidAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono">{formatMoney(activeInvoiceForDetail.paidAmount)}</span>
                 </div>
                 <div className="border-t-2 border-slate-300 pt-2 flex justify-between items-center font-black text-rose-700 text-sm">
                   <span>مانده قابل تسویه / صدور چک صیادی:</span>
-                  <span className="font-mono">{activeInvoiceForDetail.remainingBalance.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono">{formatMoney(activeInvoiceForDetail.remainingBalance)}</span>
                 </div>
               </div>
 
@@ -335,8 +338,7 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
                 بستن
               </button>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

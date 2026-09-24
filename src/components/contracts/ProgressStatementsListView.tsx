@@ -18,6 +18,7 @@ import {
   Layers,
   ChevronLeft,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact } from '../../utils/money';
 
 interface ProgressStatementsListViewProps {
   statements: DetailedProgressStatement[];
@@ -101,31 +102,31 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
         <div>
           <span className="text-slate-500 block text-[11px]">مجموع ناخالص کارکرد:</span>
           <span className="font-black text-slate-900 font-mono text-sm">
-            {(totalGross / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(totalGross)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">مجموع کسورات قانونی:</span>
           <span className="font-bold text-rose-700 font-mono text-sm">
-            {(totalDeductions / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(totalDeductions)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">خالص مصوب قابل پرداخت:</span>
           <span className="font-black text-indigo-900 font-mono text-sm">
-            {(totalNet / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(totalNet)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">کل دریافتی نقد و اسناد:</span>
           <span className="font-bold text-emerald-700 font-mono text-sm">
-            {(totalReceived / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(totalReceived)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">مانده مطالبات وصول‌نشده:</span>
           <span className="font-black text-rose-600 font-mono text-sm">
-            {(totalRemaining / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(totalRemaining)}
           </span>
         </div>
       </div>
@@ -218,19 +219,19 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
                     </span>
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-slate-800">
-                    {stm.grossAmount.toLocaleString('fa-IR')}
+                    {formatMoney(stm.grossAmount, false)}
                   </td>
                   <td className="p-3 text-left font-mono text-rose-700">
-                    {stm.totalDeductions.toLocaleString('fa-IR')}
+                    {formatMoney(stm.totalDeductions, false)}
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-indigo-900">
-                    {stm.netPayable.toLocaleString('fa-IR')}
+                    {formatMoney(stm.netPayable, false)}
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                    {stm.receivedAmount.toLocaleString('fa-IR')}
+                    {formatMoney(stm.receivedAmount, false)}
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-rose-600">
-                    {stm.remainingPayable.toLocaleString('fa-IR')}
+                    {formatMoney(stm.remainingPayable, false)}
                   </td>
                   <td className="p-3 text-center">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${meta.color}`}>

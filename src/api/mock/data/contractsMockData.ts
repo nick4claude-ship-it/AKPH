@@ -13,7 +13,7 @@ import {
   PriceAdjustment,
   StatementPayment,
   ContractAuditLog,
-} from '../types';
+} from '../../../types';
 
 /** Seed format of legacy per-contract attachments; migrated into the document center by the store. */
 export interface SeedContractDocument {

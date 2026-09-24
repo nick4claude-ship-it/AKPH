@@ -29,6 +29,7 @@ import { useWorkflows } from '../../store/useWorkflows';
 import { useCurrentUser } from '../../store/session';
 import { generateUUID } from '../../utils/ids';
 import { toPersianDate } from '../../utils/date';
+import { Dialog } from '../common/Dialog';
 
 /** Labels for what a document can be linked to. */
 const ENTITY_LABELS: Record<DocumentEntityType, string> = {
@@ -112,19 +113,16 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedDocForPreview, setSelectedDocForPreview] = useState<DocRow | null>(null);
 
-  const handleDownloadFile = (title: string, format: string) => {
-    const blob = new Blob(
-      [`شرکت پایدار مدیریت پروژه\nعنوان سند: ${title}\nنوع فایل: ${format}\nتاریخ دریافت: ${new Date().toLocaleDateString('fa-IR')}`],
-      { type: 'text/plain;charset=utf-8' }
-    );
-    const url = URL.createObjectURL(blob);
+  // Only a stored file can be downloaded; a metadata-only record has nothing to download yet.
+  const handleDownloadFile = (doc: AppDocument) => {
+    if (!doc.url) return;
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title.replace(/[\/\\:*?"<>|]/g, '_')}.${format.toLowerCase().includes('pdf') ? 'pdf' : 'txt'}`;
+    a.href = doc.url;
+    a.download = doc.fileName || doc.title;
+    a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    a.remove();
   };
 
   // New Document Modal State
@@ -135,7 +133,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
   const [newDocPartner, setNewDocPartner] = useState('');
   const [newDocLinkType, setNewDocLinkType] = useState<DocumentEntityType>('contract');
   const [newDocLinkId, setNewDocLinkId] = useState('');
-  const [newDocFormat, setNewDocFormat] = useState<any>('PDF');
+  const [newDocFormat, setNewDocFormat] = useState<AppDocument['fileFormat']>('PDF');
   const [newDocDesc, setNewDocDesc] = useState('');
 
   const filteredDocs = documents.filter((doc) => {
@@ -338,9 +336,10 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDownloadFile(doc.title, doc.fileFormat)}
-                        className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg cursor-pointer"
-                        title="دریافت فایل پیوست"
+                        onClick={() => handleDownloadFile(doc)}
+                        disabled={!doc.url}
+                        className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={doc.url ? 'دریافت فایل پیوست' : 'فایل اصلی هنوز بارگذاری نشده است (به‌زودی)'}
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
@@ -355,8 +354,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
       {/* Modal: Document Preview */}
       {selectedDocForPreview && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog onClose={() => setSelectedDocForPreview(null)} label="پیش‌نمایش سند" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+          
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-slate-100 rounded-xl">
@@ -413,8 +412,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               <div>
                 <span className="text-slate-400 text-[11px] block mb-1">متصل به:</span>
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {selectedDocForPreview.links.map((l, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded text-[10px]">
+                  {selectedDocForPreview.links.map((l) => (
+                    <span key={`${l.entityType}:${l.entityId}`} className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded text-[10px]">
                       {linkLabel(l)}
                     </span>
                   ))}
@@ -460,8 +459,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               <div>
                 <span className="text-slate-400 text-[11px] block mb-1">برچسب‌ها:</span>
                 <div className="flex flex-wrap gap-1">
-                  {selectedDocForPreview.tags.map((t, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px]">
+                  {[...new Set(selectedDocForPreview.tags)].map((t) => (
+                    <span key={t} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px]">
                       #{t}
                     </span>
                   ))}
@@ -473,11 +472,12 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               <span className="text-xs text-slate-400">ثبت‌کننده: {selectedDocForPreview.registeredBy}</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleDownloadFile(selectedDocForPreview.title, selectedDocForPreview.fileFormat)}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => handleDownloadFile(selectedDocForPreview)}
+                  disabled={!selectedDocForPreview.url}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Download className="w-3.5 h-3.5 text-amber-400" />
-                  <span>دانلود فایل پیوست</span>
+                  <span>{selectedDocForPreview.url ? 'دانلود فایل پیوست' : 'دانلود فایل (به‌زودی)'}</span>
                 </button>
                 <button
                   onClick={() => setSelectedDocForPreview(null)}
@@ -487,14 +487,13 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
 
       {/* Modal: Upload New Document */}
       {isNewDocModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
+        <Dialog onClose={() => setIsNewDocModalOpen(false)} label="بارگذاری و بایگانی سند جدید" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
+          
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <h3 className="text-sm font-bold text-slate-900">بارگذاری و بایگانی سند جدید</h3>
               <button
@@ -601,7 +600,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 <label className="block font-medium text-slate-700 mb-1">فرمت فایل:</label>
                 <select
                   value={newDocFormat}
-                  onChange={(e) => setNewDocFormat(e.target.value)}
+                  onChange={(e) => setNewDocFormat(e.target.value as AppDocument['fileFormat'])}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
                 >
                   <option value="PDF">PDF Document</option>
@@ -639,8 +638,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

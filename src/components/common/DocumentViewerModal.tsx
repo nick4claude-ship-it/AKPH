@@ -4,6 +4,7 @@ import { useAppState } from '../../store/AppStore';
 import { selectDocumentsFor } from '../../store/domainSelectors';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { X, FileText, CheckCircle2, ShieldCheck, Download, Printer } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
 
 interface DocumentViewerModalProps {
   item: ApprovalItem | null;
@@ -32,8 +33,8 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   const attachment = docs[0];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+    <Dialog onClose={onClose} label="مشاهده سند مالی و فاکتور پیوست" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+      
         {/* Header */}
         <div className="bg-slate-900 text-white p-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -124,24 +125,22 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               </div>
             </div>
             <button
+              disabled={!attachment?.url}
+              title={attachment?.url ? 'دانلود فایل' : 'فایل اصلی هنوز بارگذاری نشده است (به‌زودی)'}
               onClick={() => {
-                const blob = new Blob(
-                  [`پیوست سند شرکت پیمانکاری\nنام فایل: ${attachment?.fileName || '-'}\nشماره سند: ${item.docNumber}\nپروژه: ${item.projectName}`],
-                  { type: 'application/pdf' }
-                );
-                const url = URL.createObjectURL(blob);
+                if (!attachment?.url) return;
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = attachment?.fileName || 'document.pdf';
+                a.href = attachment.url;
+                a.download = attachment.fileName || attachment.title;
+                a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                a.remove();
               }}
-              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>دانلود</span>
+              <span>{attachment?.url ? 'دانلود' : 'دانلود (به‌زودی)'}</span>
             </button>
           </div>
         </div>
@@ -162,10 +161,9 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
             className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>تأیید فوری سند توسط مدیرعامل</span>
+            <span>تأیید سند</span>
           </button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

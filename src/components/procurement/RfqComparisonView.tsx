@@ -15,6 +15,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { RequestForQuotation, BidSupplierQuote } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney } from '../../utils/money';
 
 interface RfqComparisonViewProps {
   rfqs: RequestForQuotation[];
@@ -99,7 +101,7 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                     </div>
                     <div className="flex justify-between text-emerald-800 text-[11px] pt-1">
                       <span>مبلغ کل پیشنهادی:</span>
-                      <span className="font-mono font-bold">{winningQuote.totalQuoteAmount.toLocaleString('fa-IR')} تومان</span>
+                      <span className="font-mono font-bold">{formatMoney(winningQuote.totalQuoteAmount)}</span>
                     </div>
                     <div className="flex justify-between text-emerald-800 text-[11px]">
                       <span>شرایط پرداخت:</span>
@@ -134,8 +136,8 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
 
       {/* Bid Comparison Matrix Modal (کمیسیون معاملات) */}
       {activeRfqForMatrix && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <Dialog onClose={() => setActiveRfqForMatrix(null)} label="جدول مقایسه فنی و مالی پیش‌فاکتورها -" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
               <div className="flex items-center gap-2">
@@ -173,7 +175,7 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                 </div>
                 {activeRfqForMatrix.savingsVsBudgetAmount && activeRfqForMatrix.savingsVsBudgetAmount > 0 && (
                   <div className="text-emerald-700 font-bold bg-emerald-100/60 px-2.5 py-1 rounded-lg">
-                    صرفه‌جویی نسبت به برآورد اولیه: {activeRfqForMatrix.savingsVsBudgetAmount.toLocaleString('fa-IR')} تومان
+                    صرفه‌جویی نسبت به برآورد اولیه: {formatMoney(activeRfqForMatrix.savingsVsBudgetAmount)}
                   </div>
                 )}
               </div>
@@ -211,25 +213,25 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                         <div className="flex justify-between text-slate-600">
                           <span>نرخ واحد کالا:</span>
                           <span className="font-mono font-bold text-slate-900">
-                            {quote.unitPrice.toLocaleString('fa-IR')} تومان
+                            {formatMoney(quote.unitPrice)}
                           </span>
                         </div>
                         <div className="flex justify-between text-slate-600">
                           <span>کرایه حمل واحد:</span>
                           <span className="font-mono text-slate-800">
-                            {quote.freightCostPerUnit.toLocaleString('fa-IR')} تومان
+                            {formatMoney(quote.freightCostPerUnit)}
                           </span>
                         </div>
                         <div className="flex justify-between text-slate-600">
                           <span>مالیات ارزش افزوده:</span>
                           <span className="font-mono text-slate-800">
-                            {quote.vatAmount.toLocaleString('fa-IR')} تومان
+                            {formatMoney(quote.vatAmount)}
                           </span>
                         </div>
                         <div className="flex justify-between border-t border-slate-200 pt-1.5 font-black text-indigo-900">
                           <span>مبلغ کل پیش‌فاکتور:</span>
                           <span className="font-mono text-sm">
-                            {quote.totalQuoteAmount.toLocaleString('fa-IR')} تومان
+                            {formatMoney(quote.totalQuoteAmount)}
                           </span>
                         </div>
                       </div>
@@ -321,8 +323,7 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                 بستن
               </button>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

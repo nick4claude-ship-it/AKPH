@@ -16,6 +16,8 @@ import {
   User,
   CheckCircle2,
 } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface InventoryDocumentModalProps {
   receipt: GoodsReceiptNote | null;
@@ -49,8 +51,8 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+    <Dialog onClose={onClose} label="جزئیات سند انبار" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+      
         {/* Top Control Bar */}
         <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between no-print">
           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -216,13 +218,13 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                     <th className="border border-slate-300 p-2 text-right">کد و شرح کالا</th>
                     <th className="border border-slate-300 p-2">واحد</th>
                     <th className="border border-slate-300 p-2">مقدار تحویلی</th>
-                    <th className="border border-slate-300 p-2 text-left">نرخ واحد (تومان)</th>
-                    <th className="border border-slate-300 p-2 text-left">مبلغ کل (تومان)</th>
+                    <th className="border border-slate-300 p-2 text-left">نرخ واحد ({moneyUnitLabel()})</th>
+                    <th className="border border-slate-300 p-2 text-left">مبلغ کل ({moneyUnitLabel()})</th>
                   </tr>
                 </thead>
                 <tbody>
                   {receipt.items.map((item, i) => (
-                    <tr key={i}>
+                    <tr key={`${item.materialId}-${i}`}>
                       <td className="border border-slate-300 p-2 text-center font-mono">{i + 1}</td>
                       <td className="border border-slate-300 p-2 font-bold">{item.materialName}</td>
                       <td className="border border-slate-300 p-2 text-center">{item.unit}</td>
@@ -230,10 +232,10 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                         {item.acceptedQty.toLocaleString('fa-IR')}
                       </td>
                       <td className="border border-slate-300 p-2 text-left font-mono">
-                        {item.unitPrice.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitPrice, false)}
                       </td>
                       <td className="border border-slate-300 p-2 text-left font-mono font-bold">
-                        {item.totalPrice.toLocaleString('fa-IR')}
+                        {formatMoney(item.totalPrice, false)}
                       </td>
                     </tr>
                   ))}
@@ -242,7 +244,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                       جمع کل رسید انبار:
                     </td>
                     <td className="border border-slate-300 p-2 text-left font-mono font-black text-emerald-800">
-                      {receipt.totalAmount.toLocaleString('fa-IR')} تومان
+                      {formatMoney(receipt.totalAmount)}
                     </td>
                   </tr>
                 </tbody>
@@ -306,13 +308,13 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                     <th className="border border-slate-300 p-2 text-right">کد و شرح مصالح</th>
                     <th className="border border-slate-300 p-2">واحد</th>
                     <th className="border border-slate-300 p-2">مقدار مصرف</th>
-                    <th className="border border-slate-300 p-2 text-left">بهای واحد (تومان)</th>
-                    <th className="border border-slate-300 p-2 text-left">هزینه کل (تومان)</th>
+                    <th className="border border-slate-300 p-2 text-left">بهای واحد ({moneyUnitLabel()})</th>
+                    <th className="border border-slate-300 p-2 text-left">هزینه کل ({moneyUnitLabel()})</th>
                   </tr>
                 </thead>
                 <tbody>
                   {issue.items.map((item, i) => (
-                    <tr key={i}>
+                    <tr key={`${item.materialId}-${i}`}>
                       <td className="border border-slate-300 p-2 text-center font-mono">{i + 1}</td>
                       <td className="border border-slate-300 p-2 font-bold">{item.materialName}</td>
                       <td className="border border-slate-300 p-2 text-center">{item.unit}</td>
@@ -320,10 +322,10 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                         {item.issuedQty.toLocaleString('fa-IR')}
                       </td>
                       <td className="border border-slate-300 p-2 text-left font-mono">
-                        {item.unitCost.toLocaleString('fa-IR')}
+                        {formatMoney(item.unitCost, false)}
                       </td>
                       <td className="border border-slate-300 p-2 text-left font-mono font-bold">
-                        {item.totalCost.toLocaleString('fa-IR')}
+                        {formatMoney(item.totalCost, false)}
                       </td>
                     </tr>
                   ))}
@@ -332,7 +334,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                       جمع کل حواله مصرف کارگاه:
                     </td>
                     <td className="border border-slate-300 p-2 text-left font-mono font-black text-amber-800">
-                      {issue.totalCost.toLocaleString('fa-IR')} تومان
+                      {formatMoney(issue.totalCost)}
                     </td>
                   </tr>
                 </tbody>
@@ -371,7 +373,6 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

@@ -17,6 +17,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Supplier, ProcurementCategory, VendorGrade } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, formatMoneyCompact } from '../../utils/money';
 
 interface SuppliersDirectoryViewProps {
   suppliers: Supplier[];
@@ -159,13 +161,13 @@ export const SuppliersDirectoryView: React.FC<SuppliersDirectoryViewProps> = ({
                 <div className="flex justify-between text-slate-600">
                   <span>حجم کل معاملات:</span>
                   <span className="font-mono font-bold text-slate-800">
-                    {(supplier.financials.totalPurchasesAmount / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} م.ت
+                    {formatMoneyCompact(supplier.financials.totalPurchasesAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>مانده بستانکاری طرف حساب:</span>
                   <span className="font-mono font-bold text-rose-600">
-                    {(supplier.financials.currentPayableBalance / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    {formatMoneyCompact(supplier.financials.currentPayableBalance)}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
@@ -210,8 +212,8 @@ export const SuppliersDirectoryView: React.FC<SuppliersDirectoryViewProps> = ({
 
       {/* Supplier Profile Modal */}
       {activeSupplierProfile && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <Dialog onClose={() => setActiveSupplierProfile(null)} label="پرونده جامع تأمین‌کننده" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          
             <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-teal-50 text-teal-600 rounded-lg">
@@ -289,19 +291,19 @@ export const SuppliersDirectoryView: React.FC<SuppliersDirectoryViewProps> = ({
                   <div>
                     <span className="text-slate-500 block text-[11px]">مجموع خریدهای انجام شده:</span>
                     <span className="font-mono font-bold text-slate-900 text-sm">
-                      {activeSupplierProfile.financials.totalPurchasesAmount.toLocaleString('fa-IR')} تومان
+                      {formatMoney(activeSupplierProfile.financials.totalPurchasesAmount)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[11px]">مانده بدهی شرکت به فروشنده:</span>
                     <span className="font-mono font-bold text-rose-600 text-sm">
-                      {activeSupplierProfile.financials.currentPayableBalance.toLocaleString('fa-IR')} تومان
+                      {formatMoney(activeSupplierProfile.financials.currentPayableBalance)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[11px]">چک‌های صیادی در جریان:</span>
                     <span className="font-mono font-bold text-indigo-700 text-sm">
-                      {activeSupplierProfile.financials.unclearedChecksAmount.toLocaleString('fa-IR')} تومان
+                      {formatMoney(activeSupplierProfile.financials.unclearedChecksAmount)}
                     </span>
                   </div>
                 </div>
@@ -324,8 +326,7 @@ export const SuppliersDirectoryView: React.FC<SuppliersDirectoryViewProps> = ({
                 بستن پرونده
               </button>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

@@ -23,12 +23,16 @@ import {
   Send,
   BookOpen,
 } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
+import { downloadCsv } from '../../utils/export';
+import { formatPercent } from '../../utils/formatters';
 
 interface StatementDetailAndPrintModalProps {
   statement: DetailedProgressStatement;
   currentUser: UserProfile;
   onClose: () => void;
-  onUpdateStatus: (statementId: string, newStatus: any, reason?: string) => void;
+  onUpdateStatus: (statementId: string, newStatus: DetailedProgressStatement['status'], reason?: string) => void;
   onIssueAccountingEntry?: (statement: DetailedProgressStatement) => void;
 }
 
@@ -44,6 +48,8 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectError, setRejectError] = useState(false);
   const [accountingIssued, setAccountingIssued] = useState(!!statement.accountingJournalEntryId);
+  // VAT is charged on the period's work, adjustments and allowable items; the shown rate is the stored one.
+  const vatBase = statement.workAmountCurrent + statement.adjustmentAmount + statement.otherAllowableItemsAmount;
 
   // Status mapping
   const statusMeta: Record<string, { label: string; color: string }> = {
@@ -67,32 +73,24 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   };
 
   const handleExportExcel = () => {
-    // Generate CSV
-    const headers = ['ردیف', 'کد آیتم', 'شرح عملیات', 'واحد', 'مقدار قرارداد', 'مقدار قبلی', 'این دوره', 'تجمعی', 'بهای واحد', 'مبلغ این دوره', 'مبلغ تجمعی'];
-    const rows = statement.items.map((i) => [
-      i.rowNumber,
-      i.code,
-      `"${i.description.replace(/"/g, '""')}"`,
-      i.unit,
-      i.contractQuantity,
-      i.previousQuantity,
-      i.currentQuantity,
-      i.cumulativeQuantity,
-      i.unitRate,
-      i.currentAmount,
-      i.cumulativeAmount,
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${statement.statementNumber}_${statement.contractCode}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const unit = moneyUnitLabel();
+    downloadCsv(
+      `${statement.statementNumber}_${statement.contractCode}.csv`,
+      ['ردیف', 'کد آیتم', 'شرح عملیات', 'واحد', 'مقدار قرارداد', 'مقدار قبلی', 'این دوره', 'تجمعی', `بهای واحد (${unit})`, `مبلغ این دوره (${unit})`, `مبلغ تجمعی (${unit})`],
+      statement.items.map((i) => [
+        i.rowNumber,
+        i.code,
+        i.description,
+        i.unit,
+        i.contractQuantity,
+        i.previousQuantity,
+        i.currentQuantity,
+        i.cumulativeQuantity,
+        toDisplayAmount(i.unitRate),
+        toDisplayAmount(i.currentAmount),
+        toDisplayAmount(i.cumulativeAmount),
+      ])
+    );
   };
 
   const handleCreateAccountingEntry = () => {
@@ -103,8 +101,8 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="صورت‌وضعیت موقت / کارکرد پیمان" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+      
         {/* Top Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between no-print">
           <div className="flex items-center gap-3">
@@ -178,28 +176,28 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                 <div>
                   <span className="text-[11px] text-slate-500 block">کارکرد ناخالص این دوره:</span>
                   <span className="text-base font-black text-slate-900 font-mono">
-                    {statement.grossAmount.toLocaleString('fa-IR')} تومان
+                    {formatMoney(statement.grossAmount)}
                   </span>
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-500 block">مجموع کسورات قانونی:</span>
                   <span className="text-base font-black text-rose-700 font-mono">
-                    {statement.totalDeductions.toLocaleString('fa-IR')} تومان
+                    {formatMoney(statement.totalDeductions)}
                   </span>
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-500 block">مبلغ خالص قابل پرداخت:</span>
                   <span className="text-base font-black text-indigo-900 font-mono">
-                    {statement.netPayable.toLocaleString('fa-IR')} تومان
+                    {formatMoney(statement.netPayable)}
                   </span>
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-500 block">دریافت شده / مانده طلب:</span>
                   <span className="text-sm font-bold text-emerald-700 font-mono block">
-                    دریافتی: {statement.receivedAmount.toLocaleString('fa-IR')}
+                    دریافتی: {formatMoney(statement.receivedAmount, false)}
                   </span>
                   <span className="text-xs font-bold text-rose-600 font-mono block">
-                    مانده: {statement.remainingPayable.toLocaleString('fa-IR')} تومان
+                    مانده: {formatMoney(statement.remainingPayable)}
                   </span>
                 </div>
               </div>
@@ -357,9 +355,9 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                               </span>
                             )}
                           </td>
-                          <td className="p-2.5 text-left font-mono">{i.unitRate.toLocaleString('fa-IR')}</td>
+                          <td className="p-2.5 text-left font-mono">{formatMoney(i.unitRate, false)}</td>
                           <td className="p-2.5 text-left font-mono font-bold text-slate-900">
-                            {i.currentAmount.toLocaleString('fa-IR')}
+                            {formatMoney(i.currentAmount, false)}
                           </td>
                         </tr>
                       ))}
@@ -378,8 +376,8 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                         <th className="p-2.5">عنوان کسری</th>
                         <th className="p-2.5">نوع محاسبه</th>
                         <th className="p-2.5 text-center">درصد / ضریب</th>
-                        <th className="p-2.5 text-left">مبلغ مبنا (تومان)</th>
-                        <th className="p-2.5 text-left">مبلغ کسور (تومان)</th>
+                        <th className="p-2.5 text-left">مبلغ مبنا ({moneyUnitLabel()})</th>
+                        <th className="p-2.5 text-left">مبلغ کسور ({moneyUnitLabel()})</th>
                         <th className="p-2.5">توضیحات و مستندات</th>
                       </tr>
                     </thead>
@@ -389,9 +387,9 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                           <td className="p-2.5 font-bold text-slate-900">{d.title}</td>
                           <td className="p-2.5 text-slate-600">{d.mode === 'percentage' ? 'درصدی' : 'مبلغ مقطوع'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-700">{d.rate > 0 ? `${d.rate}٪` : '-'}</td>
-                          <td className="p-2.5 text-left font-mono">{d.baseAmount.toLocaleString('fa-IR')}</td>
+                          <td className="p-2.5 text-left font-mono">{formatMoney(d.baseAmount, false)}</td>
                           <td className="p-2.5 text-left font-mono font-bold text-rose-700">
-                            {d.calculatedAmount.toLocaleString('fa-IR')}
+                            {formatMoney(d.calculatedAmount, false)}
                           </td>
                           <td className="p-2.5 text-slate-500 text-[11px]">{d.description || '-'}</td>
                         </tr>
@@ -403,7 +401,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                           مجموع کل کسورات دوره:
                         </td>
                         <td className="p-2.5 text-left font-mono font-black text-rose-800">
-                          {statement.totalDeductions.toLocaleString('fa-IR')} تومان
+                          {formatMoney(statement.totalDeductions)}
                         </td>
                         <td></td>
                       </tr>
@@ -473,11 +471,11 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">تعدیل آحادبها:</span>
-                  <span className="font-mono font-bold">{statement.adjustmentAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold">{formatMoney(statement.adjustmentAmount)}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">مالیات بر ارزش افزوده:</span>
-                  <span className="font-mono font-bold">{statement.vatAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold">{formatMoney(statement.vatAmount)}</span>
                 </div>
               </div>
 
@@ -492,7 +490,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                       <th className="p-1.5 border border-slate-300 text-center">واحد</th>
                       <th className="p-1.5 border border-slate-300 text-left">کارکرد این دوره</th>
                       <th className="p-1.5 border border-slate-300 text-left">بهای واحد</th>
-                      <th className="p-1.5 border border-slate-300 text-left">مبلغ دوره (تومان)</th>
+                      <th className="p-1.5 border border-slate-300 text-left">مبلغ دوره ({moneyUnitLabel()})</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -503,8 +501,8 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                         <td className="p-1.5 border border-slate-300">{i.description}</td>
                         <td className="p-1.5 border border-slate-300 text-center">{i.unit}</td>
                         <td className="p-1.5 border border-slate-300 text-left font-mono">{i.currentQuantity.toLocaleString('fa-IR')}</td>
-                        <td className="p-1.5 border border-slate-300 text-left font-mono">{i.unitRate.toLocaleString('fa-IR')}</td>
-                        <td className="p-1.5 border border-slate-300 text-left font-mono font-bold">{i.currentAmount.toLocaleString('fa-IR')}</td>
+                        <td className="p-1.5 border border-slate-300 text-left font-mono">{formatMoney(i.unitRate, false)}</td>
+                        <td className="p-1.5 border border-slate-300 text-left font-mono font-bold">{formatMoney(i.currentAmount, false)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -515,31 +513,31 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               <div className="bg-slate-50 p-4 rounded border border-slate-300 space-y-2 text-xs">
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۱. کارکرد عملیات این دوره:</span>
-                  <span className="font-mono font-bold">{statement.workAmountCurrent.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold">{formatMoney(statement.workAmountCurrent)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۲. تعدیل آحادبها و مابه‌التفاوت مصالح:</span>
-                  <span className="font-mono font-bold">+{statement.adjustmentAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold">+{formatMoney(statement.adjustmentAmount)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۳. مصالح پای‌کار و سایر اقلام مجاز:</span>
-                  <span className="font-mono font-bold">+{statement.otherAllowableItemsAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold">+{formatMoney(statement.otherAllowableItemsAmount)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>۴. مالیات بر ارزش افزوده (۱۰٪):</span>
-                  <span className="font-mono font-bold">+{statement.vatAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span>۴. مالیات بر ارزش افزوده ({formatPercent(vatBase ? (statement.vatAmount * 100) / vatBase : 0)}):</span>
+                  <span className="font-mono font-bold">+{formatMoney(statement.vatAmount)}</span>
                 </div>
                 <div className="flex justify-between py-1.5 bg-slate-200 px-2 rounded font-black text-slate-900">
                   <span>مجموع ناخالص کارکرد دوره (Gross Amount):</span>
-                  <span className="font-mono">{statement.grossAmount.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono">{formatMoney(statement.grossAmount)}</span>
                 </div>
                 <div className="flex justify-between py-1 text-rose-700">
                   <span>کسورات قانونی و قراردادی (استرداد پیش‌پرداخت، حسن انجام کار، بیمه و...):</span>
-                  <span className="font-mono font-bold">-{statement.totalDeductions.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono font-bold">-{formatMoney(statement.totalDeductions)}</span>
                 </div>
                 <div className="flex justify-between py-2 bg-amber-100 text-amber-950 px-2 rounded font-black text-sm">
                   <span>مبلغ خالص قابل پرداخت به پیمانکار (Net Payable):</span>
-                  <span className="font-mono">{statement.netPayable.toLocaleString('fa-IR')} تومان</span>
+                  <span className="font-mono">{formatMoney(statement.netPayable)}</span>
                 </div>
               </div>
 
@@ -588,7 +586,6 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

@@ -13,103 +13,10 @@ const isDev = (): boolean => {
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export interface Employee {
-  id: string;
-  personnelCode: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  nationalCode: string;
-  birthDate: string;
-  phone: string;
-  email: string;
-  role: string;
-  department: 'فنی و مهندسی' | 'مالی و اداری' | 'اجرایی کارگاه' | 'تدارکات و انبار' | 'مدیریت و کنترل پروژه' | 'HSE و ایمنی';
-  assignedProjectId: string;
-  assignedProjectName: string;
-  costCenterId: string;
-  hireDate: string;
-  contractType: 'پیمانی تمام‌وقت' | 'قراردادی موقت' | 'ساعتی/مشاوره‌ای' | 'کارگری روزمزد';
-  baseSalary: number; // حقوق پایه ماهانه
-  housingAllowance: number; // حق مسکن
-  foodAllowance: number; // بن خواروبار
-  childAllowance: number; // حق اولاد
-  specialSkillAllowance: number; // حق تخصص و کارگاهی
-  childrenCount: number;
-  maritalStatus: 'متاهل' | 'مجرد';
-  bankAccount: {
-    bankName: string;
-    shebaNumber: string;
-    accountNumber: string;
-  };
-  insuranceNumber: string;
-  status: 'فعال' | 'مرخصی بدون حقوق' | 'تسویه شده';
-}
+import type { Employee, MonthlyTimesheet, PayrollSlip } from '../../../types';
 
-export interface MonthlyTimesheet {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  monthYear: string; // e.g. ۱۴۰۳/۰۶
-  projectId: string;
-  standardWorkDays: number;
-  actualWorkDays: number;
-  absentDays: number;
-  paidLeaveDays: number;
-  overtimeHours: number;
-  nightWorkHours: number;
-  holidayWorkHours: number;
-  missionDays: number;
-  status: 'تأیید سرپرست کارگاه' | 'تأیید مدیر پروژه' | 'تأیید منابع انسانی';
-}
 
-export interface PayrollSlip {
-  id: string;
-  slipNumber: string;
-  monthYear: string;
-  employeeId: string;
-  employeeName: string;
-  personnelCode: string;
-  role: string;
-  department: string;
-  projectId: string;
-  projectName: string;
-  costCenterId: string;
-  issueDate: string;
 
-  // Carried over
-  actualWorkDays: number;
-  overtimeHours: number;
-
-  // Earnings (مزایا و ناخالص حقوق)
-  baseSalaryGross: number;
-  housingAllowance: number;
-  foodAllowance: number;
-  childAllowance: number;
-  specialSkillAllowance: number;
-  overtimePay: number;
-  missionPay: number;
-  grossTotalSalary: number; // جمع ناخالص دریافتی
-
-  // Deductions (کسورات قانونی و اختیاری)
-  workerInsuranceDeduction: number; // سهم کارگر ۷٪
-  incomeTaxDeduction: number; // مالیات حقوق
-  loanDeduction: number; // مساعده یا وام پرسنلی
-  disciplinaryDeduction: number;
-  totalDeductions: number; // جمع کسورات
-
-  // Net Pay (خالص پرداختی)
-  netPayableSalary: number;
-
-  // Employer Contributions (سهم کارفرما برای سند حسابداری)
-  employerInsuranceContribution: number; // سهم کارفرما ۲۳٪ (۲۰٪ تامین اجتماعی + ۳٪ بیمه بیکاری)
-  totalCostForCompany: number; // هزینه تمام‌شده پرسنل برای پروژه (Gross + Employer Insurance)
-
-  // Financial status
-  status: 'محاسبه شده' | 'تأیید مالی' | 'صادر شده جهت پرداخت' | 'پرداخت شده';
-  journalEntryId?: string;
-  paymentRequestId?: string;
-}
 
 const rawEmployees: Employee[] = [
   {

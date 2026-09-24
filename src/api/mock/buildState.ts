@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AppState, FinancialEventInput } from './types';
-import { postFinancialEventToState } from './postingEngine';
+import { AppState, FinancialEventInput } from '../../store/types';
+import { postFinancialEventToState } from '../../store/postingEngine';
 import {
   clientStatementApprovedEvent,
   subcontractorStatementApprovedEvent,
@@ -13,104 +13,29 @@ import {
   storeIssueEvent,
   pettyCashExpenseApprovedEvent,
   payrollApprovedEvent,
-} from './events';
-import { buildPaymentRequest } from './paymentRequests';
+} from '../../store/events';
+import { buildPaymentRequest } from '../../store/paymentRequests';
 import {
-  AppDocument,
-  DocumentCategory,
-  DocumentLink,
-  ReceiptRecord,
-  StockBalance,
-  PaymentRequest,
-} from '../types';
-import { mockProjects } from '../data/mockData';
-import {
-  mockChartOfAccounts,
-  mockBankAccounts,
-  mockCostCenters,
-  mockJournalEntries,
-  mockReceipts,
-  mockPayments,
-  mockBankReconciliationItems,
-} from '../data/accountingMockData';
-import { mockCounterparties } from '../data/counterpartiesMockData';
-import {
-  mockContracts,
-  mockDetailedStatements,
-  mockStatementPayments,
-  mockContractDocuments,
-  SeedContractDocument,
-} from '../data/contractsMockData';
-import { mockSubcontractorContracts, mockSubcontractorStatements } from '../data/subcontractorsMockData';
-import { mockCashDesks } from '../data/paymentsTreasuryMockData';
-import { mockSystemDocuments, SeedDocument } from '../data/documentsMockData';
-import {
-  initialPettyCashAccounts,
-  initialPettyCashExpenses,
-  initialPettyCashReplenishments,
-  initialPettyCashRequests,
-  initialPettyCashSettings,
-} from '../data/pettyCashMockData';
-import { mockPurchaseOrders, mockVendorInvoices, mockRequisitions } from '../data/procurementMockData';
-import {
-  mockGoodsReceipts,
-  mockStoreIssues,
-  mockMaterialItems,
-  mockWarehouses,
-} from '../data/inventoryMockData';
-import { mockPayrollSlips } from '../data/hrPayrollMockData';
+  emptyState,
+  payrollPeriodId,
+  CLIENT_APPROVED_STATUSES,
+  SUBCONTRACTOR_APPROVED_STATUSES,
+  PETTY_CASH_APPROVED_STATUSES,
+  VENDOR_INVOICE_APPROVED_STATUSES,
+  PAYROLL_APPROVED_STATUSES,
+  OPENING_BALANCE_SUBLEDGER,
+  DEFAULT_FINANCE_SETTINGS,
+} from '../../store/state';
+import { AppDocument, DocumentCategory, DocumentLink, ReceiptRecord, StockBalance, PaymentRequest } from '../../types';
+import { getRelativePersianDate } from '../../utils/date';
+import type { SeedContractDocument } from './data/contractsMockData';
+import type { SeedDocument } from './data/documentsMockData';
+import { loadMockSeeds, OperationalSeeds } from './seeds';
 
-export const CLIENT_APPROVED_STATUSES = ['approved_by_employer', 'claimed', 'partially_paid', 'paid'];
-export const SUBCONTRACTOR_APPROVED_STATUSES = ['management_approved', 'paid'];
-export const PETTY_CASH_APPROVED_STATUSES = ['approved', 'accounting_posted', 'reconciled'];
-export const VENDOR_INVOICE_APPROVED_STATUSES = ['تأیید تطبیق سه‌جانبه', 'پرداخت شده', 'پرداخت ناقص'];
-export const PAYROLL_APPROVED_STATUSES = ['تأیید مالی', 'صادر شده جهت پرداخت', 'پرداخت شده'];
-
-/** Subledger used for historical cash movements whose bank account is not recorded in the seed data. */
-export const OPENING_BALANCE_SUBLEDGER = 'opening-balance';
-
-export function emptyState(): AppState {
-  return {
-    projects: [],
-    costCenters: [],
-    counterparties: [],
-    contracts: [],
-    clientStatements: [],
-    subcontractorContracts: [],
-    subcontractorStatements: [],
-    financialEvents: [],
-    journalEntries: [],
-    chartOfAccounts: [],
-    bankAccounts: [],
-    cashDesks: [],
-    pettyCashAccounts: [],
-    pettyCashExpenses: [],
-    pettyCashReplenishments: [],
-    pettyCashRequests: [],
-    pettyCashSettings: initialPettyCashSettings,
-    paymentRequests: [],
-    receipts: [],
-    payments: [],
-    documents: [],
-    bankReconciliations: [],
-    purchaseRequisitions: [],
-    purchaseOrders: [],
-    vendorInvoices: [],
-    goodsReceipts: [],
-    storeIssues: [],
-    materials: [],
-    warehouses: [],
-    stockBalances: [],
-    stockReservations: [],
-    stockReturns: [],
-    payrollSlips: [],
-    dismissedNotificationIds: [],
-  };
-}
-
-export function payrollPeriodId(period: string): string {
-  return `PAYROLL-${period.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace('/', '-')}`;
-}
+/**
+ * Builds the demo AppState from the mock seeds (already in Rials): legacy attachments become linked
+ * documents, stock is split per warehouse, and historical approvals are posted to the ledger.
+ */
 
 // ---------------------------------------------------------------------------
 // Document center migration: every legacy attachment becomes a linked Document.
@@ -131,15 +56,15 @@ const formatOf = (fileName: string): AppDocument['fileFormat'] => {
   return ext === 'DWG' || ext === 'XLSX' || ext === 'JPG' || ext === 'DOCX' ? ext : ext === 'XLS' ? 'XLSX' : ext === 'PNG' || ext === 'JPEG' ? 'JPG' : 'PDF';
 };
 
-function fromSeedDocument(d: SeedDocument): AppDocument {
+function fromSeedDocument(seeds: OperationalSeeds, d: SeedDocument): AppDocument {
   const links: DocumentLink[] = [];
   if (d.projectId) links.push({ entityType: 'project', entityId: d.projectId });
   if (d.contractId) {
-    const isSub = mockSubcontractorContracts.some((c) => c.id === d.contractId);
+    const isSub = seeds.subcontractorContracts.some((c) => c.id === d.contractId);
     links.push({ entityType: isSub ? 'subcontract' : 'contract', entityId: d.contractId });
   }
   if (d.statementId) {
-    const isSub = mockSubcontractorStatements.some((s) => s.id === d.statementId);
+    const isSub = seeds.subcontractorStatements.some((s) => s.id === d.statementId);
     links.push({ entityType: isSub ? 'subcontractor_statement' : 'client_statement', entityId: d.statementId });
   }
   const party = d.counterpartyId || d.partnerId;
@@ -164,9 +89,9 @@ function fromSeedDocument(d: SeedDocument): AppDocument {
   };
 }
 
-function fromContractDocument(d: SeedContractDocument): AppDocument {
+function fromContractDocument(seeds: OperationalSeeds, d: SeedContractDocument): AppDocument {
   const links: DocumentLink[] = [];
-  const contract = mockContracts.find((c) => c.id === d.contractId);
+  const contract = seeds.contracts.find((c) => c.id === d.contractId);
   if (contract) {
     links.push({ entityType: 'contract', entityId: contract.id }, { entityType: 'project', entityId: contract.projectId });
     if (contract.counterpartyId) links.push({ entityType: 'counterparty', entityId: contract.counterpartyId });
@@ -192,17 +117,20 @@ function fromContractDocument(d: SeedContractDocument): AppDocument {
   };
 }
 
-function migrateDocuments(): AppDocument[] {
-  const docs: AppDocument[] = [...mockSystemDocuments.map(fromSeedDocument), ...mockContractDocuments.map(fromContractDocument)];
+function migrateDocuments(seeds: OperationalSeeds): AppDocument[] {
+  const docs: AppDocument[] = [
+    ...seeds.systemDocuments.map((d) => fromSeedDocument(seeds, d)),
+    ...seeds.contractDocuments.map((d) => fromContractDocument(seeds, d)),
+  ];
 
-  for (const s of mockDetailedStatements) {
+  for (const s of seeds.detailedStatements) {
     for (const a of s.attachments) {
-      const doc = fromContractDocument({ ...a, contractId: s.contractId, statementId: s.id });
+      const doc = fromContractDocument(seeds, { ...a, contractId: s.contractId, statementId: s.id });
       if (!docs.some((d) => d.id === doc.id)) docs.push(doc);
     }
   }
 
-  for (const e of initialPettyCashExpenses) {
+  for (const e of seeds.pettyCashExpenses) {
     e.attachments.forEach((a, i) => {
       docs.push({
         id: `doc-${e.id}-${a.id || i}`,
@@ -235,25 +163,25 @@ function migrateDocuments(): AppDocument[] {
 // Stock per warehouse: net documented movements per warehouse, remainder in the central warehouse.
 // ---------------------------------------------------------------------------
 
-function migrateStockBalances(): StockBalance[] {
+function migrateStockBalances(seeds: OperationalSeeds): StockBalance[] {
   const key = (w: string, m: string) => `${w}|${m}`;
   const qty = new Map<string, number>();
   const add = (w: string, m: string, q: number) => qty.set(key(w, m), (qty.get(key(w, m)) || 0) + q);
 
-  for (const g of mockGoodsReceipts) {
+  for (const g of seeds.goodsReceipts) {
     if (g.status !== 'تأیید نهایی انبارداری') continue;
     for (const i of g.items) add(g.warehouseId, i.materialId, i.acceptedQty);
   }
-  for (const v of mockStoreIssues) {
+  for (const v of seeds.storeIssues) {
     if (v.status !== 'خروج قطعی از انبار') continue;
     for (const i of v.items) add(v.warehouseId, i.materialId, -i.issuedQty);
   }
 
-  const central = mockWarehouses.find((w) => w.type === 'مرکزی')?.id || mockWarehouses[0]?.id;
+  const central = seeds.warehouses.find((w) => w.type === 'مرکزی')?.id || seeds.warehouses[0]?.id;
   const balances: StockBalance[] = [];
-  for (const m of mockMaterialItems) {
+  for (const m of seeds.materials) {
     let allocated = 0;
-    for (const w of mockWarehouses) {
+    for (const w of seeds.warehouses) {
       const q = Math.max(0, qty.get(key(w.id, m.id)) || 0);
       if (q > 0 && allocated + q <= m.currentStock) {
         balances.push({ warehouseId: w.id, materialId: m.id, qty: q, reservedQty: 0 });
@@ -274,12 +202,12 @@ function migrateStockBalances(): StockBalance[] {
 // Receipts: one register, each client receipt references its statement.
 // ---------------------------------------------------------------------------
 
-function migrateReceipts(): ReceiptRecord[] {
-  const receipts: ReceiptRecord[] = [...mockReceipts];
-  for (const s of mockDetailedStatements) {
+function migrateReceipts(seeds: OperationalSeeds): ReceiptRecord[] {
+  const receipts: ReceiptRecord[] = [...seeds.receipts];
+  for (const s of seeds.detailedStatements) {
     if (!CLIENT_APPROVED_STATUSES.includes(s.status) || s.receivedAmount <= 0) continue;
-    const contract = mockContracts.find((c) => c.id === s.contractId);
-    const recorded = mockStatementPayments.filter((p) => p.statementId === s.id);
+    const contract = seeds.contracts.find((c) => c.id === s.contractId);
+    const recorded = seeds.statementPayments.filter((p) => p.statementId === s.id);
     const base = {
       counterpartyId: s.counterpartyId || contract?.counterpartyId,
       costCenterId: s.costCenterId || contract?.costCenterId,
@@ -429,7 +357,7 @@ function seedEvents(state: AppState): FinancialEventInput[] {
 /** Payment requests for every approved, unpaid payable (the treasury queue is derived from real records). */
 function seedPaymentRequests(state: AppState): PaymentRequest[] {
   const requests: PaymentRequest[] = [];
-  const today = '۱۴۰۳/۰۷/۰۵';
+  const today = getRelativePersianDate(0);
   const push = (input: Parameters<typeof buildPaymentRequest>[1], status: PaymentRequest['status']) =>
     requests.push({ ...buildPaymentRequest(requests, input, today), status });
 
@@ -442,7 +370,7 @@ function seedPaymentRequests(state: AppState): PaymentRequest[] {
         beneficiaryName: s.subcontractorName, beneficiaryType: 'پیمانکار جزء', totalAmount: s.remainingPayable,
         dueDate: s.managementApprovalDate,
       },
-      'تأیید مدیرعامل'
+      'تأیید مدیر ارشد'
     );
   }
   for (const inv of state.vendorInvoices) {
@@ -485,38 +413,63 @@ function seedPaymentRequests(state: AppState): PaymentRequest[] {
   return requests;
 }
 
-export function buildInitialState(): AppState {
-  let state: AppState = {
+export function buildMockState(): AppState {
+  const seeds = loadMockSeeds();
+  const base: AppState = {
     ...emptyState(),
-    projects: mockProjects,
-    costCenters: mockCostCenters,
-    counterparties: mockCounterparties,
-    contracts: mockContracts,
-    clientStatements: mockDetailedStatements.map(({ attachments: _a, ...s }) => s),
-    subcontractorContracts: mockSubcontractorContracts,
-    subcontractorStatements: mockSubcontractorStatements,
-    journalEntries: mockJournalEntries,
-    chartOfAccounts: mockChartOfAccounts,
-    bankAccounts: mockBankAccounts,
-    cashDesks: mockCashDesks,
-    pettyCashAccounts: initialPettyCashAccounts,
-    pettyCashExpenses: initialPettyCashExpenses.map(({ attachments: _a, ...e }) => e),
-    pettyCashReplenishments: initialPettyCashReplenishments,
-    pettyCashRequests: initialPettyCashRequests,
-    pettyCashSettings: initialPettyCashSettings,
-    receipts: migrateReceipts(),
-    payments: mockPayments,
-    documents: migrateDocuments(),
-    bankReconciliations: mockBankReconciliationItems,
-    purchaseRequisitions: mockRequisitions,
-    purchaseOrders: mockPurchaseOrders,
-    vendorInvoices: mockVendorInvoices,
-    goodsReceipts: mockGoodsReceipts,
-    storeIssues: mockStoreIssues,
-    materials: mockMaterialItems,
-    warehouses: mockWarehouses,
-    stockBalances: migrateStockBalances(),
-    payrollSlips: mockPayrollSlips,
+    chartOfAccounts: seeds.chartOfAccounts,
+    costCenters: seeds.costCenters,
+    bankAccounts: seeds.bankAccounts,
+    subledgers: seeds.subledgers,
+    pettyCashSettings: seeds.pettyCashSettings,
+    pettyCashCategories: seeds.pettyCashCategories,
+    financeSettings: DEFAULT_FINANCE_SETTINGS,
+  };
+  const op = seeds.operational;
+  if (!op) return base;
+
+  let state: AppState = {
+    ...base,
+    projects: op.projects,
+    counterparties: op.counterparties,
+    contracts: op.contracts,
+    clientStatements: op.detailedStatements.map(({ attachments: _a, ...s }) => s),
+    subcontractorContracts: op.subcontractorContracts,
+    subcontractorStatements: op.subcontractorStatements,
+    contractBoq: op.contractBoq,
+    contractAmendments: op.contractAmendments,
+    advancePayments: op.advancePayments,
+    priceAdjustments: op.priceAdjustments,
+    contractAuditLogs: op.contractAuditLogs,
+    journalEntries: op.journalEntries,
+    cashDesks: op.cashDesks,
+    treasuryChecks: op.treasuryChecks,
+    auditLogs: op.auditLogs,
+    pettyCashAccounts: op.pettyCashAccounts,
+    pettyCashExpenses: op.pettyCashExpenses.map(({ attachments: _a, ...e }) => e),
+    pettyCashReplenishments: op.pettyCashReplenishments,
+    pettyCashRequests: op.pettyCashRequests,
+    pettyCashReconciliations: op.pettyCashReconciliations,
+    receipts: migrateReceipts(op),
+    payments: op.payments,
+    documents: migrateDocuments(op),
+    bankReconciliations: op.bankReconciliations,
+    purchaseRequisitions: op.requisitions,
+    purchaseOrders: op.purchaseOrders,
+    vendorInvoices: op.vendorInvoices,
+    suppliers: op.suppliers,
+    rfqs: op.rfqs,
+    goodsReceipts: op.goodsReceipts,
+    storeIssues: op.storeIssues,
+    materials: op.materials,
+    warehouses: op.warehouses,
+    stockBalances: migrateStockBalances(op),
+    interTransfers: op.interTransfers,
+    stocktakes: op.stocktakes,
+    kardex: op.kardex.map((k) => ({ ...k, warehouseId: op.warehouses.find((w) => w.name === k.warehouseName)?.id })),
+    payrollSlips: op.payrollSlips,
+    employees: op.employees,
+    timesheets: op.timesheets,
   };
 
   for (const input of seedEvents(state)) {

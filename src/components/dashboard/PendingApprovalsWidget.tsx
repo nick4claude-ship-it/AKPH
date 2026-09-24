@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ApprovalItem } from '../../types';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { CheckCircle2, XCircle, FileText, AlertCircle, Clock, Eye, Check, X } from 'lucide-react';
+import { usePermission } from '../../store/session';
+import { formatInt } from '../../utils/money';
 
 interface PendingApprovalsWidgetProps {
   approvals: ApprovalItem[];
@@ -18,11 +20,14 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
 }) => {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const { check } = usePermission();
+  const permissionFor = (item: ApprovalItem) => check(item.action, { projectId: item.projectId || undefined, createdBy: item.createdBy });
 
   const pendingList = approvals;
 
   const handleConfirmReject = (id: string) => {
-    onReject(id, rejectReason || 'عدم تطابق با مستندات پیوست');
+    if (!rejectReason.trim()) return;
+    onReject(id, rejectReason.trim());
     setRejectingId(null);
     setRejectReason('');
   };
@@ -39,11 +44,11 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <span>کارتابل هزینه‌های در انتظار تأیید</span>
               <span className="text-[11px] font-mono bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold">
-                {pendingList.length} سند جدید
+                {formatInt(pendingList.length)} سند جدید
               </span>
             </h3>
             <p className="text-[11px] text-slate-500">
-              بررسی و تأیید/رد فاکتورهای تنخواه، خریدهای مستقیم، ماشین‌آلات و اسناد مالی توسط مدیرعامل
+              بررسی و تأیید/رد فاکتورهای تنخواه، خریدها، صورت‌وضعیت‌ها و اسناد مالی بر اساس نقش شما
             </p>
           </div>
         </div>
@@ -68,7 +73,7 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                 <th className="py-2.5 px-3 text-left">مرحله / پیوست</th>
                 <th className="py-2.5 px-3 text-center">تاریخ</th>
                 <th className="py-2.5 px-3 text-center">مستند</th>
-                <th className="py-2.5 px-3 text-center">دستور مدیرعامل</th>
+                <th className="py-2.5 px-3 text-center">اقدام</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -114,7 +119,7 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                   <td className="py-3 px-3 font-mono tabular-nums text-left text-[11px]">
                     <div className="text-slate-500">تأییدکننده: {item.approverRole}</div>
                     <div className={item.documentCount ? 'text-emerald-700' : 'text-rose-600 font-medium'}>
-                      {item.documentCount ? `${item.documentCount.toLocaleString('fa-IR')} سند پیوست` : 'بدون سند پیوست'}
+                      {item.documentCount ? `${formatInt(item.documentCount)} سند پیوست` : 'بدون سند پیوست'}
                     </div>
                   </td>
 
@@ -148,7 +153,8 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                         />
                         <button
                           onClick={() => handleConfirmReject(item.id)}
-                          className="bg-rose-600 text-white p-1 rounded hover:bg-rose-700 cursor-pointer"
+                          disabled={!rejectReason.trim()}
+                          className="disabled:opacity-40 bg-rose-600 text-white p-1 rounded hover:bg-rose-700 cursor-pointer"
                           title="تأیید رد سند"
                         >
                           <Check className="w-3 h-3" />
@@ -165,14 +171,17 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
                       <div className="flex items-center gap-1.5 justify-center">
                         <button
                           onClick={() => onApprove(item.id)}
-                          className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs"
+                          disabled={!permissionFor(item).ok}
+                          title={permissionFor(item).reason}
+                          className="disabled:opacity-40 flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs"
                         >
                           <Check className="w-3 h-3" />
                           <span>تأیید</span>
                         </button>
                         <button
                           onClick={() => setRejectingId(item.id)}
-                          className="flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
+                          disabled={!permissionFor(item).ok}
+                          className="disabled:opacity-40 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
                         >
                           <X className="w-3 h-3" />
                           <span>رد</span>

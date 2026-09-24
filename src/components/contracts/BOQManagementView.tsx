@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   FileSpreadsheet,
 } from 'lucide-react';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface BOQManagementViewProps {
   contracts: Contract[];
@@ -122,7 +123,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
               <th className="p-3">شرح عملیات فهرست‌بها</th>
               <th className="p-3 text-center">واحد</th>
               <th className="p-3 text-left">مقدار اولیه مصوب</th>
-              <th className="p-3 text-left">بهای واحد (تومان)</th>
+              <th className="p-3 text-left">بهای واحد ({moneyUnitLabel()})</th>
               <th className="p-3 text-left">مقدار کارکرد اجراشده</th>
               <th className="p-3 text-left">مبلغ کل کارکرد</th>
               <th className="p-3 text-center">پیشرفت احجام</th>
@@ -155,7 +156,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                     {item.initialQuantity.toLocaleString('fa-IR')}
                   </td>
                   <td className="p-3 text-left font-mono text-slate-600">
-                    {item.unitRate.toLocaleString('fa-IR')}
+                    {formatMoney(item.unitRate, false)}
                   </td>
                   <td className="p-3 text-left font-mono">
                     <span
@@ -172,7 +173,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                     )}
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-slate-900">
-                    {item.executedAmount.toLocaleString('fa-IR')}
+                    {formatMoney(item.executedAmount, false)}
                   </td>
                   <td className="p-3 text-center">
                     <span

@@ -13,7 +13,7 @@ const isDev = (): boolean => {
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { DocumentCategory } from '../types';
+import type { DocumentCategory } from '../../../types';
 
 /** Seed format of the legacy document register; converted to linked Documents in the store. */
 export interface SeedDocument {

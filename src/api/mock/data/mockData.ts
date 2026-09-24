@@ -6,8 +6,9 @@
 import {
   Project,
   UserProfile,
-} from '../types';
-import { getRelativePersianDate } from '../utils/date';
+} from '../../../types';
+import { getRelativePersianDate } from '../../../utils/date';
+import { executiveAvatar, projectFajrInterchange, projectRonikaTower } from '../../../assets/images';
 
 const isDev = (): boolean => {
   try {
@@ -19,29 +20,42 @@ const isDev = (): boolean => {
   }
 };
 
-export const currentUser: UserProfile = {
-  id: 'usr-001',
-  name: 'کاربر مدیرعامل نمونه',
-  role: 'مدیرعامل',
-  email: 'ceo@example.com',
-  avatar: '/src/assets/images/executive_avatar_1790176059277.jpg',
-};
-
-export const alternativeUsers: UserProfile[] = [
-  currentUser,
+/** Demo users, one per paydar-portal role (used only by the DEV role switcher). */
+export const mockUsers: UserProfile[] = [
+  {
+    id: 'usr-001',
+    name: 'کاربر مدیر ارشد نمونه',
+    role: 'مدیر ارشد',
+    email: 'ceo@example.com',
+    avatar: executiveAvatar,
+  },
   {
     id: 'usr-002',
-    name: 'کاربر مدیر مالی نمونه',
-    role: 'مدیر مالی',
-    email: 'cfo@example.com',
-    avatar: '/src/assets/images/executive_avatar_1790176059277.jpg',
+    name: 'کاربر حسابدار نمونه',
+    role: 'حسابدار',
+    email: 'accountant@example.com',
+    avatar: executiveAvatar,
   },
   {
     id: 'usr-003',
     name: 'کاربر مدیر پروژه نمونه ۱',
     role: 'مدیر پروژه',
     email: 'pm1@example.com',
-    avatar: '/src/assets/images/executive_avatar_1790176059277.jpg',
+    avatar: executiveAvatar,
+  },
+  {
+    id: 'usr-005',
+    name: 'کاربر مدیر پروژه نمونه ۲',
+    role: 'مدیر پروژه',
+    email: 'pm2@example.com',
+    avatar: executiveAvatar,
+  },
+  {
+    id: 'usr-004',
+    name: 'کاربر مدیر سیستم نمونه',
+    role: 'مدیر سیستم',
+    email: 'admin@example.com',
+    avatar: executiveAvatar,
   },
 ];
 
@@ -73,7 +87,7 @@ const rawProjects: Project[] = [
     manager: 'کاربر مدیر پروژه نمونه ۱',
     startDate: getRelativePersianDate(-450),
     expectedEndDate: getRelativePersianDate(400),
-    image: '/src/assets/images/project_ronika_tower_1790176089542.jpg',
+    image: projectRonikaTower,
     directCost: 91_200_000_000,
     indirectCost: 7_300_000_000,
     cashInflow: 95_600_000_000,
@@ -118,7 +132,7 @@ const rawProjects: Project[] = [
     manager: 'کاربر مدیر پروژه نمونه ۱',
     startDate: getRelativePersianDate(-320),
     expectedEndDate: getRelativePersianDate(120),
-    image: '/src/assets/images/project_fajr_interchange_1790176101414.jpg',
+    image: projectFajrInterchange,
     directCost: 55_400_000_000,
     indirectCost: 3_800_000_000,
     cashInflow: 45_500_000_000,
@@ -142,7 +156,7 @@ const rawProjects: Project[] = [
     name: 'پروژه نمونه ۱۰۳ (بیمارستان تخصصی البرز)',
     clientId: 'cp-cl-03',
     consultantId: 'cp-cns-03',
-    managerUserId: 'usr-003',
+    managerUserId: 'usr-005',
     siteSupervisor: 'کاربر سرپرست کارگاه نمونه ۱',
     costCenterIds: ['cc-prj103-01', 'cc-prj103-02'],
     contractIds: ['cnt-03'],
@@ -160,7 +174,7 @@ const rawProjects: Project[] = [
     actualCost: 82_400_000_000,
     forecastFinalCost: 198_000_000_000,
     status: 'در حال اجرا',
-    manager: 'کاربر مدیر پروژه نمونه ۱',
+    manager: 'کاربر مدیر پروژه نمونه ۲',
     startDate: getRelativePersianDate(-240),
     expectedEndDate: getRelativePersianDate(550),
     directCost: 76_000_000_000,
@@ -186,7 +200,7 @@ const rawProjects: Project[] = [
     name: 'پروژه نمونه ۱۰۴ (مجتمع مسکونی نیلوفر)',
     clientId: 'cp-cl-04',
     consultantId: 'cp-cns-04',
-    managerUserId: 'usr-003',
+    managerUserId: 'usr-005',
     siteSupervisor: 'کاربر سرپرست کارگاه نمونه ۱',
     costCenterIds: ['cc-prj104-01', 'cc-prj104-02'],
     contractIds: ['cnt-04'],
@@ -204,7 +218,7 @@ const rawProjects: Project[] = [
     actualCost: 84_100_000_000,
     forecastFinalCost: 87_500_000_000,
     status: 'تحویل موقت',
-    manager: 'کاربر مدیر پروژه نمونه ۱',
+    manager: 'کاربر مدیر پروژه نمونه ۲',
     startDate: getRelativePersianDate(-600),
     expectedEndDate: getRelativePersianDate(30),
     directCost: 78_600_000_000,
@@ -230,7 +244,7 @@ const rawProjects: Project[] = [
     name: 'پروژه نمونه ۱۰۵ (تصفیه‌خانه و خط انتقال آب)',
     clientId: 'cp-cl-05',
     consultantId: 'cp-cns-05',
-    managerUserId: 'usr-003',
+    managerUserId: 'usr-005',
     siteSupervisor: 'کاربر سرپرست کارگاه نمونه ۱',
     costCenterIds: ['cc-prj105-01', 'cc-prj105-02'],
     contractIds: ['cnt-05'],
@@ -248,7 +262,7 @@ const rawProjects: Project[] = [
     actualCost: 16_100_000_000,
     forecastFinalCost: 66_800_000_000,
     status: 'در حال اجرا',
-    manager: 'کاربر مدیر پروژه نمونه ۱',
+    manager: 'کاربر مدیر پروژه نمونه ۲',
     startDate: getRelativePersianDate(-120),
     expectedEndDate: getRelativePersianDate(420),
     directCost: 14_900_000_000,

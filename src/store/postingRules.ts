@@ -70,6 +70,7 @@ export const ACCOUNTS = {
   subInsurance: '21602',
   subOtherDeductions: '21603',
   bankSuspense: '21701',
+  retainedEarnings: '33',
   clientAdvances: '21301',
   contractRevenue: '41101',
   stocktakeGain: '41301',
@@ -80,6 +81,7 @@ export const ACCOUNTS = {
   hqSalaryCost: '61101',
   bankFees: '62101',
   stocktakeLoss: '62401',
+  cashShortage: '62402',
 } as const;
 
 /** کسورات صورت‌وضعیت کارفرما: هر نوع کسر در حساب اختصاصی خودش. */
@@ -250,7 +252,7 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
     return { entryType: 'صورت وضعیت', title: `شناسایی درآمد صورت‌وضعیت ${ref} - ${ctx.counterpartyName}`, rows };
   },
 
-  // صورت‌وضعیت جزء پس از تأیید مدیرعامل: بدهکار بهای پروژه / بستانکار پرداختنی پیمانکار و کسورات.
+  // صورت‌وضعیت جزء پس از تأیید مدیر ارشد: بدهکار بهای پروژه / بستانکار پرداختنی پیمانکار و کسورات.
   SUBCONTRACTOR_STATEMENT_APPROVED: (e, ctx) => {
     const deductions = (e.details?.deductions ?? []) as DeductionLine[];
     const ref = e.details?.docNumber || e.sourceId;
@@ -509,4 +511,18 @@ export const POSTING_RULES: Record<FinancialEventType, PostingRule> = {
           ],
         };
   },
+
+  // سند معکوس: ردیف‌های سند اصلی با جابه‌جایی بدهکار و بستانکار (ردیف‌ها در details.rows).
+  JOURNAL_REVERSAL: (e) => ({
+    entryType: requireDetail<JournalEntryType>(e, 'entryType'),
+    title: `سند معکوس سند ${requireDetail<string>(e, 'originalDocNumber')} - علت: ${e.details?.reason || '-'}`,
+    rows: requireDetail<PostingRow[]>(e, 'rows'),
+  }),
+
+  // بستن حساب‌های موقت سال مالی به سود (زیان) انباشته (ردیف‌ها از مانده دفاتر همان سال محاسبه می‌شود).
+  FISCAL_YEAR_CLOSE: (e) => ({
+    entryType: 'بستن حساب‌ها',
+    title: `سند بستن حساب‌های درآمد و هزینه سال مالی ${requireDetail<number>(e, 'fiscalYear')}`,
+    rows: requireDetail<PostingRow[]>(e, 'rows'),
+  }),
 };

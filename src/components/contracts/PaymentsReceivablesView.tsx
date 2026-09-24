@@ -21,6 +21,7 @@ import {
   ArrowUpRight,
   FileText,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 
 interface PaymentsReceivablesViewProps {
   contracts: Contract[];
@@ -82,7 +83,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <DollarSign className="w-4 h-4 text-slate-600" />
           </div>
           <span className="text-xl font-black text-slate-900 font-mono">
-            {(totalReceivables / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(totalReceivables)}
           </span>
           <span className="text-[10px] text-slate-400 block mt-1">
             از {unpaidStatements.length} فقره صورت‌وضعیت
@@ -95,7 +96,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <Clock className="w-4 h-4 text-emerald-600" />
           </div>
           <span className="text-xl font-black text-emerald-700 font-mono">
-            {(currentReceivables.reduce((sum, s) => sum + s.remainingPayable, 0) / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(currentReceivables.reduce((sum, s) => sum + s.remainingPayable, 0))}
           </span>
           <span className="text-[10px] text-emerald-600 block mt-1">کمتر از ۳۰ روز تا سررسید</span>
         </div>
@@ -106,7 +107,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <AlertTriangle className="w-4 h-4 text-amber-600" />
           </div>
           <span className="text-xl font-black text-amber-800 font-mono">
-            {(overdue30.reduce((sum, s) => sum + s.remainingPayable, 0) / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(overdue30.reduce((sum, s) => sum + s.remainingPayable, 0))}
           </span>
           <span className="text-[10px] text-amber-700 block mt-1">نیاز به پیگیری امور مالی</span>
         </div>
@@ -117,7 +118,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
           <span className="text-xl font-black text-rose-700 font-mono">
-            {(overdueCritical.reduce((sum, s) => sum + s.remainingPayable, 0) / 1_000_000_000).toFixed(2)} م.ت
+            {formatMoneyCompact(overdueCritical.reduce((sum, s) => sum + s.remainingPayable, 0))}
           </span>
           <span className="text-[10px] text-rose-700 block mt-1">مشمول خسارت تأخیر تادیه</span>
         </div>
@@ -159,7 +160,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
                     <th className="p-3">کارفرما</th>
                     <th className="p-3 text-left">مبلغ خالص مصوب</th>
                     <th className="p-3 text-left">دریافتی تا کنون</th>
-                    <th className="p-3 text-left">مانده طلب (تومان)</th>
+                    <th className="p-3 text-left">مانده طلب ({moneyUnitLabel()})</th>
                     <th className="p-3 text-center">سررسید پرداخت</th>
                     <th className="p-3 text-center">تاخیر (روز)</th>
                     <th className="p-3 text-center">عملیات</th>
@@ -172,13 +173,13 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
                       <td className="p-3 max-w-xs font-medium text-slate-800">{stm.projectName}</td>
                       <td className="p-3 text-slate-600">{stm.client}</td>
                       <td className="p-3 text-left font-mono font-bold text-slate-800">
-                        {stm.netPayable.toLocaleString('fa-IR')}
+                        {formatMoney(stm.netPayable, false)}
                       </td>
                       <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                        {stm.receivedAmount.toLocaleString('fa-IR')}
+                        {formatMoney(stm.receivedAmount, false)}
                       </td>
                       <td className="p-3 text-left font-mono font-black text-rose-700">
-                        {stm.remainingPayable.toLocaleString('fa-IR')}
+                        {formatMoney(stm.remainingPayable, false)}
                       </td>
                       <td className="p-3 text-center font-mono text-slate-600">{stm.dueDate}</td>
                       <td className="p-3 text-center">
@@ -213,7 +214,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
                     <th className="p-3">نوع و روش وصول</th>
                     <th className="p-3">شماره پیگیری / حواله</th>
                     <th className="p-3">حساب واریزی شرکت</th>
-                    <th className="p-3 text-left">مبلغ وصولی (تومان)</th>
+                    <th className="p-3 text-left">مبلغ وصولی ({moneyUnitLabel()})</th>
                     <th className="p-3 text-center">سند حسابداری</th>
                   </tr>
                 </thead>
@@ -230,7 +231,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
                       <td className="p-3 font-mono text-slate-600">{p.referenceNumber}</td>
                       <td className="p-3 font-medium text-slate-800">{p.destinationBank}</td>
                       <td className="p-3 text-left font-mono font-black text-emerald-700">
-                        {p.amount.toLocaleString('fa-IR')}
+                        {formatMoney(p.amount, false)}
                       </td>
                       <td className="p-3 text-center">
                         <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-700 font-mono">

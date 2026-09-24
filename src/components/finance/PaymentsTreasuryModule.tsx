@@ -29,22 +29,14 @@ import {
   FileSpreadsheet,
   X,
 } from 'lucide-react';
-import {
-  BankAccount,
-  Project,
-  UserProfile,
-} from '../../types';
-import {
-  PaymentRequest,
-  TreasuryCheck,
-  CashDesk,
-  mockTreasuryChecks,
-} from '../../data/paymentsTreasuryMockData';
+import { Project, UserProfile, PaymentRequest } from '../../types';
 import { useAppState, useStoreSlice } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { buildPaymentRequest } from '../../store/paymentRequests';
+import { usePermission } from '../../store/session';
 import { selectPaymentSchedule } from '../../store/domainSelectors';
 import { toPersianDate } from '../../utils/date';
+import { generateUUID } from '../../utils/ids';
+import { MoneyInput } from '../common/NumberInput';
 import { TreasuryReceiptsTab } from './TreasuryReceiptsTab';
 import { PaymentScheduleTab } from './PaymentScheduleTab';
 
@@ -55,7 +47,9 @@ const TAB_PATHS: Partial<Record<TreasuryTab, string>> = {
   bank_accounts: '/finance/banks',
   cash_desks: '/finance/cash',
 };
-import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
+import { formatCurrencyCompact } from '../../utils/formatters';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface PaymentsTreasuryModuleProps {
   /** Initial tab from the route (payments, receipts, banks, cash). */
@@ -75,6 +69,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   const [params] = useSearchParams();
   const sourceFilter = params.get('source');
   const wf = useWorkflows();
+  const { can } = usePermission();
   const appState = useAppState();
   const schedule = useMemo(() => selectPaymentSchedule(appState), [appState]);
   const [innerTab, setInnerTab] = useState<TreasuryTab>(tab);
@@ -82,8 +77,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   // Routed tabs change the URL (so links and Back work); checks and schedule are in-page tabs.
   const setActiveTab = (t: TreasuryTab) => (TAB_PATHS[t] && t !== tab ? navigate(TAB_PATHS[t]!) : setInnerTab(t));
 
-  const [paymentRequests, setPaymentRequests] = useStoreSlice('paymentRequests');
-  const [checks, setChecks] = useState<TreasuryCheck[]>(mockTreasuryChecks);
+  const [paymentRequests] = useStoreSlice('paymentRequests');
+  const [checks] = useStoreSlice('treasuryChecks');
   const [cashDesks] = useStoreSlice('cashDesks');
   const [bankAccounts] = useStoreSlice('bankAccounts');
 
@@ -96,19 +91,21 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   const [selectedRequestForPay, setSelectedRequestForPay] = useState<PaymentRequest | null>(null);
   // No default account: the payer account (bank or cash desk) must be chosen explicitly.
   const [paymentSourceId, setPaymentSourceId] = useState('');
-  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [payError, setPayError] = useState<string | null>(null);
   const [paymentTrackingNo, setPaymentTrackingNo] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
 
   // Modal for new payment request
   const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   const [newRequestBeneficiary, setNewRequestBeneficiary] = useState('');
-  const [newRequestAmount, setNewRequestAmount] = useState('');
+  const [newRequestAmount, setNewRequestAmount] = useState(0);
+  const [newRequestError, setNewRequestError] = useState<string | null>(null);
   // Requests for statements, invoices, payroll and petty cash are created by their modules; only
   // payments without a source document can be entered manually here.
-  const [newRequestSource, setNewRequestSource] = useState<any>('سایر هزینه‌های عمومی');
+  const [newRequestSource, setNewRequestSource] = useState<PaymentRequest['sourceType']>('سایر هزینه‌های عمومی');
   const [newRequestProject, setNewRequestProject] = useState(projects[0]?.id || '');
-  const [newRequestDueDate, setNewRequestDueDate] = useState('۱۴۰۳/۰۷/۱۵');
+  const [newRequestDueDate, setNewRequestDueDate] = useState(() => toPersianDate(new Date()));
 
   // KPI Calculations
   const totalPendingPayments = paymentRequests
@@ -131,55 +128,58 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   const openPayment = (req: PaymentRequest) => {
     setSelectedRequestForPay(req);
     setPaymentSourceId('');
-    setPaymentAmount(String(req.remainingAmount));
+    setPaymentAmount(req.remainingAmount);
+    setPayError(null);
   };
 
   // Execute payment: posting (with balance control) and source-document update happen in the workflow.
   const handleExecutePayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequestForPay) return;
+    if (paymentAmount <= 0) return setPayError('مبلغ پرداخت باید بیش از صفر باشد.');
+    if (paymentAmount > selectedRequestForPay.remainingAmount) {
+      return setPayError(`مبلغ پرداخت از مانده (${formatMoney(selectedRequestForPay.remainingAmount)}) بیشتر است.`);
+    }
+    if (!paymentSourceId) return setPayError('حساب بانکی یا صندوق پرداخت‌کننده را انتخاب کنید.');
     const [kind, id] = paymentSourceId.split(':');
     const result = wf.executePayment(selectedRequestForPay.id, {
       bankAccountId: kind === 'bank' ? id : undefined,
       cashDeskId: kind === 'cash' ? id : undefined,
-      amount: Number(paymentAmount.replace(/[^\d]/g, '')),
+      amount: paymentAmount,
       trackingNumber: paymentTrackingNo || undefined,
     });
+    if (!result.ok) return setPayError(result.message);
     onToast(result.message);
-    if (!result.ok) return;
+    setPayError(null);
     setSelectedRequestForPay(null);
     setPaymentTrackingNo('');
     setPaymentNotes('');
   };
 
-  // Create new payment request handler
+  // Manual request (no source document): created through the workflow with a sequential number.
   const handleCreateNewRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    const amt = parseFloat(newRequestAmount.replace(/,/g, ''));
-    if (!amt || !newRequestBeneficiary) return;
-
-    const proj = projects.find((p) => p.id === newRequestProject) || projects[0];
-
-    const newReq: PaymentRequest = buildPaymentRequest(
-      paymentRequests,
-      {
-        sourceType: newRequestSource,
-        sourceRefId: `manual-${Date.now()}`,
-        sourceRefNumber: 'بدون سند مبدأ',
-        projectId: proj.id,
-        projectName: proj.name,
-        costCenterId: '',
-        beneficiaryName: newRequestBeneficiary,
-        beneficiaryType: newRequestSource === 'حق بیمه و مالیات' ? 'سازمان تامین اجتماعی' : 'تأمین‌کننده',
-        totalAmount: amt,
-        dueDate: newRequestDueDate,
-      },
-      toPersianDate(new Date())
-    );
-    setPaymentRequests((prev) => [newReq, ...prev]);
+    if (newRequestAmount <= 0) return setNewRequestError('مبلغ درخواست باید بیش از صفر باشد.');
+    const proj = projects.find((p) => p.id === newRequestProject);
+    if (!proj) return setNewRequestError('پروژه را انتخاب کنید.');
+    const result = wf.createPaymentRequest({
+      sourceType: newRequestSource,
+      sourceRefId: generateUUID(),
+      sourceRefNumber: 'بدون سند مبدأ',
+      projectId: proj.id,
+      projectName: proj.name,
+      costCenterId: '',
+      beneficiaryName: newRequestBeneficiary.trim(),
+      beneficiaryType: newRequestSource === 'حق بیمه و مالیات' ? 'سازمان تامین اجتماعی' : 'تأمین‌کننده',
+      totalAmount: newRequestAmount,
+      dueDate: newRequestDueDate,
+    });
+    if (!result.ok) return setNewRequestError(result.message);
+    onToast(result.message);
     setIsNewRequestModalOpen(false);
     setNewRequestBeneficiary('');
-    setNewRequestAmount('');
+    setNewRequestAmount(0);
+    setNewRequestError(null);
   };
 
   const filteredRequests = paymentRequests.filter((r) => {
@@ -219,6 +219,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {can('payment_request.create') && (
           <button
             onClick={() => setIsNewRequestModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
@@ -226,6 +227,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
             <Plus className="w-3.5 h-3.5" />
             <span>ثبت درخواست پرداخت جدید</span>
           </button>
+          )}
         </div>
       </div>
 
@@ -239,7 +241,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
             </div>
           </div>
           <div className="text-lg font-bold text-slate-900 font-mono">
-            {formatNumber(totalLiquidCash)} <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalLiquidCash, false)} <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-emerald-600 font-medium">موجودی تجمیعی ۳ حساب بانکی و ۳ صندوق</span>
         </div>
@@ -252,7 +254,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
             </div>
           </div>
           <div className="text-lg font-bold text-amber-700 font-mono">
-            {formatNumber(totalPendingPayments)} <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalPendingPayments)}
           </div>
           <span className="text-[11px] text-amber-600 font-medium">
             {paymentRequests.filter((p) => p.status !== 'پرداخت شده').length} فقره دستور پرداخت آماده تسویه
@@ -267,7 +269,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
             </div>
           </div>
           <div className="text-lg font-bold text-rose-700 font-mono">
-            {formatNumber(upcomingChecksDue)} <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(upcomingChecksDue)}
           </div>
           <span className="text-[11px] text-rose-600 font-medium">تعهد چک‌های صیادی صادره به فروشندگان</span>
         </div>
@@ -280,7 +282,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
             </div>
           </div>
           <div className="text-lg font-bold text-blue-700 font-mono">
-            {formatNumber(totalPaidThisMonth)} <span className="text-xs text-slate-500 font-sans">تومان</span>
+            {formatMoney(totalPaidThisMonth, false)} <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium">همراه با ثبت اتوماتیک در اسناد حسابداری</span>
         </div>
@@ -403,7 +405,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               >
                 <option value="all">همه وضعیت‌ها</option>
                 <option value="در انتظار تأیید مالی">در انتظار تأیید مالی</option>
-                <option value="تأیید مدیرعامل">تأیید مدیرعامل</option>
+                <option value="تأیید مدیر ارشد">تأیید مدیر ارشد</option>
                 <option value="در صف پرداخت خزانه">در صف پرداخت خزانه</option>
                 <option value="پرداخت شده">پرداخت شده</option>
                 <option value="رد شده">رد شده</option>
@@ -438,7 +440,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                     <th className="py-3 px-3">منبع و ارجاع</th>
                     <th className="py-3 px-3">پروژه و مرکز هزینه</th>
                     <th className="py-3 px-3">ذینفع و حساب بانکی</th>
-                    <th className="py-3 px-3 text-left">مبلغ کل (تومان)</th>
+                    <th className="py-3 px-3 text-left">مبلغ کل ({moneyUnitLabel()})</th>
                     <th className="py-3 px-3 text-left">مانده پرداختنی</th>
                     <th className="py-3 px-3">سررسید</th>
                     <th className="py-3 px-3">وضعیت</th>
@@ -475,10 +477,10 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                           </span>
                         </td>
                         <td className="py-3 px-3 text-left font-mono font-bold text-slate-900">
-                          {formatNumber(req.totalAmount)}
+                          {formatMoney(req.totalAmount, false)}
                         </td>
                         <td className="py-3 px-3 text-left font-mono font-bold text-amber-700">
-                          {formatNumber(req.remainingAmount)}
+                          {formatMoney(req.remainingAmount, false)}
                         </td>
                         <td className="py-3 px-3 font-mono text-slate-600">
                           {req.dueDate}
@@ -488,7 +490,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                             className={`px-2 py-0.5 rounded text-[11px] font-medium ${
                               req.status === 'پرداخت شده'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : req.status === 'تأیید مدیرعامل'
+                                : req.status === 'تأیید مدیر ارشد'
                                 ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                 : req.status === 'در صف پرداخت خزانه'
                                 ? 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -502,7 +504,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                         </td>
                         <td className="py-3 px-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            {req.status === 'در انتظار تأیید مالی' && (
+                            {req.status === 'در انتظار تأیید مالی' && can('payment_request.approve', { projectId: req.projectId || undefined, createdBy: req.requestedBy }) && (
                               <>
                                 <button
                                   onClick={() => handleApproveRequest(req.id)}
@@ -519,7 +521,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                               </>
                             )}
 
-                            {(req.status === 'تأیید مدیرعامل' || req.status === 'در صف پرداخت خزانه') && (
+                            {(req.status === 'تأیید مدیر ارشد' || req.status === 'در صف پرداخت خزانه') && can('payment.execute') && (
                               <button
                                 onClick={() => openPayment(req)}
                                 className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
@@ -589,8 +591,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-xs text-slate-500">موجودی فعلی:</span>
                   <strong className="text-base font-bold text-slate-900 font-mono">
-                    {formatNumber(b.balance)}{' '}
-                    <span className="text-[11px] font-sans font-normal text-slate-500">تومان</span>
+                    {formatMoney(b.balance, false)}{' '}
+                    <span className="text-[11px] font-sans font-normal text-slate-500">{moneyUnitLabel()}</span>
                   </strong>
                 </div>
               </div>
@@ -631,7 +633,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   <th className="py-3 px-3">بانک و شماره چک</th>
                   <th className="py-3 px-3">صادرکننده / در وجه</th>
                   <th className="py-3 px-3">پروژه مرتبط</th>
-                  <th className="py-3 px-3 text-left">مبلغ (تومان)</th>
+                  <th className="py-3 px-3 text-left">مبلغ ({moneyUnitLabel()})</th>
                   <th className="py-3 px-3">سررسید</th>
                   <th className="py-3 px-3">وضعیت</th>
                 </tr>
@@ -665,7 +667,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                       {chk.projectName || '---'}
                     </td>
                     <td className="py-3 px-3 text-left font-mono font-bold text-slate-900">
-                      {formatNumber(chk.amount)}
+                      {formatMoney(chk.amount, false)}
                     </td>
                     <td className="py-3 px-3 font-mono text-slate-700 font-medium">
                       {chk.dueDate}
@@ -713,7 +715,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-sans">سقف مجاز:</span>
-                  <span>{formatNumber(c.ceilingLimit)} تومان</span>
+                  <span>{formatMoney(c.ceilingLimit)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-sans">آخرین شمارش فیزیکی:</span>
@@ -724,7 +726,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-500">موجودی نقدی:</span>
                 <strong className="text-base font-bold text-purple-900 font-mono">
-                  {formatNumber(c.balance)} <span className="text-[11px] font-sans font-normal text-slate-500">تومان</span>
+                  {formatMoney(c.balance, false)} <span className="text-[11px] font-sans font-normal text-slate-500">{moneyUnitLabel()}</span>
                 </strong>
               </div>
             </div>
@@ -734,8 +736,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
       {/* Modal: Execute Payment to Beneficiary */}
       {selectedRequestForPay && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog onClose={() => setSelectedRequestForPay(null)} label="دستور پرداخت و خروج نقدینگی از حساب" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+          
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
@@ -770,7 +772,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               <div className="flex justify-between pt-1 border-t border-slate-200 text-sm">
                 <span className="font-bold text-slate-700">مانده قابل پرداخت:</span>
                 <strong className="text-amber-800 font-mono font-bold">
-                  {formatNumber(selectedRequestForPay.remainingAmount)} تومان
+                  {formatMoney(selectedRequestForPay.remainingAmount)}
                 </strong>
               </div>
             </div>
@@ -803,15 +805,23 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">مبلغ پرداخت (تا سقف مانده؛ پرداخت جزئی مجاز است):</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value.replace(/[^\d]/g, ''))}
-                  required
-                  className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:border-amber-500"
-                />
+                <label className="block font-medium text-slate-700 mb-1">
+                  مبلغ پرداخت ({moneyUnitLabel()}؛ حداکثر مانده، پرداخت جزئی مجاز است):
+                  <MoneyInput
+                    value={paymentAmount}
+                    onValueChange={(v) => {
+                      setPaymentAmount(v);
+                      setPayError(null);
+                    }}
+                    aria-invalid={paymentAmount <= 0 || paymentAmount > selectedRequestForPay.remainingAmount}
+                    className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </label>
+                {payError && (
+                  <p className="mt-1 text-rose-700 font-bold" role="alert">
+                    {payError}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -853,14 +863,13 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </Dialog>
       )}
 
       {/* Modal: New Payment Request */}
       {isNewRequestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
+        <Dialog onClose={() => setIsNewRequestModalOpen(false)} label="ایجاد دستور پرداخت جدید در خزانه‌داری" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
+          
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <h3 className="text-sm font-bold text-slate-900">ایجاد دستور پرداخت جدید در خزانه‌داری</h3>
               <button
@@ -876,7 +885,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 <label className="block font-medium text-slate-700 mb-1">منبع ایجاد تعهد:</label>
                 <select
                   value={newRequestSource}
-                  onChange={(e) => setNewRequestSource(e.target.value)}
+                  onChange={(e) => setNewRequestSource(e.target.value as PaymentRequest['sourceType'])}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
                 >
                   <option value="سایر هزینه‌های عمومی">سایر هزینه‌های عمومی</option>
@@ -913,15 +922,22 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">مبلغ درخواستی (تومان):</label>
-                <input
-                  type="number"
-                  placeholder="مثال: 120000000"
-                  value={newRequestAmount}
-                  onChange={(e) => setNewRequestAmount(e.target.value)}
-                  required
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs font-mono"
-                />
+                <label className="block font-medium text-slate-700 mb-1">
+                  مبلغ درخواستی ({moneyUnitLabel()}):
+                  <MoneyInput
+                    value={newRequestAmount}
+                    onValueChange={(v) => {
+                      setNewRequestAmount(v);
+                      setNewRequestError(null);
+                    }}
+                    className="mt-1 w-full p-2 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                  />
+                </label>
+                {newRequestError && (
+                  <p className="mt-1 text-rose-700 font-bold" role="alert">
+                    {newRequestError}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -950,8 +966,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

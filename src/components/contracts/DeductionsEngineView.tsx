@@ -6,6 +6,7 @@
 import React from 'react';
 import { Contract, AdvancePaymentRecord, UserProfile } from '../../types';
 import { ShieldCheck, DollarSign, Calendar, Layers, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { formatMoneyCompact } from '../../utils/money';
 
 interface DeductionsEngineViewProps {
   contracts: Contract[];
@@ -58,15 +59,15 @@ export const DeductionsEngineView: React.FC<DeductionsEngineViewProps> = ({
                 <div className="space-y-1.5 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   <div className="flex justify-between">
                     <span className="text-slate-500">کل پیش‌پرداخت دریافتی ({adv.percentage}٪):</span>
-                    <span className="font-bold font-mono">{(adv.totalAdvanceAmount / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono">{formatMoneyCompact(adv.totalAdvanceAmount)}</span>
                   </div>
                   <div className="flex justify-between text-emerald-700">
                     <span>مستهلک‌شده در صورت‌وضعیت‌ها:</span>
-                    <span className="font-bold font-mono">{(adv.totalAmortized / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-bold font-mono">{formatMoneyCompact(adv.totalAmortized)}</span>
                   </div>
                   <div className="flex justify-between text-amber-900 font-black">
                     <span>مانده مستهلک‌نشده:</span>
-                    <span className="font-mono">{(adv.remainingAdvance / 1_000_000_000).toFixed(2)} م.ت</span>
+                    <span className="font-mono">{formatMoneyCompact(adv.remainingAdvance)}</span>
                   </div>
                 </div>
 
@@ -85,10 +86,10 @@ export const DeductionsEngineView: React.FC<DeductionsEngineViewProps> = ({
                 {adv.installments && adv.installments.length > 0 && (
                   <div className="pt-2 border-t border-slate-100 text-[10px] space-y-1">
                     <span className="font-bold text-slate-700 block">اقساط مستهلک‌شده اخیر:</span>
-                    {adv.installments.map((inst, idx) => (
-                      <div key={idx} className="flex justify-between text-slate-500">
+                    {adv.installments.map((inst) => (
+                      <div key={`${inst.statementId}-${inst.date}`} className="flex justify-between text-slate-500">
                         <span>{inst.statementNumber} ({inst.date})</span>
-                        <span className="font-mono font-bold">{(inst.amortizedAmount / 1_000_000).toFixed(1)} م.ت</span>
+                        <span className="font-mono font-bold">{formatMoneyCompact(inst.amortizedAmount)}</span>
                       </div>
                     ))}
                   </div>

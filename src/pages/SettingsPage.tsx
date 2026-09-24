@@ -1,45 +1,38 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from 'react';
-import { Settings, Save, Coins, ShieldCheck } from 'lucide-react';
-import { useStoreSlice } from '../store/AppStore';
-import { useCurrentUser } from '../store/session';
+import { Settings, Save, Coins, ShieldCheck, Percent } from 'lucide-react';
+import { useAppState } from '../store/AppStore';
+import { usePermission } from '../store/session';
+import { useWorkflows } from '../store/useWorkflows';
 import { PETTY_CASH_FUND_LABELS, PettyCashFundType, PettyCashSettings, PettyCashApprovalLevel } from '../types';
+import { moneyUnitLabel } from '../utils/money';
+import { IntegerInput, MoneyInput } from '../components/common/NumberInput';
 
 const LEVEL_LABELS: Record<PettyCashApprovalLevel, string> = {
-  site_manager_and_finance: 'سطح ۱ (سرپرست کارگاه + مالی)',
-  project_and_finance: 'سطح ۲ (مدیر پروژه + مالی)',
-  ceo_full: 'سطح ۳ (با تأیید مدیرعامل)',
+  site_manager_and_finance: 'سطح ۱',
+  project_and_finance: 'سطح ۲',
+  ceo_full: 'سطح ۳',
 };
 
-const NumberInput: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => (
-  <input
-    type="text"
-    inputMode="numeric"
-    value={value.toLocaleString('en-US')}
-    onChange={(e) => onChange(Number(e.target.value.replace(/[^\d]/g, '')) || 0)}
-    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono text-left focus:outline-none focus:border-amber-500"
-  />
-);
+const INPUT_CLASS =
+  'w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono text-left focus:outline-none focus:border-amber-500';
 
-/** تنظیمات ذخیره‌شده سامانه؛ سقف‌ها و زنجیره تأیید تنخواه از همین‌جا خوانده می‌شوند. */
+/** تنظیمات ذخیره‌شده سامانه؛ نرخ ارزش افزوده، سقف‌ها و زنجیره تأیید تنخواه از همین‌جا خوانده می‌شوند. */
 export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onToast }) => {
-  const user = useCurrentUser();
-  const [settings, setSettings] = useStoreSlice('pettyCashSettings');
-  const [draft, setDraft] = useState<PettyCashSettings>(settings);
-  const canEdit = user.role === 'مدیرعامل' || user.role === 'مدیر مالی';
+  const { can } = usePermission();
+  const wf = useWorkflows();
+  const state = useAppState();
+  const [draft, setDraft] = useState<PettyCashSettings>(state.pettyCashSettings);
+  const [vatRate, setVatRate] = useState(state.financeSettings.vatRatePercent);
+  const canEdit = can('settings.manage');
 
   const setLimit = (fund: PettyCashFundType, key: keyof PettyCashSettings['fundLimits'][PettyCashFundType], v: number) =>
     setDraft((d) => ({ ...d, fundLimits: { ...d.fundLimits, [fund]: { ...d.fundLimits[fund], [key]: v } } }));
 
   const save = () => {
-    if (!canEdit) return onToast('ویرایش تنظیمات فقط برای مدیرعامل و مدیر مالی مجاز است.');
-    if (draft.siteLevelMax >= draft.projectLevelMax) return onToast('سقف سطح ۱ باید کمتر از سقف سطح ۲ باشد.');
-    setSettings(draft);
-    onToast('تنظیمات تنخواه ذخیره شد و از این پس در ثبت و تأیید هزینه‌ها اعمال می‌شود.');
+    const finance = wf.updateFinanceSettings({ vatRatePercent: vatRate });
+    if (!finance.ok) return onToast(finance.message);
+    const petty = wf.updatePettyCashSettings(draft);
+    onToast(petty.ok ? 'تنظیمات ذخیره شد و از این پس در ثبت و تأیید اسناد اعمال می‌شود.' : petty.message);
   };
 
   return (
@@ -51,7 +44,7 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900">تنظیمات سامانه</h2>
-            <p className="text-xs text-slate-500">سیاست تنخواه: سقف هر نوع صندوق، سقف هر هزینه، آستانه‌های سطح تأیید و هشدار موجودی</p>
+            <p className="text-xs text-slate-500">نرخ ارزش افزوده و سیاست تنخواه: سقف هر نوع صندوق، سقف هر هزینه، آستانه‌های سطح تأیید و هشدار موجودی</p>
           </div>
         </div>
         <button
@@ -66,7 +59,25 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
 
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <Coins className="w-4 h-4 text-amber-500" /> سقف صندوق‌های تنخواه (تومان)
+          <Percent className="w-4 h-4 text-indigo-600" /> تنظیمات مالی
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <label className="space-y-1">
+            <span className="text-slate-600">نرخ مالیات بر ارزش افزوده (درصد)</span>
+            <IntegerInput disabled={!canEdit} value={vatRate} onValueChange={(v) => setVatRate(Math.min(100, v))} className={INPUT_CLASS} />
+          </label>
+          <div className="space-y-1">
+            <span className="text-slate-600">واحد پول نمایش</span>
+            <div className="px-2.5 py-1.5 rounded-lg border border-slate-100 bg-slate-50 text-slate-800 font-bold">
+              {moneyUnitLabel()} <span className="font-normal text-slate-500">(یک‌بار در افزونه پایدار پورتال تعیین می‌شود؛ مبالغ به ریال ذخیره می‌شوند)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Coins className="w-4 h-4 text-amber-500" /> سقف صندوق‌های تنخواه ({moneyUnitLabel()})
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -82,9 +93,9 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
               {(Object.keys(PETTY_CASH_FUND_LABELS) as PettyCashFundType[]).map((f) => (
                 <tr key={f} className="border-b border-slate-50">
                   <td className="py-2 font-medium text-slate-800">{PETTY_CASH_FUND_LABELS[f]}</td>
-                  <td className="py-2 px-2"><NumberInput value={draft.fundLimits[f].ceiling} onChange={(v) => setLimit(f, 'ceiling', v)} /></td>
-                  <td className="py-2 px-2"><NumberInput value={draft.fundLimits[f].minBalanceWarning} onChange={(v) => setLimit(f, 'minBalanceWarning', v)} /></td>
-                  <td className="py-2 px-2"><NumberInput value={draft.fundLimits[f].maxSingleExpense} onChange={(v) => setLimit(f, 'maxSingleExpense', v)} /></td>
+                  <td className="py-2 px-2"><MoneyInput disabled={!canEdit} value={draft.fundLimits[f].ceiling} onValueChange={(v) => setLimit(f, 'ceiling', v)} className={INPUT_CLASS} /></td>
+                  <td className="py-2 px-2"><MoneyInput disabled={!canEdit} value={draft.fundLimits[f].minBalanceWarning} onValueChange={(v) => setLimit(f, 'minBalanceWarning', v)} className={INPUT_CLASS} /></td>
+                  <td className="py-2 px-2"><MoneyInput disabled={!canEdit} value={draft.fundLimits[f].maxSingleExpense} onValueChange={(v) => setLimit(f, 'maxSingleExpense', v)} className={INPUT_CLASS} /></td>
                 </tr>
               ))}
             </tbody>
@@ -99,15 +110,15 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <label className="space-y-1">
             <span className="text-slate-600">حداکثر مبلغ سطح ۱</span>
-            <NumberInput value={draft.siteLevelMax} onChange={(v) => setDraft((d) => ({ ...d, siteLevelMax: v }))} />
+            <MoneyInput disabled={!canEdit} value={draft.siteLevelMax} onValueChange={(v) => setDraft((d) => ({ ...d, siteLevelMax: v }))} className={INPUT_CLASS} />
           </label>
           <label className="space-y-1">
             <span className="text-slate-600">حداکثر مبلغ سطح ۲ (بیشتر از آن: سطح ۳)</span>
-            <NumberInput value={draft.projectLevelMax} onChange={(v) => setDraft((d) => ({ ...d, projectLevelMax: v }))} />
+            <MoneyInput disabled={!canEdit} value={draft.projectLevelMax} onValueChange={(v) => setDraft((d) => ({ ...d, projectLevelMax: v }))} className={INPUT_CLASS} />
           </label>
           <label className="space-y-1">
             <span className="text-slate-600">هشدار موجودی کم (درصد از سقف)</span>
-            <NumberInput value={draft.lowBalancePercent} onChange={(v) => setDraft((d) => ({ ...d, lowBalancePercent: Math.min(100, v) }))} />
+            <IntegerInput disabled={!canEdit} value={draft.lowBalancePercent} onValueChange={(v) => setDraft((d) => ({ ...d, lowBalancePercent: Math.min(100, v) }))} className={INPUT_CLASS} />
           </label>
         </div>
         <div className="space-y-1.5 text-xs">

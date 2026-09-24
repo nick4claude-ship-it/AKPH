@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Network,
   ChevronLeft,
@@ -9,14 +9,37 @@ import {
   FileText,
   Plus,
 } from 'lucide-react';
-import { AccountNode } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
+import { AccountNode, JournalEntry } from '../../types';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface ChartOfAccountsViewProps {
   chart: AccountNode[];
+  /** Final entries; turnover and balance of every node are summed from their rows. */
+  entries: JournalEntry[];
 }
 
-export const ChartOfAccountsView: React.FC<ChartOfAccountsViewProps> = ({ chart }) => {
+export const ChartOfAccountsView: React.FC<ChartOfAccountsViewProps> = ({ chart, entries }) => {
+  // Posting rows by account code; a group node covers every code that starts with its own code.
+  const totals = useMemo(() => {
+    const map = new Map<string, { debit: number; credit: number }>();
+    for (const e of entries) {
+      for (const r of e.rows) {
+        const cur = map.get(r.accountCode) || { debit: 0, credit: 0 };
+        map.set(r.accountCode, { debit: cur.debit + r.debit, credit: cur.credit + r.credit });
+      }
+    }
+    return map;
+  }, [entries]);
+  const nodeTotals = (code: string) => {
+    let debit = 0;
+    let credit = 0;
+    for (const [c, v] of totals) {
+      if (!c.startsWith(code)) continue;
+      debit += v.debit;
+      credit += v.credit;
+    }
+    return { debit, credit };
+  };
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     '1': true,
     '11': true,
@@ -33,6 +56,8 @@ export const ChartOfAccountsView: React.FC<ChartOfAccountsViewProps> = ({ chart 
   };
 
   const renderNode = (node: AccountNode, depth: number = 0) => {
+    const t = nodeTotals(node.code);
+    const balance = node.nature === 'بستانکار' ? t.credit - t.debit : t.debit - t.credit;
     const isExpanded = expandedNodes[node.code];
     const hasChildren = node.children && node.children.length > 0;
 
@@ -93,10 +118,10 @@ export const ChartOfAccountsView: React.FC<ChartOfAccountsViewProps> = ({ chart 
 
           <div className="flex items-center gap-6 font-mono text-[11px]">
             <div className="w-24 text-left text-slate-500 hidden sm:block">
-              گردش: {formatCurrency(node.turnoverDebit)}
+              گردش: {formatMoney(t.debit, false)}
             </div>
             <div className="w-28 text-left font-bold text-slate-900 tabular-nums">
-              مانده: {formatCurrency(node.balance)}
+              مانده: {formatMoney(balance, false)}
             </div>
             <div className="w-16 text-center font-sans">
               <span
@@ -153,7 +178,7 @@ export const ChartOfAccountsView: React.FC<ChartOfAccountsViewProps> = ({ chart 
           <span>ساختار سلسله‌مراتبی حساب‌ها</span>
           <div className="flex items-center gap-6 font-mono text-[11px]">
             <span className="w-24 text-left hidden sm:block">گردش بدهکار</span>
-            <span className="w-28 text-left">مانده قطعی (تومان)</span>
+            <span className="w-28 text-left">مانده دفاتر ({moneyUnitLabel()})</span>
             <span className="w-16 text-center font-sans">ماهیت</span>
           </div>
         </div>

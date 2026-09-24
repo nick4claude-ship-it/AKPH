@@ -4,8 +4,7 @@
  */
 
 import { PaymentRequest } from '../types';
-import { generateUUID, getNextSequentialDocNumber } from '../utils/ids';
-import { getCurrentFiscalYear } from '../utils/date';
+import { generateUUID, nextDocNumber } from '../utils/ids';
 
 /** Maps a treasury payment request to the payable account role it settles (see PAYABLE_ACCOUNTS). */
 export function payableTypeForRequest(req: PaymentRequest): string {
@@ -38,7 +37,7 @@ export function buildPaymentRequest(existing: PaymentRequest[], input: NewPaymen
   return {
     ...input,
     id: generateUUID(),
-    requestNumber: getNextSequentialDocNumber(existing.map((r) => r.requestNumber), 'PR', 4, getCurrentFiscalYear()),
+    requestNumber: nextDocNumber(existing.map((r) => r.requestNumber), 'PR', input.date || today),
     date: input.date || today,
     dueDate: input.dueDate || today,
     beneficiaryAccount: input.beneficiaryAccount || { bankName: '-', shebaNumber: '-', accountNumber: '-' },

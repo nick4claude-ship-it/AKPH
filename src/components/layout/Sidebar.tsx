@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles } from 'lucide-react';
 import { UserProfile } from '../../types';
-import { navConfig, navChildren, navPath, matchNav, navTrail, NavNode } from '../../navigation/navConfig';
+import { matchNav, navTrail, visibleNav, NavNode } from '../../navigation/navConfig';
+import { usePermission } from '../../store/session';
+import { companyLogo } from '../../assets/images';
 
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   user: UserProfile;
-  onOpenLogout: () => void;
+  /** DEV only: opens the role switcher. Omitted in production (sign-out belongs to WordPress). */
+  onOpenLogout?: () => void;
   onOpenAiAgent: () => void;
   counts?: Record<string, string>;
 }
@@ -25,6 +28,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const activeTrail = navTrail(matchNav(location.pathname)).map((n) => n.id);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const { can } = usePermission();
+  const nodes = useMemo(() => visibleNav(can), [can]);
+  const navChildren = (id: string) => nodes.filter((n) => n.parent === id);
+  const navPath = (id: string): string => {
+    const node = nodes.find((n) => n.id === id);
+    if (node?.path) return node.path;
+    const first = navChildren(id)[0];
+    return first ? navPath(first.id) : '/';
+  };
 
   // Keep the group of the current page expanded, including after Back/Forward navigation.
   useEffect(() => {
@@ -108,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 overflow-hidden">
               <img
-                src="/src/assets/images/company_logo_emblem_1790176049355.jpg"
+                src={companyLogo}
                 alt="لوگوی شرکت سازه گستران پارس"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
@@ -149,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
             {!collapsed && (
               <div className="flex items-center justify-between w-full">
-                <span className="truncate">دستیار هوشمند مدیریت</span>
+                <span className="truncate">دستیار مدیریت (نسخه نمایشی)</span>
                 <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">AI</span>
               </div>
             )}
@@ -158,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation List (built from navConfig) */}
         <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-270px)] scrollbar-thin">
-          {navConfig.filter((n) => !n.parent && !n.hidden).map((n) => renderItem(n, 0))}
+          {nodes.filter((n) => !n.parent && !n.hidden).map((n) => renderItem(n, 0))}
         </nav>
       </div>
 
@@ -185,13 +197,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          <button
-            onClick={onOpenLogout}
-            title="خروج از حساب / تغییر کاربر"
-            className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          {onOpenLogout && (
+            <button
+              onClick={onOpenLogout}
+              title="تغییر کاربر (فقط محیط توسعه)"
+              aria-label="تغییر کاربر (فقط محیط توسعه)"
+              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </aside>

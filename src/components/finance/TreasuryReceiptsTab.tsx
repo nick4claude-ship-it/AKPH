@@ -10,6 +10,9 @@ import { ReceiptRecord } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { MoneyInput } from '../common/NumberInput';
 
 type ReceiptSource = NonNullable<ReceiptRecord['sourceType']>;
 
@@ -33,7 +36,8 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
   const [counterpartyId, setCounterpartyId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
-  const [amount, setAmount] = useState(() => String(state.clientStatements.find((s) => s.id === preselected)?.remainingPayable || ''));
+  const [amount, setAmount] = useState(() => state.clientStatements.find((s) => s.id === preselected)?.remainingPayable || 0);
+  const [error, setError] = useState<string | null>(null);
   const [method, setMethod] = useState<ReceiptRecord['method']>('حواله بانکی');
   const [tracking, setTracking] = useState('');
 
@@ -42,22 +46,27 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (amount <= 0) return setError('مبلغ دریافت باید بیش از صفر باشد.');
+    if (sourceType === 'صورت‌وضعیت کارفرما' && statement && amount > statement.remainingPayable) {
+      return setError(`مبلغ از مانده مطالبات این صورت‌وضعیت (${formatMoney(statement.remainingPayable)}) بیشتر است.`);
+    }
+    if (!bankAccountId) return setError('حساب بانکی مقصد را انتخاب کنید.');
     const result = wf.recordReceipt({
       sourceType,
       statementId: sourceType === 'صورت‌وضعیت کارفرما' ? statementId : undefined,
       counterpartyId: sourceType === 'صورت‌وضعیت کارفرما' ? undefined : counterpartyId,
       projectId: sourceType === 'صورت‌وضعیت کارفرما' ? undefined : projectId,
-      amount: Number(amount.replace(/[^\d]/g, '')),
+      amount,
       bankAccountId,
       method,
       trackingNumber: tracking || '-',
     });
+    if (!result.ok) return setError(result.message);
     onToast(result.message);
-    if (result.ok) {
-      setOpen(false);
-      setAmount('');
-      setTracking('');
-    }
+    setError(null);
+    setOpen(false);
+    setAmount(0);
+    setTracking('');
   };
 
   const totalReceived = state.receipts.reduce((a, r) => a + r.amount, 0);
@@ -68,12 +77,12 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">مانده مطالبات قابل وصول</span>
-          <div className="text-lg font-bold text-blue-700 font-mono">{formatNumber(receivable)}</div>
+          <div className="text-lg font-bold text-blue-700 font-mono">{formatMoney(receivable, false)}</div>
           <span className="text-[11px] text-slate-400">{collectible.length.toLocaleString('fa-IR')} صورت‌وضعیت مصوب</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">جمع دریافت‌های ثبت‌شده</span>
-          <div className="text-lg font-bold text-emerald-700 font-mono">{formatNumber(totalReceived)}</div>
+          <div className="text-lg font-bold text-emerald-700 font-mono">{formatMoney(totalReceived, false)}</div>
           <span className="text-[11px] text-slate-400">{state.receipts.length.toLocaleString('fa-IR')} فقره</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-center">
@@ -115,7 +124,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                   <td className="py-2.5 px-3">{r.payer}</td>
                   <td className="py-2.5 px-3">{r.projectName || '-'}</td>
                   <td className="py-2.5 px-3 text-[11px] text-slate-600">{r.destinationAccount}</td>
-                  <td className="py-2.5 px-3 text-left font-mono font-bold text-emerald-700">{formatNumber(r.amount)}</td>
+                  <td className="py-2.5 px-3 text-left font-mono font-bold text-emerald-700">{formatMoney(r.amount, false)}</td>
                   <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">{r.journalEntryId || '-'}</td>
                 </tr>
               );
@@ -125,8 +134,8 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4">
-          <form onSubmit={submit} className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-3 text-xs text-right">
+        <Dialog as="form" onClose={() => setOpen(false)} label="ثبت دریافت (مطالبات ← دریافت ← بانک ← حسابداری)" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-3 text-xs text-right" onSubmit={submit}>
+          
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <ArrowDownLeft className="w-4 h-4 text-emerald-600" /> ثبت دریافت (مطالبات ← دریافت ← بانک ← حسابداری)
@@ -151,7 +160,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                   onChange={(e) => {
                     setStatementId(e.target.value);
                     const s = collectible.find((x) => x.id === e.target.value);
-                    if (s) setAmount(String(s.remainingPayable));
+                    if (s) setAmount(s.remainingPayable);
                   }}
                   required
                   className="w-full p-2 rounded-lg border border-slate-300"
@@ -206,8 +215,16 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
             </label>
             <div className="grid grid-cols-2 gap-2">
               <label className="block space-y-1">
-                <span className="text-slate-600">مبلغ (تومان)</span>
-                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))} required className="w-full p-2 rounded-lg border border-slate-300 font-mono" />
+                <span className="text-slate-600">مبلغ ({moneyUnitLabel()})</span>
+                <MoneyInput
+                  value={amount}
+                  onValueChange={(v) => {
+                    setAmount(v);
+                    setError(null);
+                  }}
+                  aria-invalid={amount <= 0 || (!!statement && sourceType === 'صورت‌وضعیت کارفرما' && amount > statement.remainingPayable)}
+                  className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                />
               </label>
               <label className="block space-y-1">
                 <span className="text-slate-600">روش</span>
@@ -224,6 +241,11 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
               <span className="text-slate-600">شماره پیگیری</span>
               <input value={tracking} onChange={(e) => setTracking(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 font-mono" />
             </label>
+            {error && (
+              <p className="text-rose-700 font-bold" role="alert">
+                {error}
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer">
                 انصراف
@@ -232,8 +254,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                 ثبت دریافت و صدور سند
               </button>
             </div>
-          </form>
-        </div>
+          </Dialog>
       )}
     </div>
   );

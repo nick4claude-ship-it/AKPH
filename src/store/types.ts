@@ -36,8 +36,26 @@ import {
   BankReconciliationItem,
   PayrollSlip,
   PaymentRequest,
+  ProjectCashDesk,
+  Subledger,
+  AuditLog,
+  TreasuryCheck,
+  Supplier,
+  RequestForQuotation,
+  InterWarehouseTransfer,
+  StocktakeAudit,
+  KardexEntry,
+  Employee,
+  MonthlyTimesheet,
+  ContractBOQItem,
+  ContractAmendment,
+  AdvancePaymentRecord,
+  PriceAdjustment,
+  ContractAuditLog,
+  PettyCashReconciliation,
+  PettyCashCategoryItem,
+  FinanceSettings,
 } from '../types';
-import type { CashDesk } from '../data/paymentsTreasuryMockData';
 
 /**
  * تنها منبع داده برنامه. هر موجودیت فقط یک نسخه دارد و همه ماژول‌ها از همین‌جا می‌خوانند و می‌نویسند.
@@ -54,7 +72,7 @@ export interface AppState {
   journalEntries: JournalEntry[];
   chartOfAccounts: AccountNode[];
   bankAccounts: BankAccount[];
-  cashDesks: CashDesk[];
+  cashDesks: ProjectCashDesk[];
   pettyCashAccounts: PettyCashAccount[];
   pettyCashExpenses: PettyCashExpense[];
   pettyCashReplenishments: PettyCashReplenishment[];
@@ -76,6 +94,24 @@ export interface AppState {
   stockReservations: StockReservation[];
   stockReturns: StockReturn[];
   payrollSlips: PayrollSlip[];
+  employees: Employee[];
+  timesheets: MonthlyTimesheet[];
+  subledgers: Subledger[];
+  auditLogs: AuditLog[];
+  treasuryChecks: TreasuryCheck[];
+  suppliers: Supplier[];
+  rfqs: RequestForQuotation[];
+  interTransfers: InterWarehouseTransfer[];
+  stocktakes: StocktakeAudit[];
+  kardex: KardexEntry[];
+  contractBoq: ContractBOQItem[];
+  contractAmendments: ContractAmendment[];
+  advancePayments: AdvancePaymentRecord[];
+  priceAdjustments: PriceAdjustment[];
+  contractAuditLogs: ContractAuditLog[];
+  pettyCashReconciliations: PettyCashReconciliation[];
+  pettyCashCategories: PettyCashCategoryItem[];
+  financeSettings: FinanceSettings;
   /** Only dismissals are stored; notifications themselves are computed from data. */
   dismissedNotificationIds: string[];
 }
@@ -85,7 +121,7 @@ export type SliceKey = keyof AppState;
 export type SliceUpdater<K extends SliceKey> = AppState[K] | ((prev: AppState[K]) => AppState[K]);
 
 export type AppAction =
-  | { type: 'SET_SLICE'; key: SliceKey; updater: SliceUpdater<any> }
+  | { type: 'SET_SLICE'; key: SliceKey; updater: unknown }
   | { type: 'APPLY_POSTING'; event: FinancialEvent; entry: JournalEntry }
   | { type: 'REPLACE_STATE'; state: AppState };
 

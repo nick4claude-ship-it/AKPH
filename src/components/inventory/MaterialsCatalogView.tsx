@@ -22,6 +22,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 
 interface MaterialsCatalogViewProps {
   materials: MaterialItem[];
@@ -154,7 +155,7 @@ export const MaterialsCatalogView: React.FC<MaterialsCatalogViewProps> = ({
             <div className="text-left">
               <span className="text-[10px] text-slate-400 block">ارزش فیلترشده</span>
               <span className="font-bold text-slate-900 font-mono">
-                {(totalCatalogValue / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} میلیارد تومان
+                {formatMoneyCompact(totalCatalogValue)}
               </span>
             </div>
           </div>
@@ -189,7 +190,7 @@ export const MaterialsCatalogView: React.FC<MaterialsCatalogViewProps> = ({
                 <th className="p-3.5 font-bold">واحد سنجش</th>
                 <th className="p-3.5 font-bold">موجودی فعلی / نقطه سفارش</th>
                 <th className="p-3.5 font-bold">وضعیت موجودی</th>
-                <th className="p-3.5 font-bold text-left">نرخ میانگین (تومان)</th>
+                <th className="p-3.5 font-bold text-left">نرخ میانگین ({moneyUnitLabel()})</th>
                 <th className="p-3.5 font-bold text-left">ارزش کل موجودی</th>
                 <th className="p-3.5 font-bold text-center">عملیات کاردکس</th>
               </tr>
@@ -259,11 +260,11 @@ export const MaterialsCatalogView: React.FC<MaterialsCatalogViewProps> = ({
                     </td>
 
                     <td className="p-3.5 text-left font-mono font-medium text-slate-700">
-                      {mat.averageUnitPrice.toLocaleString('fa-IR')}
+                      {formatMoney(mat.averageUnitPrice, false)}
                     </td>
 
                     <td className="p-3.5 text-left font-mono font-bold text-slate-900">
-                      {mat.totalStockValue.toLocaleString('fa-IR')}
+                      {formatMoney(mat.totalStockValue, false)}
                     </td>
 
                     <td className="p-3.5 text-center">

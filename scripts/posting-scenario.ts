@@ -7,16 +7,15 @@
  */
 
 import assert from 'node:assert/strict';
-import { buildInitialState } from '../src/store/initialState';
+import { buildMockState } from '../src/api/mock/buildState';
 import { postFinancialEventToState } from '../src/store/postingEngine';
 import { selectProjectFinancials } from '../src/store/selectors';
 import { goodsReceiptEvent, vendorInvoiceEvent, storeIssueEvent, clientStatementApprovedEvent } from '../src/store/events';
-import { receiveIntoStock, issueFromStock } from '../src/store/inventoryCosting';
 import { AppState, FinancialEventInput } from '../src/store/types';
 import { GoodsReceiptNote, VendorInvoice, StoreIssueVoucher, JournalEntry } from '../src/types';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
-let state: AppState = buildInitialState();
+let state: AppState = buildMockState();
 
 const PROJECT = 'prj-101';
 const COST_CENTER = 'cc-prj101-01';
@@ -52,7 +51,7 @@ function post(label: string, input: FinancialEventInput): JournalEntry {
 const qty = 10_000;
 const unitPrice = 32_000;
 const vat = (qty * unitPrice) / 10;
-console.log(`خرید: ${qty} ${material.unit} «${material.name}» × ${fmt(unitPrice)} (میانگین فعلی ${fmt(material.averageUnitPrice)}، موجودی ${material.currentStock})`);
+console.log(`خرید: ${qty} ${material.unit} «${material.name}» × ${fmt(unitPrice)} (میانگین فعلی ${fmt(material.averageUnitPrice)} ریال)`);
 assert.equal(state.journalEntries.length, startEntries, 'purchase order must not post');
 
 // 2) Goods receipt.
@@ -66,8 +65,10 @@ const grn: GoodsReceiptNote = {
     orderedQty: qty, deliveredQty: qty, rejectedQty: 0, acceptedQty: qty, unitPrice, totalPrice: qty * unitPrice }],
   totalAmount: qty * unitPrice, status: 'تأیید نهایی انبارداری', receiverName: '-',
 };
-const received = receiveIntoStock(material, qty, unitPrice);
-state = { ...state, materials: state.materials.map((m) => (m.id === material.id ? received : m)) };
+// Weighted average over the company-wide stock of the material (the workflow layer does the same).
+const onHand = state.stockBalances.filter((b) => b.materialId === material.id).reduce((a, b) => a + b.qty, 0);
+const newAverage = Math.round((onHand * material.averageUnitPrice + qty * unitPrice) / (onHand + qty));
+state = { ...state, materials: state.materials.map((m) => (m.id === material.id ? { ...m, averageUnitPrice: newAverage } : m)) };
 post('۲) رسید انبار', goodsReceiptEvent(grn));
 
 // Idempotency: the same receipt cannot be posted twice.
@@ -84,7 +85,7 @@ const invoice: VendorInvoice = {
   poId: 'scn-po-1', poNumber: 'PO-SCN-1', grnId: grn.id, taxRegistrationNumber: '-',
   subtotal: qty * unitPrice, vatAmount: vat, shippingCost: 0, discounts: 0, totalAmount: qty * unitPrice + vat,
   paidAmount: 0, remainingBalance: qty * unitPrice + vat, status: 'تأیید تطبیق سه‌جانبه',
-  threeWayMatching: { poMatched: true, grnMatched: true, priceVarianceAmount: 0, qtyVarianceAmount: 0, status: 'تطبیق کامل و بدون مغایرت' as any },
+  threeWayMatching: { poMatched: true, grnMatched: true, priceVarianceAmount: 0, qtyVarianceAmount: 0, status: 'تطبیق کامل و بدون مغایرت' },
 };
 post('۳) فاکتور خرید', vendorInvoiceEvent(invoice));
 
@@ -98,7 +99,7 @@ post('۴) پرداخت', {
 // 5) Store issue at weighted-average cost.
 const issueQty = 3_000;
 const current = state.materials.find((m) => m.id === material.id)!;
-const { cost: issueCost } = issueFromStock(current, issueQty);
+const issueCost = Math.round(issueQty * current.averageUnitPrice);
 const issue: StoreIssueVoucher = {
   id: 'scn-siv-1', issueNumber: 'SIV-SCN-1', date: '۱۴۰۳/۰۷/۲۲', warehouseId: grn.warehouseId, warehouseName: grn.warehouseName,
   projectId: PROJECT, projectName: '', costCenterId: COST_CENTER, costCenter: '', wbsSection: '-', isSubcontractorContra: false,

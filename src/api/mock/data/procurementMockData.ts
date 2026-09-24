@@ -14,7 +14,7 @@ import {
   RequestForQuotation,
   PurchaseOrder,
   VendorInvoice,
-} from '../types';
+} from '../../../types';
 
 const rawSuppliers: Supplier[] = [
   {
@@ -447,7 +447,7 @@ const rawRequisitions: PurchaseRequisition[] = [
     wbsCode: 'WBS-2.3.1',
     costCenter: 'بتن‌ریزی عرشه پل و پایه‌ها',
     priority: 'فوری کارگاهی (حیاتی)',
-    status: 'تأیید نهایی مالی/مدیرعامل',
+    status: 'تأیید نهایی مدیر ارشد',
     requesterName: 'مهندس نیکوکار',
     requesterRole: 'مدیر اجرایی پروژه فجر',
     approvals: {

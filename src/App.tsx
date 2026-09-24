@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Suspense, lazy, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
@@ -13,15 +13,15 @@ import { GlobalSearchModal } from './components/search/GlobalSearchModal';
 import { DocumentViewerModal } from './components/common/DocumentViewerModal';
 import { LoginModal } from './components/auth/LoginModal';
 import { AiAgentWidget } from './components/dashboard/AiAgentWidget';
-import { currentUser as defaultUser } from './data/mockData';
 import { useAppState } from './store/AppStore';
-import { CurrentUserProvider } from './store/session';
+import { useCurrentUser, usePermission, useSession } from './store/session';
+import { useToastListener } from './store/toast';
 import { useApprovalActions } from './store/useApprovalActions';
 import { selectProjects, selectKpiItems } from './store/selectors';
 import { selectApprovals, selectNotifications, selectPettyFunds, selectSidebarCounts } from './store/domainSelectors';
-import { matchNav, navTrail } from './navigation/navConfig';
-import { ApprovalItem, Project, TimeRange, UserProfile } from './types';
-import { AlertCircle, CheckCircle2, RefreshCw, Building2, Filter, X } from 'lucide-react';
+import { matchNav, navTrail, NavNode } from './navigation/navConfig';
+import { ApprovalItem, Project, TimeRange } from './types';
+import { CheckCircle2, RefreshCw, Filter, X, Lock } from 'lucide-react';
 
 /** Lazily loaded module screens (one chunk per module). */
 function named<M, K extends keyof M>(loader: () => Promise<M>, key: K) {
@@ -66,7 +66,7 @@ const ProjectsRoute: React.FC<{ projects: Project[] }> = ({ projects }) => {
       onNavigate={(path: string) => navigate(path)}
     />
   );
-};
+}
 
 const PartnersRoute: React.FC<{ projects: Project[]; kind: 'clients' | 'subcontractors' | 'suppliers' }> = ({ projects, kind }) => {
   const { counterpartyId } = useParams();
@@ -80,19 +80,22 @@ const PartnersRoute: React.FC<{ projects: Project[]; kind: 'clients' | 'subcontr
       onNavigate={(path: string) => navigate(path)}
     />
   );
-};
-
-export default function App() {
-  const [user, setUser] = useState<UserProfile>(defaultUser);
-  return (
-    <CurrentUserProvider user={user}>
-      <AppShell user={user} onUserChange={setUser} />
-    </CurrentUserProvider>
-  );
 }
 
-/** Layout rendered inside the current-user context so workflows see the signed-in role. */
-const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => void }> = ({ user, onUserChange }) => {
+/** Pages that need a permission render this instead when the signed-in role lacks it. */
+const NoAccess: React.FC = () => (
+  <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm" role="alert">
+    <Lock className="w-10 h-10 text-slate-300 mx-auto" />
+    <h3 className="text-sm font-bold text-slate-900">دسترسی به این بخش برای نقش شما تعریف نشده است</h3>
+    <p className="text-xs text-slate-500">در صورت نیاز، مدیر سیستم نقش شما را در افزونه پرتال تغییر دهد.</p>
+  </div>
+);
+
+/** App shell: the session (user, currency, data source) is provided by main.tsx. */
+export default function App() {
+  const user = useCurrentUser();
+  const { session, switchUser, devUsers, sourceLabel, isDemoData } = useSession();
+  const { can } = usePermission();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -116,14 +119,16 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
   const [selectedProjectForDashboard, setSelectedProjectForDashboard] = useState<Project | null>(null);
   const [activeApproval, setActiveApproval] = useState<ApprovalItem | null>(null);
 
-  // System States (Simulation of Empty, Loading, and Error states per requirement)
-  const [systemState, setSystemState] = useState<'normal' | 'loading' | 'empty' | 'error'>('normal');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4500);
-  };
+  }, []);
+  useToastListener(showToast);
+
+  /** Route element guarded by the nav node's permission. */
+  const guarded = (node: NavNode['requires'], element: React.ReactElement) => (!node || can(node) ? element : <NoAccess />);
   const onPosted = (docNumber: string) => showToast(`سند حسابداری ${docNumber} صادر شد.`);
 
   // Page title comes from navConfig (group › page).
@@ -147,7 +152,7 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         user={user}
-        onOpenLogout={() => setIsLoginOpen(true)}
+        onOpenLogout={switchUser ? () => setIsLoginOpen(true) : undefined}
         onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
         counts={sidebarCounts}
       />
@@ -170,36 +175,11 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
           user={user}
           alerts={notifications}
           onOpenAlertsModal={() => navigate('/notifications')}
-          onSwitchUser={() => setIsLoginOpen(true)}
+          onSwitchUser={switchUser ? () => setIsLoginOpen(true) : undefined}
         />
 
-        {/* System State Selector Bar (demonstrates Empty, Loading, Error states) */}
-        <div className="no-print bg-white/80 border-b border-slate-200/80 px-6 py-2 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">شبیه‌سازی وضعیت‌های سیستمی:</span>
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md">
-              {(
-                [
-                  ['normal', 'داده‌های فعال (Normal)', 'text-slate-900'],
-                  ['loading', 'بارگذاری (Loading)', 'text-blue-700'],
-                  ['empty', 'داده خالی (Empty)', 'text-amber-700'],
-                  ['error', 'خطا (Error)', 'text-rose-700'],
-                ] as const
-              ).map(([key, label, color]) => (
-                <button
-                  key={key}
-                  onClick={() => setSystemState(key)}
-                  className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                    systemState === key ? `bg-white ${color} font-bold shadow-2xs` : 'text-slate-600'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {selectedProjectId !== 'all' && (
+        {selectedProjectId !== 'all' && (
+          <div className="no-print bg-white/80 border-b border-slate-200/80 px-6 py-2 flex items-center justify-end text-[11px] text-slate-500">
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-2 py-0.5 rounded">
               <Filter className="w-3 h-3 text-amber-600" />
               <span>فیلتر فعال روی یک پروژه</span>
@@ -207,46 +187,11 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
                 نمایش تمام پروژه‌ها
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto">
-          {systemState === 'loading' && <LoadingView />}
-
-          {systemState === 'error' && (
-            <div className="p-8 rounded-2xl bg-white border border-rose-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm">
-              <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-900">خطا در برقراری ارتباط با سرور حسابداری</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                امکان دریافت آخرین تراز آزمایشی و گردش نقدینگی وجود ندارد. لطفاً ارتباط شبکه یا سرویس پایگاه داده را بررسی نمایید.
-              </p>
-              <button onClick={() => setSystemState('normal')} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 cursor-pointer">
-                تلاش مجدد و بارگذاری مجدد
-              </button>
-            </div>
-          )}
-
-          {systemState === 'empty' && (
-            <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm">
-              <Building2 className="w-10 h-10 text-slate-300 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-900">هیچ پروژه‌ای در این دوره ثبت نشده است</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                هنوز پروژه یا سند مالی در بازه زمانی انتخاب‌شده وجود ندارد. می‌توانید اولین قرارداد یا هزینه را اضافه نمایید.
-              </p>
-              <button
-                onClick={() => {
-                  setSystemState('normal');
-                  navigate('/projects');
-                }}
-                className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-lg text-xs hover:bg-amber-600 cursor-pointer"
-              >
-                تعریف اولین پروژه عمرانی
-              </button>
-            </div>
-          )}
-
-          {systemState === 'normal' && (
-            <Suspense fallback={<LoadingView />}>
+          <Suspense fallback={<LoadingView />}>
               <Routes>
                 <Route
                   path="/"
@@ -275,11 +220,11 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
                 <Route path="/inventory" element={<InventoryModule projects={projects} currentUser={user} />} />
                 <Route path="/petty-cash" element={<PettyCashModule projects={projects} currentUser={user} onToast={showToast} />} />
                 <Route path="/finance" element={<Navigate to="/finance/accounting" replace />} />
-                <Route path="/finance/accounting" element={<AccountingModule currentUser={user} />} />
-                <Route path="/finance/payments" element={<PaymentsTreasuryModule key="pay" tab="payment_requests" projects={projects} currentUser={user} onToast={showToast} />} />
-                <Route path="/finance/receipts" element={<PaymentsTreasuryModule key="rec" tab="receipts" projects={projects} currentUser={user} onToast={showToast} />} />
-                <Route path="/finance/banks" element={<PaymentsTreasuryModule key="bank" tab="bank_accounts" projects={projects} currentUser={user} onToast={showToast} />} />
-                <Route path="/finance/cash" element={<PaymentsTreasuryModule key="cash" tab="cash_desks" projects={projects} currentUser={user} onToast={showToast} />} />
+                <Route path="/finance/accounting" element={guarded('journal.create', <AccountingModule currentUser={user} />)} />
+                <Route path="/finance/payments" element={guarded('payment_request.create', <PaymentsTreasuryModule key="pay" tab="payment_requests" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/finance/receipts" element={guarded('receipt.record', <PaymentsTreasuryModule key="rec" tab="receipts" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/finance/banks" element={guarded('payment.execute', <PaymentsTreasuryModule key="bank" tab="bank_accounts" projects={projects} currentUser={user} onToast={showToast} />)} />
+                <Route path="/finance/cash" element={guarded('payment.execute', <PaymentsTreasuryModule key="cash" tab="cash_desks" projects={projects} currentUser={user} onToast={showToast} />)} />
                 <Route path="/partners" element={<Navigate to="/partners/clients" replace />} />
                 <Route path="/partners/clients" element={<PartnersRoute key="c" projects={projects} kind="clients" />} />
                 <Route path="/partners/clients/:counterpartyId" element={<PartnersRoute key="cp" projects={projects} kind="clients" />} />
@@ -287,17 +232,16 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
                 <Route path="/partners/subcontractors/:counterpartyId" element={<PartnersRoute key="sp" projects={projects} kind="subcontractors" />} />
                 <Route path="/partners/suppliers" element={<PartnersRoute key="u" projects={projects} kind="suppliers" />} />
                 <Route path="/partners/suppliers/:counterpartyId" element={<PartnersRoute key="up" projects={projects} kind="suppliers" />} />
-                <Route path="/payroll" element={<PayrollModule projects={projects} currentUser={user} onToast={showToast} />} />
+                <Route path="/payroll" element={guarded('payroll.approve', <PayrollModule projects={projects} currentUser={user} onToast={showToast} />)} />
                 <Route path="/documents" element={<DocumentCenterModule projects={projects} />} />
                 <Route path="/approvals" element={<ApprovalCenterModule onToast={showToast} />} />
                 <Route path="/notifications" element={<NotificationCenterPage />} />
                 <Route path="/reports" element={<ReportsBIModule projects={projects} />} />
                 <Route path="/ai" element={<AiAgentWidget isOpen={true} isFloating={false} />} />
-                <Route path="/settings" element={<SettingsPage onToast={showToast} />} />
+                <Route path="/settings" element={guarded('settings.manage', <SettingsPage onToast={showToast} />)} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-            </Suspense>
-          )}
+          </Suspense>
         </main>
 
         <footer className="no-print mt-auto py-4 px-6 border-t border-slate-200 bg-white/60 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -307,7 +251,9 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
           <div className="flex items-center gap-3 text-[11px] font-mono">
             <span>عملیات ← تأیید ← رویداد مالی ← حسابداری</span>
             <span>·</span>
-            <span className="text-emerald-700 font-bold">هسته متصل و پایدار</span>
+            <span className={isDemoData ? 'text-amber-700 font-bold' : 'text-emerald-700 font-bold'}>
+              {sourceLabel} · واحد پول: {session.currency === 'rial' ? 'ریال' : 'تومان'}
+            </span>
           </div>
         </footer>
       </div>
@@ -355,19 +301,20 @@ const AppShell: React.FC<{ user: UserProfile; onUserChange: (u: UserProfile) => 
         }}
       />
 
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        currentUser={user}
-        onSelectUser={(u) => {
-          onUserChange(u);
-          showToast(`کاربر جاری به «${u.name}» (${u.role}) تغییر یافت.`);
-        }}
-      />
+      {isLoginOpen && switchUser && devUsers && (
+        <LoginModal
+          onClose={() => setIsLoginOpen(false)}
+          currentUser={user}
+          users={devUsers}
+          onSelectUser={(u) => {
+            switchUser(u.id);
+          }}
+        />
+      )}
 
       {isAiAgentFloatingOpen && (
         <AiAgentWidget isOpen={isAiAgentFloatingOpen} onClose={() => setIsAiAgentFloatingOpen(false)} isFloating={true} />
       )}
     </div>
   );
-};
+}

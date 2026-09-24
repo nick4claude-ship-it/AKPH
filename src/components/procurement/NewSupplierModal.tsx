@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { X, Building2, Check, ShieldCheck } from 'lucide-react';
 import { Supplier, ProcurementCategory, VendorGrade } from '../../types';
+import { Dialog } from '../common/Dialog';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { useAppState } from '../../store/AppStore';
 
 interface NewSupplierModalProps {
   isOpen: boolean;
@@ -25,6 +28,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
   onClose,
   onAddSupplier,
 }) => {
+  const existingCodes = useAppState().suppliers.map((s) => s.code);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ProcurementCategory>('آهن‌آلات و مقاطع فولادی');
   const [grade, setGrade] = useState<VendorGrade>('A');
@@ -48,13 +52,12 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newId = `sup-${Date.now()}`;
-    const code = `VEN-${Math.floor(Math.random() * 80) + 110}`;
+    const code = nextDocNumber(existingCodes, 'VEN');
 
     const newSupplier: Supplier = {
-      id: newId,
+      id: generateUUID(),
       code,
-      name,
+      name: name.trim(),
       category,
       grade,
       nationalId,
@@ -73,21 +76,22 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
       },
       hasVatCertificate,
       paymentTerms,
+      // No history yet: scores start empty and are built from orders and receipts.
       performance: {
-        qualityScore: 90,
-        deliveryScore: 88,
-        priceCompetitiveness: 90,
-        paymentFlexibility: 85,
-        overallRating: 4.2,
+        qualityScore: 0,
+        deliveryScore: 0,
+        priceCompetitiveness: 0,
+        paymentFlexibility: 0,
+        overallRating: 0,
         totalOrdersCount: 0,
-        onTimeDeliveryRate: 100,
+        onTimeDeliveryRate: 0,
         rejectionRate: 0,
       },
       financials: {
         totalPurchasesAmount: 0,
         currentPayableBalance: 0,
         unclearedChecksAmount: 0,
-        lastTransactionDate: 'ثبت جدید',
+        lastTransactionDate: '—',
       },
       status: 'فعال در وندورلیست',
       notes,
@@ -98,8 +102,8 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="تعریف تأمین‌کننده در وندورلیست رسمی (AVL)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+      
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -262,7 +266,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               <label className="block font-bold text-slate-700 mb-1">شرایط پرداخت توافق‌شده:</label>
               <select
                 value={paymentTerms}
-                onChange={(e) => setPaymentTerms(e.target.value as any)}
+                onChange={(e) => setPaymentTerms(e.target.value as Supplier['paymentTerms'])}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
               >
                 <option value="نقدی پیش از تحویل">نقدی پیش از تحویل</option>
@@ -304,7 +308,6 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

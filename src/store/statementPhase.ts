@@ -4,7 +4,7 @@
  */
 
 import { DetailedProgressStatement } from '../types';
-import { CLIENT_APPROVED_STATUSES } from './initialState';
+import { CLIENT_APPROVED_STATUSES } from './state';
 import { dayIndex, todayIndex } from './domainSelectors';
 
 export type ClientStatementPhase = 'in_review' | 'approved' | 'overdue' | 'settled' | 'returned';

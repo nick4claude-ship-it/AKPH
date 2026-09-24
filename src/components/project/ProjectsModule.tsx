@@ -32,6 +32,7 @@ import {
 } from '../../store/domainSelectors';
 import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from '../statements/statementLabels';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatMoney } from '../../utils/money';
 
 type ProjectTab = 'overview' | 'contract' | 'cost_centers' | 'statements' | 'suppliers' | 'inventory' | 'petty_cash' | 'documents' | 'budget';
 
@@ -184,14 +185,14 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
         {tab === 'overview' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Stat label="مبلغ قرارداد" value={formatNumber(project.contractAmount)} />
-              <Stat label="درآمد شناسایی‌شده (دفاتر)" value={formatNumber(f.recordedRevenue)} tone="text-emerald-700" />
-              <Stat label="بهای تمام‌شده (دفاتر)" value={formatNumber(f.actualCost)} tone="text-rose-700" />
-              <Stat label="سود" value={formatNumber(f.profit)} tone={f.profit >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
-              <Stat label="مطالبات از کارفرما" value={formatNumber(f.receivables)} tone="text-blue-700" />
-              <Stat label="بدهی پروژه" value={formatNumber(f.liabilities)} tone="text-amber-700" />
-              <Stat label="بودجه مصوب" value={formatNumber(project.budget)} />
-              <Stat label="حاشیه سود" value={`${f.profitMargin.toLocaleString('fa-IR')}٪`} />
+              <Stat label="مبلغ قرارداد" value={formatMoney(project.contractAmount, false)} />
+              <Stat label="درآمد شناسایی‌شده (دفاتر)" value={formatMoney(f.recordedRevenue, false)} tone="text-emerald-700" />
+              <Stat label="بهای تمام‌شده (دفاتر)" value={formatMoney(f.actualCost, false)} tone="text-rose-700" />
+              <Stat label="سود" value={formatMoney(f.profit, false)} tone={f.profit >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
+              <Stat label="مطالبات از کارفرما" value={formatMoney(f.receivables, false)} tone="text-blue-700" />
+              <Stat label="بدهی پروژه" value={formatMoney(f.liabilities, false)} tone="text-amber-700" />
+              <Stat label="بودجه مصوب" value={formatMoney(project.budget, false)} />
+              <Stat label="حاشیه سود" value={`${formatMoney(f.profitMargin, false)}٪`} />
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               {[
@@ -274,7 +275,7 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                   <td className="py-2 font-bold">{c.name}</td>
                   <td className="py-2">{c.type}</td>
                   <td className="py-2">{c.manager || '-'}</td>
-                  <td className="py-2 text-left font-mono">{formatNumber(c.budget || 0)}</td>
+                  <td className="py-2 text-left font-mono">{formatMoney(c.budget || 0, false)}</td>
                 </tr>
               ))}
             </tbody>
@@ -401,11 +402,11 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                 <div className="text-[11px] text-slate-500">{a.holderName}</div>
                 <div className="flex justify-between">
                   <span>قابل مصرف</span>
-                  <span className="font-mono">{formatNumber(a.usableBalance)}</span>
+                  <span className="font-mono">{formatMoney(a.usableBalance, false)}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>سقف</span>
-                  <span className="font-mono">{formatNumber(a.ceilingLimit)}</span>
+                  <span className="font-mono">{formatMoney(a.ceilingLimit, false)}</span>
                 </div>
               </div>
             ))}
@@ -435,9 +436,9 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
         {tab === 'budget' && (
           <div className="space-y-3 text-xs">
             <div className="grid grid-cols-3 gap-3">
-              <Stat label="بودجه مراکز هزینه" value={formatNumber(budgetTotal)} />
-              <Stat label="هزینه واقعی (دفاتر)" value={formatNumber(actualTotal)} tone="text-rose-700" />
-              <Stat label="انحراف" value={formatNumber(budgetTotal - actualTotal)} tone={budgetTotal - actualTotal >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
+              <Stat label="بودجه مراکز هزینه" value={formatMoney(budgetTotal, false)} />
+              <Stat label="هزینه واقعی (دفاتر)" value={formatMoney(actualTotal, false)} tone="text-rose-700" />
+              <Stat label="انحراف" value={formatMoney(budgetTotal - actualTotal, false)} tone={budgetTotal - actualTotal >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
             </div>
             <table className="w-full text-right">
               <thead className="text-[11px] text-slate-500 border-b border-slate-100">
@@ -453,9 +454,9 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                 {budget.map((r) => (
                   <tr key={r.costCenterId || 'none'}>
                     <td className="py-2 font-medium">{r.name}</td>
-                    <td className="py-2 text-left font-mono">{formatNumber(r.budget)}</td>
-                    <td className="py-2 text-left font-mono">{formatNumber(r.actual)}</td>
-                    <td className={`py-2 text-left font-mono ${r.variance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatNumber(r.variance)}</td>
+                    <td className="py-2 text-left font-mono">{formatMoney(r.budget, false)}</td>
+                    <td className="py-2 text-left font-mono">{formatMoney(r.actual, false)}</td>
+                    <td className={`py-2 text-left font-mono ${r.variance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatMoney(r.variance, false)}</td>
                     <td className="py-2">
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div

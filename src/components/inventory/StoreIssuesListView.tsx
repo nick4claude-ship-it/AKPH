@@ -24,6 +24,7 @@ import {
   Layers,
   AlertCircle,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact } from '../../utils/money';
 
 interface StoreIssuesListViewProps {
   issues: StoreIssueVoucher[];
@@ -129,7 +130,7 @@ export const StoreIssuesListView: React.FC<StoreIssuesListViewProps> = ({
           <div>
             <select
               value={contraFilter}
-              onChange={(e) => setContraFilter(e.target.value as any)}
+              onChange={(e) => setContraFilter(e.target.value as typeof contraFilter)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 bg-slate-50/50 cursor-pointer"
             >
               <option value="all">همه حواله‌ها</option>
@@ -143,13 +144,13 @@ export const StoreIssuesListView: React.FC<StoreIssuesListViewProps> = ({
             <div>
               <span className="text-[10px] text-amber-800 block">جمع مصالح تهاتری</span>
               <span className="font-bold text-amber-900 font-mono">
-                {(totalContra / 1_000_000).toLocaleString('fa-IR')} م.ت
+                {formatMoneyCompact(totalContra)}
               </span>
             </div>
             <div className="text-left">
               <span className="text-[10px] text-slate-500 block">کل مصرف دوره</span>
               <span className="font-bold text-slate-900 font-mono">
-                {(totalCost / 1_000_000).toLocaleString('fa-IR')} م.ت
+                {formatMoneyCompact(totalCost)}
               </span>
             </div>
           </div>
@@ -243,7 +244,7 @@ export const StoreIssuesListView: React.FC<StoreIssuesListViewProps> = ({
                   </td>
 
                   <td className="p-3.5 text-left font-mono font-bold text-slate-900">
-                    {issue.totalCost.toLocaleString('fa-IR')}
+                    {formatMoney(issue.totalCost, false)}
                   </td>
 
                   <td className="p-3.5 text-center">

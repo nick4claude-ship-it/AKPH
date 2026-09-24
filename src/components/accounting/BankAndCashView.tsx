@@ -18,6 +18,7 @@ import {
   BankReconciliationItem,
 } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
+import { moneyUnitLabel } from '../../utils/money';
 
 interface BankAndCashViewProps {
   bankAccounts: BankAccount[];
@@ -109,7 +110,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
                 <div className="mt-3 font-mono">
                   <span className="text-[10px] font-sans text-slate-500 block">مانده موجودی نقد:</span>
                   <div className="text-base font-extrabold text-slate-900 tabular-nums">
-                    {formatCurrency(bank.balance)} <span className="text-[10px] font-sans font-normal text-slate-400">تومان</span>
+                    {formatCurrency(bank.balance)}
                   </div>
                 </div>
 
@@ -202,7 +203,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
               <div className="mt-4 font-mono p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-sans text-slate-500 block">مانده فیزیکی در صندوق:</span>
-                  <span className="text-base font-extrabold text-slate-900">{formatCurrency(cash.balance)} تومان</span>
+                  <span className="text-base font-extrabold text-slate-900">{formatCurrency(cash.balance)}</span>
                 </div>
                 <button className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg cursor-pointer">
                   شمارش و صورت‌جلسه
@@ -249,7 +250,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
                   <th className="py-2.5 px-4 font-mono">تاریخ</th>
                   <th className="py-2.5 px-4">شرح تراکنش بانکی</th>
                   <th className="py-2.5 px-3">نوع</th>
-                  <th className="py-2.5 px-3 font-mono text-left">مبلغ (تومان)</th>
+                  <th className="py-2.5 px-3 font-mono text-left">مبلغ ({moneyUnitLabel()})</th>
                   <th className="py-2.5 px-3">وضعیت تطبیق</th>
                   <th className="py-2.5 px-4">نوع مغایرت</th>
                   <th className="py-2.5 px-4 text-center">اقدام اصلاحی</th>

@@ -3,16 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mockProjects } from '../data/mockData';
-import { mockCounterparties } from '../data/counterpartiesMockData';
-import { mockContracts, mockDetailedStatements } from '../data/contractsMockData';
-import { mockSubcontractorContracts, mockSubcontractorStatements } from '../data/subcontractorsMockData';
-import { mockPurchaseOrders, mockVendorInvoices } from '../data/procurementMockData';
-import { mockGoodsReceipts, mockStoreIssues } from '../data/inventoryMockData';
-import { mockSystemDocuments } from '../data/documentsMockData';
-import { mockCostCenters } from '../data/accountingMockData';
-import { mockPaymentRequests, mockCashDesks } from '../data/paymentsTreasuryMockData';
-import { mockPettyCashAccounts, mockPettyCashExpenses } from '../data/pettyCashMockData';
+import { mockProjects } from './data/mockData';
+import { mockCounterparties } from './data/counterpartiesMockData';
+import { mockContracts, mockDetailedStatements } from './data/contractsMockData';
+import { mockSubcontractorContracts, mockSubcontractorStatements } from './data/subcontractorsMockData';
+import { mockPurchaseOrders, mockVendorInvoices } from './data/procurementMockData';
+import { mockGoodsReceipts, mockStoreIssues } from './data/inventoryMockData';
+import { mockSystemDocuments } from './data/documentsMockData';
+import { mockCostCenters } from './data/accountingMockData';
+import { mockPaymentRequests, mockCashDesks } from './data/paymentsTreasuryMockData';
+import { mockPettyCashAccounts, mockPettyCashExpenses } from './data/pettyCashMockData';
 
 export interface ReferenceValidationResult {
   valid: boolean;

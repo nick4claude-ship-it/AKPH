@@ -23,7 +23,9 @@ import {
   VendorInvoice,
   Supplier,
   Project,
+  ProcurementSubTab,
 } from '../../types';
+import { formatMoney, formatMoneyCompact } from '../../utils/money';
 
 interface ProcurementDashboardViewProps {
   orders: PurchaseOrder[];
@@ -32,7 +34,7 @@ interface ProcurementDashboardViewProps {
   invoices: VendorInvoice[];
   suppliers: Supplier[];
   projects: Project[];
-  onNavigateToTab: (tab: any) => void;
+  onNavigateToTab: (tab: ProcurementSubTab) => void;
   onSelectOrderForPrint: (order: PurchaseOrder) => void;
   onOpenNewRequisition: () => void;
   onOpenNewOrder: () => void;
@@ -67,15 +69,13 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
   const pendingInvoices = invoices.filter((i) => i.status === 'در حال تطبیق' || i.status === 'دارای مغایرت و متوقف');
   const totalAccountsPayable = invoices.reduce((acc, i) => acc + i.remainingBalance, 0);
 
-  // Category breakdown calculation
-  const categorySpend: { [key: string]: number } = {
-    'آهن‌آلات و مقاطع فولادی': 3_500_000_000,
-    'سیمان، بتن و فرآورده‌های بتنی': 2_100_000_000,
-    'تأسیسات مکانیکی و پایپینگ': 1_420_800_000,
-    'تأسیسات الکتریکی و تابلو برق': 1_137_000_000,
-    'تجهیزات قالب‌بندی و ماشین‌آلات': 288_000_000,
-    'عایق، رنگ و شیمی ساختمان': 410_000_000,
-  };
+  // Spend per category, from issued orders grouped by the supplier's category.
+  const categorySpend: Record<string, number> = {};
+  for (const o of orders) {
+    if (o.status === 'فسخ شده') continue;
+    const category = suppliers.find((sup) => sup.id === o.supplierId)?.category ?? 'سایر';
+    categorySpend[category] = (categorySpend[category] ?? 0) + o.totalOrderAmount;
+  }
   const categoryTotal = Object.values(categorySpend).reduce((a, b) => a + b, 0);
 
   return (
@@ -128,10 +128,9 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-black text-slate-900">
-              {(totalOrdersAmount / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}
+              {formatMoneyCompact(totalOrdersAmount)}
             </span>
-            <span className="text-[11px] text-slate-500">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>تعداد سفارشات در جریان:</span>
             <span className="font-bold text-indigo-700 font-mono">{activeOrdersCount} سفارش</span>
@@ -194,7 +193,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">صرفه‌جویی کمیسیون:</span>
-            <span className="font-bold text-emerald-700 font-mono">{(totalSavings / 1_000_000).toLocaleString('fa-IR')} م.ت</span>
+            <span className="font-bold text-emerald-700 font-mono">{formatMoneyCompact(totalSavings)}</span>
           </div>
         </div>
 
@@ -208,10 +207,9 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-black text-slate-900">
-              {(totalAccountsPayable / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}
+              {formatMoneyCompact(totalAccountsPayable)}
             </span>
-            <span className="text-[11px] text-slate-500">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">فاکتورهای در تطبیق:</span>
             <span className="font-bold text-blue-700 font-mono">{pendingInvoices.length} فاکتور</span>
@@ -294,7 +292,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
                       <div key={it.id} className="flex items-center justify-between text-slate-600">
                         <span>• {it.materialName} ({it.requestedQty.toLocaleString('fa-IR')} {it.unit})</span>
                         <span className="font-mono text-slate-800 font-bold">
-                          {it.estimatedTotalPrice.toLocaleString('fa-IR')} تومان
+                          {formatMoney(it.estimatedTotalPrice)}
                         </span>
                       </div>
                     ))}
@@ -399,7 +397,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
                   <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                     <span>محل تخلیه: {order.destinationWarehouse}</span>
                     <span className="font-bold text-slate-900 font-mono">
-                      {order.totalOrderAmount.toLocaleString('fa-IR')} تومان
+                      {formatMoney(order.totalOrderAmount)}
                     </span>
                   </div>
                 </div>
@@ -435,7 +433,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
                       ></div>
                     </div>
                     <div className="text-[10px] text-left text-slate-400 font-mono">
-                      {(amount / 1_000_000_000).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} میلیارد تومان
+                      {formatMoneyCompact(amount)}
                     </div>
                   </div>
                 );

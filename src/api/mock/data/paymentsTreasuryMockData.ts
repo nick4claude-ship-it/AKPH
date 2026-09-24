@@ -13,86 +13,12 @@ const isDev = (): boolean => {
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CashDesk as BaseCashDesk } from '../types';
+import type { PaymentRequest, TreasuryCheck, ProjectCashDesk as CashDesk } from '../../../types';
 
-export type PaymentSourceType =
-  | 'صورت‌وضعیت پیمانکار جزء'
-  | 'فاکتور خرید تأمین‌کننده'
-  | 'شارژ و تسویه تنخواه'
-  | 'حقوق و دستمزد ماهانه'
-  | 'پیش‌پرداخت خرید'
-  | 'حق بیمه و مالیات'
-  | 'سایر هزینه‌های عمومی';
 
-export type PaymentMethodType =
-  | 'حواله ساتنا'
-  | 'حواله پایا'
-  | 'چک صیادی بانکی'
-  | 'کارت به کارت'
-  | 'صندوق نقد'
-  | 'تهاتر ملکی/خدماتی';
 
-export interface PaymentRequest {
-  id: string;
-  requestNumber: string;
-  sourceType: PaymentSourceType;
-  sourceRefId: string; // e.g. statement id, po id, invoice id
-  sourceRefNumber: string;
-  date: string;
-  dueDate: string;
-  projectId: string;
-  projectName: string;
-  costCenterId: string;
-  beneficiaryName: string;
-  counterpartyId?: string; // دریافت‌کننده وجه
-  beneficiaryType: 'پیمانکار جزء' | 'تأمین‌کننده' | 'مسئول تنخواه' | 'پرسنل' | 'سازمان تامین اجتماعی' | 'سازمان امور مالیاتی';
-  beneficiaryAccount: {
-    bankName: string;
-    shebaNumber: string;
-    accountNumber: string;
-  };
-  totalAmount: number;
-  approvedAmount: number;
-  paidAmount: number;
-  remainingAmount: number;
-  priority: 'فوری / بحرانی' | 'عادی' | 'پایین';
-  status: 'پیش‌نویس' | 'در انتظار تأیید مالی' | 'تأیید مدیرعامل' | 'در صف پرداخت خزانه' | 'پرداخت شده' | 'رد شده';
-  approvedBy?: string;
-  approvedDate?: string;
-  paymentMethod?: PaymentMethodType;
-  payerBankAccountId?: string;
-  payerBankAccountName?: string;
-  paymentDate?: string;
-  trackingNumber?: string;
-  journalEntryId?: string;
-  notes?: string;
-}
 
-export interface TreasuryCheck {
-  id: string;
-  checkType: 'صادره (پرداختی)' | 'وارده (دریافتی)';
-  sayadNumber: string; // شناسه صیاد ۱۶ رقمی
-  checkNumber: string;
-  bankName: string;
-  branch: string;
-  amount: number;
-  issueDate: string;
-  dueDate: string;
-  drawer: string; // صادرکننده
-  payee: string; // در وجه
-  projectId?: string;
-  projectName?: string;
-  relatedDocNumber?: string;
-  status: 'در جریان وصول/سررسید' | 'پاس شده و تسویه' | 'برگشت خورده' | 'ابطال شده' | 'واگذار شده';
-  clearedDate?: string;
-}
 
-export interface CashDesk extends BaseCashDesk {
-  projectId: string;
-  projectName: string;
-  ceilingLimit: number;
-  lastAuditDate: string;
-}
 
 const rawPaymentRequests: PaymentRequest[] = [
   {
@@ -151,7 +77,7 @@ const rawPaymentRequests: PaymentRequest[] = [
     paidAmount: 0,
     remainingAmount: 1_250_000_000,
     priority: 'فوری / بحرانی',
-    status: 'تأیید مدیرعامل',
+    status: 'تأیید مدیر ارشد',
     approvedBy: 'مهندس محمدرضا رادمنش (مدیرعامل)',
     approvedDate: '۱۴۰۳/۰۷/۰۲',
     paymentMethod: 'چک صیادی بانکی',

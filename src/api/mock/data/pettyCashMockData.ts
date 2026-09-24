@@ -17,7 +17,7 @@ import {
   PettyCashCategoryItem,
   PettyCashAttachment,
   PettyCashSettings,
-} from '../types';
+} from '../../../types';
 
 // ==================== 1. PETTY CASH ACCOUNTS (تنخواه‌گردان‌ها) ====================
 export const initialPettyCashAccounts: PettyCashAccount[] = [
@@ -234,7 +234,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'pending_approval',
     approvalLevelRequired: 'site_manager_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'سرپرست کارگاه',
@@ -279,7 +279,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'pending_approval',
     approvalLevelRequired: 'project_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'سرپرست کارگاه',
@@ -324,7 +324,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'pending_approval',
     approvalLevelRequired: 'site_manager_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'سرپرست کارگاه',
@@ -428,7 +428,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'pending_approval',
     approvalLevelRequired: 'site_manager_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'مدیر پروژه',
@@ -473,7 +473,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'pending_approval',
     approvalLevelRequired: 'site_manager_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'سرپرست کارگاه',
@@ -520,7 +520,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'pending_approval',
     approvalLevelRequired: 'site_manager_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'کارپرداز',
@@ -621,7 +621,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     ],
     status: 'rejected',
     approvalLevelRequired: 'site_manager_and_finance',
-    currentApprovalStep: 'مدیر مالی',
+    currentApprovalStep: 'حسابدار',
     approvalHistory: [
       {
         level: 'سرپرست کارگاه',
@@ -867,9 +867,9 @@ export const initialPettyCashSettings: PettyCashSettings = {
   siteLevelMax: 20_000_000,
   projectLevelMax: 100_000_000,
   approvalChains: {
-    site_manager_and_finance: ['سرپرست کارگاه', 'مدیر مالی'],
-    project_and_finance: ['مدیر پروژه', 'مدیر مالی'],
-    ceo_full: ['مدیر پروژه', 'مدیر مالی', 'مدیرعامل'],
+    site_manager_and_finance: ['حسابدار'],
+    project_and_finance: ['مدیر پروژه', 'حسابدار'],
+    ceo_full: ['مدیر پروژه', 'حسابدار', 'مدیر ارشد'],
   },
   lowBalancePercent: 25,
 };

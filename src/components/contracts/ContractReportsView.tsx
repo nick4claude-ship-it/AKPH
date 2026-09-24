@@ -19,6 +19,8 @@ import {
   DollarSign,
   PieChart,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
+import { downloadCsv } from '../../utils/export';
 
 interface ContractReportsViewProps {
   contracts: Contract[];
@@ -41,61 +43,49 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
     window.print();
   };
 
+  // Amounts are exported in the display currency (named in each header) as plain integers.
   const handleExportCSV = () => {
-    let headers: string[] = [];
-    let rows: (string | number)[][] = [];
-    let fileName = 'report.csv';
-
+    const unit = moneyUnitLabel();
+    const m = (rial: number) => toDisplayAmount(rial);
     if (activeReport === 'progress') {
-      fileName = 'گزارش_کارکرد_پیمان‌ها.csv';
-      headers = ['کد پیمان', 'عنوان پروژه', 'کارفرما', 'مبلغ پیمان', 'کارکرد متره شده', 'درصد پیشرفت', 'صورت‌وضعیت ارسالی', 'وصولی'];
-      rows = contracts.map((c) => [
-        c.code,
-        `"${c.projectTitle}"`,
-        `"${c.employer}"`,
-        c.currentValue,
-        c.executedValue,
-        ((c.executedValue / c.currentValue) * 100).toFixed(1) + '%',
-        c.billedValue,
-        c.receivedValue,
-      ]);
+      downloadCsv(
+        'گزارش_کارکرد_پیمان‌ها.csv',
+        ['کد پیمان', 'عنوان پروژه', 'کارفرما', `مبلغ پیمان (${unit})`, `کارکرد متره شده (${unit})`, 'درصد پیشرفت', `صورت‌وضعیت ارسالی (${unit})`, `وصولی (${unit})`],
+        contracts.map((c) => [
+          c.code,
+          c.projectTitle,
+          c.employer,
+          m(c.currentValue),
+          m(c.executedValue),
+          c.currentValue ? ((c.executedValue / c.currentValue) * 100).toFixed(1) : '0',
+          m(c.billedValue),
+          m(c.receivedValue),
+        ])
+      );
     } else if (activeReport === 'statements') {
-      fileName = 'گزارش_جامع_صورت‌وضعیت‌ها.csv';
-      headers = ['شماره', 'پیمان', 'پروژه', 'دوره', 'ناخالص', 'کسورات', 'خالص', 'دریافتی', 'مانده طلب', 'وضعیت'];
-      rows = statements.map((s) => [
-        s.statementNumber,
-        s.contractCode,
-        `"${s.projectName}"`,
-        `${s.periodStartDate} تا ${s.periodEndDate}`,
-        s.grossAmount,
-        s.totalDeductions,
-        s.netPayable,
-        s.receivedAmount,
-        s.remainingPayable,
-        s.status,
-      ]);
+      downloadCsv(
+        'گزارش_جامع_صورت‌وضعیت‌ها.csv',
+        ['شماره', 'پیمان', 'پروژه', 'دوره', `ناخالص (${unit})`, `کسورات (${unit})`, `خالص (${unit})`, `دریافتی (${unit})`, `مانده طلب (${unit})`, 'وضعیت'],
+        statements.map((s) => [
+          s.statementNumber,
+          s.contractCode,
+          s.projectName,
+          `${s.periodStartDate} تا ${s.periodEndDate}`,
+          m(s.grossAmount),
+          m(s.totalDeductions),
+          m(s.netPayable),
+          m(s.receivedAmount),
+          m(s.remainingPayable),
+          s.status,
+        ])
+      );
     } else {
-      fileName = 'گزارش_مطالبات_کارفرمایان.csv';
-      headers = ['پیمان', 'پروژه', 'کارفرما', 'مانده طلب معوق', 'سررسید گذشته'];
-      rows = contracts.map((c) => [
-        c.code,
-        `"${c.projectTitle}"`,
-        `"${c.employer}"`,
-        c.receivableValue,
-        c.receivableValue > 0 ? 'بله' : 'خیر',
-      ]);
+      downloadCsv(
+        'گزارش_مطالبات_کارفرمایان.csv',
+        ['پیمان', 'پروژه', 'کارفرما', `مانده طلب (${unit})`],
+        contracts.map((c) => [c.code, c.projectTitle, c.employer, m(c.receivableValue)])
+      );
     }
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -196,10 +186,10 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
                       <td className="p-3 font-bold text-slate-900">{c.projectTitle}</td>
                       <td className="p-3 text-slate-600">{c.employer}</td>
                       <td className="p-3 text-left font-mono font-bold">
-                        {(c.currentValue / 1_000_000_000).toFixed(2)} م.ت
+                        {formatMoneyCompact(c.currentValue)}
                       </td>
                       <td className="p-3 text-left font-mono font-bold text-indigo-700">
-                        {(c.executedValue / 1_000_000_000).toFixed(2)} م.ت
+                        {formatMoneyCompact(c.executedValue)}
                       </td>
                       <td className="p-3 text-center">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-800">
@@ -207,13 +197,13 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
                         </span>
                       </td>
                       <td className="p-3 text-left font-mono text-purple-700">
-                        {(c.billedValue / 1_000_000_000).toFixed(2)} م.ت
+                        {formatMoneyCompact(c.billedValue)}
                       </td>
                       <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                        {(c.receivedValue / 1_000_000_000).toFixed(2)} م.ت
+                        {formatMoneyCompact(c.receivedValue)}
                       </td>
                       <td className="p-3 text-left font-mono text-slate-500">
-                        {(c.remainingValue / 1_000_000_000).toFixed(2)} م.ت
+                        {formatMoneyCompact(c.remainingValue)}
                       </td>
                     </tr>
                   );
@@ -241,9 +231,9 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
                   <th className="p-3">شماره صورت‌وضعیت</th>
                   <th className="p-3">پروژه و کارفرما</th>
                   <th className="p-3">دوره کارکرد</th>
-                  <th className="p-3 text-left">مبلغ ناخالص (تومان)</th>
-                  <th className="p-3 text-left">کسورات (تومان)</th>
-                  <th className="p-3 text-left">خالص مصوب (تومان)</th>
+                  <th className="p-3 text-left">مبلغ ناخالص ({moneyUnitLabel()})</th>
+                  <th className="p-3 text-left">کسورات ({moneyUnitLabel()})</th>
+                  <th className="p-3 text-left">خالص مصوب ({moneyUnitLabel()})</th>
                   <th className="p-3 text-left">وصول‌شده</th>
                   <th className="p-3 text-left">مانده طلب</th>
                   <th className="p-3 text-center">وضعیت تسویه</th>
@@ -258,19 +248,19 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
                       {s.periodStartDate} تا {s.periodEndDate}
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-slate-800">
-                      {s.grossAmount.toLocaleString('fa-IR')}
+                      {formatMoney(s.grossAmount, false)}
                     </td>
                     <td className="p-3 text-left font-mono text-rose-700">
-                      {s.totalDeductions.toLocaleString('fa-IR')}
+                      {formatMoney(s.totalDeductions, false)}
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-indigo-900">
-                      {s.netPayable.toLocaleString('fa-IR')}
+                      {formatMoney(s.netPayable, false)}
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                      {s.receivedAmount.toLocaleString('fa-IR')}
+                      {formatMoney(s.receivedAmount, false)}
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-rose-600">
-                      {s.remainingPayable.toLocaleString('fa-IR')}
+                      {formatMoney(s.remainingPayable, false)}
                     </td>
                     <td className="p-3 text-center font-bold text-[10px]">
                       {s.paymentStatus === 'Paid' ? (
@@ -317,25 +307,25 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
                     <td className="p-3 font-bold text-slate-900">{c.employer}</td>
                     <td className="p-3 font-medium text-slate-800">{c.projectTitle}</td>
                     <td className="p-3 text-left font-mono font-bold text-purple-900">
-                      {(c.approvedBilledValue / 1_000_000_000).toFixed(2)} م.ت
+                      {formatMoneyCompact(c.approvedBilledValue)}
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-emerald-700">
-                      {(c.receivedValue / 1_000_000_000).toFixed(2)} م.ت
+                      {formatMoneyCompact(c.receivedValue)}
                     </td>
                     <td className="p-3 text-left font-mono font-black text-rose-700">
-                      {(c.receivableValue / 1_000_000_000).toFixed(2)} م.ت
+                      {formatMoneyCompact(c.receivableValue)}
                     </td>
                     <td className="p-3 text-center">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          c.receivableValue > 1_000_000_000
+                          c.receivableValue > 10_000_000_000
                             ? 'bg-rose-100 text-rose-900'
                             : c.receivableValue > 0
                             ? 'bg-amber-100 text-amber-900'
                             : 'bg-emerald-100 text-emerald-900'
                         }`}
                       >
-                        {c.receivableValue > 1_000_000_000
+                        {c.receivableValue > 10_000_000_000
                           ? 'ریسک متوسط تاخیر'
                           : c.receivableValue > 0
                           ? 'پیگیری عادی'

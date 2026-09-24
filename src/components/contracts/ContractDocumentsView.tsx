@@ -114,11 +114,12 @@ export const ContractDocumentsView: React.FC<ContractDocumentsViewProps> = ({
                   {doc.uploadDate} · {doc.fileSize}
                 </span>
                 <button
-                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 font-bold text-xs"
-                  title="دانلود فایل"
+                  disabled
+                  className="p-1.5 rounded-lg text-slate-400 cursor-not-allowed flex items-center gap-1 font-bold text-xs"
+                  title="دانلود فایل (به‌زودی)"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>دانلود</span>
+                  <span>دانلود (به‌زودی)</span>
                 </button>
               </div>
             </div>

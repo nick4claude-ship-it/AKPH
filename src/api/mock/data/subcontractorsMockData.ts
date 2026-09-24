@@ -16,7 +16,7 @@ const isDev = (): boolean => {
 import {
   SubcontractorContract,
   SubcontractorProgressStatement,
-} from '../types';
+} from '../../../types';
 
 const rawSubcontractorContracts: SubcontractorContract[] = [
   {

@@ -9,8 +9,52 @@ import { useCurrentUser } from './session';
 import * as wf from './workflows';
 import { WorkflowEnv } from './workflows';
 
+/** Workflow functions exposed to the UI (each takes the environment as first argument). */
+const WORKFLOW_ACTIONS = [
+  'createClientStatement',
+  'advanceClientStatement',
+  'returnClientStatement',
+  'recordReceipt',
+  'createSubcontractorStatement',
+  'advanceSubcontractorStatement',
+  'returnSubcontractorStatement',
+  'submitPettyCashExpense',
+  'approvePettyCashExpense',
+  'rejectPettyCashExpense',
+  'requestPettyCashReplenishment',
+  'approveVendorInvoice',
+  'rejectVendorInvoice',
+  'approveRequisition',
+  'cancelRequisition',
+  'createPaymentRequest',
+  'approvePaymentRequest',
+  'rejectPaymentRequest',
+  'executePayment',
+  'approvePayrollPeriod',
+  'createManualJournalEntry',
+  'approveJournalEntry',
+  'rejectJournalEntry',
+  'reverseJournalEntry',
+  'closeFiscalYear',
+  'updateFinanceSettings',
+  'updatePettyCashSettings',
+  'reconcilePettyCash',
+  'addDocument',
+  'linkDocument',
+  'receiveGoodsFromPO',
+  'requestStoreIssue',
+  'confirmStoreIssue',
+  'releaseStoreIssue',
+  'returnFromProject',
+  'returnToSupplier',
+  'createTransfer',
+  'advanceTransfer',
+  'applyStocktake',
+] as const;
+
+type ActionName = (typeof WORKFLOW_ACTIONS)[number];
 type Bound<F> = F extends (env: WorkflowEnv, ...args: infer A) => infer R ? (...args: A) => R : never;
-type WorkflowApi = { [K in keyof typeof wf as (typeof wf)[K] extends (env: WorkflowEnv, ...a: any[]) => any ? K : never]: Bound<(typeof wf)[K]> };
+export type WorkflowApi = { [K in ActionName]: Bound<(typeof wf)[K]> };
 
 /** Workflow services bound to the store and the signed-in user. */
 export function useWorkflows(): WorkflowApi {
@@ -27,44 +71,10 @@ export function useWorkflows(): WorkflowApi {
       user,
     };
     const api: Record<string, unknown> = {};
-    for (const [name, fn] of Object.entries(wf)) {
-      if (typeof fn === 'function' && fn.length >= 1 && WORKFLOW_ACTIONS.has(name)) {
-        api[name] = (...args: unknown[]) => (fn as (...a: unknown[]) => unknown)(env, ...args);
-      }
+    for (const name of WORKFLOW_ACTIONS) {
+      const fn = wf[name] as (env: WorkflowEnv, ...a: unknown[]) => unknown;
+      api[name] = (...args: unknown[]) => fn(env, ...args);
     }
     return api as WorkflowApi;
   }, [dispatch, getState, post, user]);
 }
-
-/** Exported workflow functions that take the environment as first argument. */
-const WORKFLOW_ACTIONS = new Set([
-  'advanceClientStatement',
-  'returnClientStatement',
-  'recordReceipt',
-  'advanceSubcontractorStatement',
-  'returnSubcontractorStatement',
-  'submitPettyCashExpense',
-  'approvePettyCashExpense',
-  'rejectPettyCashExpense',
-  'requestPettyCashReplenishment',
-  'approveVendorInvoice',
-  'rejectVendorInvoice',
-  'approveRequisition',
-  'cancelRequisition',
-  'approvePaymentRequest',
-  'rejectPaymentRequest',
-  'executePayment',
-  'approvePayrollPeriod',
-  'approveJournalEntry',
-  'rejectJournalEntry',
-  'addDocument',
-  'linkDocument',
-  'receiveGoodsFromPO',
-  'requestStoreIssue',
-  'confirmStoreIssue',
-  'releaseStoreIssue',
-  'returnFromProject',
-  'returnToSupplier',
-  'completeTransfer',
-  'applyStocktake',
-]);

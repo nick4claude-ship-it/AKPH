@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Clock,
 } from 'lucide-react';
+import { formatMoneyCompact } from '../../../utils/money';
 
 interface SubcontractorContractsListViewProps {
   contracts: SubcontractorContract[];
@@ -99,15 +100,14 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">سقف کل قراردادهای جزء</span>
           <span className="text-base font-black text-slate-900">
-            {(totalContractValue / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalContractValue)}
           </span>
-          <span className="text-[10px] text-slate-400 block mt-0.5">میلیون تومان</span>
-        </div>
+                  </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">کارکرد اجراشده (متره)</span>
           <span className="text-base font-black text-blue-700">
-            {(totalExecuted / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalExecuted)}
           </span>
           <span className="text-[10px] text-blue-500 block mt-0.5">
             {totalContractValue > 0 ? Number(((totalExecuted / totalContractValue) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ پیشرفت
@@ -117,15 +117,14 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">صورت‌وضعیت‌های مصوب</span>
           <span className="text-base font-black text-purple-700">
-            {(totalApproved / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalApproved)}
           </span>
-          <span className="text-[10px] text-purple-500 block mt-0.5">میلیون تومان</span>
-        </div>
+                  </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <span className="text-[11px] text-slate-500 block mb-1">پرداخت‌شده قطعی</span>
           <span className="text-base font-black text-emerald-700">
-            {(totalPaid / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalPaid)}
           </span>
           <span className="text-[10px] text-emerald-500 block mt-0.5">
             {totalApproved > 0 ? Number(((totalPaid / totalApproved) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ وصولی
@@ -135,7 +134,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
         <div className="bg-rose-50/60 p-3.5 rounded-xl border border-rose-200 shadow-2xs">
           <span className="text-[11px] text-rose-800 font-bold block mb-1">مانده بدهی تاییدشده</span>
           <span className="text-base font-black text-rose-700">
-            {(totalDebt / 1_000_000).toLocaleString('fa-IR')}
+            {formatMoneyCompact(totalDebt)}
           </span>
           <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">بدهی فوری AKPH</span>
         </div>
@@ -248,15 +247,14 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <span className="text-[10px] text-slate-400 block">مبلغ قرارداد</span>
                   <span className="font-black text-slate-900">
-                    {(contract.contractValue / 1_000_000).toLocaleString('fa-IR')}
+                    {formatMoneyCompact(contract.contractValue)}
                   </span>
-                  <span className="text-[9px] text-slate-400 block">م.ت</span>
-                </div>
+                                  </div>
 
                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <span className="text-[10px] text-slate-400 block">کارکرد متره</span>
                   <span className="font-bold text-blue-700">
-                    {(contract.executedValue / 1_000_000).toLocaleString('fa-IR')}
+                    {formatMoneyCompact(contract.executedValue)}
                   </span>
                   <span className="text-[9px] text-blue-600 block">{Math.round(execPct).toLocaleString('fa-IR')}٪ پیشرفت</span>
                 </div>
@@ -264,10 +262,9 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
                 <div className="bg-rose-50/60 p-2 rounded-lg border border-rose-200">
                   <span className="text-[10px] text-rose-700 block font-bold">مانده بدهی</span>
                   <span className="font-black text-rose-700">
-                    {(contract.remainingPayableValue / 1_000_000).toLocaleString('fa-IR')}
+                    {formatMoneyCompact(contract.remainingPayableValue)}
                   </span>
-                  <span className="text-[9px] text-rose-600 block">م.ت</span>
-                </div>
+                                  </div>
               </div>
 
               {/* Multi-step progress bar */}
@@ -293,10 +290,10 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-500">
                   <span className="text-emerald-700 font-bold">
-                    پرداختی: {(contract.paidValue / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    پرداختی: {formatMoneyCompact(contract.paidValue)}
                   </span>
                   <span className="text-slate-400">
-                    ظرفیت مانده: {(contract.remainingContractValue / 1_000_000).toLocaleString('fa-IR')} م.ت
+                    ظرفیت مانده: {formatMoneyCompact(contract.remainingContractValue)}
                   </span>
                 </div>
               </div>

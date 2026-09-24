@@ -13,6 +13,8 @@ import {
   PETTY_CASH_FUND_LABELS,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface ReplenishmentViewProps {
   accounts: PettyCashAccount[];
@@ -98,12 +100,12 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
                       </div>
                     </td>
                     <td className="py-2.5 px-3">{PETTY_CASH_FUND_LABELS[a.fundType]}</td>
-                    <td className="py-2.5 px-3 text-left font-mono">{formatNumber(a.actualBalance)}</td>
+                    <td className="py-2.5 px-3 text-left font-mono">{formatMoney(a.actualBalance, false)}</td>
                     <td className={`py-2.5 px-3 text-left font-mono ${a.usableBalance <= a.minBalanceWarning ? 'text-rose-600 font-bold' : ''}`}>
-                      {formatNumber(a.usableBalance)}
+                      {formatMoney(a.usableBalance, false)}
                     </td>
-                    <td className="py-2.5 px-3 text-left font-mono text-slate-500">{formatNumber(a.ceilingLimit)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatNumber(room)}</td>
+                    <td className="py-2.5 px-3 text-left font-mono text-slate-500">{formatMoney(a.ceilingLimit, false)}</td>
+                    <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatMoney(room, false)}</td>
                     <td className="py-2.5 px-3 text-left">
                       {openReq ? (
                         <span className="text-[11px] text-amber-700">درخواست باز: {openReq.requestNumber}</span>
@@ -141,7 +143,7 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
                 </div>
               </div>
               <div className="text-left">
-                <div className="font-mono font-bold">{formatNumber(r.suggestedAmount)}</div>
+                <div className="font-mono font-bold">{formatMoney(r.suggestedAmount, false)}</div>
                 <div className="text-[10px] text-slate-500">
                   {r.status}
                   {treasuryStatus(r) ? ` · خزانه: ${treasuryStatus(r)}` : ''}
@@ -164,7 +166,7 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
                 </div>
               </div>
               <div className="text-left">
-                <div className="font-mono font-bold text-emerald-700">{formatNumber(r.amount)}</div>
+                <div className="font-mono font-bold text-emerald-700">{formatMoney(r.amount, false)}</div>
                 <div className="text-[10px] text-slate-500 font-mono">{r.journalEntryId || '-'}</div>
               </div>
             </div>
@@ -173,8 +175,8 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
       </div>
 
       {modalFund && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4">
-          <form onSubmit={submit} className="bg-white rounded-2xl w-full max-w-md p-5 space-y-3 text-xs">
+        <Dialog as="form" onClose={() => setModalFund(null)} label="درخواست شارژ" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4" className="bg-white rounded-2xl w-full max-w-md p-5 space-y-3 text-xs" onSubmit={submit}>
+          
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">درخواست شارژ {modalFund.title}</h3>
               <button type="button" onClick={() => setModalFund(null)} className="p-1 text-slate-400 cursor-pointer">
@@ -185,7 +187,7 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
               موجودی {formatCurrency(modalFund.actualBalance)} · سقف {formatCurrency(modalFund.ceilingLimit)}
             </p>
             <label className="block space-y-1">
-              <span className="text-slate-600">مبلغ درخواستی (تومان)</span>
+              <span className="text-slate-600">مبلغ درخواستی ({moneyUnitLabel()})</span>
               <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))} className="w-full p-2 rounded-lg border border-slate-300 font-mono" />
             </label>
             <label className="block space-y-1">
@@ -201,8 +203,7 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
                 ثبت و ارسال به خزانه
               </button>
             </div>
-          </form>
-        </div>
+          </Dialog>
       )}
     </div>
   );

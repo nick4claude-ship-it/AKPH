@@ -25,6 +25,13 @@ import {
   DollarSign,
   ShieldAlert,
 } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
+import { formatMoney, moneyUnitLabel, formatInt, roundRial } from '../../utils/money';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { generateUUID } from '../../utils/ids';
+import { toPersianDate, toPersianTime, getRelativePersianDate } from '../../utils/date';
+import { toPersianDigits } from '../../utils/formatters';
+import { useAppState } from '../../store/AppStore';
 
 interface NewStatementModalProps {
   contracts: Contract[];
@@ -32,7 +39,7 @@ interface NewStatementModalProps {
   preselectedContract?: Contract | null;
   currentUser: UserProfile;
   onClose: () => void;
-  onSaveStatement: (statement: DetailedProgressStatement) => void;
+  onSaveStatement: (statement: DetailedProgressStatement) => { ok: boolean; message: string };
 }
 
 export const NewStatementModal: React.FC<NewStatementModalProps> = ({
@@ -57,52 +64,61 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
     [allBOQItems, selectedContract]
   );
 
-  // Form Metadata
-  const [statementNumber, setStatementNumber] = useState('صورت‌وضعیت موقت شماره ۰۵');
-  const [statementType, setStatementType] = useState<StatementType>('موقت');
-  const [periodStartDate, setPeriodStartDate] = useState('۱۴۰۳/۰۶/۰۱');
-  const [periodEndDate, setPeriodEndDate] = useState('۱۴۰۳/۰۶/۳۱');
-  const [preparationDate, setPreparationDate] = useState('۱۴۰۳/۰۷/۰۲');
-  const [preparerName, setPreparerName] = useState(currentUser.name);
-  const [description, setDescription] = useState('عملیات اجرایی و کارکرد عمرانی دوره منتهی به شهریور ۱۴۰۳');
+  const store = useAppState();
+  const vatRate = store.financeSettings.vatRatePercent;
+  const contractStatements = store.clientStatements.filter((st) => st.contractId === selectedContract?.id);
+  // Advance still to be recovered: advances paid on the contract minus advance deductions already
+  // taken in its statements (rejected or returned statements do not count).
+  const remainingAdvance = useMemo(() => {
+    if (!selectedContract) return 0;
+    const paid = store.advancePayments.filter((a) => a.contractId === selectedContract.id).reduce((a, r) => a + r.totalAdvanceAmount, 0);
+    const recovered = contractStatements
+      .filter((st) => st.status !== 'rejected' && st.status !== 'returned_for_correction')
+      .flatMap((st) => st.deductions)
+      .filter((d) => d.type === 'advance_payment')
+      .reduce((a, d) => a + d.calculatedAmount, 0);
+    return Math.max(0, paid - recovered);
+  }, [store.advancePayments, contractStatements, selectedContract]);
 
-  // Interactive current period quantities for BOQ items
-  const [currentQuantities, setCurrentQuantities] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    contractBOQ.forEach((item) => {
-      // default sample quantity to demonstrate calculations
-      init[item.id] = Math.round(item.initialQuantity * 0.05);
-    });
-    return init;
-  });
+  // Form metadata (the number follows the statements already issued on this contract)
+  const [statementNumber, setStatementNumber] = useState(() => `صورت‌وضعیت موقت شماره ${toPersianDigits(contractStatements.length + 1)}`);
+  const [statementType, setStatementType] = useState<StatementType>('موقت');
+  const [periodStartDate, setPeriodStartDate] = useState(() => getRelativePersianDate(-30));
+  const [periodEndDate, setPeriodEndDate] = useState(() => getRelativePersianDate(0));
+  const [preparationDate, setPreparationDate] = useState(() => getRelativePersianDate(0));
+  const preparerName = currentUser.name;
+  const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Quantities of this period start at zero; nothing is pre-filled.
+  const [currentQuantities, setCurrentQuantities] = useState<Record<string, number>>({});
 
   // Overrun classifications
-  const [overrunClassifications, setOverrunClassifications] = useState<Record<string, string>>({});
+  const [overrunClassifications, setOverrunClassifications] = useState<Record<string, StatementBOQItem['exceededClassification']>>({});
 
-  // Additional allowances & Adjustments
-  const [otherAllowables, setOtherAllowables] = useState<number>(50_000_000);
-  const [adjustmentAmount, setAdjustmentAmount] = useState<number>(75_000_000);
+  // Additional allowances & Adjustments (Rials)
+  const [otherAllowables, setOtherAllowables] = useState<number>(0);
+  const [adjustmentAmount, setAdjustmentAmount] = useState<number>(0);
   const [includeVAT, setIncludeVAT] = useState<boolean>(true);
 
-  // Deductions percentages
-  const [advanceRate, setAdvanceRate] = useState<number>(10);
-  const [retentionRate, setRetentionRate] = useState<number>(10);
+  // Deductions (percentages are whole numbers)
+  const [advanceRate, setAdvanceRate] = useState<number>(selectedContract?.advancePaymentPercentage || 0);
+  const [retentionRate, setRetentionRate] = useState<number>(selectedContract?.retentionPercentage || 0);
   const [insuranceRate, setInsuranceRate] = useState<number>(5);
-  const [materialDeduction, setMaterialDeduction] = useState<number>(20_000_000);
+  const [materialDeduction, setMaterialDeduction] = useState<number>(0);
 
-  // Calculations
-  const calculatedItems: StatementBOQItem[] = useMemo(() => {
+  // Calculations (ids are assigned only when the statement is saved)
+  const calculatedItems: Omit<StatementBOQItem, 'id'>[] = useMemo(() => {
     return contractBOQ.map((b) => {
-      const currentQty = Number(currentQuantities[b.id] || 0);
+      const currentQty = currentQuantities[b.id] || 0;
       const prevQty = b.cumulativeExecutedQuantity;
       const cumulativeQty = prevQty + currentQty;
       const isExceeded = cumulativeQty > b.initialQuantity;
       const exceededQty = isExceeded ? cumulativeQty - b.initialQuantity : 0;
-      const currentAmount = currentQty * b.unitRate;
-      const cumulativeAmount = cumulativeQty * b.unitRate;
+      const currentAmount = roundRial(currentQty * b.unitRate);
+      const cumulativeAmount = roundRial(cumulativeQty * b.unitRate);
 
       return {
-        id: `s-item-${b.id}-${Date.now()}`,
         boqItemId: b.id,
         rowNumber: b.rowNumber,
         code: b.code,
@@ -117,9 +133,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         cumulativeAmount,
         isExceeded,
         exceededQuantity: exceededQty,
-        exceededClassification: isExceeded
-          ? (overrunClassifications[b.id] as any) || 'تغییر مقادیر'
-          : undefined,
+        exceededClassification: isExceeded ? overrunClassifications[b.id] || 'تغییر مقادیر' : undefined,
         inventoryMaterialCode: b.inventoryMaterialCode,
       };
     });
@@ -129,19 +143,21 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
     return calculatedItems.reduce((sum, item) => sum + item.currentAmount, 0);
   }, [calculatedItems]);
 
-  const vatAmount = useMemo(() => {
-    return includeVAT ? Math.round((workAmountCurrent + otherAllowables + adjustmentAmount) * 0.1) : 0;
-  }, [includeVAT, workAmountCurrent, otherAllowables, adjustmentAmount]);
+  // Deductions are computed on the work amount before VAT (VAT is paid in full by the employer).
+  const baseBeforeVat = workAmountCurrent + otherAllowables + adjustmentAmount;
 
-  const grossAmount = useMemo(() => {
-    return workAmountCurrent + otherAllowables + adjustmentAmount + vatAmount;
-  }, [workAmountCurrent, otherAllowables, adjustmentAmount, vatAmount]);
+  const vatAmount = useMemo(() => (includeVAT ? roundRial((baseBeforeVat * vatRate) / 100) : 0), [includeVAT, baseBeforeVat, vatRate]);
 
-  // Deductions
+  const grossAmount = baseBeforeVat + vatAmount;
+
+  const advanceByRate = roundRial((baseBeforeVat * advanceRate) / 100);
+  const advanceCapped = advanceByRate > remainingAdvance;
+
   const deductionsList: DeductionItem[] = useMemo(() => {
-    const adv = Math.round(grossAmount * (advanceRate / 100));
-    const ret = Math.round(grossAmount * (retentionRate / 100));
-    const ins = Math.round(grossAmount * (insuranceRate / 100));
+    // Advance recovery never exceeds what is still unrecovered on the contract.
+    const adv = Math.min(roundRial((baseBeforeVat * advanceRate) / 100), remainingAdvance);
+    const ret = roundRial((baseBeforeVat * retentionRate) / 100);
+    const ins = roundRial((baseBeforeVat * insuranceRate) / 100);
 
     return [
       {
@@ -150,7 +166,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         type: 'advance_payment',
         mode: 'percentage',
         rate: advanceRate,
-        baseAmount: grossAmount,
+        baseAmount: baseBeforeVat,
         calculatedAmount: adv,
       },
       {
@@ -159,7 +175,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         type: 'retention',
         mode: 'percentage',
         rate: retentionRate,
-        baseAmount: grossAmount,
+        baseAmount: baseBeforeVat,
         calculatedAmount: ret,
       },
       {
@@ -168,7 +184,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         type: 'insurance',
         mode: 'percentage',
         rate: insuranceRate,
-        baseAmount: grossAmount,
+        baseAmount: baseBeforeVat,
         calculatedAmount: ins,
       },
       {
@@ -177,11 +193,11 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
         type: 'materials',
         mode: 'fixed',
         rate: 0,
-        baseAmount: grossAmount,
+        baseAmount: baseBeforeVat,
         calculatedAmount: materialDeduction,
       },
-    ];
-  }, [grossAmount, advanceRate, retentionRate, insuranceRate, materialDeduction]);
+    ].filter((d) => d.calculatedAmount > 0) as DeductionItem[];
+  }, [baseBeforeVat, advanceRate, retentionRate, insuranceRate, materialDeduction, remainingAdvance]);
 
   const totalDeductions = useMemo(() => {
     return deductionsList.reduce((sum, d) => sum + d.calculatedAmount, 0);
@@ -194,18 +210,25 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
   const hasAnyExceeded = calculatedItems.some((i) => i.isExceeded);
 
   const handleSubmit = (targetStatus: 'draft' | 'submitted_to_consultant') => {
-    if (!selectedContract) return;
+    if (!selectedContract) return setFormError('قرارداد را انتخاب کنید.');
+    if (!selectedContract.costCenterId || !selectedContract.counterpartyId) {
+      return setFormError('مرکز هزینه یا کارفرمای این قرارداد تعریف نشده است؛ ابتدا قرارداد را تکمیل کنید.');
+    }
+    if (baseBeforeVat <= 0) return setFormError('کارکرد این دوره صفر است؛ مقدار حداقل یک ردیف را وارد کنید.');
+    if ([advanceRate, retentionRate, insuranceRate].some((r) => r > 100)) return setFormError('درصد کسورات نمی‌تواند بیش از ۱۰۰ باشد.');
+    if (totalDeductions > grossAmount) return setFormError('جمع کسورات از مبلغ ناخالص بیشتر است.');
 
+    const now = new Date();
     const newStatement: DetailedProgressStatement = {
-      id: `stm-${Date.now()}`,
+      id: generateUUID(),
       statementNumber,
       contractId: selectedContract.id,
       contractCode: selectedContract.code,
       contractNumber: selectedContract.number,
       projectId: selectedContract.projectId,
       projectName: selectedContract.projectName,
-      costCenterId: selectedContract.costCenterId || 'cc-prj101-01',
-      counterpartyId: selectedContract.counterpartyId || 'cp-cl-01',
+      costCenterId: selectedContract.costCenterId,
+      counterpartyId: selectedContract.counterpartyId,
       client: selectedContract.employer,
       consultant: selectedContract.consultant || 'مهندسین مشاور پروژه',
       type: statementType,
@@ -215,7 +238,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
       preparerName,
       description,
       status: targetStatus,
-      items: calculatedItems,
+      items: calculatedItems.filter((i) => i.currentQuantity > 0).map((i) => ({ ...i, id: generateUUID() })),
       workAmountCurrent,
       otherAllowableItemsAmount: otherAllowables,
       adjustmentAmount,
@@ -227,13 +250,13 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
       approvedNetPayable: 0,
       receivedAmount: 0,
       remainingPayable: netPayable,
-      dueDate: '۱۴۰۳/۰۷/۳۰',
+      dueDate: getRelativePersianDate(30),
       paymentStatus: 'Unpaid',
       overdueDays: 0,
       workflowHistory: [
         {
-          date: preparationDate,
-          time: '۱۱:۰۰',
+          date: toPersianDate(now),
+          time: toPersianTime(now),
           user: currentUser.name,
           role: currentUser.role,
           fromStatus: 'draft',
@@ -243,13 +266,14 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
       ],
     };
 
-    onSaveStatement(newStatement);
+    const result = onSaveStatement(newStatement);
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="فرم تهیه و صدور صورت‌وضعیت پیمانکاری" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+      
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -304,7 +328,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
               <label className="block text-slate-600 font-bold mb-1">نوع صورت‌وضعیت:</label>
               <select
                 value={statementType}
-                onChange={(e) => setStatementType(e.target.value as any)}
+                onChange={(e) => setStatementType(e.target.value as StatementType)}
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white font-medium"
               >
                 <option value="موقت">موقت</option>
@@ -316,13 +340,8 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-slate-600 font-bold mb-1">تهیه‌کننده (سرپرست کارگاه):</label>
-              <input
-                type="text"
-                value={preparerName}
-                onChange={(e) => setPreparerName(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 bg-white font-medium"
-              />
+              <span className="block text-slate-600 font-bold mb-1">تهیه‌کننده:</span>
+              <span className="block p-2 rounded-lg bg-slate-200/60 font-medium">{preparerName}</span>
             </div>
 
             <div>
@@ -363,6 +382,16 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
             </div>
           </div>
 
+          <label className="block text-xs text-slate-600 font-bold">
+            شرح عملیات دوره:
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="mt-1 w-full p-2 rounded-lg border border-slate-300 bg-white font-medium"
+            />
+          </label>
+
           {/* Section 2: Interactive BOQ Item Quantities with Overrun Warning */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -396,7 +425,7 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
                     <th className="p-2.5 text-center w-28">مقدار این دوره</th>
                     <th className="p-2.5 text-left">کارکرد تجمعی</th>
                     <th className="p-2.5 text-left">نرخ واحد</th>
-                    <th className="p-2.5 text-left">مبلغ دوره (تومان)</th>
+                    <th className="p-2.5 text-left">مبلغ دوره ({moneyUnitLabel()})</th>
                     <th className="p-2.5 text-center">وضعیت مازاد</th>
                   </tr>
                 </thead>
@@ -410,43 +439,38 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
                       <td className="p-2.5 font-mono font-bold text-blue-700">{item.code}</td>
                       <td className="p-2.5 max-w-xs font-medium text-slate-900">{item.description}</td>
                       <td className="p-2.5 text-center font-bold text-slate-600">{item.unit}</td>
-                      <td className="p-2.5 text-left font-mono">{item.contractQuantity.toLocaleString('fa-IR')}</td>
-                      <td className="p-2.5 text-left font-mono">{item.previousQuantity.toLocaleString('fa-IR')}</td>
+                      <td className="p-2.5 text-left font-mono">{formatInt(item.contractQuantity)}</td>
+                      <td className="p-2.5 text-left font-mono">{formatInt(item.previousQuantity)}</td>
                       <td className="p-2.5 text-center">
-                        <input
-                          type="number"
+                        <IntegerInput
+                          aria-label={`مقدار این دوره ${item.code}`}
                           value={currentQuantities[item.boqItemId] || 0}
-                          onChange={(e) =>
-                            setCurrentQuantities({
-                              ...currentQuantities,
-                              [item.boqItemId]: Number(e.target.value),
-                            })
-                          }
+                          onValueChange={(v) => setCurrentQuantities((prev) => ({ ...prev, [item.boqItemId]: v }))}
                           className="w-24 p-1.5 rounded-lg border border-slate-300 text-center font-mono font-bold bg-white focus:outline-amber-500"
                         />
                       </td>
                       <td className="p-2.5 text-left font-mono font-bold">
                         <span className={item.isExceeded ? 'text-rose-700 font-black' : 'text-indigo-900'}>
-                          {item.cumulativeQuantity.toLocaleString('fa-IR')}
+                          {formatInt(item.cumulativeQuantity)}
                         </span>
                       </td>
-                      <td className="p-2.5 text-left font-mono text-slate-600">{item.unitRate.toLocaleString('fa-IR')}</td>
+                      <td className="p-2.5 text-left font-mono text-slate-600">{formatMoney(item.unitRate, false)}</td>
                       <td className="p-2.5 text-left font-mono font-bold text-slate-900">
-                        {item.currentAmount.toLocaleString('fa-IR')}
+                        {formatMoney(item.currentAmount, false)}
                       </td>
                       <td className="p-2.5 text-center">
                         {item.isExceeded ? (
                           <div className="space-y-1">
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-200 text-rose-900 block">
-                              +{item.exceededQuantity.toLocaleString('fa-IR')} مازاد
+                              +{formatInt(item.exceededQuantity)} مازاد
                             </span>
                             <select
                               value={overrunClassifications[item.boqItemId] || 'تغییر مقادیر'}
                               onChange={(e) =>
-                                setOverrunClassifications({
-                                  ...overrunClassifications,
-                                  [item.boqItemId]: e.target.value,
-                                })
+                                setOverrunClassifications((prev) => ({
+                                  ...prev,
+                                  [item.boqItemId]: e.target.value as StatementBOQItem['exceededClassification'],
+                                }))
                               }
                               className="text-[10px] p-1 rounded border border-rose-300 bg-white"
                             >
@@ -471,32 +495,22 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
             <div>
               <label className="block text-slate-700 font-bold mb-1">سایر اقلام مجاز / تجهیز کارگاه و مصالح پای‌کار:</label>
-              <input
-                type="number"
-                value={otherAllowables}
-                onChange={(e) => setOtherAllowables(Number(e.target.value))}
-                className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono"
-              />
+              <MoneyInput value={otherAllowables} onValueChange={setOtherAllowables} showUnit className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono" />
               <span className="text-[10px] text-slate-400 mt-0.5 block">
-                {otherAllowables.toLocaleString('fa-IR')} تومان
+                {formatMoney(otherAllowables)}
               </span>
             </div>
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">مبلغ تعدیل آحادبها این دوره:</label>
-              <input
-                type="number"
-                value={adjustmentAmount}
-                onChange={(e) => setAdjustmentAmount(Number(e.target.value))}
-                className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono"
-              />
+              <MoneyInput value={adjustmentAmount} onValueChange={setAdjustmentAmount} showUnit className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono" />
               <span className="text-[10px] text-slate-400 mt-0.5 block">
-                {adjustmentAmount.toLocaleString('fa-IR')} تومان
+                {formatMoney(adjustmentAmount)}
               </span>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">مالیات بر ارزش افزوده (۱۰٪):</label>
+              <span className="block text-slate-700 font-bold mb-1">مالیات بر ارزش افزوده ({toPersianDigits(vatRate)}٪ طبق تنظیمات):</span>
               <div className="flex items-center gap-2 mt-2">
                 <input
                   type="checkbox"
@@ -506,11 +520,11 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
                   className="w-4 h-4 rounded text-amber-600"
                 />
                 <label htmlFor="vat-check" className="text-slate-800 font-medium">
-                  اعمال ارزش افزوده (+۱۰٪ به ناخالص)
+                  اعمال ارزش افزوده (+{toPersianDigits(vatRate)}٪ روی مبلغ پیش از مالیات)
                 </label>
               </div>
               <span className="text-[10px] text-slate-500 mt-1 block">
-                مبلغ محاسبه‌شده: {vatAmount.toLocaleString('fa-IR')} تومان
+                مبلغ محاسبه‌شده: {formatMoney(vatAmount)}
               </span>
             </div>
           </div>
@@ -519,16 +533,19 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
           <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
             <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
               <DollarSign className="w-4 h-4 text-rose-600" />
-              موتور محاسبات کسورات قانونی (Deduction Engine)
+              موتور محاسبات کسورات قانونی (مبنا: مبلغ پیش از ارزش افزوده {formatMoney(baseBeforeVat)})
             </h4>
+            <p className="text-[11px] text-slate-600">
+              مانده پیش‌پرداخت قابل استهلاک این قرارداد: <strong className="font-mono">{formatMoney(remainingAdvance)}</strong>
+              {advanceCapped && <span className="text-amber-700 font-bold"> — استهلاک به همین مانده محدود شد.</span>}
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-slate-600 mb-1">درصد استرداد پیش‌پرداخت:</label>
                 <div className="flex items-center gap-1">
-                  <input
-                    type="number"
+                  <IntegerInput
                     value={advanceRate}
-                    onChange={(e) => setAdvanceRate(Number(e.target.value))}
+                    onValueChange={(v) => setAdvanceRate(Math.min(100, v))}
                     className="w-20 p-1.5 rounded border border-slate-300 bg-white text-center font-bold"
                   />
                   <span>٪</span>
@@ -538,10 +555,9 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
               <div>
                 <label className="block text-slate-600 mb-1">درصد سپرده حسن انجام کار:</label>
                 <div className="flex items-center gap-1">
-                  <input
-                    type="number"
+                  <IntegerInput
                     value={retentionRate}
-                    onChange={(e) => setRetentionRate(Number(e.target.value))}
+                    onValueChange={(v) => setRetentionRate(Math.min(100, v))}
                     className="w-20 p-1.5 rounded border border-slate-300 bg-white text-center font-bold"
                   />
                   <span>٪</span>
@@ -551,10 +567,9 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
               <div>
                 <label className="block text-slate-600 mb-1">درصد بیمه تأمین اجتماعی (ماده ۳۸):</label>
                 <div className="flex items-center gap-1">
-                  <input
-                    type="number"
+                  <IntegerInput
                     value={insuranceRate}
-                    onChange={(e) => setInsuranceRate(Number(e.target.value))}
+                    onValueChange={(v) => setInsuranceRate(Math.min(100, v))}
                     className="w-20 p-1.5 rounded border border-slate-300 bg-white text-center font-bold"
                   />
                   <span>٪</span>
@@ -563,15 +578,16 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
 
               <div>
                 <label className="block text-slate-600 mb-1">کسورات مصالح کارفرما (مقطوع):</label>
-                <input
-                  type="number"
-                  value={materialDeduction}
-                  onChange={(e) => setMaterialDeduction(Number(e.target.value))}
-                  className="w-full p-1.5 rounded border border-slate-300 bg-white font-mono"
-                />
+                <MoneyInput value={materialDeduction} onValueChange={setMaterialDeduction} showUnit className="w-full p-1.5 rounded border border-slate-300 bg-white font-mono" />
               </div>
             </div>
           </div>
+
+          {formError && (
+            <p className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-bold" role="alert">
+              {formError}
+            </p>
+          )}
 
           {/* Section 5: Final Calculated Totals Banner */}
           <div className="p-4 rounded-xl bg-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -579,19 +595,19 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
               <div>
                 <span className="text-[11px] text-slate-400 block">کارکرد ناخالص (Gross):</span>
                 <span className="text-base font-black text-amber-400 font-mono">
-                  {grossAmount.toLocaleString('fa-IR')} تومان
+                  {formatMoney(grossAmount)}
                 </span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 block">مجموع کسورات (Deductions):</span>
                 <span className="text-base font-black text-rose-400 font-mono">
-                  -{totalDeductions.toLocaleString('fa-IR')} تومان
+                  -{formatMoney(totalDeductions)}
                 </span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 block">مبلغ خالص قابل پرداخت (Net):</span>
                 <span className="text-lg font-black text-emerald-400 font-mono">
-                  {netPayable.toLocaleString('fa-IR')} تومان
+                  {formatMoney(netPayable)}
                 </span>
               </div>
             </div>
@@ -612,7 +628,6 @@ export const NewStatementModal: React.FC<NewStatementModalProps> = ({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };

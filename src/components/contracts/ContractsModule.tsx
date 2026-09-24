@@ -58,15 +58,11 @@ import { AdjustmentsEngineView } from './AdjustmentsEngineView';
 import { PaymentsReceivablesView } from './PaymentsReceivablesView';
 import { ContractReportsView } from './ContractReportsView';
 import { ContractDocumentsView } from './ContractDocumentsView';
-import {
-  mockContractBOQ,
-  mockAmendments,
-  mockAdvancePayments,
-  mockPriceAdjustments,
-  mockContractAuditLogs,
-} from '../../data/contractsMockData';
 import { useAppState, useStoreSlice } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
+import { usePermission } from '../../store/session';
+import { generateUUID } from '../../utils/ids';
+import { toPersianDate, toPersianTime } from '../../utils/date';
 import { selectStatementPayments } from '../../store/domainSelectors';
 import { selectContractFiles } from './contractFiles';
 import { SubcontractorDashboard } from './subcontractors/SubcontractorDashboard';
@@ -108,6 +104,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
 }) => {
   const appState = useAppState();
   const wf = useWorkflows();
+  const { can } = usePermission();
   const navigate = useNavigate();
   const toast = (r: { ok: boolean; message: string; docNumber?: string }) => {
     onToast?.(r.message);
@@ -120,15 +117,15 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   // Client Section States
   const [activeTab, setActiveTab] = useState<ContractsSubTab>('dashboard');
   const [contracts, setContracts] = useStoreSlice('contracts');
-  const [boqItems, setBOQItems] = useState<ContractBOQItem[]>(mockContractBOQ);
+  const [boqItems] = useStoreSlice('contractBoq');
   const [statements, setStatements] = useStoreSlice('clientStatements');
-  const [amendments, setAmendments] = useState<ContractAmendment[]>(mockAmendments);
-  const [advancePayments, setAdvancePayments] = useState<AdvancePaymentRecord[]>(mockAdvancePayments);
-  const [adjustments, setAdjustments] = useState<PriceAdjustment[]>(mockPriceAdjustments);
+  const [amendments, setAmendments] = useStoreSlice('contractAmendments');
+  const [advancePayments] = useStoreSlice('advancePayments');
+  const [adjustments] = useStoreSlice('priceAdjustments');
   // Receipts and documents are single records in their own layers; contracts only view them.
   const payments = useMemo(() => selectStatementPayments(appState), [appState]);
   const documents = useMemo(() => selectContractFiles(appState), [appState]);
-  const [auditLogs, setAuditLogs] = useState<ContractAuditLog[]>(mockContractAuditLogs);
+  const [auditLogs, setAuditLogs] = useStoreSlice('contractAuditLogs');
 
   // Subcontractor Section States
   const [subTab, setSubTab] = useState<SubcontractorSubTab>('dashboard');
@@ -167,25 +164,14 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   };
 
   const handleSaveSubContract = (newContract: SubcontractorContract) => {
-    setSubContracts([newContract, ...subContracts]);
+    if (!can('contract.manage', { projectId: newContract.projectId })) return onToast?.('اجازه ثبت قرارداد را ندارید.');
+    setSubContracts((prev) => [newContract, ...prev]);
   };
 
   const handleSaveSubStatement = (newStatement: SubcontractorProgressStatement) => {
-    setSubStatements([newStatement, ...subStatements]);
-    // Update subcontractor contract executedValue & remaining capacity
-    setSubContracts(
-      subContracts.map((c) => {
-        if (c.id === newStatement.subcontractorContractId) {
-          const newExecuted = c.executedValue + newStatement.grossAmount;
-          return {
-            ...c,
-            executedValue: newExecuted,
-            remainingContractValue: Math.max(0, c.contractValue - newExecuted),
-          };
-        }
-        return c;
-      })
-    );
+    const result = wf.createSubcontractorStatement(newStatement);
+    if (result.ok) onToast?.(result.message);
+    return result;
   };
 
   // Workflow steps run in the store's workflow service (same code as the approval center).
@@ -224,50 +210,41 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   };
 
   const handleSaveContract = (newContract: Contract) => {
-    setContracts([newContract, ...contracts]);
+    if (!can('contract.manage', { projectId: newContract.projectId })) return onToast?.('اجازه ثبت قرارداد را ندارید.');
+    setContracts((prev) => [newContract, ...prev]);
+    const now = new Date();
     const newLog: ContractAuditLog = {
-      id: `cal-${Date.now()}`,
+      id: generateUUID(),
       contractId: newContract.id,
       user: currentUser.name,
       role: currentUser.role,
-      date: '۱۴۰۳/۰۷/۰۲',
-      time: '۱۰:۰۰',
+      date: toPersianDate(now),
+      time: toPersianTime(now),
       action: 'تأیید',
       targetField: 'contract',
       oldValue: '-',
       newValue: newContract.code,
       reason: 'انعقاد قرارداد جدید',
     };
-    setAuditLogs([newLog, ...auditLogs]);
+    setAuditLogs((prev) => [newLog, ...prev]);
   };
 
   const handleSaveStatement = (newStatement: DetailedProgressStatement) => {
-    setStatements([newStatement, ...statements]);
-    // Also update contract billedValue
-    setContracts(
-      contracts.map((c) => {
-        if (c.id === newStatement.contractId) {
-          const newBilled = c.billedValue + newStatement.grossAmount;
-          return {
-            ...c,
-            billedValue: newBilled,
-            executedValue: Math.max(c.executedValue, newBilled),
-          };
-        }
-        return c;
-      })
-    );
+    const result = wf.createClientStatement(newStatement);
+    onToast?.(result.message);
+    return result;
   };
 
   const handleSaveAmendment = (newAmendment: ContractAmendment, updatedContract: Contract) => {
-    setAmendments([newAmendment, ...amendments]);
-    setContracts(contracts.map((c) => (c.id === updatedContract.id ? updatedContract : c)));
+    if (!can('contract.manage', { projectId: updatedContract.projectId })) return onToast?.('اجازه ثبت الحاقیه را ندارید.');
+    setAmendments((prev) => [newAmendment, ...prev]);
+    setContracts((prev) => prev.map((c) => (c.id === updatedContract.id ? updatedContract : c)));
     if (selectedContract?.id === updatedContract.id) {
       setSelectedContract(updatedContract);
     }
   };
 
-  const handleUpdateStatementStatus = (statementId: string, newStatus: any, reason?: string) => {
+  const handleUpdateStatementStatus = (statementId: string, newStatus: DetailedProgressStatement['status'], reason?: string) => {
     const result =
       newStatus === 'returned_for_correction' || newStatus === 'rejected'
         ? wf.returnClientStatement(statementId, reason || 'نیاز به اصلاح')
@@ -395,7 +372,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                   <button
                     key={tab.id}
                     onClick={() => {
-                      setActiveTab(tab.id as any);
+                      setActiveTab(tab.id as ContractsSubTab);
                       if (tab.id !== 'contract_detail') setSelectedContract(null);
                     }}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all shrink-0 cursor-pointer ${
@@ -567,7 +544,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setSubTab(tab.id as any)}
+                    onClick={() => setSubTab(tab.id as SubcontractorSubTab)}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all shrink-0 cursor-pointer ${
                       isActive
                         ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
@@ -668,7 +645,6 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
           ========================================================================= */}
       {isNewSubStatementOpen && (
       <NewSubcontractorStatementModal
-        isOpen={isNewSubStatementOpen}
         onClose={() => setIsNewSubStatementOpen(false)}
         contracts={subContracts}
         initialContract={contractForNewSubStatement}

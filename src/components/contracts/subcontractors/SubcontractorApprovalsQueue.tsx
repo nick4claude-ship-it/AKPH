@@ -24,6 +24,10 @@ import {
   UserCheck,
   Building,
 } from 'lucide-react';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
+import { usePermission } from '../../../store/session';
+import { SUBCONTRACTOR_STATEMENT_FLOW, creatorOf } from '../../../store/workflows';
+import { Dialog } from '../../common/Dialog';
 
 interface SubcontractorApprovalsQueueProps {
   statements: SubcontractorProgressStatement[];
@@ -51,6 +55,13 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
     null
   );
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+  const { check } = usePermission();
+  // The workflow re-checks on submit; the buttons only reflect the same rules (role, project, no self-approval).
+  const stepPermission = (s: SubcontractorProgressStatement) => {
+    const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
+    return step ? check(step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) }) : { ok: false, reason: 'مرحله تأیید باز نیست.' };
+  };
+  const canReturn = (s: SubcontractorProgressStatement) => check('sub_statement.return', { projectId: s.projectId }).ok;
 
   // Categorize statements by workflow stage
   // Site stage: work recorded → measurement → site approval.
@@ -80,11 +91,8 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
         );
       }
     } else {
-      onUpdateStatus(
-        selectedStatementForAction.id,
-        'returned_for_revision',
-        actionComment || 'برگشت جهت اصلاح متره و مقادیر'
-      );
+      if (!actionComment.trim()) return;
+      onUpdateStatus(selectedStatementForAction.id, 'returned_for_revision', actionComment.trim());
     }
 
     setSelectedStatementForAction(null);
@@ -255,7 +263,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                     <div className="text-left">
                       <span className="text-xs text-slate-400 block">ناخالص اعلامی:</span>
                       <span className="text-base font-black text-slate-900">
-                        {(stmt.grossAmount / 1_000_000).toLocaleString('fa-IR')} م.ت
+                        {formatMoneyCompact(stmt.grossAmount)}
                       </span>
                     </div>
                   </div>
@@ -271,7 +279,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                             <th className="pb-1.5 text-center">واحد</th>
                             <th className="pb-1.5 text-center">مقدار دوره</th>
                             <th className="pb-1.5 text-left">نرخ واحد</th>
-                            <th className="pb-1.5 text-left">مبلغ (تومان)</th>
+                            <th className="pb-1.5 text-left">مبلغ ({moneyUnitLabel()})</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -283,10 +291,10 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                                 {item.currentQuantity.toLocaleString('fa-IR')}
                               </td>
                               <td className="py-1.5 text-left text-slate-600">
-                                {item.unitRate.toLocaleString('fa-IR')}
+                                {formatMoney(item.unitRate, false)}
                               </td>
                               <td className="py-1.5 text-left font-black text-slate-900">
-                                {(item.currentAmount / 1_000_000).toLocaleString('fa-IR')} م.ت
+                                {formatMoneyCompact(item.currentAmount)}
                               </td>
                             </tr>
                           ))}
@@ -311,13 +319,16 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                           setSelectedStatementForAction(stmt);
                           setActionType('reject');
                         }}
-                        className="px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                        disabled={!canReturn(stmt)}
+                        className="disabled:opacity-40 px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         <span>برگشت جهت اصلاح</span>
                       </button>
 
                       <button
+                        disabled={!stepPermission(stmt).ok}
+                        title={stepPermission(stmt).reason}
                         onClick={() => {
                           onUpdateStatus(
                             stmt.id,
@@ -325,7 +336,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                             'احجام و متره میدانی توسط سرپرست کارگاه کنترل و تایید شد.'
                           );
                         }}
-                        className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                        className="disabled:opacity-40 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>تأیید متره کارگاه و ارجاع به مدیر پروژه</span>
@@ -367,7 +378,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                   <div className="text-left">
                     <span className="text-xs text-slate-400 block">مبلغ مصوب کارگاه:</span>
                     <span className="text-base font-black text-indigo-700">
-                      {(stmt.siteVerifiedAmount / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(stmt.siteVerifiedAmount)}
                     </span>
                   </div>
                 </div>
@@ -389,6 +400,8 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                   </button>
 
                   <button
+                    disabled={!stepPermission(stmt).ok}
+                    title={stepPermission(stmt).reason}
                     onClick={() => {
                       onUpdateStatus(
                         stmt.id,
@@ -396,7 +409,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                         'انطباق با برنامه زمانبندی و کیفیت فنی کار مورد تأیید مدیر پروژه است.'
                       );
                     }}
-                    className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                    className="disabled:opacity-40 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                   >
                     <CheckSquare className="w-4 h-4" />
                     <span>تأیید مدیر پروژه و ارسال به مدیریت / مالی</span>
@@ -441,7 +454,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                     <div className="text-left">
                       <span className="text-xs text-slate-400 block">خالص پرداختنی:</span>
                       <span className="text-lg font-black text-purple-700">
-                        {(stmt.netPayable / 1_000_000).toLocaleString('fa-IR')} م.ت
+                        {formatMoneyCompact(stmt.netPayable)}
                       </span>
                     </div>
                   </div>
@@ -449,8 +462,8 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                       <span className="text-slate-500 block mb-1">تفکیک کسورات:</span>
-                      <div>سپرده حسن انجام کار: {(stmt.deductions.retention / 1_000_000).toLocaleString('fa-IR')} م.ت</div>
-                      <div>استهلاک پیش‌پرداخت: {(stmt.deductions.advancePaymentDeduction / 1_000_000).toLocaleString('fa-IR')} م.ت</div>
+                      <div>سپرده حسن انجام کار: {formatMoneyCompact(stmt.deductions.retention)}</div>
+                      <div>استهلاک پیش‌پرداخت: {formatMoneyCompact(stmt.deductions.advancePaymentDeduction)}</div>
                     </div>
 
                     <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 text-indigo-950">
@@ -469,6 +482,8 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                     </button>
 
                     <button
+                      disabled={!stepPermission(stmt).ok}
+                      title={stepPermission(stmt).reason}
                       onClick={() => {
                         onUpdateStatus(
                           stmt.id,
@@ -476,7 +491,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                           'تأیید مدیریت و صدور مجوز پرداخت توسط مدیریت شرکت صادر شد.'
                         );
                       }}
-                      className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                      className="disabled:opacity-40 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                     >
                       <ShieldCheck className="w-4 h-4" />
                       <span>تأیید مدیریت و صدور مجوز پرداخت</span>
@@ -522,7 +537,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                     <div className="text-left">
                       <span className="text-xs text-slate-400 block">مانده قابل پرداخت:</span>
                       <span className="text-xl font-black text-rose-700">
-                        {(stmt.remainingPayable / 1_000_000).toLocaleString('fa-IR')} م.ت
+                        {formatMoneyCompact(stmt.remainingPayable)}
                       </span>
                     </div>
                   </div>
@@ -563,8 +578,15 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
 
       {/* Confirmation Modal for Reject/Revision */}
       {selectedStatementForAction && actionType === 'reject' && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+        <Dialog
+          onClose={() => {
+            setSelectedStatementForAction(null);
+            setActionType(null);
+          }}
+          label="برگشت صورت‌وضعیت جهت اصلاح"
+          overlayClassName="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4"
+        >
             <h4 className="text-base font-bold text-slate-900">برگشت صورت‌وضعیت جهت اصلاح</h4>
             <p className="text-xs text-slate-500">
               لطفاً علت عدم تأیید یا مغایرت‌های متره را جهت اطلاع پیمانکار جزء ثبت نمایید:
@@ -591,13 +613,13 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
 
               <button
                 onClick={handleExecuteAction}
-                className="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 cursor-pointer"
+                disabled={!actionComment.trim()}
+                className="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 cursor-pointer disabled:opacity-40"
               >
                 ثبت و بازگشت به پیمانکار
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

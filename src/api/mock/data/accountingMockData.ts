@@ -20,7 +20,7 @@ import {
   AccountsPayableItem,
   BankReconciliationItem,
   AuditLog,
-} from '../types';
+} from '../../../types';
 
 // ==================== 1. CHART OF ACCOUNTS (درخت سرفصل‌های کدینگ) ====================
 export const mockChartOfAccounts: AccountNode[] = [
@@ -451,7 +451,7 @@ export const mockChartOfAccounts: AccountNode[] = [
           },
           {
             code: '624',
-            title: 'کسری و ضایعات انبار',
+            title: 'کسری و ضایعات انبار و صندوق',
             level: 'معین',
             nature: 'بدهکار',
             balance: 0,
@@ -459,6 +459,7 @@ export const mockChartOfAccounts: AccountNode[] = [
             turnoverCredit: 0,
             children: [
               { code: '62401', title: 'کسری انبارگردانی', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+              { code: '62402', title: 'کسری صندوق و تنخواه', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
         ],

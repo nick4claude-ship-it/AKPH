@@ -15,6 +15,8 @@ import {
   StatementPayment,
   PaymentRequest,
   Counterparty,
+  AccountsReceivableItem,
+  AccountsPayableItem,
 } from '../types';
 import { postedEntries } from './selectors';
 import {
@@ -22,21 +24,15 @@ import {
   CLIENT_STATEMENT_APPROVAL_STATUSES,
   SUBCONTRACTOR_STATEMENT_FLOW,
   nextRequisitionStep,
+  creatorOf,
 } from './workflows';
-import { CLIENT_APPROVED_STATUSES, VENDOR_INVOICE_APPROVED_STATUSES } from './initialState';
-import { toPersianDate } from '../utils/date';
+import { PETTY_STEP_ACTION } from '../utils/permissions';
+import { CLIENT_APPROVED_STATUSES, VENDOR_INVOICE_APPROVED_STATUSES } from './state';
+import { dayIndex, toPersianDate } from '../utils/date';
+import { formatInt, formatMoney } from '../utils/money';
 
-const fa = (n: number) => n.toLocaleString('fa-IR');
-const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
-
-/** Sortable day index of a Jalali 'YYYY/MM/DD' date (NaN when unparseable). */
-export function dayIndex(date?: string): number {
-  const m = toLatin(date || '').match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-  if (!m) return NaN;
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  return y * 365 + (mo <= 6 ? (mo - 1) * 31 : 186 + (mo - 7) * 30) + d;
-}
-
+const fa = (n: number) => formatInt(n);
+export { dayIndex };
 export const todayIndex = () => dayIndex(toPersianDate(new Date()));
 
 // =============================================================================
@@ -138,6 +134,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: s.statementNumber, title: s.description || s.statementNumber, amount: s.netPayable,
       requester: s.preparerName, projectId: s.projectId, projectName: s.projectName, costCenterName: ccName(s.costCenterId),
       counterpartyName: s.client, date: s.preparationDate, stage: step.label, approverRole: step.role,
+      action: step.action, createdBy: creatorOf(s.workflowHistory),
       classification: 'مالی', documentCount: documentCount(state, 'client_statement', s.id),
     });
   }
@@ -150,6 +147,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: s.statementNumber, title: `${s.tradeType} - ${s.subcontractorName}`, amount: s.netPayable,
       requester: s.subcontractorName, projectId: s.projectId, projectName: s.projectName, costCenterName: ccName(s.costCenterId),
       counterpartyName: s.subcontractorName, date: s.submissionDate, stage: step.label, approverRole: step.role,
+      action: step.action, createdBy: creatorOf(s.workflowHistory),
       classification: 'مستقیم پروژه', documentCount: documentCount(state, 'subcontractor_statement', s.id),
     });
   }
@@ -161,6 +159,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: e.expenseNumber, title: e.description, amount: e.amount, requester: e.submitterName,
       projectId: e.projectId, projectName: e.projectName, costCenterName: ccName(e.costCenterId) || e.costCenter,
       counterpartyName: e.vendor, date: e.date, stage: `تأیید ${e.currentApprovalStep}`, approverRole: e.currentApprovalStep,
+      action: PETTY_STEP_ACTION[e.currentApprovalStep as keyof typeof PETTY_STEP_ACTION] ?? 'petty.approve_ceo', createdBy: e.submitterName,
       classification: e.projectId ? 'مستقیم پروژه' : 'سربار و ستادی', documentCount: documentCount(state, 'petty_cash_expense', e.id),
     });
   }
@@ -171,19 +170,21 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `vendor_invoice:${inv.id}`, module: 'vendor_invoice', moduleLabel: 'فاکتور خرید', recordId: inv.id,
       docNumber: inv.invoiceNumber, title: `فاکتور ${inv.supplierName} - سفارش ${inv.poNumber}`, amount: inv.totalAmount,
       requester: 'واحد تدارکات', projectId: inv.projectId, projectName: inv.projectName, costCenterName: ccName(inv.costCenterId),
-      counterpartyName: inv.supplierName, date: inv.invoiceDate, stage: 'تطبیق سه‌جانبه و تأیید مالی', approverRole: 'مدیر مالی',
+      counterpartyName: inv.supplierName, date: inv.invoiceDate, stage: 'تطبیق سه‌جانبه و تأیید مالی', approverRole: 'حسابدار',
+      action: 'vendor_invoice.approve',
       classification: 'مالی', documentCount: documentCount(state, 'vendor_invoice', inv.id),
     });
   }
 
   for (const r of state.purchaseRequisitions) {
-    const step = nextRequisitionStep(r as any);
+    const step = nextRequisitionStep(r);
     if (!step) continue;
     items.push({
       id: `purchase_requisition:${r.id}`, module: 'purchase_requisition', moduleLabel: 'درخواست خرید', recordId: r.id,
       docNumber: r.requisitionNumber, title: r.justification || r.items.map((i) => i.materialName).join('، '), amount: r.totalEstimatedAmount,
       requester: r.requesterName, projectId: r.projectId, projectName: r.projectName, costCenterName: ccName(r.costCenterId) || r.costCenter,
-      date: r.date, stage: step.label, approverRole: step.role, classification: 'مستقیم پروژه', documentCount: 0,
+      date: r.date, stage: step.label, approverRole: step.role, action: step.action, createdBy: r.requesterName,
+      classification: 'مستقیم پروژه', documentCount: 0,
     });
   }
 
@@ -192,8 +193,9 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
     items.push({
       id: `payment_request:${p.id}`, module: 'payment_request', moduleLabel: 'درخواست پرداخت', recordId: p.id,
       docNumber: p.requestNumber, title: `${p.sourceType} - ${p.beneficiaryName}`, amount: p.remainingAmount,
-      requester: 'خزانه‌داری', projectId: p.projectId, projectName: p.projectName || projectName(p.projectId),
-      counterpartyName: p.beneficiaryName || partyName(p.counterpartyId), date: p.date, stage: 'تأیید پرداخت', approverRole: 'مدیرعامل',
+      requester: p.requestedBy || 'خزانه‌داری', projectId: p.projectId, projectName: p.projectName || projectName(p.projectId),
+      counterpartyName: p.beneficiaryName || partyName(p.counterpartyId), date: p.date, stage: 'تأیید پرداخت', approverRole: 'مدیر ارشد',
+      action: 'payment_request.approve', createdBy: p.requestedBy,
       classification: 'مالی', documentCount: documentCount(state, 'payment_request', p.id),
     });
   }
@@ -205,7 +207,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `payroll:${period}`, module: 'payroll', moduleLabel: 'حقوق و دستمزد', recordId: period,
       docNumber: `لیست حقوق ${period}`, title: `${fa(slips.length)} فیش حقوق محاسبه‌شده`, amount: slips.reduce((a, s) => a + s.totalCostForCompany, 0),
       requester: 'منابع انسانی', projectId: '', projectName: 'ستاد و کارگاه‌ها', date: slips[0].issueDate,
-      stage: 'تأیید مالی حقوق', approverRole: 'مدیر مالی', classification: 'سربار و ستادی', documentCount: 0,
+      stage: 'تأیید مالی حقوق', approverRole: 'حسابدار', action: 'payroll.approve', classification: 'سربار و ستادی', documentCount: 0,
     });
   }
 
@@ -215,7 +217,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `journal_entry:${j.id}`, module: 'journal_entry', moduleLabel: 'سند حسابداری', recordId: j.id,
       docNumber: j.docNumber, title: j.title, amount: j.totalDebit, requester: j.submitter,
       projectId: j.projectId || '', projectName: j.projectName || '-', costCenterName: j.costCenterName, date: j.date,
-      stage: 'تأیید سند', approverRole: 'مدیر مالی', classification: 'مالی', documentCount: documentCount(state, 'journal_entry', j.id),
+      stage: 'تأیید سند', approverRole: 'حسابدار', action: 'journal.approve', createdBy: j.submitter, classification: 'مالی', documentCount: documentCount(state, 'journal_entry', j.id),
     });
   }
 
@@ -278,7 +280,7 @@ export function selectNotifications(state: AppState, includeDismissed = false): 
     out.push({
       id: `low_petty_cash:${f.id}`, kind: 'low_petty_cash', priority: f.usableBalance <= 0 ? 'critical' : 'warning', date: todayStr,
       title: `کمبود موجودی ${f.title}`,
-      description: `موجودی قابل مصرف ${fa(f.usableBalance)} تومان؛ کمتر از ${fa(state.pettyCashSettings.lowBalancePercent)}٪ سقف ${fa(f.ceilingLimit)}.`,
+      description: `موجودی قابل مصرف ${formatMoney(f.usableBalance)}؛ کمتر از ${fa(state.pettyCashSettings.lowBalancePercent)}٪ سقف ${formatMoney(f.ceilingLimit)}.`,
       relatedProjectId: f.projectId, relatedProjectName: f.projectName, amount: f.usableBalance,
       actionLabel: 'درخواست شارژ', actionPath: '/petty-cash',
     });
@@ -314,7 +316,7 @@ export function selectNotifications(state: AppState, includeDismissed = false): 
     out.push({
       id: `overdue_receivable:${s.id}`, kind: 'overdue_receivable', priority: 'critical', date: todayStr,
       title: `مطالبات معوق ${s.statementNumber}`,
-      description: `${fa(s.remainingPayable)} تومان از ${s.client} از سررسید ${s.dueDate} وصول نشده است.`,
+      description: `${formatMoney(s.remainingPayable)} از ${s.client} از سررسید ${s.dueDate} وصول نشده است.`,
       relatedProjectId: s.projectId, relatedProjectName: s.projectName, amount: s.remainingPayable,
       actionLabel: 'ثبت دریافت', actionPath: '/finance/receipts',
     });
@@ -328,7 +330,7 @@ export function selectNotifications(state: AppState, includeDismissed = false): 
     out.push({
       id: `payable_due:${r.id}`, kind: 'payable_due', priority: due < t ? 'critical' : 'warning', date: todayStr,
       title: `بدهی سررسیدشده: ${r.beneficiaryName}`,
-      description: `${r.sourceType} ${r.sourceRefNumber} — ${fa(r.remainingAmount)} تومان، سررسید ${r.dueDate}.`,
+      description: `${r.sourceType} ${r.sourceRefNumber} — ${formatMoney(r.remainingAmount)}، سررسید ${r.dueDate}.`,
       relatedProjectId: r.projectId, relatedProjectName: r.projectName || project(r.projectId)?.name, amount: r.remainingAmount,
       actionLabel: 'برنامه پرداخت', actionPath: '/finance/payments',
     });
@@ -437,11 +439,11 @@ export interface CounterpartyProfile {
   balance: number;
   deductionsHeld: number;
   statements: Array<{ id: string; number: string; projectName: string; amount: number; net: number; status: string; date: string }>;
-  payments: Array<{ docNumber: string; date: string; amount: number; description: string }>;
+  payments: Array<{ id: string; docNumber: string; date: string; amount: number; description: string }>;
   guarantees: AppDocument[];
   documents: AppDocument[];
   performance: { total: number; returned: number; approvedOnFirstPass: number; score: number };
-  priceHistory: Array<{ material: string; unit: string; date: string; unitPrice: number; poNumber: string }>;
+  priceHistory: Array<{ id: string; material: string; unit: string; date: string; unitPrice: number; poNumber: string }>;
 }
 
 export function selectCounterpartyProfile(state: AppState, counterpartyId: string): CounterpartyProfile | undefined {
@@ -503,7 +505,7 @@ export function selectCounterpartyProfile(state: AppState, counterpartyId: strin
   for (const ev of state.financialEvents) {
     if (ev.counterpartyId !== counterpartyId || (ev.type !== 'TREASURY_PAYMENT' && ev.type !== 'TREASURY_RECEIPT')) continue;
     paidOrReceived += ev.amount;
-    payments.push({ docNumber: ev.docNumber || '-', date: ev.date, amount: ev.amount, description: `${ev.type === 'TREASURY_PAYMENT' ? 'پرداخت' : 'دریافت'} ${ev.details?.docNumber || ''}` });
+    payments.push({ id: ev.id, docNumber: ev.docNumber || '-', date: ev.date, amount: ev.amount, description: `${ev.type === 'TREASURY_PAYMENT' ? 'پرداخت' : 'دریافت'} ${ev.details?.docNumber || ''}` });
   }
 
   const projectIds = [...new Set(contracts.map((c) => c.projectId))];
@@ -515,7 +517,7 @@ export function selectCounterpartyProfile(state: AppState, counterpartyId: strin
     counterparty.kind === 'supplier'
       ? state.purchaseOrders
           .filter((p) => (p.counterpartyId || p.supplierId) === counterpartyId)
-          .flatMap((p) => p.items.map((i) => ({ material: i.materialName, unit: i.unit, date: p.issueDate, unitPrice: i.unitPrice, poNumber: p.poNumber })))
+          .flatMap((p) => p.items.map((i) => ({ id: `${p.id}:${i.id}`, material: i.materialName, unit: i.unit, date: p.issueDate, unitPrice: i.unitPrice, poNumber: p.poNumber })))
       : [];
 
   const total = statements.length;
@@ -542,7 +544,7 @@ export function selectCounterpartyProfile(state: AppState, counterpartyId: strin
 // =============================================================================
 
 export function selectSidebarCounts(state: AppState): Record<string, string> {
-  const pendingPayments = state.paymentRequests.filter((r) => r.status === 'تأیید مدیرعامل' || r.status === 'در صف پرداخت خزانه').length;
+  const pendingPayments = state.paymentRequests.filter((r) => r.status === 'تأیید مدیر ارشد' || r.status === 'در صف پرداخت خزانه').length;
   return {
     projects: fa(state.projects.length),
     contracts: fa(state.contracts.length + state.subcontractorContracts.length),
@@ -553,4 +555,56 @@ export function selectSidebarCounts(state: AppState): Record<string, string> {
     approvals: fa(selectApprovals(state).length),
     notifications: fa(selectNotifications(state).length),
   };
+}
+
+// =============================================================================
+// Receivables / payables aging (from approved statements and open payment requests)
+// =============================================================================
+
+const agingStatus = <T extends string>(overdueDays: number, due: T, near: T, late: T): T => (overdueDays > 0 ? late : overdueDays > -15 ? near : due);
+
+export function selectReceivablesAging(state: AppState): AccountsReceivableItem[] {
+  const t = todayIndex();
+  return state.clientStatements
+    .filter((s) => CLIENT_APPROVED_STATUSES.includes(s.status) && s.remainingPayable > 0)
+    .map((s) => {
+      const overdueDays = Number.isNaN(dayIndex(s.dueDate)) ? 0 : t - dayIndex(s.dueDate);
+      const billed = s.approvedNetPayable ?? s.netPayable;
+      return {
+        id: s.id,
+        debtorName: s.client,
+        type: 'کارفرما' as const,
+        projectId: s.projectId,
+        projectName: s.projectName,
+        billedAmount: billed,
+        receivedAmount: s.receivedAmount,
+        remainingClaim: s.remainingPayable,
+        dueDate: s.dueDate || '-',
+        overdueDays: Math.max(0, overdueDays),
+        status: agingStatus(overdueDays, 'جاری', 'نزدیک سررسید', 'معوق سررسید گذشته'),
+      };
+    });
+}
+
+export function selectPayablesAging(state: AppState): AccountsPayableItem[] {
+  const t = todayIndex();
+  const typeOf = (r: PaymentRequest): AccountsPayableItem['type'] =>
+    r.beneficiaryType === 'پیمانکار جزء' ? 'پیمانکار جزء' : r.beneficiaryType === 'تأمین‌کننده' ? 'تأمین‌کننده مصالح' : r.beneficiaryType === 'پرسنل' ? 'پرسنل' : 'سایر';
+  return state.paymentRequests
+    .filter((r) => r.status !== 'رد شده' && r.remainingAmount > 0)
+    .map((r) => {
+      const overdueDays = Number.isNaN(dayIndex(r.dueDate)) ? 0 : t - dayIndex(r.dueDate);
+      return {
+        id: r.id,
+        creditorName: r.beneficiaryName,
+        type: typeOf(r),
+        projectId: r.projectId,
+        projectName: r.projectName,
+        incurredDebt: r.totalAmount,
+        paidAmount: r.paidAmount,
+        remainingDebt: r.remainingAmount,
+        dueDate: r.dueDate,
+        status: overdueDays > 30 ? 'معوق' : overdueDays > 0 ? 'سررسید شده' : 'در مهلت پرداخت',
+      };
+    });
 }

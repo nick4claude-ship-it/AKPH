@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TimeRange } from '../../types';
 import { MonthlyTrendPoint } from '../../store/selectors';
 import { formatCurrencyCompact, formatPercent } from '../../utils/formatters';
+import { moneyUnitLabel } from '../../utils/money';
 import { BarChart3, TrendingUp, Info } from 'lucide-react';
 
 interface FinancialChartsProps {
@@ -21,6 +22,9 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
   // Filter or scale data based on timeframe
   const displayData = data;
   const maxVal = Math.max(1, ...displayData.map((d) => Math.max(d.revenue, d.cost)));
+  const best = displayData.reduce<MonthlyTrendPoint | null>((b, d) => (!b || d.profit > b.profit ? d : b), null);
+  const totalRevenue = displayData.reduce((a, d) => a + d.revenue, 0);
+  const totalProfit = displayData.reduce((a, d) => a + d.profit, 0);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -100,7 +104,7 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
           </div>
         </div>
 
-        <div className="text-[11px] text-slate-400 font-mono">واحد: میلیارد تومان</div>
+        <div className="text-[11px] text-slate-400 font-mono">واحد: {moneyUnitLabel()}</div>
       </div>
 
       {/* SVG Interactive Multi-Bar / Trend Display */}
@@ -181,9 +185,13 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
       <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
         <span className="flex items-center gap-1">
           <Info className="w-3.5 h-3.5 text-amber-500" />
-          بالاترین بازدهی سود در ماه شهریور با ۱۶.۲ میلیارد تومان ثبت گردیده است.
+          {best && best.profit > 0
+            ? `بالاترین سود در ماه ${best.month} با ${formatCurrencyCompact(best.profit)} ثبت شده است.`
+            : 'در این بازه سود مثبتی در دفاتر ثبت نشده است.'}
         </span>
-        <span className="font-mono text-slate-700">رشد سود میانگین: +۲۵.۳٪ سالانه</span>
+        <span className="font-mono text-slate-700">
+          حاشیه سود دوره: {formatPercent(totalRevenue ? (totalProfit * 100) / totalRevenue : 0)}
+        </span>
       </div>
     </div>
   );

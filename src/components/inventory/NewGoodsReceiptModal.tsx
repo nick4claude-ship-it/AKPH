@@ -8,6 +8,8 @@ import { X, ArrowDownLeft, Truck, ShieldCheck } from 'lucide-react';
 import { GoodsReceiptNote, MaterialItem, PurchaseOrder, Warehouse } from '../../types';
 import { ReceiveFromPOLine } from '../../store/workflows';
 import { formatNumber } from '../../utils/formatters';
+import { Dialog } from '../common/Dialog';
+import { formatMoney } from '../../utils/money';
 
 interface NewGoodsReceiptModalProps {
   onClose: () => void;
@@ -74,8 +76,8 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto">
-      <form onSubmit={submit} className="bg-white rounded-2xl w-full max-w-4xl text-xs overflow-hidden my-auto">
+    <Dialog as="form" onClose={onClose} label="رسید انبار از سفارش خرید (GRN)" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto" className="bg-white rounded-2xl w-full max-w-4xl text-xs overflow-hidden my-auto" onSubmit={submit}>
+      
         <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
           <h3 className="text-sm font-bold flex items-center gap-2">
             <ArrowDownLeft className="w-4 h-4 text-emerald-400" /> رسید انبار از سفارش خرید (GRN)
@@ -167,7 +169,7 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
                             <td className="p-2">
                               <input value={l.rejected} onChange={(e) => set({ rejected: e.target.value.replace(/[^\d.]/g, '') })} className="w-20 p-1.5 rounded border border-slate-300 font-mono" />
                             </td>
-                            <td className="p-2 text-left font-mono">{formatNumber(i.unitPrice)}</td>
+                            <td className="p-2 text-left font-mono">{formatMoney(i.unitPrice, false)}</td>
                           </tr>
                         );
                       })}
@@ -218,7 +220,6 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
             ثبت رسید و ورود به انبار
           </button>
         </div>
-      </form>
-    </div>
+      </Dialog>
   );
 };

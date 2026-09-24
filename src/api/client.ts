@@ -15,7 +15,8 @@ export interface PaydarPortalConfig {
   userId?: string | number;
   displayName?: string;
   role?: string;
-  can?: (action: string, user: any, context?: any) => boolean;
+  /** Optional runtime permission hook; it can never allow approving one's own document. */
+  can?: (action: string, user: unknown, context?: unknown) => boolean;
   accounting?: {
     currency?: 'toman' | 'rial';
     fiscalYear?: number;
@@ -129,23 +130,24 @@ export async function apiRequest<T>(
     }
 
     return (await response.json()) as T;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof ApiError) {
       throw err;
     }
-    throw new ApiError(0, err.message || 'Network error', 'عدم برقراری ارتباط با سرور. لطفاً اتصال اینترنت خود را بررسی نمایید.');
+    const message = err instanceof Error ? err.message : 'Network error';
+    throw new ApiError(0, message, 'عدم برقراری ارتباط با سرور. لطفاً اتصال اینترنت خود را بررسی نمایید.');
   }
 }
 
 /**
- * Mock API service wrapper providing consistent interface during development.
+ * JSON REST helpers used by the WordPress data source (src/api/wordpress).
  */
 export const apiClient = {
-  get: <T>(endpoint: string, params?: Record<string, any>) =>
+  get: <T>(endpoint: string, params?: Record<string, string | number | boolean>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
-  post: <T>(endpoint: string, data: any) =>
+  post: <T>(endpoint: string, data: unknown) =>
     apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
-  put: <T>(endpoint: string, data: any) =>
+  put: <T>(endpoint: string, data: unknown) =>
     apiRequest<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
   delete: <T>(endpoint: string) =>
     apiRequest<T>(endpoint, { method: 'DELETE' }),

@@ -10,8 +10,10 @@ import { ApprovalItem, ApprovalModule } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { selectApprovals } from '../../store/domainSelectors';
 import { useApprovalActions, APPROVAL_MODULE_PATHS } from '../../store/useApprovalActions';
-import { useCurrentUser, canAct } from '../../store/session';
+import { useCurrentUser, usePermission } from '../../store/session';
+import { Dialog } from '../common/Dialog';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
+import { formatInt, formatMoney } from '../../utils/money';
 
 interface ApprovalCenterModuleProps {
   onToast: (msg: string) => void;
@@ -24,6 +26,8 @@ interface ApprovalCenterModuleProps {
 export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onToast }) => {
   const state = useAppState();
   const user = useCurrentUser();
+  const { check } = usePermission();
+  const permissionFor = (a: ApprovalItem) => check(a.action, { projectId: a.projectId || undefined, createdBy: a.createdBy });
   const navigate = useNavigate();
   const { approve, reject } = useApprovalActions();
   const approvals = useMemo(() => selectApprovals(state), [state]);
@@ -47,10 +51,10 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
   const q = search.trim().toLowerCase();
   const rows = approvals.filter(
     (a) =>
-      (moduleFilter === 'all' || (moduleFilter === 'mine' ? canAct(user, a.approverRole) : a.module === moduleFilter)) &&
+      (moduleFilter === 'all' || (moduleFilter === 'mine' ? permissionFor(a).ok : a.module === moduleFilter)) &&
       (!q || a.docNumber.toLowerCase().includes(q) || a.title.toLowerCase().includes(q) || a.projectName.toLowerCase().includes(q) || (a.counterpartyName || '').toLowerCase().includes(q))
   );
-  const mine = approvals.filter((a) => canAct(user, a.approverRole)).length;
+  const mine = approvals.filter((a) => permissionFor(a).ok).length;
 
   return (
     <div className="space-y-5">
@@ -64,8 +68,8 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
             <ShieldCheck className="w-5 h-5 text-emerald-600" /> کارتابل تأییدات مرکزی مدیریت
           </h2>
           <p className="text-xs text-slate-500">
-            {approvals.length.toLocaleString('fa-IR')} مورد در انتظار به ارزش {formatCurrencyCompact(approvals.reduce((s, a) => s + a.amount, 0))} ·{' '}
-            {mine.toLocaleString('fa-IR')} مورد در حیطه نقش شما ({user.role})
+            {formatInt(approvals.length)} مورد در انتظار به ارزش {formatCurrencyCompact(approvals.reduce((s, a) => s + a.amount, 0))} ·{' '}
+            {formatInt(mine)} مورد در حیطه نقش شما ({user.role})
           </p>
         </div>
         <div className="relative w-full md:w-72">
@@ -85,14 +89,14 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
           className={`p-2.5 rounded-xl border text-right cursor-pointer ${moduleFilter === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200'}`}
         >
           <div className="text-[10px] opacity-70">همه موارد</div>
-          <div className="text-sm font-bold">{approvals.length.toLocaleString('fa-IR')}</div>
+          <div className="text-sm font-bold">{formatInt(approvals.length)}</div>
         </button>
         <button
           onClick={() => setModuleFilter('mine')}
           className={`p-2.5 rounded-xl border text-right cursor-pointer ${moduleFilter === 'mine' ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-white border-slate-200'}`}
         >
           <div className="text-[10px] opacity-70">کارتابل من</div>
-          <div className="text-sm font-bold">{mine.toLocaleString('fa-IR')}</div>
+          <div className="text-sm font-bold">{formatInt(mine)}</div>
         </button>
         {groups.map(([mod, g]) => (
           <button
@@ -101,7 +105,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
             className={`p-2.5 rounded-xl border text-right cursor-pointer ${moduleFilter === mod ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200'}`}
           >
             <div className="text-[10px] opacity-70 truncate">{g.label}</div>
-            <div className="text-sm font-bold">{g.count.toLocaleString('fa-IR')}</div>
+            <div className="text-sm font-bold">{formatInt(g.count)}</div>
             <div className="text-[10px] opacity-70 font-mono">{formatCurrencyCompact(g.amount)}</div>
           </button>
         ))}
@@ -123,7 +127,8 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((a) => {
-              const allowed = canAct(user, a.approverRole);
+              const permission = permissionFor(a);
+              const allowed = permission.ok;
               return (
                 <tr key={a.id} className="hover:bg-slate-50/70">
                   <td className="py-2.5 px-3">
@@ -144,7 +149,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
                     {a.requester}
                     <div className="text-[10px] text-slate-400 font-mono">{a.date}</div>
                   </td>
-                  <td className="py-2.5 px-3 text-left font-mono font-bold">{formatNumber(a.amount)}</td>
+                  <td className="py-2.5 px-3 text-left font-mono font-bold">{formatMoney(a.amount, false)}</td>
                   <td className="py-2.5 px-3">
                     <div className="font-bold text-slate-800">{a.stage}</div>
                     <div className="text-[10px] text-slate-500">تأییدکننده: {a.approverRole}</div>
@@ -153,7 +158,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
                     {a.documentCount ? (
                       <span className="inline-flex items-center gap-1 text-emerald-700">
                         <Paperclip className="w-3 h-3" />
-                        {a.documentCount.toLocaleString('fa-IR')}
+                        {formatInt(a.documentCount)}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-rose-500" title="سند ناقص">
@@ -172,7 +177,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
                       </button>
                       <button
                         disabled={!allowed}
-                        title={allowed ? 'تأیید' : `نیازمند نقش ${a.approverRole}`}
+                        title={allowed ? 'تأیید' : permission.reason}
                         onClick={() => onToast(approve(a).message)}
                         className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 disabled:opacity-40 cursor-pointer"
                       >
@@ -180,6 +185,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
                       </button>
                       <button
                         disabled={!allowed}
+                        title={allowed ? 'رد / برگشت' : permission.reason}
                         onClick={() => setRejecting(a)}
                         className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold hover:bg-rose-100 disabled:opacity-40 cursor-pointer"
                       >
@@ -202,8 +208,12 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
       </div>
 
       {rejecting && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-5 text-right space-y-3 text-xs">
+        <Dialog
+          onClose={() => setRejecting(null)}
+          label={`رد / برگشت ${rejecting.moduleLabel} ${rejecting.docNumber}`}
+          overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4"
+          className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-5 text-right space-y-3 text-xs"
+        >
             <h3 className="text-sm font-bold text-slate-900">
               رد / برگشت {rejecting.moduleLabel} {rejecting.docNumber}
             </h3>
@@ -219,18 +229,18 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
                 انصراف
               </button>
               <button
+                disabled={!reason.trim()}
                 onClick={() => {
-                  onToast(reject(rejecting, reason.trim() || 'عدم تطابق با مستندات').message);
+                  onToast(reject(rejecting, reason.trim()).message);
                   setRejecting(null);
                   setReason('');
                 }}
-                className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer disabled:opacity-40"
               >
                 ثبت
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

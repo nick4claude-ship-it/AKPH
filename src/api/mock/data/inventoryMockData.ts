@@ -21,7 +21,7 @@ import {
   InterWarehouseTransfer,
   StocktakeAudit,
   KardexEntry,
-} from '../types';
+} from '../../../types';
 
 const rawWarehouses: Warehouse[] = [
   {

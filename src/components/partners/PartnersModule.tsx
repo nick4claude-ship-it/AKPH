@@ -10,6 +10,7 @@ import { useAppState } from '../../store/AppStore';
 import { selectCounterpartyProfile, CounterpartyProfile } from '../../store/domainSelectors';
 import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from '../statements/statementLabels';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatMoney, formatInt } from '../../utils/money';
 
 type PartnerKind = 'clients' | 'subcontractors' | 'suppliers';
 
@@ -147,18 +148,18 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({ kind, counterpar
           <div className="text-[10px] text-slate-500">سابقه عملکرد (بدون برگشت/مغایرت)</div>
           <div className={`text-lg font-bold ${profile.performance.score >= 80 ? 'text-emerald-700' : 'text-amber-700'}`}>{profile.performance.score.toLocaleString('fa-IR')}٪</div>
           <div className="text-[10px] text-slate-400">
-            {profile.performance.returned.toLocaleString('fa-IR')} مورد برگشتی از {profile.performance.total.toLocaleString('fa-IR')}
+            {profile.performance.returned.toLocaleString('fa-IR')} مورد برگشتی از {formatInt(profile.performance.total)}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Stat label={meta.contracts} value={profile.contracts.length.toLocaleString('fa-IR')} />
-        <Stat label={meta.executed} value={formatNumber(profile.executed)} />
-        <Stat label={meta.approved} value={formatNumber(profile.approvedStatements)} />
-        <Stat label={meta.settled} value={formatNumber(profile.paidOrReceived)} tone="text-emerald-700" />
-        <Stat label={`${meta.balance} (دفاتر)`} value={formatNumber(profile.balance)} tone="text-amber-700" />
-        <Stat label={kind === 'clients' ? 'کسورات نزد کارفرما' : 'کسورات/تضمین مکسوره'} value={formatNumber(profile.deductionsHeld)} tone="text-blue-700" />
+        <Stat label={meta.executed} value={formatMoney(profile.executed)} />
+        <Stat label={meta.approved} value={formatMoney(profile.approvedStatements)} />
+        <Stat label={meta.settled} value={formatMoney(profile.paidOrReceived, false)} tone="text-emerald-700" />
+        <Stat label={`${meta.balance} (دفاتر)`} value={formatMoney(profile.balance, false)} tone="text-amber-700" />
+        <Stat label={kind === 'clients' ? 'کسورات نزد کارفرما' : 'کسورات/تضمین مکسوره'} value={formatMoney(profile.deductionsHeld, false)} tone="text-blue-700" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
@@ -204,8 +205,8 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({ kind, counterpar
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
           <h3 className="font-bold text-slate-900">{kind === 'clients' ? 'دریافت‌ها' : 'پرداخت‌ها'} (رویدادهای مالی)</h3>
           {profile.payments.length === 0 && <p className="text-slate-400">موردی ثبت نشده است.</p>}
-          {profile.payments.map((p, i) => (
-            <div key={i} className="flex justify-between border-b border-slate-50 py-1.5">
+          {profile.payments.map((p) => (
+            <div key={p.id} className="flex justify-between border-b border-slate-50 py-1.5">
               <span>
                 {p.description} <span className="text-[10px] text-slate-400 font-mono">{p.docNumber}</span>
               </span>
@@ -243,13 +244,13 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({ kind, counterpar
             <h3 className="font-bold text-slate-900">سوابق قیمت و کالاها</h3>
             <table className="w-full text-right">
               <tbody className="divide-y divide-slate-50">
-                {profile.priceHistory.map((h, i) => (
-                  <tr key={i}>
+                {profile.priceHistory.map((h) => (
+                  <tr key={h.id}>
                     <td className="py-1.5">{h.material}</td>
                     <td className="py-1.5 font-mono text-[11px] text-slate-500">{h.poNumber}</td>
                     <td className="py-1.5 font-mono text-[11px] text-slate-500">{h.date}</td>
                     <td className="py-1.5 text-left font-mono">
-                      {formatNumber(h.unitPrice)} / {h.unit}
+                      {formatMoney(h.unitPrice, false)} / {h.unit}
                     </td>
                   </tr>
                 ))}

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Counterparty } from '../types';
+import { Counterparty } from '../../../types';
 
 const isDev = (): boolean => {
   try {

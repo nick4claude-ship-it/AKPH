@@ -55,7 +55,7 @@ export function subcontractorDeductionLines(s: SubcontractorProgressStatement): 
   ].filter((x) => x.amount > 0);
 }
 
-/** صورت‌وضعیت پیمانکار جزء پس از تأیید مدیرعامل. مبلغ = خالص + کسورات (کارکرد تأییدشده). */
+/** صورت‌وضعیت پیمانکار جزء پس از تأیید مدیر ارشد. مبلغ = خالص + کسورات (کارکرد تأییدشده). */
 export function subcontractorStatementApprovedEvent(s: SubcontractorProgressStatement): FinancialEventInput {
   const deductions = subcontractorDeductionLines(s);
   const amount = s.netPayable + deductions.reduce((a, d) => a + d.amount, 0);

@@ -29,6 +29,7 @@ import {
   CheckSquare,
   ShieldAlert,
 } from 'lucide-react';
+import { formatMoneyCompact, moneyUnitLabel, formatInt } from '../../../utils/money';
 
 interface SubcontractorDashboardProps {
   contracts: SubcontractorContract[];
@@ -271,14 +272,13 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {Number((totalContractCommitments / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalContractCommitments)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>تعداد قراردادها: {filteredContracts.length.toLocaleString('fa-IR')}</span>
             <span className="text-slate-700 font-bold">
-              کارکرد: {Number((totalExecutedValue / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')} م.ت
+              کارکرد: {formatMoneyCompact(totalExecutedValue)}
             </span>
           </div>
         </div>
@@ -293,10 +293,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-950 tracking-tight">
-              {Number((pendingSiteReviewAmount / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(pendingSiteReviewAmount)}
             </span>
-            <span className="text-xs text-amber-700 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-amber-200/50 flex items-center justify-between text-[11px]">
             <span className="text-amber-800 font-bold">{pendingSiteReviewCount.toLocaleString('fa-IR')} صورت‌وضعیت</span>
             <span className="text-amber-700">کنترل احجام و متره میدانی</span>
@@ -313,10 +312,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-indigo-950 tracking-tight">
-              {Number((pendingManagementReviewAmount / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(pendingManagementReviewAmount)}
             </span>
-            <span className="text-xs text-indigo-700 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-indigo-200/50 flex items-center justify-between text-[11px]">
             <span className="text-indigo-800 font-bold">{pendingManagementReviewCount.toLocaleString('fa-IR')} صورت‌وضعیت</span>
             <span className="text-indigo-700">تأیید مدیر پروژه شده</span>
@@ -333,10 +331,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-rose-950 tracking-tight">
-              {Number((approvedUnpaidAmount / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(approvedUnpaidAmount)}
             </span>
-            <span className="text-xs text-rose-700 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-rose-200/50 flex items-center justify-between text-[11px]">
             <span className="text-rose-800 font-bold">{approvedUnpaidCount.toLocaleString('fa-IR')} مورد پرداختنی فوری</span>
             <span className="text-rose-600 font-medium">دستور پرداخت صادرشده</span>
@@ -353,10 +350,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-emerald-900 tracking-tight">
-              {Number((paidAmount / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(paidAmount)}
             </span>
-            <span className="text-xs text-emerald-700 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-emerald-200/50 flex items-center justify-between text-[11px] text-emerald-800">
             <span>تسویه شده: {paidCount.toLocaleString('fa-IR')} صورت‌وضعیت</span>
             <span className="font-bold">ثبت شده در هزینه پروژه</span>
@@ -373,14 +369,13 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-purple-950 tracking-tight">
-              {Number((totalStatementsGross / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalStatementsGross)}
             </span>
-            <span className="text-xs text-purple-700 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-purple-200/50 flex items-center justify-between text-[11px] text-purple-800">
             <span>{totalStatementsCount.toLocaleString('fa-IR')} دوره ثبت‌شده</span>
             <span className="font-bold">
-              تأییدشده: {Number((totalApprovedStatements / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')} م.ت
+              تأییدشده: {formatMoneyCompact(totalApprovedStatements)}
             </span>
           </div>
         </div>
@@ -395,10 +390,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-950 tracking-tight">
-              {Number((totalRemainingPayableDebt / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalRemainingPayableDebt)}
             </span>
-            <span className="text-xs text-amber-800 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-amber-300/60 flex items-center justify-between text-[11px] text-amber-900">
             <span>تأییدشده منهای پرداخت‌شده</span>
             <span className="font-bold">
@@ -420,10 +414,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-teal-950 tracking-tight">
-              {Number((totalRemainingWorkCapacity / 1_000_000_000).toFixed(2)).toLocaleString('fa-IR')}
+              {formatMoneyCompact(totalRemainingWorkCapacity)}
             </span>
-            <span className="text-xs text-teal-700 font-medium">میلیارد تومان</span>
-          </div>
+                      </div>
           <div className="mt-3 pt-2 border-t border-teal-200/50 flex items-center justify-between text-[11px] text-teal-800">
             <span>حجم کارهای انجام‌نشده</span>
             <span className="font-bold">
@@ -484,23 +477,23 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               </span>
               <span className="text-slate-400">←</span>
               <span className="bg-amber-500/20 text-amber-200 border border-amber-400/40 px-3 py-1.5 rounded-lg">
-                قرارداد {Number((drilldownContract.contractValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')} میلیارد
+                قرارداد {formatMoneyCompact(drilldownContract.contractValue)}
               </span>
               <span className="text-slate-400">←</span>
               <span className="bg-blue-500/20 text-blue-200 border border-blue-400/40 px-3 py-1.5 rounded-lg">
-                کارکرد {Number((drilldownContract.executedValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')} میلیارد
+                کارکرد {formatMoneyCompact(drilldownContract.executedValue)}
               </span>
               <span className="text-slate-400">←</span>
               <span className="bg-purple-500/20 text-purple-200 border border-purple-400/40 px-3 py-1.5 rounded-lg">
-                صورت‌وضعیت تاییدشده {Number((drilldownContract.approvedStatementsValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')} میلیارد
+                صورت‌وضعیت تاییدشده {formatMoneyCompact(drilldownContract.approvedStatementsValue)}
               </span>
               <span className="text-slate-400">←</span>
               <span className="bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 px-3 py-1.5 rounded-lg">
-                پرداخت‌شده {Number((drilldownContract.paidValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')} میلیارد
+                پرداخت‌شده {formatMoneyCompact(drilldownContract.paidValue)}
               </span>
               <span className="text-slate-400">←</span>
               <span className="bg-rose-500/30 text-rose-200 border border-rose-400/60 px-3 py-1.5 rounded-lg font-black text-rose-300">
-                مانده بدهی {Number((drilldownContract.remainingPayableValue / 1_000_000_000).toFixed(1)).toLocaleString('fa-IR')} میلیارد
+                مانده بدهی {formatMoneyCompact(drilldownContract.remainingPayableValue)}
               </span>
             </div>
 
@@ -509,15 +502,14 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
                 <span className="text-[11px] text-slate-400 block mb-1">۱. سقف قرارداد</span>
                 <span className="text-lg font-black text-amber-400">
-                  {(drilldownContract.contractValue / 1_000_000).toLocaleString('fa-IR')}
+                  {formatMoneyCompact(drilldownContract.contractValue)}
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">میلیون تومان</span>
-              </div>
+                              </div>
 
               <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
                 <span className="text-[11px] text-slate-400 block mb-1">۲. کارکرد متره (اجرا)</span>
                 <span className="text-lg font-black text-blue-300">
-                  {(drilldownContract.executedValue / 1_000_000).toLocaleString('fa-IR')}
+                  {formatMoneyCompact(drilldownContract.executedValue)}
                 </span>
                 <span className="text-[10px] text-blue-400 block mt-0.5">
                   {Number(((drilldownContract.executedValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪ پیشرفت
@@ -527,7 +519,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
                 <span className="text-[11px] text-slate-400 block mb-1">۳. صورت‌وضعیت مصوب</span>
                 <span className="text-lg font-black text-purple-300">
-                  {(drilldownContract.approvedStatementsValue / 1_000_000).toLocaleString('fa-IR')}
+                  {formatMoneyCompact(drilldownContract.approvedStatementsValue)}
                 </span>
                 <span className="text-[10px] text-purple-400 block mt-0.5">
                   {Number(((drilldownContract.approvedStatementsValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪ از پیمان
@@ -537,7 +529,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
                 <span className="text-[11px] text-slate-400 block mb-1">۴. پرداختی نقدی قطعی</span>
                 <span className="text-lg font-black text-emerald-400">
-                  {(drilldownContract.paidValue / 1_000_000).toLocaleString('fa-IR')}
+                  {formatMoneyCompact(drilldownContract.paidValue)}
                 </span>
                 <span className="text-[10px] text-emerald-400 block mt-0.5">
                   {drilldownContract.approvedStatementsValue > 0
@@ -550,7 +542,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <div className="bg-slate-800/80 p-3.5 rounded-xl border border-rose-900/50 bg-rose-950/20">
                 <span className="text-[11px] text-rose-300 block mb-1 font-bold">۵. مانده بدهی (تسویه نشده)</span>
                 <span className="text-lg font-black text-rose-400">
-                  {(drilldownContract.remainingPayableValue / 1_000_000).toLocaleString('fa-IR')}
+                  {formatMoneyCompact(drilldownContract.remainingPayableValue)}
                 </span>
                 <span className="text-[10px] text-rose-300 block mt-0.5">تأییدشده پرداخت‌نشده</span>
               </div>
@@ -558,7 +550,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <div className="bg-slate-800/80 p-3.5 rounded-xl border border-teal-900/50 bg-teal-950/20">
                 <span className="text-[11px] text-teal-300 block mb-1 font-bold">۶. مانده حجم کار</span>
                 <span className="text-lg font-black text-teal-400">
-                  {(drilldownContract.remainingContractValue / 1_000_000).toLocaleString('fa-IR')}
+                  {formatMoneyCompact(drilldownContract.remainingContractValue)}
                 </span>
                 <span className="text-[10px] text-teal-300 block mt-0.5">
                   {Number(((drilldownContract.remainingContractValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪ ظرفیت مانده
@@ -580,7 +572,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                   style={{
                     width: `${Math.min(100, (drilldownContract.paidValue / drilldownContract.contractValue) * 100)}%`,
                   }}
-                  title={`پرداخت‌شده: ${(drilldownContract.paidValue / 1_000_000).toLocaleString('fa-IR')} م.ت`}
+                  title={`پرداخت‌شده: ${formatMoneyCompact(drilldownContract.paidValue)}`}
                 />
                 {/* Approved unpaid portion (rose) */}
                 <div
@@ -591,7 +583,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                       (drilldownContract.remainingPayableValue / drilldownContract.contractValue) * 100
                     )}%`,
                   }}
-                  title={`تأییدشده پرداخت‌نشده: ${(drilldownContract.remainingPayableValue / 1_000_000).toLocaleString('fa-IR')} م.ت`}
+                  title={`تأییدشده پرداخت‌نشده: ${formatMoneyCompact(drilldownContract.remainingPayableValue)}`}
                 />
                 {/* Executed unbilled portion (blue) */}
                 <div
@@ -631,7 +623,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
             {/* Quick Actions for this contract */}
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-slate-400">
-                پیش‌پرداخت اولیه: {(drilldownContract.advancePaid / 1_000_000).toLocaleString('fa-IR')} م.ت | سپرده حسن انجام کار مکسوره: {(drilldownContract.retentionDeposit / 1_000_000).toLocaleString('fa-IR')} م.ت
+                پیش‌پرداخت اولیه: {formatMoneyCompact(drilldownContract.advancePaid)} | سپرده حسن انجام کار مکسوره: {formatMoneyCompact(drilldownContract.retentionDeposit)}
               </div>
               <div className="flex items-center gap-2">
                 {onSelectContract && (
@@ -715,7 +707,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                   <div className="flex items-center justify-between text-slate-600 text-[11px]">
                     <span>{stmt.subcontractorName}</span>
                     <span className="font-bold text-slate-900">
-                      {(stmt.netPayable / 1_000_000).toLocaleString('fa-IR')} م.ت
+                      {formatMoneyCompact(stmt.netPayable)}
                     </span>
                   </div>
 
@@ -753,7 +745,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <h4 className="text-sm font-bold text-slate-900">ماتریس تعهدات به تفکیک پروژه و پیمانکار جزء</h4>
               <p className="text-[11px] text-slate-500">مقایسه سقف قرارداد، کارکرد متره، تأییدشده، پرداختی و مانده</p>
             </div>
-            <span className="text-xs text-slate-400 font-medium">مبالغ به میلیون تومان</span>
+            <span className="text-xs text-slate-400 font-medium">واحد مبالغ: {moneyUnitLabel()}</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -782,22 +774,22 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                       </td>
                       <td className="p-2.5 text-slate-600 text-[11px]">{c.projectName}</td>
                       <td className="p-2.5 text-left font-black text-slate-800">
-                        {(c.contractValue / 1_000_000).toLocaleString('fa-IR')}
+                        {formatMoneyCompact(c.contractValue)}
                       </td>
                       <td className="p-2.5 text-left font-bold text-blue-700">
-                        {(c.executedValue / 1_000_000).toLocaleString('fa-IR')}
+                        {formatMoneyCompact(c.executedValue)}
                       </td>
                       <td className="p-2.5 text-left font-bold text-purple-700">
-                        {(c.approvedStatementsValue / 1_000_000).toLocaleString('fa-IR')}
+                        {formatMoneyCompact(c.approvedStatementsValue)}
                       </td>
                       <td className="p-2.5 text-left font-bold text-emerald-700">
-                        {(c.paidValue / 1_000_000).toLocaleString('fa-IR')}
+                        {formatMoneyCompact(c.paidValue)}
                         <div className="text-[9px] text-emerald-600 font-normal">
-                          {Math.round(payRatio).toLocaleString('fa-IR')}٪ تسویه
+                          {formatInt(Math.round(payRatio))}٪ تسویه
                         </div>
                       </td>
                       <td className="p-2.5 text-left font-black text-rose-600">
-                        {(c.remainingPayableValue / 1_000_000).toLocaleString('fa-IR')}
+                        {formatMoneyCompact(c.remainingPayableValue)}
                       </td>
                       <td className="p-2.5 text-center">
                         <button

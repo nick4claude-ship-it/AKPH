@@ -5,7 +5,8 @@
 
 import { AppState } from './types';
 import { JournalEntry, KpiItem, Project } from '../types';
-import { CLIENT_APPROVED_STATUSES } from './initialState';
+import { CLIENT_APPROVED_STATUSES } from './state';
+import { formatInt } from '../utils/money';
 
 /**
  * همه ارقام مالی از اسناد حسابداری و رویدادهای مالی محاسبه می‌شوند؛ هیچ مقدار ثابت یا پیش‌فرضی وجود ندارد.
@@ -28,12 +29,29 @@ function shiftPeriod(key: string, months: number): string {
   return `${Math.floor(index / 12)}/${String((index % 12) + 1).padStart(2, '0')}`;
 }
 
+/** Monthly sums of dated amounts for the last `months` periods, ending at the latest period with data. */
+export function monthlyTotals(items: { date: string; amount: number }[], months = 5): { period: string; label: string; amount: number }[] {
+  const map = new Map<string, number>();
+  for (const it of items) {
+    const key = periodKey(it.date);
+    if (key) map.set(key, (map.get(key) || 0) + it.amount);
+  }
+  const last = [...map.keys()].sort().pop();
+  if (!last) return [];
+  const out: { period: string; label: string; amount: number }[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const period = shiftPeriod(last, -i);
+    out.push({ period, label: MONTH_NAMES[Number(period.split('/')[1]) - 1], amount: map.get(period) || 0 });
+  }
+  return out;
+}
+
 /** Entries that affect the ledger (drafts, rejected and pending vouchers are excluded). */
 export function postedEntries(state: AppState): JournalEntry[] {
   return state.journalEntries.filter((j) => j.status === 'ثبت قطعی' || j.status === 'تأیید شده' || j.status === 'برگشت خورده');
 }
 
-interface Balances {
+export interface Balances {
   revenue: number;
   cost: number;
   receivables: number;
@@ -171,15 +189,15 @@ export function selectKpiItems(state: AppState, projectId: string = 'all'): KpiI
 
   return [
     kpi('kpi-1', 'کل درآمد کارکرد پروژه‌ها', now.revenue, prev.revenue, {
-      isPositiveGood: true, unit: 'تومان', icon: 'TrendingUp', color: 'emerald',
+      isPositiveGood: true, unit: 'money', icon: 'TrendingUp', color: 'emerald',
       description: 'مجموع درآمد شناسایی‌شده در اسناد حسابداری از صورت‌وضعیت‌های تأییدشده کارفرما',
     }),
     kpi('kpi-2', 'بهای تمام‌شده و هزینه‌ها', now.cost, prev.cost, {
-      isPositiveGood: false, unit: 'تومان', icon: 'Receipt', color: 'amber',
+      isPositiveGood: false, unit: 'money', icon: 'Receipt', color: 'amber',
       description: 'مجموع مانده حساب‌های بهای تمام‌شده پروژه و هزینه‌های ستادی در دفاتر',
     }),
     kpi('kpi-3', 'سود ناخالص عملیاتی شرکت', grossProfit, prevProfit, {
-      isPositiveGood: true, unit: 'تومان', icon: 'Coins', color: 'emerald',
+      isPositiveGood: true, unit: 'money', icon: 'Coins', color: 'emerald',
       description: 'تفاضل درآمد و بهای تمام‌شده ثبت‌شده در دفاتر',
     }),
     kpi('kpi-4', 'حاشیه سود ناخالص میانگین', margin, prevMargin, {
@@ -187,20 +205,20 @@ export function selectKpiItems(state: AppState, projectId: string = 'all'): KpiI
       description: 'نسبت سود ناخالص به درآمد شناسایی‌شده',
     }),
     kpi('kpi-5', 'مطالبات معوق و تجاری از کارفرما', now.receivables, prev.receivables, {
-      isPositiveGood: false, unit: 'تومان', icon: 'Clock', color: 'amber',
+      isPositiveGood: false, unit: 'money', icon: 'Clock', color: 'amber',
       description: 'مانده حساب‌های دریافتنی تجاری در دفاتر',
     }),
     kpi('kpi-6', 'صورت‌وضعیت‌های در جریان', inFlightAmount, inFlightAmount, {
-      isPositiveGood: true, unit: 'تومان', icon: 'FileSpreadsheet', color: 'purple',
-      changePeriod: `${inFlight.length.toLocaleString('fa-IR')} فقره در کارتابل رسیدگی`,
+      isPositiveGood: true, unit: 'money', icon: 'FileSpreadsheet', color: 'purple',
+      changePeriod: `${formatInt(inFlight.length)} فقره در کارتابل رسیدگی`,
       description: 'ارزش صورت‌وضعیت‌های ارسالی که هنوز به تأیید کارفرما نرسیده‌اند',
     }),
     kpi('kpi-7', 'کل موجودی نقد و بانک‌ها', cashNow, cashPrev, {
-      isPositiveGood: true, unit: 'تومان', icon: 'Wallet', color: 'cyan',
+      isPositiveGood: true, unit: 'money', icon: 'Wallet', color: 'cyan',
       description: 'جمع موجودی حساب‌های بانکی، صندوق‌ها و تنخواه‌گردان‌ها',
     }),
     kpi('kpi-8', 'تعهدات و بدهی‌های جاری', now.liabilities, prev.liabilities, {
-      isPositiveGood: false, unit: 'تومان', icon: 'CreditCard', color: 'rose',
+      isPositiveGood: false, unit: 'money', icon: 'CreditCard', color: 'rose',
       description: 'مانده بدهی‌های جاری به تأمین‌کنندگان، پیمانکاران، پرسنل و نهادها در دفاتر',
     }),
   ];
@@ -283,3 +301,68 @@ export function selectExpenseCategoryTotals(state: AppState, projectId: string =
 }
 
 
+
+/** Project cost by ledger account (group 5 rows tagged with the project). */
+export function selectProjectCostBreakdown(state: AppState, projectId: string): { accountCode: string; accountName: string; amount: number }[] {
+  const map = new Map<string, { accountName: string; amount: number }>();
+  for (const e of postedEntries(state)) {
+    for (const r of e.rows) {
+      if (r.projectId !== projectId || !isProjectCost(r.accountCode)) continue;
+      const cur = map.get(r.accountCode) || { accountName: r.accountName, amount: 0 };
+      map.set(r.accountCode, { accountName: cur.accountName, amount: cur.amount + r.debit - r.credit });
+    }
+  }
+  return [...map].map(([accountCode, v]) => ({ accountCode, ...v })).filter((x) => x.amount !== 0).sort((a, b) => b.amount - a.amount);
+}
+
+/** Cash received and paid for a project, from cash-account rows of final entries tagged with the project. */
+export function selectProjectCashFlow(state: AppState, projectId: string): { inflow: number; outflow: number; net: number } {
+  let inflow = 0;
+  let outflow = 0;
+  for (const e of postedEntries(state)) {
+    if (e.projectId !== projectId) continue;
+    for (const r of e.rows) {
+      if (!isCash(r.accountCode)) continue;
+      inflow += r.debit;
+      outflow += r.credit;
+    }
+  }
+  return { inflow, outflow, net: inflow - outflow };
+}
+
+/** Company-wide ledger totals (all final entries). */
+export function selectLedgerTotals(state: AppState): Balances {
+  return sumBalances(postedEntries(state), () => true, { projectScope: false });
+}
+
+export interface CashFlowPoint {
+  period: string;
+  label: string;
+  receipt: number;
+  payment: number;
+}
+
+/** Cash in/out per month from the cash-account rows (bank, cash desks, petty cash) of final entries. */
+export function selectCashFlowByMonth(state: AppState, months = 6): CashFlowPoint[] {
+  const map = new Map<string, { receipt: number; payment: number }>();
+  for (const e of postedEntries(state)) {
+    const key = periodKey(e.date);
+    if (!key) continue;
+    for (const r of e.rows) {
+      if (!isCash(r.accountCode)) continue;
+      const cur = map.get(key) || { receipt: 0, payment: 0 };
+      map.set(key, { receipt: cur.receipt + r.debit, payment: cur.payment + r.credit });
+    }
+  }
+  const keys = [...map.keys()].sort();
+  const last = keys[keys.length - 1];
+  if (!last) return [];
+  const out: CashFlowPoint[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const period = shiftPeriod(last, -i);
+    const month = Number(period.split('/')[1]);
+    const v = map.get(period) || { receipt: 0, payment: 0 };
+    out.push({ period, label: MONTH_NAMES[month - 1], ...v });
+  }
+  return out;
+}

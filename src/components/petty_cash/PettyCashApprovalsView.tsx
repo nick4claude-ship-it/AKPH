@@ -16,10 +16,14 @@ import {
   ShieldCheck,
   Check,
 } from 'lucide-react';
-import { PettyCashExpense, User as AppUser } from '../../types';
+import { PettyCashExpense, PortalRole, User as AppUser } from '../../types';
 import { useAppState } from '../../store/AppStore';
+import { usePermission } from '../../store/session';
+import { PETTY_STEP_ACTION } from '../../utils/permissions';
+import { Dialog } from '../common/Dialog';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { formatCurrency, formatNumber, toPersianDigits } from '../../utils/formatters';
+import { formatInt } from '../../utils/money';
 
 interface PettyCashApprovalsViewProps {
   expenses: PettyCashExpense[];
@@ -69,6 +73,15 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
     expenses.find((e) => e.id === selectedExpenseId) || displayedList[0] || null;
   // Invoice images live in the document center, linked to the expense.
   const appState = useAppState();
+  const policy = appState.pettyCashSettings;
+  const { check } = usePermission();
+  const approvePermission = activeExpense
+    ? check(PETTY_STEP_ACTION[activeExpense.currentApprovalStep as PortalRole] ?? 'petty.approve_ceo', {
+        projectId: activeExpense.projectId,
+        createdBy: activeExpense.submitterName,
+      })
+    : { ok: false };
+  const canReject = activeExpense ? check('petty.reject', { projectId: activeExpense.projectId }).ok : false;
   const activeDocs = activeExpense ? selectDocumentsFor(appState, 'petty_cash_expense', activeExpense.id) : [];
 
   const handleApprove = () => {
@@ -127,7 +140,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
             <span>در انتظار تأیید</span>
             {pendingList.length > 0 && (
               <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full tabular-nums">
-                {pendingList.length.toLocaleString('fa-IR')}
+                {formatInt(pendingList.length)}
               </span>
             )}
           </button>
@@ -145,7 +158,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
           >
             <span>تأیید شده / ثبتی</span>
             <span className="text-[10px] text-slate-500 tabular-nums">
-              ({approvedList.length.toLocaleString('fa-IR')})
+              ({formatInt(approvedList.length)})
             </span>
           </button>
 
@@ -163,7 +176,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
             <span>رد شده / اصلاحی</span>
             {rejectedList.length > 0 && (
               <span className="bg-slate-300 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full tabular-nums">
-                {rejectedList.length.toLocaleString('fa-IR')}
+                {formatInt(rejectedList.length)}
               </span>
             )}
           </button>
@@ -381,79 +394,54 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                   </div>
                 </div>
 
-                {/* Multi-Level Approval Stages Stepper (Section 10) */}
-                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800">گردش کار تایید چندمرحله‌ای:</span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      سطح الزامی:{' '}
-                      {activeExpense.approvalLevelRequired === 'ceo_full'
-                        ? 'تایید مدیرعامل (> ۱۰۰ میلیون)'
-                        : activeExpense.approvalLevelRequired === 'project_and_finance'
-                        ? 'تایید مدیر پروژه و مالی (۲۰ تا ۱۰۰ میلیون)'
-                        : 'سرپرست کارگاه و مالی (< ۲۰ میلیون)'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-1 pt-2">
-                    <div className="flex-1 text-center">
-                      <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto text-[10px] font-bold">
-                        ✓
+                {/* Multi-Level Approval Stages Stepper: the chain comes from the stored petty cash policy */}
+                {(() => {
+                  const level = activeExpense.approvalLevelRequired;
+                  const chain = policy.approvalChains[level];
+                  const done = activeExpense.status === 'approved' || activeExpense.status === 'accounting_posted';
+                  const current = done ? chain.length : Math.max(0, chain.indexOf(activeExpense.currentApprovalStep as PortalRole));
+                  const range =
+                    level === 'site_manager_and_finance'
+                      ? `تا ${formatCurrency(policy.siteLevelMax)}`
+                      : level === 'project_and_finance'
+                        ? `${formatCurrency(policy.siteLevelMax)} تا ${formatCurrency(policy.projectLevelMax)}`
+                        : `بیش از ${formatCurrency(policy.projectLevelMax)}`;
+                  const steps = ['ثبت تنخواه‌دار', ...chain];
+                  return (
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-800">گردش کار تایید چندمرحله‌ای:</span>
+                        <span className="text-[10px] text-slate-500 font-mono">سطح الزامی: {chain.join(' + ')} ({range})</span>
                       </div>
-                      <span className="text-[10px] font-medium text-slate-700 block mt-1">
-                        ثبت کارپرداز
-                      </span>
-                    </div>
-
-                    <div className="h-0.5 flex-1 bg-emerald-500" />
-
-                    <div className="flex-1 text-center">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto text-[10px] font-bold ${
-                          activeExpense.status === 'approved' || activeExpense.status === 'accounting_posted'
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-amber-500 text-slate-950 font-bold'
-                        }`}
-                      >
-                        {activeExpense.status === 'approved' || activeExpense.status === 'accounting_posted' ? '✓' : '۲'}
+                      <div className="flex items-center justify-between gap-1 pt-2">
+                        {steps.map((label, i) => {
+                          const stepDone = i === 0 || i - 1 < current;
+                          const isCurrent = !done && i - 1 === current;
+                          return (
+                            <React.Fragment key={label}>
+                              {i > 0 && <div className={`h-0.5 flex-1 ${stepDone ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
+                              <div className="flex-1 text-center">
+                                <div
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto text-[10px] font-bold ${
+                                    stepDone ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-600'
+                                  }`}
+                                >
+                                  {stepDone ? '✓' : toPersianDigits(i + 1)}
+                                </div>
+                                <span className="text-[10px] font-medium text-slate-700 block mt-1">{label}</span>
+                              </div>
+                            </React.Fragment>
+                          );
+                        })}
                       </div>
-                      <span className="text-[10px] font-medium text-slate-700 block mt-1">
-                        مدیر مالی
-                      </span>
                     </div>
-
-                    {activeExpense.approvalLevelRequired === 'ceo_full' && (
-                      <>
-                        <div
-                          className={`h-0.5 flex-1 ${
-                            activeExpense.status === 'approved' || activeExpense.status === 'accounting_posted'
-                              ? 'bg-emerald-500'
-                              : 'bg-slate-200'
-                          }`}
-                        />
-                        <div className="flex-1 text-center">
-                          <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto text-[10px] font-bold ${
-                              activeExpense.status === 'approved' || activeExpense.status === 'accounting_posted'
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            ۳
-                          </div>
-                          <span className="text-[10px] font-medium text-slate-700 block mt-1">
-                            مدیرعامل
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Rejection / Returned banner if applicable */}
                 {activeExpense.rejectionReason && (
                   <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-                    <strong className="block mb-1">دلیل رد توسط مدیر مالی:</strong>
+                    <strong className="block mb-1">دلیل رد:</strong>
                     {activeExpense.rejectionReason}
                   </div>
                 )}
@@ -468,7 +456,8 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setIsReturnModalOpen(true)}
-                        className="px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1"
+                        disabled={!canReject}
+                        className="disabled:opacity-40 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         بازگشت جهت اصلاح
@@ -476,7 +465,8 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
                       <button
                         onClick={() => setIsRejectModalOpen(true)}
-                        className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                        disabled={!canReject}
+                        className="disabled:opacity-40 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         رد فاکتور
@@ -484,7 +474,9 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
                       <button
                         onClick={handleApprove}
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+                        disabled={!approvePermission.ok}
+                        title={approvePermission.ok ? '' : approvePermission.reason}
+                        className="disabled:opacity-40 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
                       >
                         <Check className="w-4 h-4" />
                         تأیید و ثبت در حسابداری
@@ -504,8 +496,12 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
       {/* Reject Modal */}
       {isRejectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
+        <Dialog
+          onClose={() => setIsRejectModalOpen(false)}
+          label="رد فاکتور تنخواه"
+          overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+          className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200"
+        >
             <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
               <XCircle className="w-5 h-5" />
               رد فاکتور تنخواه
@@ -542,14 +538,17 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 تأیید و ثبت رد فاکتور
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Return for Correction Modal */}
       {isReturnModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
+        <Dialog
+          onClose={() => setIsReturnModalOpen(false)}
+          label="بازگشت هزینه به کاربر جهت اصلاح"
+          overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+          className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200"
+        >
             <div className="flex items-center gap-2 text-amber-600 font-bold text-sm">
               <RotateCcw className="w-5 h-5" />
               بازگشت هزینه به کاربر جهت اصلاح
@@ -586,8 +585,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 ارسال به تنخواه‌دار
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

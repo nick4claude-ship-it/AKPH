@@ -4,6 +4,8 @@ import { formatCurrencyCompact } from '../../utils/formatters';
 import { useAppState } from '../../store/AppStore';
 import { useCurrentUser } from '../../store/session';
 import { answerManagementQuery, AssistantAnswer } from '../../store/assistant';
+import { generateUUID } from '../../utils/ids';
+import { toPersianTime } from '../../utils/date';
 
 interface AiAgentWidgetProps {
   isOpen?: boolean;
@@ -39,7 +41,7 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
     {
       id: 'm1',
       sender: 'ai',
-      text: `سلام ${user.name}. من دستیار هوشمند مدیریت هستم و پاسخ‌ها را مستقیماً از داده‌های پروژه‌ها، حسابداری، قراردادها، تدارکات، تنخواه، صورت‌وضعیت‌ها و انبار محاسبه می‌کنم. مثلاً بپرسید: «وضعیت پروژه رونیکا را بگو».`,
+      text: `سلام ${user.name}. این نسخه نمایشی دستیار است و هنوز به مدل زبانی متصل نیست؛ پاسخ‌ها با قواعد ثابت و مستقیماً از داده‌های ثبت‌شده (دفاتر، قراردادها، صورت‌وضعیت‌ها، تنخواه، خرید و انبار) محاسبه می‌شود. مثلاً بپرسید: «وضعیت پروژه رونیکا را بگو».`,
       time: 'هم‌اکنون',
     },
   ]);
@@ -53,10 +55,10 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
     if (!text.trim()) return;
 
     const userMsg: Message = {
-      id: `u-${Date.now()}`,
+      id: generateUUID(),
       sender: 'user',
       text,
-      time: 'هم‌اکنون',
+      time: toPersianTime(new Date()),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -66,11 +68,11 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
     setTimeout(() => {
       const response = generateAnswer(text);
       const aiMsg: Message = {
-        id: `ai-${Date.now()}`,
+        id: generateUUID(),
         sender: 'ai',
         text: response.text,
         dataPoints: response.dataPoints,
-        time: 'هم‌اکنون',
+        time: toPersianTime(new Date()),
       };
       setMessages((prev) => [...prev, aiMsg]);
       setIsTyping(false);
@@ -95,18 +97,22 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h3 className="text-xs font-bold text-amber-300">دستیار هوشمند مدیریت (AI Agent)</h3>
-              <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">
-                نسخه مدیریتی
+              <h3 className="text-xs font-bold text-amber-300">دستیار مدیریت</h3>
+              <span
+                className="text-[9px] bg-rose-500/25 text-rose-100 border border-rose-300/40 px-1.5 py-0.5 rounded font-bold"
+                title="به مدل زبانی متصل نیست؛ پاسخ‌ها با قواعد ثابت از داده‌های سامانه محاسبه می‌شود."
+              >
+                نسخه نمایشی
               </span>
             </div>
-            <p className="text-[10px] text-slate-300">تحلیل یکپارچه پروژه‌ها، مالی، تنخواه و صورت‌وضعیت</p>
+            <p className="text-[10px] text-slate-300">پاسخ از داده‌های ثبت‌شده؛ بدون اتصال به مدل زبانی</p>
           </div>
         </div>
 
         {onClose && (
           <button
             onClick={onClose}
+            aria-label="بستن"
             className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -118,12 +124,12 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
       <div className="p-2.5 bg-slate-50 border-b border-slate-200/80">
         <div className="text-[10px] text-slate-500 font-semibold mb-1.5 flex items-center gap-1">
           <MessageSquare className="w-3 h-3 text-amber-600" />
-          <span>پرسش‌های پیشنهادی مدیرعامل:</span>
+          <span>پرسش‌های پیشنهادی:</span>
         </div>
         <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-          {samplePrompts.map((p, idx) => (
+          {samplePrompts.map((p) => (
             <button
-              key={idx}
+              key={p}
               onClick={() => handleSend(p)}
               className="text-[11px] bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 px-2 py-1 rounded-md text-right transition-colors cursor-pointer"
             >
@@ -151,12 +157,12 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
                 {m.sender === 'ai' ? (
                   <>
                     <Bot className="w-3 h-3 text-amber-600" />
-                    <span className="font-bold text-amber-800">هوش تحلیلی سامانه</span>
+                    <span className="font-bold text-amber-800">دستیار (نسخه نمایشی)</span>
                   </>
                 ) : (
                   <>
                     <User className="w-3 h-3 text-slate-300" />
-                    <span>مدیر ارشد</span>
+                    <span>{user.name}</span>
                   </>
                 )}
                 <span>·</span>
@@ -168,9 +174,9 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
               {/* Structured Key Metrics Pill Island if present */}
               {m.dataPoints && (
                 <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-1 gap-1 font-mono">
-                  {m.dataPoints.map((dp, idx) => (
+                  {m.dataPoints.map((dp) => (
                     <div
-                      key={idx}
+                      key={dp.label}
                       className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200/60"
                     >
                       <span className="text-slate-600">{dp.label}:</span>

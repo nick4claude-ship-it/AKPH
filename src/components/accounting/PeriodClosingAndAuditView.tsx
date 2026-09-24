@@ -1,225 +1,174 @@
-import React, { useState } from 'react';
-import {
-  CalendarCheck,
-  ShieldCheck,
-  History,
-  Lock,
-  CheckCircle2,
-  AlertTriangle,
-  Users,
-  Key,
-} from 'lucide-react';
-import { AuditLog, UserProfile } from '../../types';
+import React, { useMemo, useState } from 'react';
+import { CalendarCheck, ShieldCheck, History, Lock, CheckCircle2, AlertTriangle, Users } from 'lucide-react';
+import { AuditLog, JournalEntry } from '../../types';
+import { formatMoney, parseIntegerAmount } from '../../utils/money';
+import { toPersianDigits } from '../../utils/formatters';
+import { fiscalYearOf } from '../../utils/ids';
+import { getCurrentFiscalYear } from '../../utils/date';
+import { usePermission } from '../../store/session';
+import type { WorkflowResult } from '../../store/workflows';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 
 interface PeriodClosingAndAuditViewProps {
   auditLogs: AuditLog[];
-  currentUser: UserProfile;
+  journalEntries: JournalEntry[];
+  closedFiscalYears: number[];
+  onCloseFiscalYear: (year: number) => WorkflowResult;
 }
 
-export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps> = ({
-  auditLogs,
-  currentUser,
-}) => {
-  const [activeTab, setActiveTab] = useState<'closing' | 'audit' | 'roles'>('closing');
-  const [closingStep, setClosingStep] = useState<number>(1);
-  const [isPeriodClosed, setIsPeriodClosed] = useState<boolean>(false);
+/** Roles of the paydar-portal plugin and what each may do in the ledger (mirrors utils/permissions). */
+const ROLE_SUMMARY = [
+  { role: 'مدیر سیستم', access: 'دسترسی کامل', items: ['مدیریت تنظیمات و سیاست‌ها', 'همه عملیات مالی (با قاعده تفکیک وظایف)'], color: 'bg-slate-50 text-slate-900 border-slate-200' },
+  { role: 'مدیر ارشد', access: 'تأییدهای نهایی و بستن سال', items: ['تأیید نهایی صورت‌وضعیت جزء و درخواست پرداخت', 'بستن سال مالی', 'تأیید اسناد دستی'], color: 'bg-amber-50 text-amber-900 border-amber-200' },
+  { role: 'حسابدار', access: 'دفاتر، خزانه و تأیید مالی', items: ['ثبت سند دستی و سند معکوس', 'ثبت دریافت و اجرای پرداخت', 'تأیید مالی صورت‌وضعیت، فاکتور و تنخواه'], color: 'bg-emerald-50 text-emerald-900 border-emerald-200' },
+  { role: 'مدیر پروژه', access: 'فقط پروژه‌های خودش', items: ['تهیه و تأیید کارگاهی صورت‌وضعیت', 'درخواست خرید، حواله و انتقال انبار', 'ثبت هزینه تنخواه'], color: 'bg-purple-50 text-purple-900 border-purple-200' },
+];
 
-  const rolesMatrix = [
-    {
-      role: 'مدیرعامل (CEO)',
-      access: 'دسترسی نامحدود و کامل (Full Access)',
-      permissions: ['تأیید نهایی اسناد', 'مشاهده تمام دفاتر و سود و زیان', 'بستن دوره مالی', 'ابلاغ دستور پرداخت'],
-      color: 'bg-amber-50 text-amber-900 border-amber-200',
-    },
-    {
-      role: 'مدیر مالی (Finance Manager)',
-      access: 'مدیریت حسابداری + گزارش‌ها + تاییدیه',
-      permissions: ['تأیید اولیه اسناد', 'تطبیق بانکی', 'صدور سند معکوس', 'مدیریت سرفصل‌ها', 'گزارش‌های مالیاتی'],
-      color: 'bg-blue-50 text-blue-900 border-blue-200',
-    },
-    {
-      role: 'حسابدار ارشد (Accountant)',
-      access: 'ثبت و مدیریت اسناد و دفاتر',
-      permissions: ['ثبت سند دوبل', 'ثبت دریافت و پرداخت', 'کنترل فاکتورها', 'مغایرت‌گیری بانکی'],
-      color: 'bg-emerald-50 text-emerald-900 border-emerald-200',
-    },
-    {
-      role: 'مدیر پروژه (Project Manager)',
-      access: 'مشاهده مالی پروژه اختصاصی',
-      permissions: ['مشاهده کارنامه مالی پروژه', 'ارسال فاکتور کارگاهی', 'پایش انحراف بودجه پروژه'],
-      color: 'bg-purple-50 text-purple-900 border-purple-200',
-    },
-    {
-      role: 'سرپرست کارگاه (Site Manager)',
-      access: 'محدود به هزینه‌های میدانی و تنخواه',
-      permissions: ['ثبت فاکتور تنخواه', 'درخواست شارژ تنخواه', 'مشاهده حواله انبار'],
-      color: 'bg-slate-50 text-slate-900 border-slate-200',
-    },
-    {
-      role: 'حسابرس و ناظر (Viewer)',
-      access: 'فقط خواندنی (Read-Only)',
-      permissions: ['مشاهده دفاتر', 'مشاهده تراز آزمایشی', 'دریافت خروجی اکسل و PDF'],
-      color: 'bg-slate-100 text-slate-700 border-slate-300',
-    },
-  ];
+export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps> = ({ auditLogs, journalEntries, closedFiscalYears, onCloseFiscalYear }) => {
+  const { can } = usePermission();
+  const [activeTab, setActiveTab] = useState<'closing' | 'audit' | 'roles'>('closing');
+  const years = useMemo(() => {
+    const set = new Set(journalEntries.map((j) => fiscalYearOf(j.date)));
+    set.add(getCurrentFiscalYear());
+    return [...set].sort((a, b) => b - a);
+  }, [journalEntries]);
+  const [year, setYear] = useState<number>(() => years.find((y) => !closedFiscalYears.includes(y)) || getCurrentFiscalYear());
+  const [confirming, setConfirming] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const yearEntries = journalEntries.filter((j) => fiscalYearOf(j.date) === year);
+  const pending = yearEntries.filter((j) => j.status === 'در انتظار تأیید' || j.status === 'پیش‌نویس');
+  const final = yearEntries.filter((j) => j.status === 'ثبت قطعی' || j.status === 'تأیید شده' || j.status === 'برگشت خورده');
+  let revenue = 0;
+  let cost = 0;
+  for (const j of final) {
+    for (const r of j.rows) {
+      if (r.accountCode.startsWith('4')) revenue += r.credit - r.debit;
+      else if (/^[56]/.test(r.accountCode)) cost += r.debit - r.credit;
+    }
+  }
+  const isClosed = closedFiscalYears.includes(year);
+  const allowed = can('fiscal.close');
 
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
-      {/* Tab Switcher */}
-      <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-xs flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
+      <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-xs flex items-center gap-1.5" role="tablist">
+        {(
+          [
+            ['closing', 'بستن سال مالی و سند اختتامیه', CalendarCheck],
+            ['audit', 'ردیابی حسابرسی', History],
+            ['roles', 'نقش‌ها و دسترسی‌ها', ShieldCheck],
+          ] as const
+        ).map(([key, label, Icon]) => (
           <button
-            onClick={() => setActiveTab('closing')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === 'closing' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+            key={key}
+            role="tab"
+            aria-selected={activeTab === key}
+            onClick={() => setActiveTab(key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer ${
+              activeTab === key ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <CalendarCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>بستن دوره مالی و صدور سند اختتامیه</span>
+            <Icon className="w-3.5 h-3.5" />
+            <span>{label}</span>
           </button>
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === 'audit' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>ردپای حسابرسی و لاگ تغییرات (Audit Trail)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('roles')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === 'roles' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Key className="w-3.5 h-3.5" />
-            <span>ماتریس سطوح دسترسی سازمانی (RBAC)</span>
-          </button>
-        </div>
+        ))}
       </div>
 
-      {/* SECTION 1: PERIOD CLOSING */}
       {activeTab === 'closing' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                فرآیند مکانیزه بستن دوره مالی (Financial Year-End Closing)
-              </h3>
+              <h3 className="text-sm font-bold text-slate-900">بستن سال مالی</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                کنترل تراز آزمایشی، بستن حساب‌های موقت سود و زیانی، انتقال به سود انباشته و صدور سند اختتامیه
+                حساب‌های درآمد و هزینه (گروه ۴، ۵ و ۶) سال انتخاب‌شده با یک سند قطعی به سود (زیان) انباشته بسته می‌شوند و ثبت سند در آن سال قفل می‌شود.
               </p>
             </div>
-            {isPeriodClosed && (
+            <label className="text-xs text-slate-700 flex items-center gap-2">
+              سال مالی:
+              <select value={year} onChange={(e) => setYear(parseIntegerAmount(e.target.value))} className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {toPersianDigits(y)} {closedFiscalYears.includes(y) ? '(بسته)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <div className={`p-4 rounded-xl border ${pending.length ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+              <div className="font-bold mb-1">اسناد در انتظار تأیید</div>
+              <p className="text-[11px]">{pending.length ? `${toPersianDigits(pending.length)} سند باید پیش از بستن تعیین تکلیف شود.` : 'سند بازی در این سال وجود ندارد.'}</p>
+            </div>
+            <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
+              <div className="font-bold mb-1">درآمد سال</div>
+              <p className="font-mono">{formatMoney(revenue)}</p>
+            </div>
+            <div className="p-4 rounded-xl border bg-slate-50 border-slate-200">
+              <div className="font-bold mb-1">هزینه سال</div>
+              <p className="font-mono">{formatMoney(cost)}</p>
+            </div>
+            <div className="p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-900">
+              <div className="font-bold mb-1">{revenue - cost >= 0 ? 'سود' : 'زیان'} قابل انتقال</div>
+              <p className="font-mono">{formatMoney(Math.abs(revenue - cost))}</p>
+            </div>
+          </div>
+
+          {message && (
+            <p className={`p-3 rounded-xl text-xs border ${message.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`} role="status">
+              {message.text}
+            </p>
+          )}
+
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-slate-600 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              پس از بستن، هیچ سندی با تاریخ این سال ثبت نمی‌شود؛ اصلاحات بعدی در سال جاری و با سند معکوس انجام می‌شود.
+            </span>
+            {isClosed ? (
               <span className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold">
                 <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                <span>دوره مالی بسته و قفل شده است</span>
+                سال مالی {toPersianDigits(year)} بسته است
               </span>
-            )}
-          </div>
-
-          {/* Stepper Wizard */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-            <div
-              className={`p-4 rounded-xl border ${
-                closingStep >= 1 ? 'bg-blue-50/60 border-blue-300 text-blue-950' : 'bg-slate-50 border-slate-200 text-slate-400'
-              }`}
-            >
-              <div className="font-bold mb-1">گام اول: کنترل اسناد باز</div>
-              <p className="text-[11px] text-slate-500">
-                بررسی تراز آزمایشی و اطمینان از عدم وجود سند در انتظار تأیید یا نامتوازن.
-              </p>
-              <div className="mt-3 flex items-center gap-1 text-[11px] text-emerald-700 font-bold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>اسناد تراز و آماده</span>
-              </div>
-            </div>
-
-            <div
-              className={`p-4 rounded-xl border ${
-                closingStep >= 2 ? 'bg-blue-50/60 border-blue-300 text-blue-950' : 'bg-slate-50 border-slate-200 text-slate-400'
-              }`}
-            >
-              <div className="font-bold mb-1">گام دوم: بستن حساب‌های موقت</div>
-              <p className="text-[11px] text-slate-500">
-                بستن سرفصل‌های درآمد و هزینه (سرفصل ۴، ۵ و ۶) و انتقال به خلاصه سود و زیان.
-              </p>
-              {closingStep >= 2 && (
-                <div className="mt-3 flex items-center gap-1 text-[11px] text-emerald-700 font-bold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>سود دوره: ۷۰.۲ میلیارد تومان</span>
-                </div>
-              )}
-            </div>
-
-            <div
-              className={`p-4 rounded-xl border ${
-                closingStep >= 3 ? 'bg-blue-50/60 border-blue-300 text-blue-950' : 'bg-slate-50 border-slate-200 text-slate-400'
-              }`}
-            >
-              <div className="font-bold mb-1">گام سوم: انتقال به سود انباشته</div>
-              <p className="text-[11px] text-slate-500">
-                کسر ذخیره اندوخته قانونی (۵٪) و انتقال باقیمانده سود به حساب سود انباشته (سرفصل ۳۳).
-              </p>
-            </div>
-
-            <div
-              className={`p-4 rounded-xl border ${
-                closingStep >= 4 ? 'bg-blue-50/60 border-blue-300 text-blue-950' : 'bg-slate-50 border-slate-200 text-slate-400'
-              }`}
-            >
-              <div className="font-bold mb-1">گام چهارم: صدور سند اختتامیه</div>
-              <p className="text-[11px] text-slate-500">
-                صفر کردن مانده دارایی‌ها و بدهی‌ها و انتقال خودکار به سند افتتاحیه سال مالی جدید.
-              </p>
-            </div>
-          </div>
-
-          {/* Action Trigger */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-            <span className="text-xs text-slate-600">
-              توجه: پس از بستن قطعی دوره، هیچ سند مالی در این بازه قابل ویرایش نخواهد بود.
-            </span>
-
-            {!isPeriodClosed ? (
+            ) : allowed ? (
               <button
-                onClick={() => {
-                  setClosingStep(4);
-                  setIsPeriodClosed(true);
-                }}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
+                onClick={() => setConfirming(true)}
+                disabled={pending.length > 0}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-xs rounded-lg cursor-pointer inline-flex items-center gap-1"
               >
-                اجرای فرآیند بستن دوره مالی
+                <CheckCircle2 className="w-4 h-4" />
+                بستن سال مالی {toPersianDigits(year)}
               </button>
             ) : (
-              <span className="text-xs font-bold text-emerald-700">
-                سند اختتامیه صادر و دوره سال مالی ۱۴۰۳ با موفقیت بسته شد.
-              </span>
+              <span className="text-xs text-slate-500">بستن سال مالی فقط توسط مدیر ارشد یا مدیر سیستم انجام می‌شود.</span>
             )}
           </div>
+
+          {closedFiscalYears.length > 0 && (
+            <p className="text-[11px] text-slate-500">سال‌های بسته‌شده: {closedFiscalYears.map((y) => toPersianDigits(y)).join('، ')}</p>
+          )}
         </div>
       )}
 
-      {/* SECTION 2: AUDIT TRAIL LOGS */}
       {activeTab === 'audit' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-3.5 bg-slate-50 border-b border-slate-200">
             <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <History className="w-4 h-4 text-amber-600" />
-              <span>تاریخچه کامل عملیات مالی و ردیابی حسابرسی (Audit Trail):</span>
+              <span>تاریخچه عملیات مالی (Audit Trail):</span>
             </h4>
           </div>
-
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                 <tr>
                   <th className="py-2.5 px-4 font-mono">زمان و تاریخ</th>
-                  <th className="py-2.5 px-3">کاربر اقدام‌کننده</th>
-                  <th className="py-2.5 px-3">نقش سازمانی</th>
-                  <th className="py-2.5 px-3">نوع اقدام مالی</th>
-                  <th className="py-2.5 px-3 font-mono">سند هدف</th>
-                  <th className="py-2.5 px-4">شرح رویداد حسابرسی</th>
+                  <th className="py-2.5 px-3">کاربر</th>
+                  <th className="py-2.5 px-3">نقش</th>
+                  <th className="py-2.5 px-3">اقدام</th>
+                  <th className="py-2.5 px-3 font-mono">سند</th>
+                  <th className="py-2.5 px-4">شرح</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
@@ -231,9 +180,7 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
                     <td className="py-2.5 px-3 font-sans font-bold text-slate-900">{log.user}</td>
                     <td className="py-2.5 px-3 font-sans text-slate-600">{log.role}</td>
                     <td className="py-2.5 px-3 font-sans">
-                      <span className="text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold">
-                        {log.action}
-                      </span>
+                      <span className="text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold">{log.action}</span>
                     </td>
                     <td className="py-2.5 px-3 font-bold text-blue-700">{log.targetDoc}</td>
                     <td className="py-2.5 px-4 font-sans text-slate-700">{log.description}</td>
@@ -242,30 +189,29 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
               </tbody>
             </table>
           </div>
+          {auditLogs.length === 0 && <p className="py-10 text-center text-xs text-slate-400">رویدادی ثبت نشده است.</p>}
         </div>
       )}
 
-      {/* SECTION 3: RBAC MATRIX */}
       {activeTab === 'roles' && (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
           <div>
             <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
               <Users className="w-4 h-4 text-amber-600" />
-              <span>ماتریس دسترسی نقش‌ها در ماژول حسابداری (Role-Based Access Control):</span>
+              <span>نقش‌های افزونه پرتال پایدار:</span>
             </h3>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              کنترل اختیارات بر اساس جایگاه سازمانی مدیرعامل، مدیر مالی، حسابدار، مدیر پروژه و سرپرست کارگاه
+              در همه نقش‌ها تأیید سندی که خود کاربر ایجاد کرده ممنوع است؛ این قاعده حتی با تنظیمات وردپرس قابل لغو نیست.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {rolesMatrix.map((item, idx) => (
-              <div key={idx} className={`p-4 rounded-xl border ${item.color} text-right space-y-2`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {ROLE_SUMMARY.map((item) => (
+              <div key={item.role} className={`p-4 rounded-xl border ${item.color} text-right space-y-2`}>
                 <div className="font-bold text-xs">{item.role}</div>
                 <div className="text-[11px] font-semibold opacity-90">{item.access}</div>
                 <ul className="text-[11px] space-y-1 pt-2 border-t border-slate-200/60 opacity-85 font-sans">
-                  {item.permissions.map((p, pIdx) => (
-                    <li key={pIdx} className="flex items-center gap-1.5">
+                  {item.items.map((p) => (
+                    <li key={p} className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-700 shrink-0" />
                       <span>{p}</span>
                     </li>
@@ -276,6 +222,20 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirming}
+        title={`بستن سال مالی ${toPersianDigits(year)}`}
+        message="سند اختتامیه صادر و سال قفل می‌شود. این عمل برگشت‌پذیر نیست."
+        type="danger"
+        confirmText="بستن سال"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          const r = onCloseFiscalYear(year);
+          setMessage({ ok: r.ok, text: r.message });
+          setConfirming(false);
+        }}
+      />
     </div>
   );
 };

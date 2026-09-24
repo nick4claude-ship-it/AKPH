@@ -28,7 +28,11 @@ import {
 import { PettyCashFundType } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { generateUUID } from '../../utils/ids';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { toPersianDate } from '../../utils/date';
+import { Dialog } from '../common/Dialog';
+import { moneyUnitLabel } from '../../utils/money';
+import { MoneyInput } from '../common/NumberInput';
 
 interface PettyCashAccountsViewProps {
   accounts: PettyCashAccount[];
@@ -38,7 +42,7 @@ interface PettyCashAccountsViewProps {
   bankAccounts: BankAccount[];
   selectedAccount: PettyCashAccount | null;
   onSelectAccount: (acc: PettyCashAccount | null) => void;
-  onSaveNewAccount: (newAcc: PettyCashAccount) => void;
+  onSaveNewAccount: (newAcc: PettyCashAccount) => boolean;
   onOpenNewExpense: (accountId: string) => void;
   onOpenReplenish: (accountId: string) => void;
   onOpenReplenishRequest: (accountId: string) => void;
@@ -57,25 +61,32 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
   onOpenReplenish,
   onOpenReplenishRequest,
 }) => {
-  const { costCenters } = useAppState();
+  const { costCenters, pettyCashSettings, pettyCashAccounts } = useAppState();
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
 
   // New Account Form state
   const [formData, setFormData] = useState({
     title: '',
-    code: `TC-PRJ${Math.floor(100 + Math.random() * 900)}`,
     holderName: '',
     holderRole: 'سرپرست کارگاه',
     holderPhone: '',
     projectId: projects[0]?.id || '',
-    ceilingLimit: 100_000_000,
-    minBalanceWarning: 30_000_000,
     sourceBankAccountId: '',
-    startDate: '۱۴۰۳/۰۷/۰۱',
     notes: '',
   });
   const [formError, setFormError] = useState<string | null>(null);
+
+  // One project can hold several funds; the holder role decides the fund type and its stored limits.
+  const fundType: PettyCashFundType =
+    formData.holderRole === 'مدیر پروژه'
+      ? 'project_manager'
+      : formData.holderRole === 'مسئول خرید و کارپرداز'
+        ? 'procurement'
+        : formData.holderRole === 'واحد اداری و ستادی'
+          ? 'headquarters'
+          : 'site_supervisor';
+  const fundLimits = pettyCashSettings.fundLimits[fundType];
 
   const filteredAccounts = accounts.filter(
     (a) =>
@@ -96,20 +107,11 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
     const linkedProject = projects.find((p) => p.id === formData.projectId);
     const linkedBank = bankAccounts.find((b) => b.id === formData.sourceBankAccountId);
 
-    // One project can hold several funds; the holder role decides the fund type and its stored limits.
-    const fundType: PettyCashFundType =
-      formData.holderRole === 'مدیر پروژه'
-        ? 'project_manager'
-        : formData.holderRole === 'مسئول خرید و کارپرداز'
-          ? 'procurement'
-          : formData.holderRole === 'واحد اداری و ستادی'
-            ? 'headquarters'
-            : 'site_supervisor';
     const costCenter = costCenters.find((c) => c.projectId === formData.projectId && c.type === 'کارگاه پروژه');
     const newAccount: PettyCashAccount = {
       id: generateUUID(),
       fundType,
-      code: formData.code,
+      code: nextDocNumber(pettyCashAccounts.map((a) => a.code), 'PCF'),
       title: formData.title,
       holderName: formData.holderName,
       holderRole: formData.holderRole,
@@ -118,14 +120,14 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
       projectName: linkedProject ? linkedProject.name : 'ستاد مرکزی',
       costCenterId: costCenter?.id || '',
       costCenterName: costCenter?.name || 'ستاد مرکزی',
-      ceilingLimit: Number(formData.ceilingLimit),
-      minBalanceWarning: Number(formData.minBalanceWarning),
+      ceilingLimit: fundLimits.ceiling,
+      minBalanceWarning: fundLimits.minBalanceWarning,
       actualBalance: 0,
       pendingExpenses: 0,
       usableBalance: 0,
       sourceBankAccountId: formData.sourceBankAccountId,
       sourceBankAccountTitle: linkedBank ? `${linkedBank.bankName} - ${linkedBank.accountNumber}` : 'بانک شرکت',
-      startDate: formData.startDate,
+      startDate: toPersianDate(new Date()),
       status: 'active',
       monthlySpent: 0,
       lastReplenishmentDate: '-',
@@ -133,8 +135,7 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
       notes: formData.notes,
     };
 
-    onSaveNewAccount(newAccount);
-    setIsNewAccountModalOpen(false);
+    if (onSaveNewAccount(newAccount)) setIsNewAccountModalOpen(false);
   };
 
   // If an account is selected for detail view (داشبورد اختصاصی هر تنخواه)
@@ -318,8 +319,8 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
 
       {/* Detail Modal / Drawer for Selected Account (بخش ۱۸: داشبورد هر تنخواه) */}
       {selectedAccount && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <Dialog onClose={() => onSelectAccount(null)} label="جزئیات حساب تنخواه" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+          
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-200 flex items-start justify-between gap-3 bg-slate-50 rounded-t-2xl">
               <div>
@@ -442,7 +443,7 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
                         <th className="py-2.5 px-3">تاریخ</th>
                         <th className="py-2.5 px-3">شرح تراکنش</th>
                         <th className="py-2.5 px-3">طرف حساب / فروشنده</th>
-                        <th className="py-2.5 px-3 text-left">مبلغ (تومان)</th>
+                        <th className="py-2.5 px-3 text-left">مبلغ ({moneyUnitLabel()})</th>
                         <th className="py-2.5 px-3 text-center">وضعیت</th>
                       </tr>
                     </thead>
@@ -515,14 +516,13 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </Dialog>
       )}
 
       {/* Modal: Create New Petty Cash Account */}
       {isNewAccountModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+        <Dialog onClose={() => setIsNewAccountModalOpen(false)} label="تعریف حساب تنخواه‌گردان جدید" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+          
             <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
               <div>
                 <h3 className="text-base font-bold text-slate-900">تعریف حساب تنخواه‌گردان جدید</h3>
@@ -564,9 +564,9 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
+                    value="خودکار پس از ثبت"
+                    readOnly
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono bg-slate-50 text-slate-500"
                   />
                 </div>
               </div>
@@ -640,36 +640,22 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    سقف مجاز تنخواه (تومان)
+                    سقف مجاز تنخواه ({moneyUnitLabel()})
                   </label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    value={formData.ceilingLimit}
-                    onChange={(e) => setFormData({ ...formData, ceilingLimit: Number(e.target.value) })}
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-[10px] text-slate-500">
-                    {formatCurrency(formData.ceilingLimit)}
-                  </span>
+                  <div className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg font-mono bg-slate-50">
+                    {formatCurrency(fundLimits.ceiling)}
+                  </div>
+                  <span className="text-[10px] text-slate-500">از تنظیمات سامانه برای این نوع تنخواه</span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    حداقل موجودی هشدار (تومان)
+                    حداقل موجودی هشدار ({moneyUnitLabel()})
                   </label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    value={formData.minBalanceWarning}
-                    onChange={(e) =>
-                      setFormData({ ...formData, minBalanceWarning: Number(e.target.value) })
-                    }
-                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-[10px] text-slate-500">
-                    {formatCurrency(formData.minBalanceWarning)}
-                  </span>
+                  <div className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg font-mono bg-slate-50">
+                    {formatCurrency(fundLimits.minBalanceWarning)}
+                  </div>
+                  <span className="text-[10px] text-slate-500">از تنظیمات سامانه برای این نوع تنخواه</span>
                 </div>
               </div>
 
@@ -719,8 +705,7 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </Dialog>
       )}
     </div>
   );

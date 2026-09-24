@@ -10,13 +10,12 @@ import {
   Project,
   User,
 } from '../../types';
-import { initialPettyCashReconciliations, initialPettyCashCategories } from '../../data/pettyCashMockData';
 import { PettyCashNav } from './PettyCashNav';
 import { PettyCashDashboardView } from './PettyCashDashboardView';
 import { PettyCashAccountsView } from './PettyCashAccountsView';
 import { PettyCashApprovalsView } from './PettyCashApprovalsView';
 import { ReplenishmentView } from './ReplenishmentView';
-import { PettyCashReconciliationView } from './PettyCashReconciliationView';
+import { PettyCashReconciliationView, ReconciliationInput } from './PettyCashReconciliationView';
 import { PettyCashPeriodClosingView } from './PettyCashPeriodClosingView';
 import { PettyCashReportsView } from './PettyCashReportsView';
 import { PettyCashSettingsView } from './PettyCashSettingsView';
@@ -26,6 +25,7 @@ import { useAppState, useStoreSlice } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { selectPettyFunds } from '../../store/domainSelectors';
 import { AppDocument } from '../../types';
+import { usePermission } from '../../store/session';
 
 interface PettyCashModuleProps {
   currentUser: User;
@@ -40,6 +40,7 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
 }) => {
   const navigate = useNavigate();
   const wf = useWorkflows();
+  const { can } = usePermission();
   const appState = useAppState();
   const [activeSubTab, setActiveSubTab] = useState<PettyCashSubTab>('dashboard');
 
@@ -51,12 +52,8 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   const expenses = appState.pettyCashExpenses;
   const replenishments = appState.pettyCashReplenishments;
   const requests = appState.pettyCashRequests;
-  const [reconciliations, setReconciliations] = useState<PettyCashReconciliation[]>(
-    initialPettyCashReconciliations
-  );
-  const [categories, setCategories] = useState<PettyCashCategoryItem[]>(
-    initialPettyCashCategories
-  );
+  const reconciliations = appState.pettyCashReconciliations;
+  const [categories, setCategories] = useStoreSlice('pettyCashCategories');
 
   // UI state
   const [selectedAccount, setSelectedAccount] = useState<PettyCashAccount | null>(null);
@@ -94,13 +91,27 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   };
 
   // 6. Save New Petty Cash Account
+  // A new fund starts empty; money reaches it only through a replenishment paid by treasury.
   const handleSaveNewAccount = (newAcc: PettyCashAccount) => {
+    if (!can('petty.manage_funds', { projectId: newAcc.projectId || undefined })) {
+      onToast('اجازه تعریف تنخواه را ندارید.');
+      return false;
+    }
     setAccounts((prev) => [...prev, newAcc]);
+    onToast(`تنخواه ${newAcc.code} تعریف شد.`);
+    return true;
   };
 
-  // 7. Save Reconciliation
-  const handleSaveReconciliation = (recon: PettyCashReconciliation) => {
-    setReconciliations((prev) => [recon, ...prev]);
+  // Physical count; a difference becomes a pending adjustment voucher.
+  const handleSaveReconciliation = (input: ReconciliationInput) => {
+    const result = wf.reconcilePettyCash(input);
+    onToast(result.message);
+    return result;
+  };
+
+  const handleUpdateCategories = (next: PettyCashCategoryItem[]) => {
+    if (!can('settings.manage')) return onToast('ویرایش سرفصل‌های هزینه فقط با مجوز تنظیمات ممکن است.');
+    setCategories(next);
   };
 
   return (
@@ -223,7 +234,7 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
         {activeSubTab === 'settings' && (
           <PettyCashSettingsView
             categories={categories}
-            onUpdateCategories={setCategories}
+            onUpdateCategories={handleUpdateCategories}
             onOpenPolicySettings={() => navigate('/settings')}
           />
         )}

@@ -7,17 +7,19 @@ import { AppState } from './types';
 import { selectProjects, selectProjectFinancials, selectKpiItems } from './selectors';
 import { selectApprovals, selectPettyFunds, selectNotifications, selectMaterials } from './domainSelectors';
 import { formatCurrencyCompact } from '../utils/formatters';
+import { formatInt } from '../utils/money';
+import { CLIENT_APPROVED_STATUSES } from './state';
 
 export interface AssistantAnswer {
   text: string;
   dataPoints?: { label: string; value: string }[];
 }
 
-const fa = (n: number) => n.toLocaleString('fa-IR');
+const fa = (n: number) => formatInt(n);
 const money = (n: number) => formatCurrencyCompact(n);
 
 /**
- * دستیار مدیریت: پاسخ‌ها فقط از داده‌های store محاسبه می‌شود (پروژه، حسابداری، قرارداد، خرید، تنخواه، صورت‌وضعیت، انبار).
+ * دستیار مدیریت (نسخه نمایشی، بدون مدل زبانی): پاسخ‌ها فقط از داده‌های store محاسبه می‌شود (پروژه، حسابداری، قرارداد، خرید، تنخواه، صورت‌وضعیت، انبار).
  */
 export function answerManagementQuery(state: AppState, query: string): AssistantAnswer {
   const q = query.trim();
@@ -29,7 +31,10 @@ export function answerManagementQuery(state: AppState, query: string): Assistant
     const f = selectProjectFinancials(state, named.id);
     const contracts = state.contracts.filter((c) => c.projectId === named.id);
     const contractValue = contracts.reduce((a, c) => a + c.currentValue, 0) || named.contractAmount;
-    const executed = contracts.reduce((a, c) => a + c.executedValue, 0);
+    // Executed work = gross work of the employer-approved statements (not a manual contract field).
+    const executed = state.clientStatements
+      .filter((s) => s.projectId === named.id && CLIENT_APPROVED_STATUSES.includes(s.status))
+      .reduce((a, s) => a + s.workAmountCurrent, 0);
     const subPayable = state.subcontractorStatements
       .filter((s) => s.projectId === named.id && (s.status === 'management_approved' || s.status === 'paid'))
       .reduce((a, s) => a + s.remainingPayable, 0);

@@ -6,7 +6,12 @@
 import React, { useState } from 'react';
 import { Contract, ContractType, ContractStatus, Project, UserProfile } from '../../types';
 import { X, Building, Calendar, DollarSign, Plus, AlertTriangle } from 'lucide-react';
-import { generateUUID } from '../../utils/ids';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { getRelativePersianDate } from '../../utils/date';
+import { useAppState } from '../../store/AppStore';
+import { Dialog } from '../common/Dialog';
+import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
 
 interface NewContractModalProps {
   projects: Project[];
@@ -21,22 +26,23 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   onClose,
   onSaveContract,
 }) => {
-  const [code, setCode] = useState(`CNT-1403-0${Math.floor(Math.random() * 90 + 10)}`);
-  const [number, setNumber] = useState('۴۰۳/۵۴۲/ص');
+  const existingCodes = useAppState().contracts.map((c) => c.code);
+  const [code, setCode] = useState(() => nextDocNumber(existingCodes, 'CNT'));
+  const [number, setNumber] = useState('');
   const [projectTitle, setProjectTitle] = useState('');
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [employer, setEmployer] = useState('');
   const [executiveBody, setExecutiveBody] = useState('');
   const [consultant, setConsultant] = useState('');
   const [contractor, setContractor] = useState('شرکت سازه گستران پارس (سهامی عام)');
-  const [initialValue, setInitialValue] = useState<number>(10_000_000_000);
-  const [contractDate, setContractDate] = useState('۱۴۰۳/۰۲/۱۵');
-  const [startDate, setStartDate] = useState('۱۴۰۳/۰۳/۰۱');
-  const [endDate, setEndDate] = useState('۱۴۰۴/۰۹/۳۰');
-  const [durationMonths, setDurationMonths] = useState<number>(18);
+  const [initialValue, setInitialValue] = useState<number>(0);
+  const [contractDate, setContractDate] = useState(() => getRelativePersianDate(0));
+  const [startDate, setStartDate] = useState(() => getRelativePersianDate(0));
+  const [endDate, setEndDate] = useState(() => getRelativePersianDate(365));
+  const [durationMonths, setDurationMonths] = useState<number>(12);
   const [contractType, setContractType] = useState<ContractType>('فهرست‌بهایی');
   const [status, setStatus] = useState<ContractStatus>('فعال');
-  const [advancePaymentPercentage, setAdvancePaymentPercentage] = useState<number>(20);
+  const [advancePaymentPercentage, setAdvancePaymentPercentage] = useState<number>(0);
   const [retentionPercentage, setRetentionPercentage] = useState<number>(10);
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -47,6 +53,8 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
       setFormError('لطفاً عنوان پیمان و نام کارفرما را وارد فرمایید.');
       return;
     }
+    if (initialValue <= 0) return setFormError('مبلغ اولیه قرارداد باید بیش از صفر باشد.');
+    if (advancePaymentPercentage > 100 || retentionPercentage > 100) return setFormError('درصدها نمی‌توانند بیش از ۱۰۰ باشند.');
     setFormError(null);
 
     const proj = projects.find((p) => p.id === projectId);
@@ -90,8 +98,8 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="ثبت قرارداد پیمانکاری جدید" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+      
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold">
@@ -171,7 +179,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               <label className="block text-slate-700 font-bold mb-1">نوع و روش انعقاد پیمان:</label>
               <select
                 value={contractType}
-                onChange={(e) => setContractType(e.target.value as any)}
+                onChange={(e) => setContractType(e.target.value as ContractType)}
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white"
               >
                 <option value="فهرست‌بهایی">فهرست‌بهایی (Unit Price)</option>
@@ -219,33 +227,30 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">مبلغ اولیه پیمان (تومان):</label>
-              <input
-                type="number"
+              <label className="block text-slate-700 font-bold mb-1">مبلغ اولیه پیمان ({moneyUnitLabel()}):</label>
+              <MoneyInput
                 value={initialValue}
-                onChange={(e) => setInitialValue(Number(e.target.value))}
+                onValueChange={(v) => setInitialValue(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono font-bold"
                 required
               />
               <span className="text-[10px] text-slate-500 mt-0.5 block">
-                {(initialValue / 1_000_000_000).toFixed(2)} میلیارد تومان
+                {formatMoneyCompact(initialValue)}
               </span>
             </div>
             <div>
               <label className="block text-slate-700 font-bold mb-1">درصد پیش‌پرداخت:</label>
-              <input
-                type="number"
+              <IntegerInput
                 value={advancePaymentPercentage}
-                onChange={(e) => setAdvancePaymentPercentage(Number(e.target.value))}
+                onValueChange={(v) => setAdvancePaymentPercentage(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono"
               />
             </div>
             <div>
               <label className="block text-slate-700 font-bold mb-1">سپرده حسن انجام کار (٪):</label>
-              <input
-                type="number"
+              <IntegerInput
                 value={retentionPercentage}
-                onChange={(e) => setRetentionPercentage(Number(e.target.value))}
+                onValueChange={(v) => setRetentionPercentage(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono"
               />
             </div>
@@ -281,10 +286,9 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
             </div>
             <div>
               <label className="block text-slate-700 font-bold mb-1">مدت پیمان (ماه):</label>
-              <input
-                type="number"
+              <IntegerInput
                 value={durationMonths}
-                onChange={(e) => setDurationMonths(Number(e.target.value))}
+                onValueChange={(v) => setDurationMonths(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono"
               />
             </div>
@@ -317,7 +321,6 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </Dialog>
   );
 };

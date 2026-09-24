@@ -21,10 +21,11 @@ import {
 import { Project, DetailedProgressStatement, SubcontractorProgressStatement } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { useCurrentUser, canAct } from '../../store/session';
-import { CLIENT_STATEMENT_FLOW, SUBCONTRACTOR_STATEMENT_FLOW } from '../../store/workflows';
+import { useCurrentUser, usePermission } from '../../store/session';
+import { Dialog } from '../common/Dialog';
+import { CLIENT_STATEMENT_FLOW, SUBCONTRACTOR_STATEMENT_FLOW, creatorOf } from '../../store/workflows';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { CLIENT_APPROVED_STATUSES } from '../../store/initialState';
+import { CLIENT_APPROVED_STATUSES } from '../../store/state';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 import {
   CLIENT_STATUS_LABELS,
@@ -34,6 +35,7 @@ import {
   clientFlowIndex,
   subFlowIndex,
 } from './statementLabels';
+import { formatInt, formatMoney } from '../../utils/money';
 
 type StatementsTab = 'client_statements' | 'subcontractor_statements';
 
@@ -63,12 +65,13 @@ const FlowBar: React.FC<{ steps: string[]; index: number }> = ({ steps, index })
 /**
  * صورت‌وضعیت‌ها — یک مدل داده در store برای هر دو نوع:
  * کارفرما: اندازه‌گیری ← صورت‌وضعیت ← تأیید مشاور ← تأیید کارفرما ← مطالبات ← دریافت (در لایه دریافت‌ها)
- * پیمانکار جزء: کارکرد ← اندازه‌گیری ← تأیید کارگاه ← مدیر پروژه ← مالی ← مدیرعامل ← بدهی و درخواست پرداخت ← پرداخت (خزانه)
+ * پیمانکار جزء: کارکرد ← اندازه‌گیری ← تأیید کارگاه ← مدیر پروژه ← مالی ← مدیر ارشد ← بدهی و درخواست پرداخت ← پرداخت (خزانه)
  */
 export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> = ({ projects, tab, onToast }) => {
   const state = useAppState();
   const wf = useWorkflows();
   const user = useCurrentUser();
+  const { check } = usePermission();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
@@ -114,18 +117,19 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
   const clientAction = (s: DetailedProgressStatement) => {
     const step = CLIENT_STATEMENT_FLOW[s.status];
     if (step) {
-      const allowed = canAct(user, step.role);
+      const permission = check(step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) });
+      const canReturn = check('client_statement.return', { projectId: s.projectId }).ok;
       return (
         <div className="flex items-center gap-1 justify-end">
           <button
-            disabled={!allowed}
-            title={allowed ? '' : `نیازمند نقش ${step.role}`}
+            disabled={!permission.ok}
+            title={permission.ok ? '' : permission.reason}
             onClick={() => run(wf.advanceClientStatement(s.id))}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
           >
             <CheckCircle2 className="w-3 h-3" /> {step.label}
           </button>
-          <button onClick={() => setReturning({ kind: 'client', id: s.id })} className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer" title="برگشت جهت اصلاح">
+          <button disabled={!canReturn} onClick={() => setReturning({ kind: 'client', id: s.id })} className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 disabled:opacity-40 cursor-pointer" title="برگشت جهت اصلاح">
             <Undo2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -147,18 +151,19 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
   const subAction = (s: SubcontractorProgressStatement) => {
     const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
     if (step) {
-      const allowed = step.next === 'management_approved' ? user.role === 'مدیرعامل' : canAct(user, step.role);
+      const permission = check(step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) });
+      const canReturn = check('sub_statement.return', { projectId: s.projectId }).ok;
       return (
         <div className="flex items-center gap-1 justify-end">
           <button
-            disabled={!allowed}
-            title={allowed ? '' : `نیازمند نقش ${step.role}`}
+            disabled={!permission.ok}
+            title={permission.ok ? '' : permission.reason}
             onClick={() => run(wf.advanceSubcontractorStatement(s.id))}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
           >
             <CheckCircle2 className="w-3 h-3" /> {step.label}
           </button>
-          <button onClick={() => setReturning({ kind: 'sub', id: s.id })} className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer" title="برگشت جهت اصلاح">
+          <button disabled={!canReturn} onClick={() => setReturning({ kind: 'sub', id: s.id })} className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 disabled:opacity-40 cursor-pointer" title="برگشت جهت اصلاح">
             <Undo2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -223,9 +228,9 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 block mb-1">مانده مطالبات صورت‌وضعیت‌های مصوب کارفرما</span>
-            <div className="text-lg font-bold text-blue-700 font-mono">{formatNumber(receivable)} تومان</div>
+            <div className="text-lg font-bold text-blue-700 font-mono">{formatMoney(receivable)}</div>
             <span className="text-[11px] text-slate-400 font-medium">
-              {approvedClient.length.toLocaleString('fa-IR')} صورت‌وضعیت مصوب · وصول در لایه دریافت‌ها
+              {formatInt(approvedClient.length)} صورت‌وضعیت مصوب · وصول در لایه دریافت‌ها
             </span>
           </div>
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
@@ -235,9 +240,9 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 block mb-1">مانده بدهی صورت‌وضعیت‌های مصوب پیمانکاران جزء</span>
-            <div className="text-lg font-bold text-amber-700 font-mono">{formatNumber(payable)} تومان</div>
+            <div className="text-lg font-bold text-amber-700 font-mono">{formatMoney(payable)}</div>
             <span className="text-[11px] text-slate-400 font-medium">
-              {approvedSub.length.toLocaleString('fa-IR')} صورت‌وضعیت با تأیید مدیرعامل · پرداخت فقط در خزانه
+              {formatInt(approvedSub.length)} صورت‌وضعیت با تأیید مدیر ارشد · پرداخت فقط در خزانه
             </span>
           </div>
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
@@ -363,8 +368,12 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
       </div>
 
       {returning && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
+        <Dialog
+          onClose={() => setReturning(null)}
+          label="برگشت صورت‌وضعیت جهت اصلاح"
+          overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4"
+          className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs"
+        >
             <h3 className="text-sm font-bold text-slate-900">برگشت صورت‌وضعیت جهت اصلاح</h3>
             <textarea
               value={reason}
@@ -378,24 +387,28 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                 انصراف
               </button>
               <button
+                disabled={!reason.trim()}
                 onClick={() => {
-                  const why = reason.trim() || 'نیاز به اصلاح متره';
+                  const why = reason.trim();
                   run(returning.kind === 'client' ? wf.returnClientStatement(returning.id, why) : wf.returnSubcontractorStatement(returning.id, why));
                   setReturning(null);
                   setReason('');
                 }}
-                className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer disabled:opacity-40"
               >
                 ثبت برگشت
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {(detailClient || detailSub) && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-3xl text-xs overflow-hidden">
+        <Dialog
+          onClose={() => setDetail(null)}
+          label={detailClient?.statementNumber || detailSub?.statementNumber || 'جزئیات صورت‌وضعیت'}
+          overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto"
+          className="bg-white rounded-2xl w-full max-w-3xl text-xs overflow-hidden"
+        >
             <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold">{detailClient?.statementNumber || detailSub?.statementNumber}</h3>
@@ -403,7 +416,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                   {detailClient ? `${detailClient.projectName} · ${detailClient.client}` : `${detailSub!.projectName} · ${detailSub!.subcontractorName}`}
                 </p>
               </div>
-              <button onClick={() => setDetail(null)} className="p-1 text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => setDetail(null)} aria-label="بستن" className="p-1 text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -421,7 +434,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                 ].map(([label, v]) => (
                   <div key={label as string} className="bg-slate-50 border border-slate-200 rounded-lg p-2">
                     <div className="text-[10px] text-slate-500">{label}</div>
-                    <div className="font-bold font-mono">{formatNumber(v as number)}</div>
+                    <div className="font-bold font-mono">{formatMoney(v as number, false)}</div>
                   </div>
                 ))}
               </div>
@@ -432,8 +445,8 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
               <div>
                 <h4 className="font-bold text-slate-800 mb-1.5">سوابق گردش‌کار</h4>
                 <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {(detailClient?.workflowHistory || detailSub?.workflowHistory || []).map((h, i) => (
-                    <div key={i} className="flex justify-between bg-slate-50 rounded px-2 py-1">
+                  {(detailClient?.workflowHistory || detailSub?.workflowHistory || []).map((h) => (
+                    <div key={`${h.date}|${h.time}|${h.fromStatus}|${h.toStatus}|${h.user}`} className="flex justify-between bg-slate-50 rounded px-2 py-1">
                       <span>
                         {h.action} — {h.user} ({h.role})
                       </span>
@@ -457,8 +470,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                 )}
               </div>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );

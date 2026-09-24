@@ -22,8 +22,11 @@ import {
   AppDocument,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
-import { getCurrentPersianYear } from '../../utils/date';
+import { generateUUID, nextDocNumber } from '../../utils/ids';
+import { toPersianDate, toPersianTime } from '../../utils/date';
+import { Dialog } from '../common/Dialog';
+import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { moneyUnitLabel } from '../../utils/money';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -49,15 +52,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   preselectedAccountId,
   onSaveExpense,
 }) => {
-  if (!isOpen) return null;
-
   const defaultAccount =
     accounts.find((a) => a.id === preselectedAccountId) || accounts[0];
 
   const [selectedAccountId, setSelectedAccountId] = useState(defaultAccount?.id || '');
   const targetAccount = accounts.find((a) => a.id === selectedAccountId) || defaultAccount;
 
-  const [date, setDate] = useState('۱۴۰۳/۰۷/۰۲');
+  const [date, setDate] = useState(() => toPersianDate(new Date()));
   const [selectedCategory, setSelectedCategory] = useState(categories[0]?.name || 'مصالح ساختمانی');
   const currentCategoryObj = categories.find((c) => c.name === selectedCategory) || categories[0];
   const [selectedSubCategory, setSelectedSubCategory] = useState(
@@ -68,7 +69,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const [vendor, setVendor] = useState('');
   const [vendorNationalId, setVendorNationalId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState('۱۴۰۳/۰۷/۰۲');
+  const [invoiceDate, setInvoiceDate] = useState(() => toPersianDate(new Date()));
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'کارت تنخواه' | 'نقد' | 'حواله/انتقال' | 'سایر'>(
     'کارت تنخواه'
@@ -84,15 +85,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const [inventoryUnit, setInventoryUnit] = useState('عدد');
 
   // Attachments State
-  const [attachments, setAttachments] = useState<PettyCashAttachment[]>([
-    {
-      id: 'att-sample-1',
-      name: 'invoice_official_scan.jpg',
-      type: 'image',
-      size: '1.2 MB',
-      url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80',
-    },
-  ]);
+  const [attachments, setAttachments] = useState<PettyCashAttachment[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<PettyCashAttachment | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -153,11 +146,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     if (!targetAccount) return;
 
 
-    const expNumber = getNextSequentialDocNumber(
+    const expNumber = nextDocNumber(
       existingExpenses.map((e) => e.expenseNumber),
       'EXP',
-      3,
-      getCurrentPersianYear()
+      date
     );
 
     const newExpense: PettyCashExpense = {
@@ -182,14 +174,14 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       status: 'pending_approval',
       // Set from the stored thresholds and approval chains when the workflow accepts the expense.
       approvalLevelRequired: 'site_manager_and_finance',
-      currentApprovalStep: 'سرپرست کارگاه',
+      currentApprovalStep: 'مدیر پروژه',
       approvalHistory: [
         {
           level: 'ثبت اولیه',
           approverName: currentUser.name,
           approverRole: currentUser.role,
           date,
-          time: '۱۱:۳۰',
+          time: toPersianTime(new Date()),
           action: 'approved',
           comment: 'ثبت هزینه و ارسال به کارتابل تأییدات',
         },
@@ -231,9 +223,16 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
+    <>
+    <Dialog
+      onClose={onClose}
+      label="ثبت هزینه جدید از محل تنخواه‌گردان"
+      overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200"
+    >
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
           <div>
@@ -251,6 +250,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
           <button
             onClick={onClose}
+            aria-label="بستن"
             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -324,15 +324,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                مبلغ فاکتور / هزینه (تومان) <span className="text-rose-500">*</span>
+                مبلغ فاکتور / هزینه ({moneyUnitLabel()}) <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="number"
-                step="1000"
+              <MoneyInput
                 required
-                value={amount || ''}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                placeholder="مبلغ به تومان"
+                value={amount}
+                onValueChange={(v) => setAmount(v)}
+                placeholder={`مبلغ به ${moneyUnitLabel()}`}
                 className={`w-full text-xs px-3 py-2 border rounded-lg font-mono focus:ring-2 font-bold tabular-nums ${
                   isOverUsable
                     ? 'border-rose-500 bg-rose-50 text-rose-800 focus:ring-rose-500'
@@ -363,7 +361,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               </label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
               >
                 <option value="کارت تنخواه">کارت بانکی تنخواه</option>
@@ -576,11 +574,9 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   <label className="block text-[11px] font-medium text-slate-600 mb-1">
                     مقدار / تعداد
                   </label>
-                  <input
-                    type="number"
-                    min="1"
+                  <IntegerInput
                     value={inventoryQuantity}
-                    onChange={(e) => setInventoryQuantity(Number(e.target.value))}
+                    onValueChange={(v) => setInventoryQuantity(v)}
                     className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded font-mono"
                   />
                 </div>
@@ -615,7 +611,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   فایل فاکتور را اینجا بکشید یا برای انتخاب کلیک کنید
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  جهت تسریع تایید فاکتور توسط مدیر مالی، تصویر باکیفیت و خوانا ضمیمه شود.
+                  جهت تسریع تایید فاکتور توسط حسابدار، تصویر باکیفیت و خوانا ضمیمه شود.
                 </div>
               </div>
             </div>
@@ -687,16 +683,21 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
           </div>
         </form>
-      </div>
+    </Dialog>
 
       {/* Invoice Zoom/Preview Modal */}
       {previewAttachment && (
-        <div className="fixed inset-0 z-60 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full p-4 space-y-3">
+        <Dialog
+          onClose={() => setPreviewAttachment(null)}
+          label={previewAttachment.name}
+          overlayClassName="fixed inset-0 z-60 bg-black/80 flex items-center justify-center p-4"
+          className="bg-white rounded-xl max-w-2xl w-full p-4 space-y-3"
+        >
             <div className="flex items-center justify-between border-b pb-2">
               <span className="text-xs font-bold text-slate-900">{previewAttachment.name}</span>
               <button
                 onClick={() => setPreviewAttachment(null)}
+                aria-label="بستن"
                 className="text-slate-500 hover:text-slate-800"
               >
                 <X className="w-5 h-5" />
@@ -711,9 +712,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 />
               )}
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
-    </div>
+    </>
   );
 };

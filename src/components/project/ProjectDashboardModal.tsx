@@ -21,6 +21,9 @@ import {
   FileText,
   Printer,
 } from 'lucide-react';
+import { Dialog } from '../common/Dialog';
+import { useAppState } from '../../store/AppStore';
+import { selectProjects, selectProjectCostBreakdown, selectProjectCashFlow } from '../../store/selectors';
 
 interface ProjectDashboardModalProps {
   project: Project | null;
@@ -33,31 +36,25 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
   onClose,
   onPrintProjectPdf,
 }) => {
+  const state = useAppState();
   const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'budget' | 'cashflow'>(
     'overview'
   );
 
   if (!project) return null;
 
-  // Budget Variance (EAC vs Budget)
-  const budgetVariance = project.forecastFinalCost - project.budget;
-  const isBudgetOverrun = budgetVariance > 0;
-
-  // Breakdown array
-  const breakdownList = [
-    { label: 'مصالح پایه', amount: project.expenseBreakdown.materials, color: 'bg-amber-500' },
-    { label: 'نیروی انسانی', amount: project.expenseBreakdown.labor, color: 'bg-blue-500' },
-    { label: 'پیمانکاران جزء', amount: project.expenseBreakdown.subcontractors, color: 'bg-emerald-500' },
-    { label: 'ماشین‌آلات', amount: project.expenseBreakdown.machinery, color: 'bg-purple-500' },
-    { label: 'حمل‌ونقل', amount: project.expenseBreakdown.transport, color: 'bg-pink-500' },
-    { label: 'تجهیزات خاص', amount: project.expenseBreakdown.procurement, color: 'bg-cyan-500' },
-    { label: 'اداری کارگاه', amount: project.expenseBreakdown.office, color: 'bg-slate-500' },
-    { label: 'بیمه و حوادث', amount: project.expenseBreakdown.insurance, color: 'bg-teal-500' },
-  ];
+  // Every financial figure below comes from final ledger entries tagged with this project;
+  // manual project summaries (expense breakdown, cash in/out, overhead, EAC) are not used.
+  const ledger = selectProjects(state).find((p) => p.id === project.id) ?? project;
+  const breakdownList = selectProjectCostBreakdown(state, project.id);
+  const cash = selectProjectCashFlow(state, project.id);
+  // Budget is a planning figure, shown only next to the ledger cost and never added to it.
+  const budgetUsed = project.budget > 0 ? (ledger.cost * 100) / project.budget : 0;
+  const isBudgetOverrun = project.budget > 0 && ledger.cost > project.budget;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="داشبورد پروژه" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      
         {/* Modal Top Header */}
         <div className="bg-slate-900 text-white p-5 border-b border-slate-800 flex items-start justify-between">
           <div className="flex items-start gap-4">
@@ -95,6 +92,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
 
             <button
               onClick={onClose}
+              aria-label="بستن"
               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -161,7 +159,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-[11px] text-slate-500 block mb-1">کارکرد تأییدشده (درآمد)</span>
               <span className="text-sm font-bold text-emerald-700 font-mono tabular-nums">
-                {formatCurrencyCompact(project.recordedRevenue)}
+                {formatCurrencyCompact(ledger.recordedRevenue)}
               </span>
               <span className="text-[10px] text-emerald-600 block mt-0.5">صورت‌وضعیت‌های قطعی</span>
             </div>
@@ -169,26 +167,26 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-[11px] text-slate-500 block mb-1">هزینه کل تمام‌شده</span>
               <span className="text-sm font-bold text-slate-800 font-mono tabular-nums">
-                {formatCurrencyCompact(project.cost)}
+                {formatCurrencyCompact(ledger.cost)}
               </span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">مستقیم و غیرمستقیم</span>
+              <span className="text-[10px] text-slate-400 block mt-0.5">هزینه‌های ثبت‌شده در دفاتر</span>
             </div>
 
             <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl">
               <span className="text-[11px] text-amber-900 block mb-1">سود عملیاتی پروژه</span>
               <span className="text-sm font-extrabold text-amber-700 font-mono tabular-nums">
-                {formatCurrencyCompact(project.profit)}
+                {formatCurrencyCompact(ledger.profit)}
               </span>
               <span className="text-[10px] text-amber-700 block mt-0.5 font-bold">
-                حاشیه سود: {formatPercent(project.profitMargin)}
+                حاشیه سود: {formatPercent(ledger.profitMargin)}
               </span>
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-[11px] text-slate-500 block mb-1">پیشرفت فیزیکی / مالی</span>
               <div className="flex items-center justify-between text-xs font-bold font-mono text-slate-800">
-                <span>فیزیکی: {project.physicalProgress}٪</span>
-                <span>مالی: {project.financialProgress}٪</span>
+                <span>فیزیکی: {formatPercent(project.physicalProgress)}</span>
+                <span>مالی: {formatPercent(ledger.financialProgress)}</span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div
@@ -201,7 +199,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-[11px] text-slate-500 block mb-1">مطالبات از کارفرما</span>
               <span className="text-sm font-bold text-rose-600 font-mono tabular-nums">
-                {formatCurrencyCompact(project.receivables)}
+                {formatCurrencyCompact(ledger.receivables)}
               </span>
               <span className="text-[10px] text-slate-400 block mt-0.5">اسناد وصول‌نشده</span>
             </div>
@@ -209,27 +207,27 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-[11px] text-slate-500 block mb-1">بدهی به پیمانکاران/خرید</span>
               <span className="text-sm font-bold text-slate-700 font-mono tabular-nums">
-                {formatCurrencyCompact(project.liabilities)}
+                {formatCurrencyCompact(ledger.liabilities)}
               </span>
               <span className="text-[10px] text-slate-400 block mt-0.5">تعهدات پرداخت جاری</span>
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <span className="text-[11px] text-slate-500 block mb-1">پیش‌بینی هزینه نهایی (EAC)</span>
+              <span className="text-[11px] text-slate-500 block mb-1">بودجه مصوب (برنامه)</span>
               <span className="text-sm font-bold text-slate-900 font-mono tabular-nums">
-                {formatCurrencyCompact(project.forecastFinalCost)}
+                {formatCurrencyCompact(project.budget)}
               </span>
               <span
                 className={`text-[10px] block mt-0.5 font-bold ${
                   isBudgetOverrun ? 'text-rose-600' : 'text-emerald-600'
                 }`}
               >
-                {isBudgetOverrun ? 'انحراف نامساعد بودجه' : 'در محدوده بودجه مصوب'}
+                مصرف‌شده: {formatPercent(budgetUsed)} {isBudgetOverrun ? '(فراتر از بودجه)' : ''}
               </span>
             </div>
           </div>
 
-          {/* Direct Cost vs Indirect Cost Breakdown Principle */}
+          {/* Direct cost vs overhead: overhead stays in company accounts and is not allocated to projects */}
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
             <h4 className="text-xs font-bold text-slate-900 mb-2 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-amber-600" />
@@ -239,20 +237,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
               <div className="p-3 bg-white rounded-lg border border-slate-200">
                 <div className="flex justify-between items-center text-slate-600 mb-1">
                   <span>هزینه مستقیم پروژه (Direct Cost):</span>
-                  <strong className="text-slate-900">{formatCurrencyCompact(project.directCost)}</strong>
+                  <strong className="text-slate-900">{formatCurrencyCompact(ledger.cost)}</strong>
                 </div>
                 <p className="text-[11px] text-slate-500 font-sans">
-                  مستقیماً از درآمد همین پروژه کسر شده و سود ناخالص کارگاهی را تعیین می‌کند.
+                  از ردیف‌های قطعی دفاتر با برچسب همین پروژه؛ سود ناخالص کارگاهی را تعیین می‌کند.
                 </p>
               </div>
 
               <div className="p-3 bg-white rounded-lg border border-slate-200">
                 <div className="flex justify-between items-center text-slate-600 mb-1">
                   <span>هزینه غیرمستقیم و سربار (Indirect / Overhead):</span>
-                  <strong className="text-slate-900">{formatCurrencyCompact(project.indirectCost)}</strong>
+                  <strong className="text-slate-500 font-sans">در سطح شرکت</strong>
                 </div>
                 <p className="text-[11px] text-slate-500 font-sans">
-                  سهم تخصیص یافته از هزینه‌های ستادی دفتر مرکزی، نرم‌افزارها و پشتیبانی حقوقی.
+                  هزینه‌های ستادی در حساب‌های گروه ۶ ثبت می‌شوند و به سود این پروژه تخصیص داده نمی‌شوند.
                 </p>
               </div>
             </div>
@@ -265,17 +263,20 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
               <span>ترکیب سرفصل‌های هزینه این پروژه</span>
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {breakdownList.length === 0 && (
+                <p className="col-span-full text-xs text-slate-400">هنوز هزینه قطعی برای این پروژه در دفاتر ثبت نشده است.</p>
+              )}
               {breakdownList.map((item) => (
                 <div
-                  key={item.label}
+                  key={item.accountCode}
                   className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs font-mono"
                 >
-                  <div className="text-[11px] text-slate-500 mb-1 font-sans">{item.label}</div>
+                  <div className="text-[11px] text-slate-500 mb-1 font-sans">{item.accountName}</div>
                   <div className="font-bold text-slate-900 tabular-nums">
                     {formatCurrencyCompact(item.amount)}
                   </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">
-                    {((item.amount / project.cost) * 100).toFixed(1)}٪ از کل هزینه
+                    {formatPercent(ledger.cost ? (item.amount * 100) / ledger.cost : 0)} از کل هزینه
                   </div>
                 </div>
               ))}
@@ -292,29 +293,29 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
               <div className="bg-white p-3 rounded-lg border border-amber-200">
                 <span className="text-[10px] text-slate-500 block mb-0.5 font-sans">دریافتی نقد قطعی (Receipts)</span>
                 <span className="text-emerald-700 font-bold text-sm tabular-nums">
-                  {formatCurrencyCompact(project.cashInflow)}
+                  {formatCurrencyCompact(cash.inflow)}
                 </span>
                 <span className="text-[10px] text-slate-400 block mt-0.5 font-sans">
-                  مانده تا درآمد ثبتی: {formatCurrencyCompact(project.recordedRevenue - project.cashInflow)}
+                  مطالبات وصول‌نشده: {formatCurrencyCompact(ledger.receivables)}
                 </span>
               </div>
 
               <div className="bg-white p-3 rounded-lg border border-amber-200">
                 <span className="text-[10px] text-slate-500 block mb-0.5 font-sans">پرداختی نقد کل (Payments)</span>
                 <span className="text-slate-800 font-bold text-sm tabular-nums">
-                  {formatCurrencyCompact(project.cashOutflow)}
+                  {formatCurrencyCompact(cash.outflow)}
                 </span>
                 <span className="text-[10px] text-slate-400 block mt-0.5 font-sans">
-                  بدهی باز تأمین‌کنندگان: {formatCurrencyCompact(project.liabilities)}
+                  بدهی باز تأمین‌کنندگان: {formatCurrencyCompact(ledger.liabilities)}
                 </span>
               </div>
 
               <div className="bg-white p-3 rounded-lg border border-amber-200">
                 <span className="text-[10px] text-slate-500 block mb-0.5 font-sans">مازاد نقدینگی پروژه</span>
                 <span className="text-amber-700 font-black text-sm tabular-nums">
-                  {formatCurrencyCompact(project.cashInflow - project.cashOutflow)}
+                  {formatCurrencyCompact(cash.net)}
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5 font-sans">تراز نقدینگی مثبت</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5 font-sans">{cash.net >= 0 ? 'تراز نقدینگی مثبت' : 'تراز نقدینگی منفی'}</span>
               </div>
             </div>
           </div>
@@ -332,7 +333,6 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({
             بستن داشبورد
           </button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 };
