@@ -30,7 +30,7 @@ const persianTimeFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
   hour12: false,
 });
 
-const persianYearFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian-u-nu-latn', {
+const persianYearFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', {
   year: 'numeric',
 });
 
@@ -61,7 +61,11 @@ export function toPersianDate(input?: string | number | Date | null): string {
     return input;
   }
   const date = safeParseDate(input);
-  return persianDateFormatter.format(date);
+  try {
+    return persianDateFormatter.format(date);
+  } catch {
+    return date.toLocaleDateString();
+  }
 }
 
 /**
@@ -70,7 +74,11 @@ export function toPersianDate(input?: string | number | Date | null): string {
 export function toPersianDateTime(input?: string | number | Date | null): string {
   if (!input) return '';
   const date = safeParseDate(input);
-  return persianDateTimeFormatter.format(date);
+  try {
+    return persianDateTimeFormatter.format(date);
+  } catch {
+    return date.toLocaleString();
+  }
 }
 
 /**
@@ -79,16 +87,25 @@ export function toPersianDateTime(input?: string | number | Date | null): string
 export function toPersianTime(input?: string | number | Date | null): string {
   if (!input) return '';
   const date = safeParseDate(input);
-  return persianTimeFormatter.format(date);
+  try {
+    return persianTimeFormatter.format(date);
+  } catch {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
 }
 
 /**
  * Get current Jalali (Persian) year as Latin number (e.g. 1403, 1404)
  */
 export function getCurrentPersianYear(): number {
-  const yearStr = persianYearFormatter.format(new Date());
-  const parsed = parseInt(yearStr, 10);
-  return isNaN(parsed) ? 1403 : parsed;
+  try {
+    const yearStr = persianYearFormatter.format(new Date());
+    const digitsOnly = yearStr.replace(/\D/g, '');
+    const parsed = parseInt(digitsOnly, 10);
+    return isNaN(parsed) || parsed < 1300 ? 1403 : parsed;
+  } catch {
+    return 1403;
+  }
 }
 
 /**
