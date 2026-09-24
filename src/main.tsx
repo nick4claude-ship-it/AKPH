@@ -77,7 +77,9 @@ function Root() {
     );
   }
 
-  const devUsers = import.meta.env.DEV ? boot.source.devUsers?.() : undefined;
+  // The role switcher exists only with demo data (DEV, or a demo build); the WordPress source never offers it.
+  const demoBuild = import.meta.env.DEV || import.meta.env.VITE_DEMO_DATA === 'true';
+  const devUsers = demoBuild && boot.source.kind === 'mock' ? boot.source.devUsers?.() : undefined;
   return (
     <AppStoreProvider key={boot.epoch} initialState={boot.state} dataSource={boot.source} onSyncError={emitToast}>
       <SessionProvider

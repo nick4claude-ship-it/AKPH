@@ -54,7 +54,8 @@ import { mockPayrollSlips, mockEmployees, mockTimesheets } from './data/hrPayrol
 
 const isDev = (() => {
   try {
-    return Boolean(import.meta.env?.DEV);
+    // DEV, or a demo build (VITE_DEMO_DATA=true, used for the WordPress demo plugin).
+    return Boolean(import.meta.env?.DEV) || import.meta.env?.VITE_DEMO_DATA === 'true';
   } catch {
     return true;
   }

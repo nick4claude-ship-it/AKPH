@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "plugin:zip": "node scripts/build-plugin.mjs",
     "test:posting": "node scripts/run-ts.mjs scripts/posting-scenario.ts",
     "test:workflows": "node scripts/run-ts.mjs scripts/workflow-scenarios.ts",
     "test:api": "node scripts/run-ts.mjs scripts/api-contract.ts",
