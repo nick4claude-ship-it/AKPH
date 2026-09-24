@@ -1,17 +1,39 @@
+import {
+  formatInt,
+  formatToman,
+  formatRial,
+  formatMoneyCompact,
+  normalizeDigits,
+} from './money';
+
+export {
+  formatInt,
+  formatToman,
+  formatRial,
+  formatMoneyCompact,
+  normalizeDigits,
+};
+
 /**
- * Format numbers with thousand separators
+ * Format numbers with Persian digits and thousand separators
  */
 export function formatNumber(value: number): string {
   if (value === undefined || value === null || isNaN(value)) return '۰';
-  return Math.round(value).toLocaleString('fa-IR');
+  return formatInt(Math.floor(value));
 }
 
 /**
- * Format currency with Rial/Toman separators
+ * Format currency with Rial/Toman separators without duplicate units
  */
 export function formatCurrency(value: number, unit: string = 'تومان'): string {
   if (value === undefined || value === null || isNaN(value)) return `۰ ${unit}`;
-  return `${Math.round(value).toLocaleString('fa-IR')} ${unit}`;
+  if (unit === 'تومان') {
+    return formatToman(value, true);
+  }
+  if (unit === 'ریال') {
+    return formatRial(value, true);
+  }
+  return `${formatInt(Math.floor(value))} ${unit}`;
 }
 
 /**
@@ -19,40 +41,31 @@ export function formatCurrency(value: number, unit: string = 'تومان'): stri
  */
 export function formatCurrencyEn(value: number): string {
   if (value === undefined || value === null || isNaN(value)) return '0';
-  return Math.round(value).toLocaleString('en-US');
+  return Math.floor(value).toLocaleString('en-US');
 }
 
 /**
  * Format currency with billion/million shorthand in Persian (e.g., ۱۸.۵ میلیارد تومان)
+ * Accurately handles Hemmat (همت), Milliard, and Million.
  */
 export function formatCurrencyCompact(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
-
-  if (abs >= 1_000_000_000_000) {
-    return `${sign}${(abs / 1_000_000_000_000).toFixed(1)} همت`;
-  }
-  if (abs >= 1_000_000_000) {
-    return `${sign}${(abs / 1_000_000_000).toFixed(1)} میلیارد`;
-  }
-  if (abs >= 1_000_000) {
-    return `${sign}${(abs / 1_000_000).toFixed(0)} میلیون`;
-  }
-  return `${sign}${formatNumber(abs)} تومان`;
+  return formatMoneyCompact(value, false);
 }
 
 /**
- * Format percentage
+ * Format percentage with Persian digits
  */
 export function formatPercent(value: number): string {
   if (value === undefined || value === null || isNaN(value)) return '۰٪';
-  return `${value.toFixed(1)}٪`;
+  const num = Number(value.toFixed(1)).toLocaleString('fa-IR');
+  return `${num}٪`;
 }
 
 /**
  * Convert English digits to Persian digits
  */
 export function toPersianDigits(num: string | number): string {
+  if (num === null || num === undefined) return '';
   const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
   return num
     .toString()

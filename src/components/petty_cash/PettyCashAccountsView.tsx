@@ -26,6 +26,7 @@ import {
   BankAccount,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { generateUUID } from '../../utils/ids';
 
 interface PettyCashAccountsViewProps {
   accounts: PettyCashAccount[];
@@ -71,6 +72,7 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
     startDate: '۱۴۰۳/۰۷/۰۱',
     notes: '',
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const filteredAccounts = accounts.filter(
     (a) =>
@@ -82,16 +84,17 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.holderName) {
-      alert('لطفاً عنوان تنخواه و نام مسئول را وارد نمایید.');
+    if (!formData.title.trim() || !formData.holderName.trim()) {
+      setFormError('لطفاً عنوان تنخواه و نام مسئول را وارد نمایید.');
       return;
     }
+    setFormError(null);
 
     const linkedProject = projects.find((p) => p.id === formData.projectId);
     const linkedBank = bankAccounts.find((b) => b.id === formData.sourceBankAccountId);
 
     const newAccount: PettyCashAccount = {
-      id: `pc-${Date.now()}`,
+      id: generateUUID(),
       code: formData.code,
       title: formData.title,
       holderName: formData.holderName,
@@ -520,6 +523,12 @@ export const PettyCashAccountsView: React.FC<PettyCashAccountsViewProps> = ({
             </div>
 
             <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200 text-xs">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">

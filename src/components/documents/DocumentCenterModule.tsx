@@ -36,6 +36,21 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedDocForPreview, setSelectedDocForPreview] = useState<SystemDocument | null>(null);
 
+  const handleDownloadFile = (title: string, format: string) => {
+    const blob = new Blob(
+      [`شرکت پایدار مدیریت پروژه\nعنوان سند: ${title}\nنوع فایل: ${format}\nتاریخ دریافت: ${new Date().toLocaleDateString('fa-IR')}`],
+      { type: 'text/plain;charset=utf-8' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[\/\\:*?"<>|]/g, '_')}.${format.toLowerCase().includes('pdf') ? 'pdf' : 'txt'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // New Document Modal State
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
   const [newDocTitle, setNewDocTitle] = useState('');
@@ -243,7 +258,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => alert(`دانلود فایل ${doc.title} (${doc.fileFormat}) آغاز شد.`)}
+                        onClick={() => handleDownloadFile(doc.title, doc.fileFormat)}
                         className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg cursor-pointer"
                         title="دریافت فایل پیوست"
                       >
@@ -331,7 +346,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               <span className="text-xs text-slate-400">ثبت‌کننده: {selectedDocForPreview.registeredBy}</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => alert(`دانلود فایل ${selectedDocForPreview.title} با موفقیت انجام شد.`)}
+                  onClick={() => handleDownloadFile(selectedDocForPreview.title, selectedDocForPreview.fileFormat)}
                   className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-amber-400" />

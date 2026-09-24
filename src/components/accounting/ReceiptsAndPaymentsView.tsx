@@ -21,6 +21,9 @@ import {
   Subledger,
 } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
+import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
+import { parseIntegerAmount } from '../../utils/money';
+import { toPersianDate, getCurrentPersianYear } from '../../utils/date';
 
 interface ReceiptsAndPaymentsViewProps {
   type: 'receipts' | 'payments';
@@ -77,13 +80,20 @@ export const ReceiptsAndPaymentsView: React.FC<ReceiptsAndPaymentsViewProps> = (
 
     const project = projects.find((p) => p.id === recProjectId);
 
+    const docNum = getNextSequentialDocNumber(
+      receipts.map((r) => r.docNumber),
+      'REC',
+      3,
+      getCurrentPersianYear()
+    );
+
     const newRecord: ReceiptRecord = {
-      id: `rec-${Date.now()}`,
-      docNumber: `REC-1403-0${Math.floor(200 + Math.random() * 800)}`,
+      id: generateUUID(),
+      docNumber: docNum,
       date: recDate,
-      amount: recAmount,
+      amount: Math.floor(recAmount),
       payer: recPayer,
-      receiver: 'شرکت سازه گستران پارس',
+      receiver: 'شرکت پایدار مدیریت پروژه',
       projectId: project?.id,
       projectName: project?.name,
       destinationAccount: recBank,
@@ -105,14 +115,21 @@ export const ReceiptsAndPaymentsView: React.FC<ReceiptsAndPaymentsViewProps> = (
     if (!payAmount || !payPayee) return;
 
     const project = projects.find((p) => p.id === payProjectId);
-    const incurred = payIncurredExpense > 0 ? payIncurredExpense : payAmount;
-    const remaining = Math.max(0, incurred - payAmount);
+    const incurred = Math.floor(payIncurredExpense) || 0;
+    const remaining = incurred > payAmount ? incurred - payAmount : 0;
+
+    const docNum = getNextSequentialDocNumber(
+      payments.map((p) => p.docNumber),
+      'PAY',
+      3,
+      getCurrentPersianYear()
+    );
 
     const newRecord: PaymentRecord = {
-      id: `pay-${Date.now()}`,
-      docNumber: `PAY-1403-0${Math.floor(500 + Math.random() * 500)}`,
+      id: generateUUID(),
+      docNumber: docNum,
       date: payDate,
-      amount: payAmount,
+      amount: Math.floor(payAmount),
       payee: payPayee,
       payerAccount: payAccount,
       projectId: project?.id,

@@ -44,12 +44,14 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
   );
 
   const canClose = accountPendingExpenses.length === 0 && missingDocsExpenses.length === 0;
+  const [closingError, setClosingError] = useState<string | null>(null);
 
   const handleExecuteClosing = () => {
     if (!canClose) {
-      alert('خطا: تا زمانی که اسناد بلاتکلیف یا دارای نقص مدرک وجود دارند، امکان بستن دوره وجود ندارد.');
+      setClosingError('خطا: تا زمانی که اسناد بلاتکلیف یا دارای نقص مدرک وجود دارند، امکان بستن دوره وجود ندارد.');
       return;
     }
+    setClosingError(null);
     setIsLocked(true);
   };
 
@@ -203,6 +205,12 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
       </div>
 
       {/* Action / Execution Area */}
+      {closingError && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl flex items-center gap-2 text-xs">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          <span>{closingError}</span>
+        </div>
+      )}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h4 className="text-sm font-bold text-slate-900">

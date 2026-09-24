@@ -150,6 +150,12 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({
   const [filterStatus, setFilterStatus] = useState<string>('در انتظار تأیید');
   const [rejectReasonModalItem, setRejectReasonModalItem] = useState<ApprovalItem | null>(null);
   const [rejectReasonText, setRejectReasonText] = useState('');
+  const [notification, setNotification] = useState<string | null>(null);
+
+  const showNotification = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 4000);
+  };
 
   // Approve single item
   const handleApprove = (item: ApprovalItem) => {
@@ -204,7 +210,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({
           : i
       )
     );
-    alert(`${pendingList.length} فقره درخواست با موفقیت به صورت گروهی تایید شدند.`);
+    showNotification(`${pendingList.length} فقره درخواست با موفقیت به صورت گروهی تایید شدند.`);
   };
 
   const filteredItems = approvalItems.filter((i) => {
@@ -221,6 +227,15 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({
 
   return (
     <div className="space-y-6">
+      {notification && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{notification}</span>
+          </div>
+          <button onClick={() => setNotification(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">✕</button>
+        </div>
+      )}
       {/* Top Banner */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

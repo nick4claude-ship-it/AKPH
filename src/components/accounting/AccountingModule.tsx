@@ -33,6 +33,8 @@ import { CounterpartiesReceivablePayableView } from './CounterpartiesReceivableP
 import { ChartOfAccountsView } from './ChartOfAccountsView';
 import { FinancialReportsView } from './FinancialReportsView';
 import { PeriodClosingAndAuditView } from './PeriodClosingAndAuditView';
+import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
+import { toPersianDate, toPersianTime, getCurrentPersianYear } from '../../utils/date';
 
 interface AccountingModuleProps {
   currentUser: UserProfile;
@@ -91,22 +93,25 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   };
 
   const handleApproveEntry = (id: string) => {
+    const docToApprove = journalEntries.find((d) => d.id === id);
+    if (!docToApprove) return;
+
+    // Self-approval restriction
+    if (docToApprove.submitter.trim() === currentUser.name.trim()) {
+      return;
+    }
+
     setJournalEntries((prev) =>
       prev.map((doc) => {
         if (doc.id === id) {
-          logAudit(
-            'تأیید سند',
-            doc.docNumber,
-            `تأیید نهایی سند حسابداری توسط ${currentUser.name}`
-          );
           return {
             ...doc,
-            status: 'تأیید شده',
+            status: 'تأیید شده' as const,
             history: [
               ...doc.history,
               {
-                date: '۱۴۰۳/۰۷/۰۱',
-                time: '۱۴:۱۵',
+                date: toPersianDate(new Date()),
+                time: toPersianTime(new Date()),
                 user: currentUser.name,
                 action: 'تأیید نهایی و درج در دفاتر قانونی',
               },
@@ -116,25 +121,30 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
         return doc;
       })
     );
+
+    // Call audit logging OUTSIDE of state updater to avoid duplicate execution in StrictMode
+    logAudit(
+      'تأیید سند',
+      docToApprove.docNumber,
+      `تأیید نهایی سند حسابداری توسط ${currentUser.name}`
+    );
   };
 
   const handleRejectEntry = (id: string, reason: string) => {
+    const docToReject = journalEntries.find((d) => d.id === id);
+    if (!docToReject) return;
+
     setJournalEntries((prev) =>
       prev.map((doc) => {
         if (doc.id === id) {
-          logAudit(
-            'رد سند',
-            doc.docNumber,
-            `رد سند حسابداری با علت: ${reason}`
-          );
           return {
             ...doc,
-            status: 'رد شده',
+            status: 'رد شده' as const,
             history: [
               ...doc.history,
               {
-                date: '۱۴۰۳/۰۷/۰۱',
-                time: '۱۴:۲۰',
+                date: toPersianDate(new Date()),
+                time: toPersianTime(new Date()),
                 user: currentUser.name,
                 action: `رد سند توسط مدیر مالی - علت: ${reason}`,
               },
@@ -144,26 +154,42 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
         return doc;
       })
     );
+
+    logAudit(
+      'رد سند',
+      docToReject.docNumber,
+      `رد سند حسابداری با علت: ${reason}`
+    );
   };
 
-  // Principle: No direct deletion of approved documents; support reverse entry (سند معکوس)
+  // Principle: Reverse entry only permitted for finalized & non-reversed documents
   const handleReverseEntry = (id: string, reason: string) => {
     const original = journalEntries.find((d) => d.id === id);
     if (!original) return;
+    if (original.status !== 'ثبت قطعی' && original.status !== 'تأیید شده') {
+      return;
+    }
 
     // Create reversed rows
     const reversedRows = original.rows.map((row) => ({
       ...row,
-      id: `rev-${row.id}`,
+      id: generateUUID(),
       description: `اصلاح و برگشت: ${row.description}`,
       debit: row.credit,
       credit: row.debit,
     }));
 
+    const revDocNum = getNextSequentialDocNumber(
+      journalEntries.map((e) => e.docNumber),
+      'ACC',
+      4,
+      getCurrentPersianYear()
+    );
+
     const reversalDoc: JournalEntry = {
-      id: `rev-doc-${Date.now()}`,
-      docNumber: `ACC-1403-REV-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: '۱۴۰۳/۰۷/۰۱',
+      id: generateUUID(),
+      docNumber: revDocNum,
+      date: toPersianDate(new Date()),
       title: `سند معکوس (برگشت) برای سند ${original.docNumber} - علت: ${reason}`,
       type: original.type,
       projectId: original.projectId,
@@ -178,8 +204,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       isBalanced: true,
       history: [
         {
-          date: '۱۴۰۳/۰۷/۰۱',
-          time: '۱۵:۰۰',
+          date: toPersianDate(new Date()),
+          time: toPersianTime(new Date()),
           user: currentUser.name,
           action: `صدور سند معکوس جهت ابطال اثر مالی سند ${original.docNumber}`,
         },
@@ -196,8 +222,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
             history: [
               ...doc.history,
               {
-                date: '۱۴۰۳/۰۷/۰۱',
-                time: '۱۵:۰۰',
+                date: toPersianDate(new Date()),
+                time: toPersianTime(new Date()),
                 user: currentUser.name,
                 action: `برگشت و خنثی‌سازی با سند معکوس ${reversalDoc.docNumber}`,
               },
@@ -220,22 +246,78 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   const handleAddReceipt = (rec: ReceiptRecord) => {
     setReceipts((prev) => [rec, ...prev]);
 
-    // Update matching receivable if applicable
+    // Update matching receivable strictly by debtor identity
     setReceivables((prev) =>
       prev.map((item) => {
-        if (rec.payer.includes(item.debtorName) || item.debtorName.includes(rec.payer)) {
+        if (rec.payer.trim() === item.debtorName.trim() || (rec.projectId && rec.projectId === item.projectId)) {
           const newReceived = item.receivedAmount + rec.amount;
-          const newRemaining = Math.max(0, item.billedAmount - newReceived);
+          const diff = item.billedAmount - newReceived;
+          const remainingClaim = diff > 0 ? diff : 0;
           return {
             ...item,
             receivedAmount: newReceived,
-            remainingClaim: newRemaining,
-            status: item.status,
+            remainingClaim,
+            status: remainingClaim === 0 ? ('تسویه شده' as any) : item.status,
           };
         }
         return item;
       })
     );
+
+    // Create balanced journal entry: Debit Bank / Credit Accounts Receivable
+    const docNum = getNextSequentialDocNumber(
+      journalEntries.map((e) => e.docNumber),
+      'ACC',
+      4,
+      getCurrentPersianYear()
+    );
+
+    const receiptJournalDoc: JournalEntry = {
+      id: generateUUID(),
+      docNumber: docNum,
+      date: rec.date || toPersianDate(new Date()),
+      title: `وصول وجه از ${rec.payer} - رهگیری ${rec.trackingNumber}`,
+      type: 'درآمد و فروش',
+      projectId: rec.projectId,
+      projectName: rec.projectName,
+      submitter: currentUser.name,
+      status: 'ثبت قطعی',
+      rows: [
+        {
+          id: generateUUID(),
+          accountCode: '11101',
+          accountName: 'موجودی نزد بانک‌ها',
+          subledgerCode: rec.destinationAccount,
+          subledgerName: rec.destinationAccount,
+          description: `واریز به حساب ${rec.destinationAccount} توسط ${rec.payer}`,
+          debit: rec.amount,
+          credit: 0,
+        },
+        {
+          id: generateUUID(),
+          accountCode: '11201',
+          accountName: 'مطالبات از کارفرمایان و اشخاص',
+          subledgerCode: '',
+          subledgerName: rec.payer,
+          description: `بستانکاری طرف حساب ${rec.payer} بابت وصول مطالبات`,
+          debit: 0,
+          credit: rec.amount,
+        },
+      ],
+      totalDebit: rec.amount,
+      totalCredit: rec.amount,
+      isBalanced: true,
+      history: [
+        {
+          date: toPersianDate(new Date()),
+          time: toPersianTime(new Date()),
+          user: currentUser.name,
+          action: 'صدور خودکار سند حسابداری متوازن دریافت وجه',
+        },
+      ],
+    };
+
+    setJournalEntries((prev) => [receiptJournalDoc, ...prev]);
 
     logAudit(
       'ایجاد سند',
@@ -247,22 +329,78 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   const handleAddPayment = (pay: PaymentRecord) => {
     setPayments((prev) => [pay, ...prev]);
 
-    // Update matching payable if applicable
+    // Update matching payable strictly by creditor identity
     setPayables((prev) =>
       prev.map((item) => {
-        if (pay.payee.includes(item.creditorName) || item.creditorName.includes(pay.payee)) {
+        if (pay.payee.trim() === item.creditorName.trim() || (pay.projectId && pay.projectId === item.projectId)) {
           const newPaid = item.paidAmount + pay.amount;
-          const newRemaining = Math.max(0, item.incurredDebt - newPaid);
+          const diff = item.incurredDebt - newPaid;
+          const remainingDebt = diff > 0 ? diff : 0;
           return {
             ...item,
             paidAmount: newPaid,
-            remainingDebt: newRemaining,
-            status: item.status,
+            remainingDebt,
+            status: remainingDebt === 0 ? ('تسویه شده' as any) : item.status,
           };
         }
         return item;
       })
     );
+
+    // Create balanced journal entry: Debit Accounts Payable / Credit Bank
+    const docNum = getNextSequentialDocNumber(
+      journalEntries.map((e) => e.docNumber),
+      'ACC',
+      4,
+      getCurrentPersianYear()
+    );
+
+    const paymentJournalDoc: JournalEntry = {
+      id: generateUUID(),
+      docNumber: docNum,
+      date: pay.date || toPersianDate(new Date()),
+      title: `تادیه وجه به ${pay.payee} - رهگیری ${pay.referenceNumber}`,
+      type: 'سایر هزینه‌ها',
+      projectId: pay.projectId,
+      projectName: pay.projectName,
+      submitter: currentUser.name,
+      status: 'ثبت قطعی',
+      rows: [
+        {
+          id: generateUUID(),
+          accountCode: '21101',
+          accountName: 'بستانکاران تجاری و پیمانکاران',
+          subledgerCode: '',
+          subledgerName: pay.payee,
+          description: `بدهکار کردن حساب بستانکار ${pay.payee} بابت پرداخت بدهی`,
+          debit: pay.amount,
+          credit: 0,
+        },
+        {
+          id: generateUUID(),
+          accountCode: '11101',
+          accountName: 'موجودی نزد بانک‌ها',
+          subledgerCode: pay.payerAccount,
+          subledgerName: pay.payerAccount,
+          description: `برداشت از حساب بانکی شرکت ${pay.payerAccount}`,
+          debit: 0,
+          credit: pay.amount,
+        },
+      ],
+      totalDebit: pay.amount,
+      totalCredit: pay.amount,
+      isBalanced: true,
+      history: [
+        {
+          date: toPersianDate(new Date()),
+          time: toPersianTime(new Date()),
+          user: currentUser.name,
+          action: 'صدور خودکار سند حسابداری متوازن پرداخت وجه',
+        },
+      ],
+    };
+
+    setJournalEntries((prev) => [paymentJournalDoc, ...prev]);
 
     logAudit(
       'ایجاد سند',
@@ -417,7 +555,56 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
             },
           ]}
           onTriggerReconciliation={(id) => {
-            alert('سند دفتری برای تراکنش بانکی صادر و ثبت شد.');
+            const docNum = getNextSequentialDocNumber(
+              journalEntries.map((e) => e.docNumber),
+              'ACC',
+              4,
+              getCurrentPersianYear()
+            );
+            const reconDoc: JournalEntry = {
+              id: generateUUID(),
+              docNumber: docNum,
+              date: toPersianDate(new Date()),
+              title: 'سند رفع مغایرت بانکی: واریز فاقد سند دفتری',
+              type: 'دریافت',
+              submitter: currentUser.name,
+              status: 'ثبت قطعی',
+              rows: [
+                {
+                  id: generateUUID(),
+                  accountCode: '11101',
+                  accountName: 'موجودی نزد بانک‌ها',
+                  subledgerCode: 'بانک ملت - جاری مرکزی',
+                  subledgerName: 'بانک ملت - جاری مرکزی',
+                  description: 'شناسایی واریز وجه بانکی نامشخص طبق صورت‌حساب',
+                  debit: 500_000_000,
+                  credit: 0,
+                },
+                {
+                  id: generateUUID(),
+                  accountCode: '21199',
+                  accountName: 'بستانکاران متفرقه و سپرده‌های تعیین تکلیف‌نشده',
+                  subledgerCode: '',
+                  subledgerName: 'سپرده متفرقه نامشخص',
+                  description: 'طرف حساب بستانکار جهت پیگیری منشأ واریزی',
+                  debit: 0,
+                  credit: 500_000_000,
+                },
+              ],
+              totalDebit: 500_000_000,
+              totalCredit: 500_000_000,
+              isBalanced: true,
+              history: [
+                {
+                  date: toPersianDate(new Date()),
+                  time: toPersianTime(new Date()),
+                  user: currentUser.name,
+                  action: 'صدور خودکار سند رفع مغایرت بانکی',
+                },
+              ],
+            };
+            setJournalEntries((prev) => [reconDoc, ...prev]);
+            logAudit('تطبیق بانکی', docNum, 'صدور سند دفتری متوازن برای واریز بانکی فاقد سند');
           }}
         />
       )}

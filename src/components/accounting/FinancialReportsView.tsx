@@ -36,10 +36,6 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({
     window.print();
   };
 
-  const handleExportExcel = () => {
-    alert('فایل اکسل گزارش مالی موردنظر با قالب استاندارد حسابداری دانلود شد.');
-  };
-
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
       {/* Top Header & Report Switcher */}
@@ -99,11 +95,12 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-medium cursor-pointer"
+            disabled
+            title="این قابلیت در حال اتصال به وب‌سرویس اکسل می‌باشد"
+            className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-lg text-xs font-medium cursor-not-allowed opacity-75"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>خروجی Excel</span>
+            <span>خروجی Excel (به‌زودی)</span>
           </button>
           <button
             onClick={handlePrint}

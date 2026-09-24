@@ -28,6 +28,10 @@ import {
   UserProfile,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
+import { parseIntegerAmount } from '../../utils/money';
+import { toPersianDate, toPersianTime, getCurrentPersianYear } from '../../utils/date';
+import { can } from '../../utils/permissions';
 
 interface JournalEntriesViewProps {
   entries: JournalEntry[];
@@ -68,16 +72,17 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   // Rejection prompt state
   const [rejectingEntryId, setRejectingEntryId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // New Entry Form State
-  const [newDocDate, setNewDocDate] = useState('۱۴۰۳/۰۷/۰۱');
+  const [newDocDate, setNewDocDate] = useState(() => toPersianDate(new Date()));
   const [newDocType, setNewDocType] = useState<JournalEntryType>('خرید و مصالح');
   const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocProjectId, setNewDocProjectId] = useState<string>('');
   const [newDocCostCenterId, setNewDocCostCenterId] = useState<string>('');
   const [newDocRows, setNewDocRows] = useState<JournalEntryRow[]>([
     {
-      id: 'row-1',
+      id: generateUUID(),
       accountCode: '511',
       accountName: 'هزینه مستقیم مصالح مصرفی',
       subledgerCode: '',
@@ -87,7 +92,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
       credit: 0,
     },
     {
-      id: 'row-2',
+      id: generateUUID(),
       accountCode: '21101',
       accountName: 'بستانکاران تأمین‌کننده مصالح',
       subledgerCode: '',
@@ -112,17 +117,27 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
     return matchesSearch && matchesStatus && matchesProject;
   });
 
-  // Calculate Balance for New Entry Form
-  const totalDebitNew = newDocRows.reduce((sum, r) => sum + (Number(r.debit) || 0), 0);
-  const totalCreditNew = newDocRows.reduce((sum, r) => sum + (Number(r.credit) || 0), 0);
+  // Calculate Balance for New Entry Form with strict integer logic
+  const totalDebitNew = newDocRows.reduce((sum, r) => sum + (Math.floor(r.debit) || 0), 0);
+  const totalCreditNew = newDocRows.reduce((sum, r) => sum + (Math.floor(r.credit) || 0), 0);
   const diffNew = totalDebitNew - totalCreditNew;
-  const isFormBalanced = totalDebitNew > 0 && totalDebitNew === totalCreditNew;
+
+  // Strict validation: each row has account, either debit OR credit positive (not both, not neither), min 2 rows
+  const areRowsValid =
+    newDocRows.length >= 2 &&
+    newDocRows.every(
+      (r) =>
+        Boolean(r.accountCode && r.accountName) &&
+        ((r.debit > 0 && r.credit === 0) || (r.credit > 0 && r.debit === 0))
+    );
+
+  const isFormBalanced = totalDebitNew > 0 && totalDebitNew === totalCreditNew && areRowsValid;
 
   const handleAddRow = () => {
     setNewDocRows((prev) => [
       ...prev,
       {
-        id: `row-${Date.now()}`,
+        id: generateUUID(),
         accountCode: '511',
         accountName: 'هزینه مستقیم مصالح مصرفی',
         subledgerCode: '',
@@ -143,6 +158,22 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
     setNewDocRows((prev) =>
       prev.map((r) => {
         if (r.id === id) {
+          if (field === 'debit') {
+            const intDebit = parseIntegerAmount(value);
+            return {
+              ...r,
+              debit: intDebit,
+              credit: intDebit > 0 ? 0 : r.credit,
+            };
+          }
+          if (field === 'credit') {
+            const intCredit = parseIntegerAmount(value);
+            return {
+              ...r,
+              credit: intCredit,
+              debit: intCredit > 0 ? 0 : r.debit,
+            };
+          }
           return { ...r, [field]: value };
         }
         return r;
@@ -152,15 +183,48 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
 
   const handleSubmitNewDoc = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormBalanced) return;
-    if (!newDocTitle.trim()) return;
+    setFormError(null);
+
+    if (newDocRows.length < 2) {
+      setFormError('سند حسابداری دوبل باید حداقل شامل دو آرتیکل (ردیف) باشد.');
+      return;
+    }
+
+    for (let i = 0; i < newDocRows.length; i++) {
+      const r = newDocRows[i];
+      if (!r.accountCode) {
+        setFormError(`ردیف شماره ${i + 1} فاقد سرفصل حساب معین است.`);
+        return;
+      }
+      if ((r.debit === 0 && r.credit === 0) || (r.debit > 0 && r.credit > 0)) {
+        setFormError(`در ردیف شماره ${i + 1} باید دقیقاً یکی از مقادیر بدهکار یا بستانکار بزرگتر از صفر باشد.`);
+        return;
+      }
+    }
+
+    if (totalDebitNew !== totalCreditNew || totalDebitNew <= 0) {
+      setFormError('سند تراز نیست. جمع بدهکار باید دقیقاً با جمع بستانکار برابر و بزرگتر از صفر باشد.');
+      return;
+    }
+
+    if (!newDocTitle.trim()) {
+      setFormError('شرح کلی سند الزامی است.');
+      return;
+    }
 
     const project = projects.find((p) => p.id === newDocProjectId);
     const costCenter = costCenters.find((c) => c.id === newDocCostCenterId);
 
+    const docNum = getNextSequentialDocNumber(
+      entries.map((ent) => ent.docNumber),
+      'ACC',
+      4,
+      getCurrentPersianYear()
+    );
+
     const newDoc: JournalEntry = {
-      id: `doc-${Date.now()}`,
-      docNumber: `ACC-1403-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: generateUUID(),
+      docNumber: docNum,
       date: newDocDate,
       title: newDocTitle,
       type: newDocType,
@@ -173,11 +237,11 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
       rows: newDocRows,
       totalDebit: totalDebitNew,
       totalCredit: totalCreditNew,
-      isBalanced: true,
+      isBalanced: isFormBalanced,
       history: [
         {
-          date: newDocDate,
-          time: '۱۰:۰۰',
+          date: toPersianDate(new Date()),
+          time: toPersianTime(new Date()),
           user: currentUser.name,
           action: 'ایجاد سند و ارسال به کارتابل تأیید',
         },
@@ -191,7 +255,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
     setNewDocTitle('');
     setNewDocRows([
       {
-        id: 'row-1',
+        id: generateUUID(),
         accountCode: '511',
         accountName: 'هزینه مستقیم مصالح مصرفی',
         subledgerCode: '',
@@ -201,7 +265,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
         credit: 0,
       },
       {
-        id: 'row-2',
+        id: generateUUID(),
         accountCode: '21101',
         accountName: 'بستانکاران تأمین‌کننده مصالح',
         subledgerCode: '',
@@ -512,7 +576,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
                 </h4>
                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
                   {selectedEntry.history.map((h, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs text-slate-600 border-b border-slate-200/60 pb-1.5 last:border-0 last:pb-0">
+                    <div key={`${h.date}-${h.time}-${h.action}-${idx}`} className="flex items-center justify-between text-xs text-slate-600 border-b border-slate-200/60 pb-1.5 last:border-0 last:pb-0">
                       <div className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                         <strong className="text-slate-800">{h.user}:</strong>
@@ -553,21 +617,29 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
               <div className="flex items-center gap-2">
                 {selectedEntry.status === 'در انتظار تأیید' && (
                   <>
-                    <button
-                      onClick={() => setRejectingEntryId(selectedEntry.id)}
-                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      رد سند
-                    </button>
-                    <button
-                      onClick={() => {
-                        onApproveEntry(selectedEntry.id);
-                        setSelectedEntry(null);
-                      }}
-                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      تأیید و صدور قطعی
-                    </button>
+                    {selectedEntry.submitter.trim() === currentUser.name.trim() ? (
+                      <span className="text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg font-medium">
+                        تأیید سند توسط ثبت‌کننده مجاز نمی‌باشد (تفکیک وظایف)
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setRejectingEntryId(selectedEntry.id)}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          رد سند
+                        </button>
+                        <button
+                          onClick={() => {
+                            onApproveEntry(selectedEntry.id);
+                            setSelectedEntry(null);
+                          }}
+                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          تأیید و صدور قطعی
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
                 <button
@@ -712,6 +784,12 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
 
             {/* Body */}
             <div className="p-6 overflow-y-auto space-y-5">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
               {/* Document Header Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div>

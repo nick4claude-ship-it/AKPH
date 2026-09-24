@@ -31,6 +31,7 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
   const [thresholdLevel1, setThresholdLevel1] = useState<number>(20_000_000);
   const [thresholdLevel2, setThresholdLevel2] = useState<number>(100_000_000);
   const [lowBalancePercent, setLowBalancePercent] = useState<number>(25);
+  const [isSaved, setIsSaved] = useState(false);
 
   const selectedCategoryObj = categoryList.find((c) => c.id === selectedCatId);
 
@@ -266,13 +267,24 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
                 </span>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
+                {isSaved && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 font-bold flex items-center justify-center gap-1.5 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>تنظیمات و سقف‌های مجاز با موفقیت ذخیره شد.</span>
+                  </div>
+                )}
                 <button
-                  onClick={() => alert('تنظیمات جدید با موفقیت در سامانه ذخیره شد.')}
-                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                  type="button"
+                  onClick={() => {
+                    onUpdateCategories(categoryList);
+                    setIsSaved(true);
+                    setTimeout(() => setIsSaved(false), 3500);
+                  }}
+                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Save className="w-4 h-4 text-emerald-400" />
-                  ذخیره تنظیمات
+                  <span>ذخیره تنظیمات</span>
                 </button>
               </div>
             </div>

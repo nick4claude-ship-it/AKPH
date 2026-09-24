@@ -54,7 +54,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
     if (selectedProjectId !== 'all' && st.projectId !== selectedProjectId) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return st.statementNumber.toLowerCase().includes(q) || st.projectName.toLowerCase().includes(q) || st.client.toLowerCase().includes(q);
+      return st.number.toLowerCase().includes(q) || st.projectName.toLowerCase().includes(q) || st.client.toLowerCase().includes(q);
     }
     return true;
   });
@@ -71,7 +71,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
 
   // Aggregates
   const totalClientApprovedReceivable = clientStatements.reduce((acc, st) => acc + st.approvedAmount, 0);
-  const totalSubcontractorPayable = subcontractorStatements.reduce((acc, st) => acc + st.netPayableAmount, 0);
+  const totalSubcontractorPayable = subcontractorStatements.reduce((acc, st) => acc + st.netPayable, 0);
 
   return (
     <div className="space-y-6">
@@ -217,8 +217,8 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                 {filteredClientStatements.map((st) => (
                   <tr key={st.id} className="hover:bg-slate-50">
                     <td className="py-3 px-3 font-sans">
-                      <strong className="block text-slate-900">{st.statementNumber}</strong>
-                      <span className="text-[10px] text-slate-400 font-mono">{st.date}</span>
+                      <strong className="block text-slate-900">{st.number}</strong>
+                      <span className="text-[10px] text-slate-400 font-mono">{st.submissionDate}</span>
                     </td>
                     <td className="py-3 px-3 font-sans">
                       <span className="text-slate-900 font-medium block">{st.projectName}</span>
@@ -226,12 +226,12 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                     </td>
                     <td className="py-3 px-3 text-left">{formatCurrencyCompact(st.submittedAmount)}</td>
                     <td className="py-3 px-3 text-left text-blue-700 font-bold">{formatCurrencyCompact(st.approvedAmount)}</td>
-                    <td className="py-3 px-3 text-left text-emerald-700 font-bold">{formatCurrencyCompact(st.paidAmount)}</td>
-                    <td className="py-3 px-3 text-left text-rose-700 font-bold">{formatCurrencyCompact(st.remainingReceivable)}</td>
+                    <td className="py-3 px-3 text-left text-emerald-700 font-bold">{formatCurrencyCompact(st.receivedAmount)}</td>
+                    <td className="py-3 px-3 text-left text-rose-700 font-bold">{formatCurrencyCompact(st.receivables)}</td>
                     <td className="py-3 px-3 font-sans">
                       <span
                         className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                          st.status === 'پرداخت کامل'
+                          st.status === 'تسویه شده'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : st.status === 'تأیید نهایی کارفرما'
                             ? 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -288,28 +288,28 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                   <tr key={sub.id} className="hover:bg-slate-50">
                     <td className="py-3 px-3 font-sans">
                       <strong className="block text-slate-900">{sub.statementNumber}</strong>
-                      <span className="text-[10px] text-slate-400 font-mono">{sub.date}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{sub.submissionDate}</span>
                     </td>
                     <td className="py-3 px-3 font-sans">
                       <span className="text-slate-900 font-bold block">{sub.subcontractorName}</span>
-                      <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded font-mono">{sub.trade}</span>
+                      <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded font-mono">{sub.tradeType}</span>
                     </td>
                     <td className="py-3 px-3 font-sans text-slate-700">{sub.projectName}</td>
-                    <td className="py-3 px-3 text-left">{formatCurrencyCompact(sub.grossApprovedAmount)}</td>
+                    <td className="py-3 px-3 text-left">{formatCurrencyCompact(sub.siteVerifiedAmount || sub.grossAmount)}</td>
                     <td className="py-3 px-3 text-left text-slate-500">
-                      {formatCurrencyCompact(sub.deductions.retentionDeposit + sub.deductions.socialSecurityInsurance)}
+                      {formatCurrencyCompact(sub.deductions.retention + (sub.deductions.insuranceDeduction || 0))}
                     </td>
-                    <td className="py-3 px-3 text-left text-amber-800 font-bold">{formatCurrencyCompact(sub.netPayableAmount)}</td>
+                    <td className="py-3 px-3 text-left text-amber-800 font-bold">{formatCurrencyCompact(sub.netPayable)}</td>
                     <td className="py-3 px-3 text-left text-emerald-700 font-bold">{formatCurrencyCompact(sub.paidAmount)}</td>
                     <td className="py-3 px-3 font-sans">
                       <span
                         className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                          sub.status === 'تسویه شده'
+                          sub.status === 'paid'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}
                       >
-                        {sub.status}
+                        {sub.status === 'paid' ? 'پرداخت شده' : sub.status}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-center">
@@ -334,7 +334,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
           <div className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">{selectedClientStatementForDetail.statementNumber}</h3>
+                <h3 className="text-sm font-bold text-slate-900">{selectedClientStatementForDetail.number}</h3>
                 <span className="text-xs text-slate-500">{selectedClientStatementForDetail.projectName}</span>
               </div>
               <button
@@ -361,12 +361,12 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">دریافت نقدینگی تا کنون:</span>
-                  <span className="font-mono text-emerald-700">{formatNumber(selectedClientStatementForDetail.paidAmount)} تومان</span>
+                  <span className="font-mono text-emerald-700">{formatNumber(selectedClientStatementForDetail.receivedAmount)} تومان</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-slate-200">
                   <span className="font-bold text-slate-700">مانده مطالبه دریافتنی:</span>
                   <strong className="font-mono text-rose-700 font-bold text-sm">
-                    {formatNumber(selectedClientStatementForDetail.remainingReceivable)} تومان
+                    {formatNumber(selectedClientStatementForDetail.receivables)} تومان
                   </strong>
                 </div>
               </div>
@@ -398,7 +398,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">{selectedSubStatementForDetail.statementNumber}</h3>
-                <span className="text-xs text-slate-500">{selectedSubStatementForDetail.subcontractorName} ({selectedSubStatementForDetail.trade})</span>
+                <span className="text-xs text-slate-500">{selectedSubStatementForDetail.subcontractorName} ({selectedSubStatementForDetail.tradeType})</span>
               </div>
               <button
                 onClick={() => setSelectedSubStatementForDetail(null)}
@@ -416,20 +416,20 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">ناخالص کارکرد مصوب:</span>
-                  <span className="font-mono">{formatNumber(selectedSubStatementForDetail.grossApprovedAmount)} تومان</span>
+                  <span className="font-mono">{formatNumber(selectedSubStatementForDetail.siteVerifiedAmount || selectedSubStatementForDetail.grossAmount)} تومان</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">کسر سپرده حسن انجام کار (۱۰٪):</span>
-                  <span className="font-mono text-slate-600">{formatNumber(selectedSubStatementForDetail.deductions.retentionDeposit)} تومان</span>
+                  <span className="font-mono text-slate-600">{formatNumber(selectedSubStatementForDetail.deductions.retention)} تومان</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">کسر بیمه تأمین اجتماعی (۵٪):</span>
-                  <span className="font-mono text-slate-600">{formatNumber(selectedSubStatementForDetail.deductions.socialSecurityInsurance)} تومان</span>
+                  <span className="font-mono text-slate-600">{formatNumber(selectedSubStatementForDetail.deductions.insuranceDeduction || 0)} تومان</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-slate-200">
                   <span className="font-bold text-slate-700">خالص بدهی پرداختنی به پیمانکار:</span>
                   <strong className="font-mono text-amber-800 font-bold text-sm">
-                    {formatNumber(selectedSubStatementForDetail.netPayableAmount)} تومان
+                    {formatNumber(selectedSubStatementForDetail.netPayable)} تومان
                   </strong>
                 </div>
               </div>

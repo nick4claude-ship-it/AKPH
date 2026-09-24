@@ -233,11 +233,12 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
             </div>
 
             <button
-              onClick={() => alert('عملیات هوشمند مقایسه تراکنش‌های وب‌سرویس بانک با اسناد صادرشده با موفقیت انجام شد.')}
-              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+              disabled
+              title="اتصال به وب‌سرویس صورت‌حساب الکترونیکی بانک مرکزی"
+              className="flex items-center gap-1.5 bg-slate-100 text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold cursor-not-allowed opacity-75"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-              <span>تطبیق خودکار برخط</span>
+              <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+              <span>تطبیق خودکار برخط (به‌زودی)</span>
             </button>
           </div>
 

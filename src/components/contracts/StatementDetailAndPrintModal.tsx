@@ -42,6 +42,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   const [activeView, setActiveView] = useState<'detail' | 'print_preview'>('detail');
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
+  const [rejectError, setRejectError] = useState(false);
   const [accountingIssued, setAccountingIssued] = useState(!!statement.accountingJournalEntryId);
 
   // Status mapping
@@ -274,16 +275,27 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               {showRejectBox && (
                 <div className="p-4 rounded-xl bg-rose-50 border border-rose-300 space-y-2 animate-in fade-in">
                   <h5 className="text-xs font-bold text-rose-900">علت بازگشت یا رد صورت‌وضعیت (اجباری):</h5>
+                  {rejectError && (
+                    <p className="text-[11px] font-bold text-rose-700 bg-rose-100 p-1.5 rounded">
+                      لطفاً دلیل بازگشت یا اصلاح صورت‌وضعیت را بنویسید.
+                    </p>
+                  )}
                   <textarea
                     value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
+                    onChange={(e) => {
+                      setRejectReason(e.target.value);
+                      if (e.target.value.trim()) setRejectError(false);
+                    }}
                     placeholder="مغایرت در احجام بتن‌ریزی، عدم ارائه صورتجلسه کارگاهی، اشتباه در ضرایب تعدیل..."
                     className="w-full text-xs p-2.5 rounded-lg border border-rose-300 bg-white focus:outline-rose-500"
                     rows={2}
                   />
                   <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => setShowRejectBox(false)}
+                      onClick={() => {
+                        setShowRejectBox(false);
+                        setRejectError(false);
+                      }}
                       className="px-3 py-1 rounded text-xs text-slate-600 hover:bg-slate-200 cursor-pointer"
                     >
                       انصراف
@@ -291,11 +303,12 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                     <button
                       onClick={() => {
                         if (!rejectReason.trim()) {
-                          alert('لطفاً دلیل بازگشت را وارد فرمایید.');
+                          setRejectError(true);
                           return;
                         }
                         onUpdateStatus(statement.id, 'returned_for_correction', rejectReason);
                         setShowRejectBox(false);
+                        setRejectError(false);
                       }}
                       className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
                     >

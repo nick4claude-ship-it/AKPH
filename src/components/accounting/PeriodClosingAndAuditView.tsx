@@ -186,7 +186,6 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
                 onClick={() => {
                   setClosingStep(4);
                   setIsPeriodClosed(true);
-                  alert('عملیات بستن حساب‌های موقت، انتقال به سود انباشته و صدور سند اختتامیه با موفقیت انجام گردید.');
                 }}
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg cursor-pointer"
               >

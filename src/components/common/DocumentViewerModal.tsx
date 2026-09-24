@@ -107,7 +107,20 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               </div>
             </div>
             <button
-              onClick={() => alert(`دانلود فایل ${item.attachmentName} آغاز شد.`)}
+              onClick={() => {
+                const blob = new Blob(
+                  [`پیوست سند شرکت پیمانکاری\nنام فایل: ${item.attachmentName}\nشماره سند: ${item.docNumber}\nپروژه: ${item.projectName}`],
+                  { type: 'application/pdf' }
+                );
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = item.attachmentName || 'document.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+              }}
               className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />

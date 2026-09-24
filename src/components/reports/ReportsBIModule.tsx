@@ -81,11 +81,12 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
             <span>چاپ گزارش (PDF)</span>
           </button>
           <button
-            onClick={() => alert('خروجی اکسل گزارش مدیریتی با موفقیت دانلود شد.')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
+            disabled
+            title="اتصال به موتور هوش تجاری اکسل"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl text-xs cursor-not-allowed opacity-75"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>خروجی اکسل (Excel)</span>
+            <span>خروجی اکسل (به‌زودی)</span>
           </button>
         </div>
       </div>

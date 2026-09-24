@@ -22,6 +22,8 @@ import {
   User,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
+import { getCurrentPersianYear } from '../../utils/date';
 
 interface ReplenishmentViewProps {
   accounts: PettyCashAccount[];
@@ -56,6 +58,7 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
     `PAYA-${Math.floor(10000000 + Math.random() * 90000000)}`
   );
   const [description, setDescription] = useState('شارژ نوبتی تنخواه کارگاه بر اساس مخارج مصوب دوره');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const targetAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
   const sourceBank = bankAccounts.find((b) => b.id === sourceBankId) || bankAccounts[0];
@@ -70,18 +73,26 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || amount <= 0) {
-      alert('مبلغ شارژ باید بیشتر از صفر باشد.');
+      setFormError('مبلغ شارژ باید بیشتر از صفر باشد.');
       return;
     }
 
     if (sourceBank && amount > sourceBank.balance) {
-      alert('خطا: موجودی حساب بانکی مبدا برای انجام این حواله کافی نمی‌باشد.');
+      setFormError('خطا: موجودی حساب بانکی مبدا برای انجام این حواله کافی نمی‌باشد.');
       return;
     }
+    setFormError(null);
+
+    const docNum = getNextSequentialDocNumber(
+      replenishments.map((r) => r.docNumber),
+      'RPL',
+      4,
+      getCurrentPersianYear()
+    );
 
     const newReplenish: PettyCashReplenishment = {
-      id: `rpl-${Date.now()}`,
-      docNumber: `RPL-1403-00${Math.floor(60 + Math.random() * 40)}`,
+      id: generateUUID(),
+      docNumber: docNum,
       pettyCashId: targetAccount.id,
       pettyCashTitle: targetAccount.title,
       amount,
@@ -274,6 +285,12 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200 text-xs">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
               {/* Target Petty Cash */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">

@@ -64,6 +64,12 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   // Modal State for Slip View & Print
   const [selectedSlipForModal, setSelectedSlipForModal] = useState<PayrollSlip | null>(null);
   const [isAccountingCreated, setIsAccountingCreated] = useState<boolean>(true);
+  const [notification, setNotification] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  const showNotification = (text: string, type: 'success' | 'info' = 'success') => {
+    setNotification({ text, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
 
   // Totals for active month
   const totalGrossSalaries = slips.reduce((acc, s) => acc + s.grossTotalSalary, 0);
@@ -82,7 +88,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         type: 'حقوق و دستمزد',
         description: `ثبت هزینه حقوق، بیمه سهم کارفرما ۲۳٪، بیمه سهم کارگر ۷٪ و مالیات حقوق به تفکیک مراکز هزینه کارگاهی و ستادی`,
       });
-      alert('سند حسابداری حقوق و دستمزد با تفکیک هزینه‌های مستقیم پروژه و سربار صادر گردید.');
+      showNotification('سند حسابداری حقوق و دستمزد با تفکیک هزینه‌های مستقیم پروژه و سربار صادر گردید.');
     }
   };
 
@@ -98,7 +104,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         beneficiaryName: 'بانک عامل - فایل پایا واریز گروهی پرسنل',
         totalAmount: totalNetPayable,
       });
-      alert('دستور پرداخت گروهی خالص حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.');
+      showNotification('دستور پرداخت گروهی خالص حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.');
     }
   };
 
@@ -130,6 +136,15 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
 
   return (
     <div className="space-y-6">
+      {notification && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{notification.text}</span>
+          </div>
+          <button onClick={() => setNotification(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">✕</button>
+        </div>
+      )}
       {/* Top Banner */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

@@ -20,7 +20,9 @@ import {
   FileSpreadsheet,
   Building,
   User,
+  AlertTriangle,
 } from 'lucide-react';
+import { generateUUID } from '../../utils/ids';
 
 interface NewStoreIssueModalProps {
   isOpen: boolean;
@@ -126,6 +128,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
     ]);
   };
 
+  const [formError, setFormError] = useState<string | null>(null);
+
   const removeItemRow = (index: number) => {
     if (items.length <= 1) return;
     setItems((prev) => prev.filter((_, i) => i !== index));
@@ -134,13 +138,14 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!wbsSection.trim()) {
-      alert('لطفاً محل مصرف و فاز WBS را مشخص فرمایید.');
+      setFormError('لطفاً محل مصرف و فاز WBS را مشخص فرمایید.');
       return;
     }
+    setFormError(null);
 
     const randomNum = Math.floor(100 + Math.random() * 900);
     const newIssue: StoreIssueVoucher = {
-      id: `siv-1403-${randomNum}`,
+      id: generateUUID(),
       issueNumber: `حواله خروج ۱۴۰۳/${randomNum}`,
       date: '۱۴۰۳/۰۷/۰۴',
       warehouseId,
@@ -197,6 +202,12 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
           {/* Location & Cost Center */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>

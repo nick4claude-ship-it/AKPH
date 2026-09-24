@@ -423,7 +423,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           isOpen={isNewRequisitionOpen}
           onClose={() => setIsNewRequisitionOpen(false)}
           projects={projects}
-          onSave={(newReq) => {
+          onAddRequisition={(newReq) => {
             setRequisitions((prev) => [newReq, ...prev]);
             setIsNewRequisitionOpen(false);
           }}
@@ -436,8 +436,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           onClose={() => setIsNewOrderOpen(false)}
           projects={projects}
           suppliers={suppliers}
-          requisitions={requisitions}
-          onSave={(newOrder) => {
+          onAddOrder={(newOrder) => {
             setOrders((prev) => [newOrder, ...prev]);
             setIsNewOrderOpen(false);
           }}
@@ -448,7 +447,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
         <NewSupplierModal
           isOpen={isNewSupplierOpen}
           onClose={() => setIsNewSupplierOpen(false)}
-          onSave={(newSup) => {
+          onAddSupplier={(newSup) => {
             setSuppliers((prev) => [newSup, ...prev]);
             setIsNewSupplierOpen(false);
           }}

@@ -20,6 +20,7 @@ import {
   User,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { generateUUID } from '../../utils/ids';
 
 interface PettyCashReconciliationViewProps {
   accounts: PettyCashAccount[];
@@ -65,6 +66,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
   const [actualCountedCash, setActualCountedCash] = useState<number>(expectedBalance);
   const [discrepancyReason, setDiscrepancyReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [notification, setNotification] = useState<string | null>(null);
 
   const discrepancy = actualCountedCash - expectedBalance; // 0 = balanced, < 0 = deficit, > 0 = surplus
 
@@ -79,7 +81,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
     }
 
     const newRecon: PettyCashReconciliation = {
-      id: `rcn-${Date.now()}`,
+      id: generateUUID(),
       reconNumber: `RCN-1403-00${Math.floor(20 + Math.random() * 80)}`,
       pettyCashId: selectedAccount.id,
       pettyCashTitle: selectedAccount.title,
@@ -102,7 +104,8 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
     };
 
     onSaveReconciliation(newRecon);
-    alert('صورتجلسه تسویه و تطبیق تنخواه با موفقیت در سیستم ثبت گردید.');
+    setNotification('صورتجلسه تسویه و تطبیق تنخواه با موفقیت در سیستم ثبت گردید.');
+    setTimeout(() => setNotification(null), 4000);
   };
 
   return (
@@ -116,6 +119,13 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           کنترل فرمول ریاضی: موجودی ابتدای دوره + شارژها - هزینه‌های تاییدشده = موجودی دفتری در برابر شمارش فیزیکی
         </p>
       </div>
+
+      {notification && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold rounded-xl flex items-center gap-2 text-xs animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{notification}</span>
+        </div>
+      )}
 
       {/* Main Reconciliation Calculation Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">

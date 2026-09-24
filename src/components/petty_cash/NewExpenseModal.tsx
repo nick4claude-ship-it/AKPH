@@ -21,6 +21,8 @@ import {
   User,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { generateUUID, getNextSequentialDocNumber } from '../../utils/ids';
+import { getCurrentPersianYear } from '../../utils/date';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -90,6 +92,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     },
   ]);
   const [previewAttachment, setPreviewAttachment] = useState<PettyCashAttachment | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Validation & Duplicate Checking
   const isOverUsable = targetAccount ? amount > targetAccount.usableBalance : false;
@@ -116,7 +119,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const newAtt: PettyCashAttachment = {
-        id: `att-${Date.now()}`,
+        id: generateUUID(),
         name: file.name,
         type: file.type.includes('pdf') ? 'pdf' : 'image',
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -134,21 +137,16 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     e.preventDefault();
 
     if (!amount || amount <= 0) {
-      alert('مبلغ هزینه باید بیشتر از صفر باشد.');
+      setFormError('مبلغ هزینه باید بیشتر از صفر باشد.');
       return;
     }
 
     if (isOverUsable) {
-      alert('خطا: مبلغ هزینه از مانده قابل مصرف این تنخواه بیشتر است.');
+      setFormError('خطا: مبلغ هزینه از مانده قابل مصرف این تنخواه بیشتر است.');
       return;
     }
 
-    if (duplicateExpense) {
-      const confirmed = window.confirm(
-        `هشدار سند تکراری:\nفاکتوری با همین شماره (${invoiceNumber}) و همین مبلغ و فروشنده قبلاً ثبت شده است (سند: ${duplicateExpense.expenseNumber}).\nآیا از ثبت مجدد اطمینان دارید؟`
-      );
-      if (!confirmed) return;
-    }
+    setFormError(null);
 
     if (!targetAccount) return;
 
@@ -164,9 +162,16 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       approvalLevel = 'project_and_finance';
     }
 
+    const expNumber = getNextSequentialDocNumber(
+      existingExpenses.map((e) => e.expenseNumber),
+      'EXP',
+      3,
+      getCurrentPersianYear()
+    );
+
     const newExpense: PettyCashExpense = {
-      id: `exp-${Date.now()}`,
-      expenseNumber: `EXP-1403-0${Math.floor(220 + Math.random() * 800)}`,
+      id: generateUUID(),
+      expenseNumber: expNumber,
       pettyCashId: targetAccount.id,
       pettyCashTitle: targetAccount.title,
       projectId: targetAccount.projectId,
@@ -240,6 +245,12 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
           {/* Target Petty Cash Account Selector & Live Balance Display */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

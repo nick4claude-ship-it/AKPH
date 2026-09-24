@@ -16,7 +16,9 @@ import {
   Truck,
   Plus,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
+import { generateUUID } from '../../utils/ids';
 
 interface NewTransferModalProps {
   isOpen: boolean;
@@ -94,16 +96,19 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
     );
   };
 
+  const [formError, setFormError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (sourceWarehouseId === targetWarehouseId) {
-      alert('انبار مبدأ و مقصد نمی‌توانند یکسان باشند.');
+      setFormError('انبار مبدأ و مقصد نمی‌توانند یکسان باشند.');
       return;
     }
+    setFormError(null);
 
     const randomNum = Math.floor(10 + Math.random() * 90);
     const newTrf: InterWarehouseTransfer = {
-      id: `trf-1403-${randomNum}`,
+      id: generateUUID(),
       transferNumber: `انتقال بین کارگاهی ۰${randomNum}`,
       date: '۱۴۰۳/۰۷/۰۴',
       sourceWarehouseId,
@@ -154,6 +159,12 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
           {/* Source and Target Warehouses */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
             <div>

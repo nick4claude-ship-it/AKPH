@@ -421,13 +421,13 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({
                           <td className="py-2.5 px-3 font-sans text-slate-800">{sc.subcontractorName}</td>
                           <td className="py-2.5 px-3 font-sans">
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px]">
-                              {sc.trade}
+                              {sc.tradeType}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 text-left">{formatCurrencyCompact(sc.contractAmount)}</td>
-                          <td className="py-2.5 px-3 text-left text-blue-700">{formatCurrencyCompact(sc.cumulativeApprovedAmount)}</td>
-                          <td className="py-2.5 px-3 text-left text-emerald-700">{formatCurrencyCompact(sc.cumulativePaidAmount)}</td>
-                          <td className="py-2.5 px-3 text-left text-amber-700 font-bold">{formatCurrencyCompact(sc.payableBalance)}</td>
+                          <td className="py-2.5 px-3 text-left">{formatCurrencyCompact(sc.contractValue)}</td>
+                          <td className="py-2.5 px-3 text-left text-blue-700">{formatCurrencyCompact(sc.approvedStatementsValue)}</td>
+                          <td className="py-2.5 px-3 text-left text-emerald-700">{formatCurrencyCompact(sc.paidValue)}</td>
+                          <td className="py-2.5 px-3 text-left text-amber-700 font-bold">{formatCurrencyCompact(sc.remainingPayableValue)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -441,7 +441,7 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({
                 {projectPettyCash.map((pc) => (
                   <div key={pc.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-slate-900 text-sm">{pc.title}</span>
+                      <span className="font-bold text-slate-900 text-sm">تنخواه {pc.holderName}</span>
                       <span className="text-[10px] bg-slate-100 text-slate-700 font-mono px-2 py-0.5 rounded">
                         {pc.code}
                       </span>
@@ -449,15 +449,15 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({
                     <div className="space-y-1.5 text-xs text-slate-600 mb-4 font-mono">
                       <div className="flex justify-between">
                         <span className="text-slate-400 font-sans">مسئول تنخواه:</span>
-                        <span className="font-sans font-medium text-slate-900">{pc.keeperName}</span>
+                        <span className="font-sans font-medium text-slate-900">{pc.holderName}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400 font-sans">سقف تنخواه:</span>
-                        <span>{formatNumber(pc.ceilingAmount)} تومان</span>
+                        <span>{formatNumber(pc.ceilingLimit)} تومان</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400 font-sans">مانده موجودی نقد:</span>
-                        <strong className="text-emerald-700 font-bold">{formatNumber(pc.currentBalance)} تومان</strong>
+                        <strong className="text-emerald-700 font-bold">{formatNumber(pc.actualBalance)} تومان</strong>
                       </div>
                     </div>
                   </div>

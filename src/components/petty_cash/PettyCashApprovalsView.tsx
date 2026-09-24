@@ -40,8 +40,10 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
   // Rejection & Return Modal States
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnComment, setReturnComment] = useState('');
+  const [returnError, setReturnError] = useState(false);
 
   const pendingList = expenses.filter(
     (e) => e.status === 'pending_approval' || e.status === 'submitted'
@@ -71,9 +73,10 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
   const handleConfirmReject = () => {
     if (!activeExpense || !rejectReason.trim()) {
-      alert('لطفاً دلیل رد فاکتور را به صورت کامل ثبت فرمایید.');
+      setRejectError(true);
       return;
     }
+    setRejectError(false);
     onRejectExpense(activeExpense.id, rejectReason);
     setIsRejectModalOpen(false);
     setRejectReason('');
@@ -81,9 +84,10 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
   const handleConfirmReturn = () => {
     if (!activeExpense || !returnComment.trim()) {
-      alert('لطفاً موارد نیازمند اصلاح را برای ثبت‌کننده تشریح کنید.');
+      setReturnError(true);
       return;
     }
+    setReturnError(false);
     onReturnExpense(activeExpense.id, returnComment);
     setIsReturnModalOpen(false);
     setReturnComment('');
@@ -504,10 +508,18 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
             <p className="text-xs text-slate-600">
               لطفاً علت رد هزینه را به صورت شفاف وارد نمایید (این پیام به تنخواه‌دار اعلام خواهد شد):
             </p>
+            {rejectError && (
+              <p className="text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-200 font-bold">
+                لطفاً دلیل رد فاکتور را وارد فرمایید.
+              </p>
+            )}
             <textarea
               rows={3}
               value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                if (e.target.value.trim()) setRejectError(false);
+              }}
               placeholder="مثال: عدم ارائه برگه باسکول، قیمت غیرمتعارف نسبت به استعلام، نقص مدارک فاکتور رسمی..."
               className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500"
             />
@@ -540,10 +552,18 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
             <p className="text-xs text-slate-600">
               توضیحات و نواقص مدارک را شرح دهید تا کاربر فاکتور را ویرایش و مجدداً ارسال نماید:
             </p>
+            {returnError && (
+              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 font-bold">
+                لطفاً موارد نیازمند اصلاح را برای ثبت‌کننده تشریح کنید.
+              </p>
+            )}
             <textarea
               rows={3}
               value={returnComment}
-              onChange={(e) => setReturnComment(e.target.value)}
+              onChange={(e) => {
+                setReturnComment(e.target.value);
+                if (e.target.value.trim()) setReturnError(false);
+              }}
               placeholder="مثال: کیفیت اسکن فاکتور ناخواناست، لطفاً عکس مجدد واضح‌تر از مهر فروشگاه پیوست کنید..."
               className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
             />

@@ -22,7 +22,9 @@ import {
   Building,
   Truck,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
+import { generateUUID } from '../../utils/ids';
 
 interface NewGoodsReceiptModalProps {
   isOpen: boolean;
@@ -157,6 +159,8 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({
     ]);
   };
 
+  const [formError, setFormError] = useState<string | null>(null);
+
   const removeItemRow = (index: number) => {
     if (items.length <= 1) return;
     setItems((prev) => prev.filter((_, i) => i !== index));
@@ -165,13 +169,14 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplierName.trim()) {
-      alert('لطفاً نام فروشنده/تأمین‌کننده را وارد فرمایید.');
+      setFormError('لطفاً نام فروشنده/تأمین‌کننده را وارد فرمایید.');
       return;
     }
+    setFormError(null);
 
     const randomNum = Math.floor(100 + Math.random() * 900);
     const newReceipt: GoodsReceiptNote = {
-      id: `grn-1403-${randomNum}`,
+      id: generateUUID(),
       receiptNumber: `رسید انبار ۱۴۰۳/${randomNum}`,
       date: '۱۴۰۳/۰۷/۰۴',
       warehouseId,
@@ -232,6 +237,12 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
           {/* Warehouse and Supplier Section */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>

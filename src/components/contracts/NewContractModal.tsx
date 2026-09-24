@@ -5,7 +5,8 @@
 
 import React, { useState } from 'react';
 import { Contract, ContractType, ContractStatus, Project, UserProfile } from '../../types';
-import { X, Building, Calendar, DollarSign, Plus } from 'lucide-react';
+import { X, Building, Calendar, DollarSign, Plus, AlertTriangle } from 'lucide-react';
+import { generateUUID } from '../../utils/ids';
 
 interface NewContractModalProps {
   projects: Project[];
@@ -38,18 +39,20 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   const [advancePaymentPercentage, setAdvancePaymentPercentage] = useState<number>(20);
   const [retentionPercentage, setRetentionPercentage] = useState<number>(10);
   const [description, setDescription] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectTitle.trim() || !employer.trim()) {
-      alert('لطفاً عنوان پیمان و نام کارفرما را وارد فرمایید.');
+      setFormError('لطفاً عنوان پیمان و نام کارفرما را وارد فرمایید.');
       return;
     }
+    setFormError(null);
 
     const proj = projects.find((p) => p.id === projectId);
 
     const newContract: Contract = {
-      id: `cnt-${Date.now()}`,
+      id: generateUUID(),
       code,
       number,
       projectTitle,
@@ -106,6 +109,12 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-slate-700 font-bold mb-1">کد سیستمی قرارداد:</label>

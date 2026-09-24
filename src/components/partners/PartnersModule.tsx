@@ -56,9 +56,9 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({
     const map = new Map<string, any>();
     subcontracts.forEach((sc) => {
       const existing = map.get(sc.subcontractorName) || {
-        id: sc.subcontractorId,
+        id: sc.id,
         name: sc.subcontractorName,
-        trade: sc.trade,
+        trade: sc.tradeType,
         contracts: [],
         totalContractValue: 0,
         totalExecutedAmount: 0,
@@ -70,11 +70,11 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({
       };
 
       existing.contracts.push(sc);
-      existing.totalContractValue += sc.contractAmount;
-      existing.totalExecutedAmount += sc.cumulativeApprovedAmount;
-      existing.totalPaidAmount += sc.cumulativePaidAmount;
-      existing.totalRemainingBalance += sc.payableBalance;
-      existing.totalRetentionHeld += sc.retentionHeld;
+      existing.totalContractValue += sc.contractValue || 0;
+      existing.totalExecutedAmount += sc.approvedStatementsValue || 0;
+      existing.totalPaidAmount += sc.paidValue || 0;
+      existing.totalRemainingBalance += sc.remainingPayableValue || 0;
+      existing.totalRetentionHeld += sc.retentionDeposit || 0;
       existing.projects.add(sc.projectName);
 
       map.set(sc.subcontractorName, existing);
@@ -399,19 +399,19 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({
                     <span className="font-medium text-slate-800">{sup.paymentTerms}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">مدت تحویل کالا:</span>
-                    <span>{sup.leadTimeDays} روز کاری</span>
+                    <span className="text-slate-400">شهر / استان:</span>
+                    <span>{sup.city}</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs mb-3 font-mono">
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                     <span className="text-[10px] text-slate-400 font-sans block">سفارشات خرید (PO):</span>
-                    <strong className="text-slate-900">{sup.totalOrdersCount} سفارش</strong>
+                    <strong className="text-slate-900">{sup.performance?.totalOrdersCount ?? 0} سفارش</strong>
                   </div>
                   <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
                     <span className="text-[10px] text-amber-600 font-sans block">بدهی مانده به تأمین‌کننده:</span>
-                    <strong className="text-amber-800">{formatCurrencyCompact(sup.currentPayableBalance)}</strong>
+                    <strong className="text-amber-800">{formatCurrencyCompact(sup.financials?.currentPayableBalance ?? 0)}</strong>
                   </div>
                 </div>
               </div>
