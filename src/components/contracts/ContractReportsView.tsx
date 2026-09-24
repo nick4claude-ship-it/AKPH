@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
 import { downloadCsv } from '../../utils/export';
+import { useCompany } from '../../store/session';
 
 interface ContractReportsViewProps {
   contracts: Contract[];
@@ -35,6 +36,7 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
   boqItems,
   currentUser,
 }) => {
+  const company = useCompany();
   const [activeReport, setActiveReport] = useState<'progress' | 'statements' | 'receivables' | 'variance'>(
     'progress'
   );
@@ -158,7 +160,7 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
           <div className="flex justify-between items-center pb-3 border-b border-slate-200">
             <div>
               <h3 className="text-sm font-bold text-slate-900">گزارش کارکرد متره شده در برابر سقف قراردادها</h3>
-              <span className="text-[11px] text-slate-500">تاریخ گزارش: مهر ماه ۱۴۰۳ · شرکت سازه گستران پارس</span>
+              <span className="text-[11px] text-slate-500">تاریخ گزارش: مهر ماه ۱۴۰۳ · {company.name}</span>
             </div>
           </div>
 

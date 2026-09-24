@@ -1,13 +1,3 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -17,6 +7,7 @@ import {
   SubcontractorContract,
   SubcontractorProgressStatement,
 } from '../../../types';
+import { demoDataEnabled } from '../demoFlag';
 
 const rawSubcontractorContracts: SubcontractorContract[] = [
   {
@@ -28,7 +19,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
     subcontractorName: 'پیمانکار جزء نمونه ۱ (جوش و اسکلت فلزی)',
-    subcontractorPhone: '۰۹۱۲۳۴۵۶۷۸۹',
+    subcontractorPhone: '۰۹۱۲۰۰۰۰۰۴۶',
     tradeType: 'جوشکاری و اسکلت فلزی',
     contractValue: 2_000_000_000, // ۲ میلیارد تومان (مطابق درخواست کاربر)
     executedValue: 800_000_000, // ۸۰۰ میلیون تومان کارکرد
@@ -43,7 +34,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     advancePaid: 200_000_000,
     retentionDeposit: 50_000_000,
     penaltyOrDeductions: 10_000_000,
-    notes: 'تأمین الکترود و دستگاه جوش اینورتر به عهده پیمانکار جزء؛ تأمین برق کارگاهی و آهن‌آلات با شرکت AKPH.',
+    notes: 'تأمین الکترود و دستگاه جوش اینورتر به عهده پیمانکار جزء؛ تأمین برق کارگاهی و آهن‌آلات با شرکت.',
   },
   {
     id: 'sub-cnt-02',
@@ -54,7 +45,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
     subcontractorName: 'پیمانکار جزء نمونه ۲ (آرماتوربندی و قالب‌بندی)',
-    subcontractorPhone: '۰۹۱۹۸۷۶۵۴۳۲',
+    subcontractorPhone: '۰۹۱۹۰۰۰۰۰۴۷',
     tradeType: 'آرماتوربندی و قالب‌بندی',
     contractValue: 1_500_000_000, // ۱.۵ میلیارد تومان
     executedValue: 950_000_000,
@@ -80,7 +71,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
     subcontractorName: 'پیمانکار جزء نمونه ۳ (بتن‌ریزی و پمپاژ)',
-    subcontractorPhone: '۰۲۱۸۸۸۸۱۹۲۰',
+    subcontractorPhone: '۰۲۱۸-۰۰۰۰۰۰۴۸',
     tradeType: 'بتن‌ریزی و پمپاژ',
     contractValue: 1_200_000_000,
     executedValue: 720_000_000,
@@ -106,7 +97,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     subcontractorName: 'پیمانکار جزء نمونه ۴ (ژئوتکنیک و نیلینگ)',
-    subcontractorPhone: '۰۲۱۲۲۵۵۳۳۴۴',
+    subcontractorPhone: '۰۲۱۲-۰۰۰۰۰۰۴۹',
     tradeType: 'خاک‌برداری و نیلینگ',
     contractValue: 3_500_000_000,
     executedValue: 2_800_000_000,
@@ -132,7 +123,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     subcontractorName: 'پیمانکار جزء نمونه ۵ (تأسیسات الکتریکی)',
-    subcontractorPhone: '۰۹۳۵۱۲۳۴۵۶۷',
+    subcontractorPhone: '۰۹۳۵۰۰۰۰۰۴۸',
     tradeType: 'تأسیسات الکتریکی',
     contractValue: 900_000_000,
     executedValue: 320_000_000,
@@ -158,7 +149,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی البرز',
     subcontractorName: 'پیمانکار جزء نمونه ۶ (تأسیسات مکانیکی)',
-    subcontractorPhone: '۰۲۶۳۲۴۰۵۰۶۰',
+    subcontractorPhone: '۰۲۶۳-۰۰۰۰۰۰۵۰',
     tradeType: 'تأسیسات مکانیکی',
     contractValue: 4_000_000_000,
     executedValue: 1_850_000_000,
@@ -184,7 +175,7 @@ const rawSubcontractorContracts: SubcontractorContract[] = [
     projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی البرز',
     subcontractorName: 'پیمانکار جزء نمونه ۲ (بنّایی و تیغه‌چینی)',
-    subcontractorPhone: '۰۹۱۸۳۳۳۴۴۵۵',
+    subcontractorPhone: '۰۹۱۸۰۰۰۰۰۴۹',
     tradeType: 'بنّایی و تیغه‌چینی',
     contractValue: 850_000_000,
     executedValue: 520_000_000,
@@ -791,5 +782,5 @@ const rawSubcontractorStatements: SubcontractorProgressStatement[] = [
   },
 ];
 
-export const mockSubcontractorContracts: SubcontractorContract[] = isDev() ? rawSubcontractorContracts : [];
-export const mockSubcontractorStatements: SubcontractorProgressStatement[] = isDev() ? rawSubcontractorStatements : [];
+export const mockSubcontractorContracts: SubcontractorContract[] = demoDataEnabled() ? rawSubcontractorContracts : [];
+export const mockSubcontractorStatements: SubcontractorProgressStatement[] = demoDataEnabled() ? rawSubcontractorStatements : [];

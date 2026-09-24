@@ -12,6 +12,7 @@ import { useAppState } from '../../store/AppStore';
 import { Dialog } from '../common/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { useCompany } from '../../store/session';
 
 interface NewContractModalProps {
   projects: Project[];
@@ -26,6 +27,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   onClose,
   onSaveContract,
 }) => {
+  const company = useCompany();
   const existingCodes = useAppState().contracts.map((c) => c.code);
   const [code, setCode] = useState(() => nextDocNumber(existingCodes, 'CNT'));
   const [number, setNumber] = useState('');
@@ -34,7 +36,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   const [employer, setEmployer] = useState('');
   const [executiveBody, setExecutiveBody] = useState('');
   const [consultant, setConsultant] = useState('');
-  const [contractor, setContractor] = useState('شرکت سازه گستران پارس (سهامی عام)');
+  const [contractor, setContractor] = useState(company.legalName);
   const [initialValue, setInitialValue] = useState<number>(0);
   const [contractDate, setContractDate] = useState(() => getRelativePersianDate(0));
   const [startDate, setStartDate] = useState(() => getRelativePersianDate(0));

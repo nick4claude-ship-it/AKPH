@@ -6,6 +6,7 @@ import { X, Printer, Download, Building2, CheckCircle2 } from 'lucide-react';
 import { companyLogo } from '../../assets/images';
 import { Dialog } from '../common/Dialog';
 import { moneyUnitLabel } from '../../utils/money';
+import { useCompany } from '../../store/session';
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
   statements: _statements,
   targetProject,
 }) => {
+  const company = useCompany();
   if (!isOpen) return null;
 
   const handlePrint = () => {
@@ -80,10 +82,10 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
               </div>
               <div>
                 <h1 className="text-base font-extrabold text-slate-900">
-                  شرکت مهندسی و پیمانکاری سازه گستران پارس
+                  {company.legalName}
                 </h1>
                 <p className="text-xs text-slate-600">
-                  سهامی خاص · شماره ثبت: ۴۹۲۱۸۴ · سامانه یکپارچه مدیریت مالی پروژه‌ها
+                  {company.registrationNumber ? `شماره ثبت: ${company.registrationNumber} · ` : ''}سامانه یکپارچه مدیریت مالی پروژه‌ها
                 </p>
                 <p className="text-[11px] text-amber-700 font-bold mt-0.5">
                   گزارش رسمی پایش عملکرد مالی و سودآوری پروژه‌های EPC

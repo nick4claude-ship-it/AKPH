@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Dialog } from '../../common/Dialog';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
+import { useCompany } from '../../../store/session';
 
 interface SubcontractorStatementDetailModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
   onUpdateStatus,
   onOpenPaymentModal,
 }) => {
+  const company = useCompany();
   const [activeTab, setActiveTab] = useState<'details' | 'history' | 'print'>('details');
 
   if (!isOpen || !statement) return null;
@@ -386,7 +388,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
           {activeTab === 'print' && (
             <div className="border border-slate-300 p-8 rounded-xl bg-white text-slate-900 space-y-6 shadow-sm">
               <div className="text-center border-b border-slate-300 pb-4">
-                <h2 className="text-lg font-black">شرکت سازه گستران پارس (سهامی عام)</h2>
+                <h2 className="text-lg font-black">{company.legalName}</h2>
                 <h3 className="text-sm font-bold text-slate-700 mt-1">
                   برگه تأییدیه کارکرد و صورت‌وضعیت پیمانکار جزء
                 </h3>

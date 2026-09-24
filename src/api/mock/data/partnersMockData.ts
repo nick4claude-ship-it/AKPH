@@ -1,12 +1,4 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
+import { demoDataEnabled } from '../demoFlag';
 
 /**
  * @license
@@ -46,14 +38,14 @@ const rawClients: ClientPartner[] = [
   {
     id: 'cli-01',
     code: 'CLI-101',
-    name: 'معاونت فنی و عمرانی شهرداری تهران',
+    name: 'معاونت فنی کارفرمای نمونه ۲',
     type: 'عمومی غیردولتی',
-    nationalId: '14003291823',
-    economicCode: '411239847101',
+    nationalId: '10100000366',
+    economicCode: '411100000023',
     representative: 'دکتر علیرضا صبوری (معاونت نظارت بر پروژه‌های بزرگ)',
-    phone: '۰۲۱-۹۶۰۱۵۵۰۰',
+    phone: '۰۲۱-۰۰۰۰۰۰۳۰',
     email: 'technical@example.com',
-    address: 'تهران، خیابان بهشت، ساختمان مرکزی شهرداری تهران',
+    address: 'تهران، خیابان نمونه ۱۲، پلاک ۱۲',
     activeProjectsCount: 1,
     totalContractValue: 94_000_000_000,
     totalApprovedRevenue: 68_000_000_000,
@@ -76,14 +68,14 @@ const rawClients: ClientPartner[] = [
   {
     id: 'cli-02',
     code: 'CLI-102',
-    name: 'شرکت سرمایه‌گذاری توسعه ساختمان تابان',
+    name: 'کارفرمای نمونه ۱ (سرمایه‌گذاری تابان)',
     type: 'خصوصی',
-    nationalId: '10103829104',
-    economicCode: '411192837465',
+    nationalId: '10100000371',
+    economicCode: '411100000024',
     representative: 'مهندس محمدرضا شریفی (مدیرعامل هلدینگ تابان)',
-    phone: '۰۲۱-۸۸۷۷۶۶۵۵',
+    phone: '۰۲۱-۰۰۰۰۰۰۳۱',
     email: 'info@example.com',
-    address: 'تهران، خیابان ولیعصر، بالاتر از پارک ساعی، برج تابان، طبقه ۱۴',
+    address: 'تهران، خیابان نمونه ۱۳، پلاک ۱۳',
     activeProjectsCount: 1,
     totalContractValue: 185_000_000_000,
     totalApprovedRevenue: 124_000_000_000,
@@ -106,14 +98,14 @@ const rawClients: ClientPartner[] = [
   {
     id: 'cli-03',
     code: 'CLI-103',
-    name: 'شرکت مهندسی و توسعه گاز ایران',
+    name: 'کارفرمای نمونه ۶ (شرکت گاز)',
     type: 'دولتی',
-    nationalId: '10100492819',
-    economicCode: '411394857102',
+    nationalId: '10100000385',
+    economicCode: '411100000025',
     representative: 'مهندس احمد کریمی (مجری خطوط انتقال گاز)',
-    phone: '۰۲۱-۸۸۹۹۰۰۱۱',
+    phone: '۰۲۱-۰۰۰۰۰۰۳۲',
     email: 'contracts@example.com',
-    address: 'تهران، خیابان طالقانی، نبش خیابان شهید سپهبد قرنی',
+    address: 'تهران، خیابان نمونه ۱۴، پلاک ۱۴',
     activeProjectsCount: 1,
     totalContractValue: 62_000_000_000,
     totalApprovedRevenue: 48_500_000_000,
@@ -138,12 +130,12 @@ const rawClients: ClientPartner[] = [
     code: 'CLI-104',
     name: 'تعاونی مسکن کارکنان دانشگاه علوم پزشکی',
     type: 'خصوصی',
-    nationalId: '10382910492',
-    economicCode: '411928374019',
+    nationalId: '10100000390',
+    economicCode: '411100000026',
     representative: 'دکتر سید مهدی حسینی (رئیس هیئت مدیره تعاونی)',
-    phone: '۰۲۱-۶۶۴۴۲۲۱۱',
+    phone: '۰۲۱-۰۰۰۰۰۰۳۳',
     email: 'maskan@example.com',
-    address: 'تهران، ولنجک، خیابان یمن، دانشگاه علوم پزشکی، ساختمان تعاونی',
+    address: 'تهران، خیابان نمونه ۱۵، پلاک ۱۵',
     activeProjectsCount: 1,
     totalContractValue: 48_000_000_000,
     totalApprovedRevenue: 45_200_000_000,
@@ -166,14 +158,14 @@ const rawClients: ClientPartner[] = [
   {
     id: 'cli-05',
     code: 'CLI-105',
-    name: 'سازمان بنادر و دریانوردی استان هرمزگان',
+    name: 'کارفرمای نمونه ۸ (سازمان بندری)',
     type: 'دولتی',
-    nationalId: '10100293841',
-    economicCode: '411293847561',
+    nationalId: '10100000406',
+    economicCode: '411100000027',
     representative: 'مهندس بیژن افشار (معاونت زیرساخت و توسعه اسکله‌ها)',
-    phone: '۰۷۶-۳۲۲۴۴۰۰۰',
+    phone: '۰۷۶-۰۰۰۰۰۰۳۴',
     email: 'ports@example.com',
-    address: 'بندرعباس، مجتمع بندری شهید رجایی، ساختمان اداری',
+    address: 'بندرعباس، خیابان نمونه ۱۶، پلاک ۱۶',
     activeProjectsCount: 1,
     totalContractValue: 21_500_000_000,
     totalApprovedRevenue: 6_800_000_000,
@@ -195,4 +187,4 @@ const rawClients: ClientPartner[] = [
   },
 ];
 
-export const mockClients: ClientPartner[] = isDev() ? rawClients : [];
+export const mockClients: ClientPartner[] = demoDataEnabled() ? rawClients : [];

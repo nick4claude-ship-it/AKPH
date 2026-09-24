@@ -1,19 +1,10 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import type { PaymentRequest, TreasuryCheck, ProjectCashDesk as CashDesk } from '../../../types';
+import { demoDataEnabled } from '../demoFlag';
 
 
 
@@ -37,8 +28,8 @@ const rawPaymentRequests: PaymentRequest[] = [
     beneficiaryType: 'پیمانکار جزء',
     beneficiaryAccount: {
       bankName: 'بانک ملت',
-      shebaNumber: 'IR890120000000004819203948',
-      accountNumber: '4819203948',
+      shebaNumber: 'IR000120000000000000000034',
+      accountNumber: '0000000034',
     },
     totalAmount: 480_000_000,
     approvedAmount: 480_000_000,
@@ -65,12 +56,12 @@ const rawPaymentRequests: PaymentRequest[] = [
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
     costCenterId: 'cc-prj101-01',
-    beneficiaryName: 'شرکت سهامی ذوب‌آهن اصفهان',
+    beneficiaryName: 'تأمین‌کننده نمونه ۶ (فولاد و مقاطع ساختمانی)',
     beneficiaryType: 'تأمین‌کننده',
     beneficiaryAccount: {
       bankName: 'بانک تجارت',
-      shebaNumber: 'IR450180000000001849204812',
-      accountNumber: '1849204812',
+      shebaNumber: 'IR000180000000000000000035',
+      accountNumber: '0000000035',
     },
     totalAmount: 1_250_000_000,
     approvedAmount: 1_250_000_000,
@@ -99,8 +90,8 @@ const rawPaymentRequests: PaymentRequest[] = [
     beneficiaryType: 'مسئول تنخواه',
     beneficiaryAccount: {
       bankName: 'بانک پاسارگاد',
-      shebaNumber: 'IR720540000000003849102948',
-      accountNumber: '3849102948',
+      shebaNumber: 'IR000540000000000000000036',
+      accountNumber: '0000000036',
     },
     totalAmount: 30_000_000,
     approvedAmount: 30_000_000,
@@ -127,8 +118,8 @@ const rawPaymentRequests: PaymentRequest[] = [
     beneficiaryType: 'پرسنل',
     beneficiaryAccount: {
       bankName: 'بانک رفاه کارگران',
-      shebaNumber: 'IR130130000000009182039481',
-      accountNumber: '9182039481',
+      shebaNumber: 'IR000130000000000000000037',
+      accountNumber: '0000000037',
     },
     totalAmount: 435_000_000,
     approvedAmount: 435_000_000,
@@ -162,8 +153,8 @@ const rawPaymentRequests: PaymentRequest[] = [
     beneficiaryType: 'پیمانکار جزء',
     beneficiaryAccount: {
       bankName: 'بانک صادرات',
-      shebaNumber: 'IR320190000000009281039481',
-      accountNumber: '9281039481',
+      shebaNumber: 'IR000190000000000000000038',
+      accountNumber: '0000000038',
     },
     totalAmount: 185_000_000,
     approvedAmount: 185_000_000,
@@ -179,15 +170,15 @@ const rawTreasuryChecks: TreasuryCheck[] = [
   {
     id: 'chk-01',
     checkType: 'صادره (پرداختی)',
-    sayadNumber: '3109482910394812',
+    sayadNumber: '0000000000000001',
     checkNumber: '891048',
     bankName: 'بانک ملت',
     branch: 'مرکزی',
     amount: 1_200_000_000,
     issueDate: '۱۴۰۳/۰۶/۱۰',
     dueDate: '۱۴۰۳/۰۷/۲۰',
-    drawer: 'شرکت سازه گستران پارس',
-    payee: 'شرکت سهامی ذوب‌آهن اصفهان',
+    drawer: 'شرکت پیمانکاری نمونه',
+    payee: 'تأمین‌کننده نمونه ۶ (فولاد و مقاطع ساختمانی)',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
     relatedDocNumber: 'PO-1403-088',
@@ -196,15 +187,15 @@ const rawTreasuryChecks: TreasuryCheck[] = [
   {
     id: 'chk-02',
     checkType: 'صادره (پرداختی)',
-    sayadNumber: '3109482910394813',
+    sayadNumber: '0000000000000002',
     checkNumber: '891049',
     bankName: 'بانک ملت',
     branch: 'مرکزی',
     amount: 450_000_000,
     issueDate: '۱۴۰۳/۰۶/۱۵',
     dueDate: '۱۴۰۳/۰۷/۱۵',
-    drawer: 'شرکت سازه گستران پارس',
-    payee: 'شرکت سیمان تهران',
+    drawer: 'شرکت پیمانکاری نمونه',
+    payee: 'تأمین‌کننده نمونه ۹ (سیمان)',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
     relatedDocNumber: 'PO-1403-092',
@@ -213,15 +204,15 @@ const rawTreasuryChecks: TreasuryCheck[] = [
   {
     id: 'chk-03',
     checkType: 'وارده (دریافتی)',
-    sayadNumber: '7829104928193847',
+    sayadNumber: '0000000000000003',
     checkNumber: '394810',
     bankName: 'بانک شهر',
     branch: 'شهرداری مرکز',
     amount: 4_500_000_000,
     issueDate: '۱۴۰۳/۰۶/۲۰',
     dueDate: '۱۴۰۳/۰۷/۳۰',
-    drawer: 'معاونت مالی و اقتصاد شهری شهرداری تهران',
-    payee: 'شرکت سازه گستران پارس',
+    drawer: 'معاونت مالی کارفرمای نمونه ۲',
+    payee: 'شرکت پیمانکاری نمونه',
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     relatedDocNumber: 'ST-FAJR-07',
@@ -230,15 +221,15 @@ const rawTreasuryChecks: TreasuryCheck[] = [
   {
     id: 'chk-04',
     checkType: 'وارده (دریافتی)',
-    sayadNumber: '8920193847102938',
+    sayadNumber: '0000000000000004',
     checkNumber: '192847',
     bankName: 'بانک پاسارگاد',
     branch: 'ساعی',
     amount: 8_000_000_000,
     issueDate: '۱۴۰۳/۰۵/۲۵',
     dueDate: '۱۴۰۳/۰۶/۲۵',
-    drawer: 'شرکت سرمایه‌گذاری تابان',
-    payee: 'شرکت سازه گستران پارس',
+    drawer: 'کارفرمای نمونه ۱ (سرمایه‌گذاری تابان)',
+    payee: 'شرکت پیمانکاری نمونه',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
     relatedDocNumber: 'ST-RONIKA-06',
@@ -289,6 +280,6 @@ const rawCashDesks: CashDesk[] = [
   },
 ];
 
-export const mockPaymentRequests: PaymentRequest[] = isDev() ? rawPaymentRequests : [];
-export const mockTreasuryChecks: TreasuryCheck[] = isDev() ? rawTreasuryChecks : [];
-export const mockCashDesks: CashDesk[] = isDev() ? rawCashDesks : [];
+export const mockPaymentRequests: PaymentRequest[] = demoDataEnabled() ? rawPaymentRequests : [];
+export const mockTreasuryChecks: TreasuryCheck[] = demoDataEnabled() ? rawTreasuryChecks : [];
+export const mockCashDesks: CashDesk[] = demoDataEnabled() ? rawCashDesks : [];

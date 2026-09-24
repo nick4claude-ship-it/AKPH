@@ -16,6 +16,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../utils/money';
+import { useCompany } from '../../store/session';
 
 interface WarehousesListViewProps {
   warehouses: Warehouse[];
@@ -28,6 +29,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
   projects,
   currentUser,
 }) => {
+  const company = useCompany();
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
       {/* Header */}
@@ -36,7 +38,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
           <div>
             <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
               <WarehouseIcon className="w-4 h-4 text-indigo-600" />
-              شبکه انبارهای مرکزی و کارگاهی سازه گستران پارس
+              شبکه انبارهای مرکزی و کارگاهی {company.name}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               مدیریت فیزیکی انبارها، باراندازهای تخلیه، سرپرستان انبار و کنترل ظرفیت دپوی مصالح

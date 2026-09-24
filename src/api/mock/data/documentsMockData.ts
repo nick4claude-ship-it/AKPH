@@ -1,19 +1,10 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import type { DocumentCategory } from '../../../types';
+import { demoDataEnabled } from '../demoFlag';
 
 /** Seed format of the legacy document register; converted to linked Documents in the store. */
 export interface SeedDocument {
@@ -57,7 +48,7 @@ const rawSystemDocuments: SeedDocument[] = [
     contractId: 'cnt-01',
     contractNumber: '۹۸/۲۴۰۵/ص',
     partnerId: 'cp-cl-01',
-    partnerName: 'شرکت سرمایه‌گذاری توسعه ساختمان تابان',
+    partnerName: 'کارفرمای نمونه ۱ (سرمایه‌گذاری تابان)',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
     fileSize: '۱۴.۲ MB',
@@ -104,7 +95,7 @@ const rawSystemDocuments: SeedDocument[] = [
     statementId: 'stm-04',
     statementNumber: 'صورت‌وضعیت ۸',
     partnerId: 'cp-cl-01',
-    partnerName: 'شرکت سرمایه‌گذاری تابان',
+    partnerName: 'کارفرمای نمونه ۱ (سرمایه‌گذاری تابان)',
     partnerType: 'کارفرما',
     fileFormat: 'XLSX',
     fileSize: '۸.۶ MB',
@@ -160,20 +151,20 @@ const rawSystemDocuments: SeedDocument[] = [
     counterpartyId: 'cp-sup-01',
     contractId: 'cnt-01',
     docNumber: 'INV-DOC-ZOB-101',
-    title: 'فاکتور رسمی الکترونیکی سامانه مودیان خرید میلگرد از ذوب‌آهن',
+    title: 'فاکتور رسمی الکترونیکی سامانه مودیان خرید میلگرد از تأمین‌کننده نمونه ۶',
     category: 'فاکتور خرید تأمین‌کننده',
     date: '۱۴۰۳/۰۶/۲۸',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
     partnerId: 'cp-sup-01',
-    partnerName: 'شرکت سهامی ذوب‌آهن اصفهان',
+    partnerName: 'تأمین‌کننده نمونه ۶ (فولاد و مقاطع ساختمانی)',
     partnerType: 'تأمین‌کننده',
     fileFormat: 'PDF',
     fileSize: '۱.۱ MB',
     status: 'معتبر و جاری',
     confidentiality: 'عادی',
     registeredBy: 'مدیر تدارکات',
-    tags: ['فاکتور رسمی', 'سامانه مودیان', 'میلگرد', 'ذوب‌آهن', 'ارزش افزوده'],
+    tags: ['فاکتور رسمی', 'سامانه مودیان', 'میلگرد', 'تأمین‌کننده نمونه ۶', 'ارزش افزوده'],
     description: 'خرید ۳۵ تن میلگرد با کد مالیاتی یکتا و محاسبه ۱۰٪ مالیات بر ارزش افزوده قانونی.',
   },
   {
@@ -188,7 +179,7 @@ const rawSystemDocuments: SeedDocument[] = [
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     partnerId: 'cp-cl-02',
-    partnerName: 'معاونت فنی و عمرانی شهرداری تهران',
+    partnerName: 'معاونت فنی کارفرمای نمونه ۲',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
     fileSize: '۳.۲ MB',
@@ -210,14 +201,14 @@ const rawSystemDocuments: SeedDocument[] = [
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     partnerId: 'cp-cl-02',
-    partnerName: 'معاونت فنی و عمرانی شهرداری تهران',
+    partnerName: 'معاونت فنی کارفرمای نمونه ۲',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
     fileSize: '۰.۹ MB',
     status: 'معتبر و جاری',
     confidentiality: 'محرمانه مدیریت',
     registeredBy: 'مهندس محمدرضا رادمنش',
-    tags: ['مکاتبات', 'شهرداری تهران', 'مطالبات معوق', 'ماده ۳۷'],
+    tags: ['مکاتبات', 'کارفرمای نمونه ۲', 'مطالبات معوق', 'ماده ۳۷'],
     description: 'ابلاغ رسمی تبعات مالی و توقف احتمالی به دلیل تعویق بیش از ۶۰ روزه در پرداخت مطالبات تایید شده تقاطع فجر.',
   },
   {
@@ -244,4 +235,4 @@ const rawSystemDocuments: SeedDocument[] = [
   },
 ];
 
-export const mockSystemDocuments: SeedDocument[] = isDev() ? rawSystemDocuments : [];
+export const mockSystemDocuments: SeedDocument[] = demoDataEnabled() ? rawSystemDocuments : [];

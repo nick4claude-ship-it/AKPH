@@ -14,7 +14,7 @@ import { DocumentViewerModal } from './components/common/DocumentViewerModal';
 import { LoginModal } from './components/auth/LoginModal';
 import { AiAgentWidget } from './components/dashboard/AiAgentWidget';
 import { useAppState } from './store/AppStore';
-import { useCurrentUser, usePermission, useSession } from './store/session';
+import { useCompany, useCurrentUser, useDemoBanner, usePermission, useSession } from './store/session';
 import { useToastListener } from './store/toast';
 import { useApprovalActions } from './store/useApprovalActions';
 import { selectProjects, selectKpiItems } from './store/selectors';
@@ -97,6 +97,8 @@ const SERVER_BACKED_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/n
 /** App shell: the session (user, currency, data source) is provided by main.tsx. */
 export default function App() {
   const user = useCurrentUser();
+  const company = useCompany();
+  const demoBanner = useDemoBanner();
   const { session, switchUser, devUsers, sourceLabel, isDemoData } = useSession();
   const { can } = usePermission();
   const location = useLocation();
@@ -161,14 +163,14 @@ export default function App() {
       />
 
       <div className={`flex-1 transition-all duration-300 flex flex-col min-h-screen ${sidebarCollapsed ? 'mr-20' : 'mr-68'}`}>
-        {isDemoData && (
+        {demoBanner && (
           <div className="bg-amber-400 text-slate-950 text-xs font-bold text-center py-1.5 px-4" role="status">
-            نسخه نمایشی — اطلاعات با تازه‌کردن صفحه پاک می‌شود
+            {demoBanner}
           </div>
         )}
         <Header
           title={pageTitle}
-          subtitle="سامانه مدیریت جامع پیمانکاری و ساخت‌وساز · شرکت سازه گستران پارس"
+          subtitle={`سامانه مدیریت جامع پیمانکاری و ساخت‌وساز · ${company.name}`}
           projects={projects}
           selectedProjectId={selectedProjectId}
           onSelectProject={(id) => setSelectedProjectId(id)}
@@ -259,7 +261,7 @@ export default function App() {
 
         <footer className="no-print mt-auto py-4 px-6 border-t border-slate-200 bg-white/60 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            سامانه جامع مدیریت پروژه‌ها و حسابداری پیمانکاری · <strong className="text-slate-700">شرکت سازه گستران پارس</strong>
+            سامانه جامع مدیریت پروژه‌ها و حسابداری پیمانکاری · <strong className="text-slate-700">{company.name}</strong>
           </div>
           <div className="flex items-center gap-3 text-[11px] font-mono">
             <span>عملیات ← تأیید ← رویداد مالی ← حسابداری</span>

@@ -163,6 +163,16 @@ export interface UserProfile {
 
 export type User = UserProfile;
 
+/** The contractor company that runs this installation (letterheads, print headers, footer). */
+export interface CompanyProfile {
+  /** Short name shown in the sidebar, header and footer. */
+  name: string;
+  /** Full legal name for letterheads and printed documents. */
+  legalName: string;
+  nationalId?: string;
+  registrationNumber?: string;
+}
+
 export type TimeRange = 'this_month' | 'last_3_months' | 'last_6_months' | 'current_year' | 'custom';
 
 // ==================== PHASE 2: ACCOUNTING MODULE TYPES ====================
@@ -682,7 +692,7 @@ export interface Contract {
   executiveBody?: string; // دستگاه اجرایی
   consultant?: string; // مهندس مشاور
   consultantId?: string; // ارجاع به مشاور
-  contractor: string; // پیمانکار (سازه گستران پارس)
+  contractor: string; // پیمانکار (شرکت صاحب سامانه)
   initialValue: number; // مبلغ اولیه قرارداد
   approvedChangesValue: number; // مبلغ الحاقیه‌ها و دستورکارهای مصوب
   currentValue: number; // مبلغ فعلی قرارداد (اولیه + تغییرات)

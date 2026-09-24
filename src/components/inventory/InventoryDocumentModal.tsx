@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Dialog } from '../common/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { useCompany } from '../../store/session';
 
 interface InventoryDocumentModalProps {
   receipt: GoodsReceiptNote | null;
@@ -39,6 +40,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
   onReturnFromProject,
   onReturnToSupplier,
 }) => {
+  const company = useCompany();
   const [returnMaterialId, setReturnMaterialId] = useState('');
   const [returnQty, setReturnQty] = useState('');
   const [returnReason, setReturnReason] = useState('');
@@ -57,7 +59,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
         <div className="px-6 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between no-print">
           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
             <FileText className="w-4 h-4 text-indigo-600" />
-            <span>پیش‌نمایش سند رسمی انبارداری سازه گستران پارس</span>
+            <span>پیش‌نمایش سند رسمی انبارداری {company.name}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -125,7 +127,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
           <div className="border-b-2 border-slate-900 pb-4 flex items-center justify-between">
             <div className="text-right">
               <h1 className="text-base font-black text-slate-900">
-                شرکت سازه گستران پارس (سهامی خاص)
+                {company.legalName}
               </h1>
               <p className="text-[11px] text-slate-500 font-medium">
                 سامانه مکانیزه انبارداری، مدیریت مصالح و زنجیره تأمین پروژه‌ها

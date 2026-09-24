@@ -12,9 +12,10 @@ export { isFinalJournalEntry } from './types';
  * Picks the data source once at startup: inside WordPress (window.PaydarPortal.restUrl is set by the
  * paydar-portal plugin) the REST implementation, otherwise the demo data. Each implementation is a
  * separate chunk, so the production WordPress bundle never downloads the demo dataset.
+ * The GitHub Pages build (VITE_PAGES=true) is demo only: it never talks to a server, whatever the page defines.
  */
 export async function createDataSource(): Promise<DataSource> {
-  if (window.PaydarPortal?.restUrl) {
+  if (import.meta.env.VITE_PAGES !== 'true' && window.PaydarPortal?.restUrl) {
     const { createWordPressDataSource } = await import('./wordpress');
     return createWordPressDataSource();
   }

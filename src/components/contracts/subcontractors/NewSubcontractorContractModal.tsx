@@ -174,7 +174,7 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
               <label className="text-xs font-bold text-slate-700 block mb-1.5">شماره تماس / همراه:</label>
               <input
                 type="text"
-                placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                placeholder="۰۹۱۲۰۰۰۰۰۰۰"
                 value={subcontractorPhone}
                 onChange={(e) => setSubcontractorPhone(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"

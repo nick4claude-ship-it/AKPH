@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 type Call = { method: string; url: string; headers: Record<string, string>; body?: unknown };
 const calls: Call[] = [];
 const responses: Record<string, unknown> = {
-  'GET me': { id: 7, display_name: 'حسابدار وردپرس', email: 'a@x.ir', role: 'paydar_accountant', project_ids: [] },
+  'GET me': { id: 7, display_name: 'حسابدار وردپرس', email: 'a@example.com', role: 'paydar_accountant', project_ids: [] },
   'GET accounting/settings': { currency: 'toman', fiscal_year: 1405, closed_fiscal_years: [1403] },
   'GET projects': [{ id: 'p1', code: 'PRJ-1', name: 'پروژه آزمون', status: 'در حال اجرا', contract_amount: 1_000_000_000 }],
   'GET accounting/accounts': [

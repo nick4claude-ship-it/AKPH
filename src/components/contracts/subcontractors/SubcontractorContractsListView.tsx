@@ -136,7 +136,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
           <span className="text-base font-black text-rose-700">
             {formatMoneyCompact(totalDebt)}
           </span>
-          <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">بدهی فوری AKPH</span>
+          <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">بدهی فوری شرکت</span>
         </div>
       </div>
 

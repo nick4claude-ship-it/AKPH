@@ -15,6 +15,8 @@ export interface PaydarPortalConfig {
   userId?: string | number;
   displayName?: string;
   role?: string;
+  /** WordPress site title (get_bloginfo('name')); shown as the company name. */
+  siteName?: string;
   /** Optional runtime permission hook; it can never allow approving one's own document. */
   can?: (action: string, user: unknown, context?: unknown) => boolean;
   accounting?: {

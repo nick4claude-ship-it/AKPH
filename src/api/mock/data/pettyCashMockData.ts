@@ -1,13 +1,3 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
-
 import {
   PettyCashAccount,
   PettyCashExpense,
@@ -18,6 +8,7 @@ import {
   PettyCashAttachment,
   PettyCashSettings,
 } from '../../../types';
+import { demoDataEnabled } from '../demoFlag';
 
 // ==================== 1. PETTY CASH ACCOUNTS (تنخواه‌گردان‌ها) ====================
 export const initialPettyCashAccounts: PettyCashAccount[] = [
@@ -28,7 +19,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     title: 'تنخواه کارگاه برج تجاری رونیکا',
     holderName: 'مهندس محمدرضا شایان‌پور',
     holderRole: 'سرپرست کارگاه',
-    holderPhone: '0912-1102948',
+    holderPhone: '0912-0000033',
     projectId: 'prj-101',
     projectName: 'برج تجاری رونیکا',
     costCenterId: 'cc-prj101-01',
@@ -45,7 +36,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     monthlySpent: 72_000_000,
     lastReplenishmentDate: '۱۴۰۳/۰۶/۲۵',
     lastReplenishmentAmount: 50_000_000,
-    notes: 'کارت تنخواه شماره ۶۱۰۴-۳۳۷۸-۹۰۱۲-۴۴۹۱ نزد بانک ملت به نام کارگاه',
+    notes: 'کارت تنخواه شماره ۰۰۰۰-۰۰۰۰-۰۰۰۰-۰۰۰۱ نزد بانک ملت به نام کارگاه',
   },
   {
     id: 'pc-101-pm',
@@ -102,7 +93,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     title: 'تنخواه کارگاه تقاطع بزرگراه فجر',
     holderName: 'مهندس بهمن کاظمی',
     holderRole: 'سرپرست کارگاه',
-    holderPhone: '0912-3349182',
+    holderPhone: '0912-0000034',
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     costCenterId: 'cc-prj102-01',
@@ -128,7 +119,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     title: 'تنخواه کارگاه بیمارستان البرز',
     holderName: 'مهندس احسان صادقی',
     holderRole: 'مدیر پروژه و ناظر اجرایی',
-    holderPhone: '0912-5509123',
+    holderPhone: '0912-0000035',
     projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی تخصصی البرز',
     costCenterId: 'cc-prj103-01',
@@ -154,7 +145,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     title: 'تنخواه کارگاه مسکونی نیلوفر',
     holderName: 'مهندس وحید پورحسینی',
     holderRole: 'سرپرست کارگاه',
-    holderPhone: '0912-7712904',
+    holderPhone: '0912-0000036',
     projectId: 'prj-104',
     projectName: 'مجتمع مسکونی نیلوفر',
     costCenterId: 'cc-prj104-01',
@@ -180,7 +171,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     title: 'تنخواه تدارکات ستاد مرکزی تهران',
     holderName: 'آقای مجتبی رحمانی',
     holderRole: 'کارپرداز ارشد ستادی',
-    holderPhone: '0912-8890123',
+    holderPhone: '0912-0000037',
     projectId: 'prj-101',
     projectName: 'دفتر مرکزی تهران',
     costCenterId: 'cc-hq',
@@ -218,8 +209,8 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     category: 'مصالح',
     subCategory: 'سیمان و گروت ساختمانی',
     amount: 18_500_000,
-    vendor: 'فروشگاه مصالح ساختمانی خلیج فارس',
-    vendorNationalId: '10100492810',
+    vendor: 'فروشگاه مصالح ساختمانی نمونه',
+    vendorNationalId: '10100000411',
     invoiceNumber: 'INV-98210',
     invoiceDate: '۱۴۰۳/۰۷/۰۱',
     description: 'خرید ۳۵ کیسه گروت پایه سیمانی پرمقاومت و ۵۰ کیسه پودر سنگ جهت آب‌بندی چاله آسانسور',
@@ -264,7 +255,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     category: 'سوخت',
     subCategory: 'گازوئیل ژنراتور و ماشین‌آلات',
     amount: 24_000_000,
-    vendor: 'جایگاه سوخت شماره ۲۴۴ فتح',
+    vendor: 'جایگاه سوخت نمونه',
     invoiceNumber: 'GAS-449102',
     invoiceDate: '۱۴۰۳/۰۷/۰۱',
     description: 'خرید ۴,۰۰۰ لیتر گازوئیل صنعتی برای ژنراتورهای تامین برق بتن‌ریزی شبانه پایه پل',
@@ -309,7 +300,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     category: 'ماشین‌آلات',
     subCategory: 'اجاره جرثقیل و بالابر',
     amount: 11_000_000,
-    vendor: 'خدمات جرثقیل کفی برادران رستمی',
+    vendor: 'خدمات جرثقیل نمونه',
     invoiceNumber: 'CRS-1092',
     invoiceDate: '۱۴۰۳/۰۶/۳۱',
     description: 'کرایه جرثقیل ۱۰ تن کفی بابت بارگیری و انتقال قالب‌های فلزی مدولار پایه‌ها',
@@ -458,7 +449,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     category: 'تعمیرات',
     subCategory: 'تعمیرات فوری ماشین‌آلات',
     amount: 14_500_000,
-    vendor: 'تعمیرگاه هیدرولیک و پمپ بتن پارس',
+    vendor: 'تعمیرگاه نمونه (هیدرولیک و پمپ بتن)',
     invoiceNumber: 'REP-40192',
     invoiceDate: '۱۴۰۳/۰۶/۲۶',
     description: 'تعمیر اضطراری جک هیدرولیک بالابر مصالح و تعویض کاسه‌نمد و شیلنگ‌های فشارقوی',
@@ -505,7 +496,7 @@ export const initialPettyCashExpenses: SeedPettyCashExpense[] = [
     category: 'اداری',
     subCategory: 'ملزومات مصرفی و چاپ',
     amount: 9_200_000,
-    vendor: 'پخش لوازم‌التحریر آریانا',
+    vendor: 'فروشگاه لوازم‌التحریر نمونه',
     invoiceNumber: 'OF-3091',
     invoiceDate: '۱۴۰۳/۰۶/۲۵',
     description: 'خرید کاغذ A4، کارتریج پرینتر، زونکن‌های بایگانی اسناد مناقصه و دفاتر مهندسی',
@@ -855,7 +846,7 @@ export const initialPettyCashCategories: PettyCashCategoryItem[] = [
   },
 ];
 
-export const mockPettyCashAccounts: PettyCashAccount[] = isDev() ? initialPettyCashAccounts : [];
+export const mockPettyCashAccounts: PettyCashAccount[] = demoDataEnabled() ? initialPettyCashAccounts : [];
 /** Stored petty cash policy (editable in Settings). */
 export const initialPettyCashSettings: PettyCashSettings = {
   fundLimits: {
@@ -874,4 +865,4 @@ export const initialPettyCashSettings: PettyCashSettings = {
   lowBalancePercent: 25,
 };
 
-export const mockPettyCashExpenses: SeedPettyCashExpense[] = isDev() ? initialPettyCashExpenses : [];
+export const mockPettyCashExpenses: SeedPettyCashExpense[] = demoDataEnabled() ? initialPettyCashExpenses : [];

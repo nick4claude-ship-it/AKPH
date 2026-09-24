@@ -19,6 +19,7 @@ import {
 } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
+import { useCompany } from '../../store/session';
 
 interface BankAndCashViewProps {
   bankAccounts: BankAccount[];
@@ -33,6 +34,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
   reconciliationItems,
   onTriggerReconciliation,
 }) => {
+  const company = useCompany();
   const [activeTab, setActiveTab] = useState<'banks' | 'cash' | 'reconciliation'>('banks');
   const [selectedBankId, setSelectedBankId] = useState<string>(bankAccounts[0]?.id || '');
 
@@ -73,7 +75,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
         </div>
 
         <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-          خزانه‌داری متمرکز شرکت سازه گستران پارس
+          خزانه‌داری متمرکز {company.name}
         </span>
       </div>
 

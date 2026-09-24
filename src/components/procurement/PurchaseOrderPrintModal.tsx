@@ -4,6 +4,7 @@ import { PurchaseOrder } from '../../types';
 import { Dialog } from '../common/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { formatPercent } from '../../utils/formatters';
+import { useCompany } from '../../store/session';
 
 interface PurchaseOrderPrintModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
   onClose,
   order,
 }) => {
+  const company = useCompany();
   if (!isOpen || !order) return null;
 
   const handlePrint = () => {
@@ -33,7 +35,7 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800">پیش‌نمایش و چاپ برگ سفارش رسمی خرید (PO)</h3>
-              <p className="text-xs text-slate-500 font-mono">{order.poNumber} - شرکت بین‌المللی سازه گستران پارس</p>
+              <p className="text-xs text-slate-500 font-mono">{order.poNumber} - {company.legalName}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -63,7 +65,7 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
                   SGP
                 </div>
                 <div>
-                  <h1 className="text-lg font-black text-slate-900">شرکت مهندسی و ساختمانی سازه گستران پارس</h1>
+                  <h1 className="text-lg font-black text-slate-900">{company.legalName}</h1>
                   <p className="text-xs text-slate-500 font-medium">معاونت اجرایی و مدیریت تدارکات و تأمین کالا (EPC)</p>
                 </div>
               </div>
@@ -95,8 +97,8 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
                 <Building className="w-4 h-4 text-indigo-600" />
                 <span>مشخصات خریدار / کارفرما</span>
               </div>
-              <div><span className="text-slate-400">نام شرکت:</span> <span className="font-bold">سازه گستران پارس (سهامی خاص)</span></div>
-              <div><span className="text-slate-400">شناسه ملی:</span> <span className="font-mono">10103892015</span></div>
+              <div><span className="text-slate-400">نام شرکت:</span> <span className="font-bold">{company.legalName}</span></div>
+              <div><span className="text-slate-400">شناسه ملی:</span> <span className="font-mono">{company.nationalId || '-'}</span></div>
               <div><span className="text-slate-400">پروژه مقصد:</span> <span className="font-bold text-indigo-700">{order.projectName}</span></div>
               <div><span className="text-slate-400">محل دقیق تخلیه:</span> <span>{order.destinationWarehouse}</span></div>
             </div>

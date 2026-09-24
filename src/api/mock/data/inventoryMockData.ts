@@ -1,13 +1,3 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -22,6 +12,7 @@ import {
   StocktakeAudit,
   KardexEntry,
 } from '../../../types';
+import { demoDataEnabled } from '../demoFlag';
 
 const rawWarehouses: Warehouse[] = [
   {
@@ -32,7 +23,7 @@ const rawWarehouses: Warehouse[] = [
     location: 'تهران - جاده مخصوص کرج، کیلومتر ۱۴، انبار مرکزی پارس',
     type: 'مرکزی',
     keeperName: 'مهندس منصور قدیری',
-    phone: '۰۲۱-۴۴۹۸۲۱۰۰',
+    phone: '۰۲۱-۰۰۰۰۰۰۲۹',
     areaM2: 8500,
     status: 'فعال',
     itemsCount: 142,
@@ -47,7 +38,7 @@ const rawWarehouses: Warehouse[] = [
     location: 'تهران - خیابان ولیعصر، تقاطع میرداماد، محوطه کارگاهی ضلع غربی',
     type: 'کارگاهی',
     keeperName: 'محسن کرمی',
-    phone: '۰۹۱۲-۳۴۵۶۷۸۱',
+    phone: '۰۹۱۲-۰۰۰۰۰۲۳',
     areaM2: 1200,
     status: 'فعال',
     itemsCount: 68,
@@ -62,7 +53,7 @@ const rawWarehouses: Warehouse[] = [
     location: 'شیراز - محدوده عملیات پایه‌های پل، دپوی روباز',
     type: 'موقت کارگاهی',
     keeperName: 'مهندس کاظمی',
-    phone: '۰۹۱۷-۱۱۲۲۳۳۴',
+    phone: '۰۹۱۷-۰۰۰۰۰۲۴',
     areaM2: 400,
     status: 'موقت',
     itemsCount: 0,
@@ -77,7 +68,7 @@ const rawWarehouses: Warehouse[] = [
     location: 'تهران - شهرک غرب، بلوار فرحزادی، جنب خیابان کوهستان',
     type: 'کارگاهی',
     keeperName: 'بهنام صالحی',
-    phone: '۰۹۱۲-۸۹۰۱۲۳۴',
+    phone: '۰۹۱۲-۰۰۰۰۰۲۵',
     areaM2: 950,
     status: 'فعال',
     itemsCount: 54,
@@ -92,7 +83,7 @@ const rawWarehouses: Warehouse[] = [
     location: 'کرج - عظیمیه، بلوار طالقانی شمالی، سایت بیمارستان',
     type: 'کارگاهی',
     keeperName: 'داریوش فرزانه',
-    phone: '۰۹۱۹-۲۳۴۵۶۷۸',
+    phone: '۰۹۱۹-۰۰۰۰۰۲۶',
     areaM2: 2400,
     status: 'فعال',
     itemsCount: 89,
@@ -104,10 +95,10 @@ const rawWarehouses: Warehouse[] = [
     name: 'انبار کارگاهی تصفیه‌خانه چابهار',
     projectId: 'prj-104',
     projectName: 'تصفیه‌خانه صنعتی چابهار',
-    location: 'چابهار - منطقه آزاد تجاری صنعتی، سایت پتروشیمی نگین مکران',
+    location: 'چابهار - منطقه آزاد تجاری صنعتی، سایت پروژه نمونه',
     type: 'کارگاهی',
     keeperName: 'عبدالستار ریگی',
-    phone: '۰۹۱۵-۳۴۵۶۷۸۹',
+    phone: '۰۹۱۵-۰۰۰۰۰۲۷',
     areaM2: 3200,
     status: 'فعال',
     itemsCount: 76,
@@ -122,7 +113,7 @@ const rawWarehouses: Warehouse[] = [
     location: 'مازندران - کیلومتر ۱۲ جاده نور به رویان، کمپ مهندسی شماره ۲',
     type: 'کارگاهی',
     keeperName: 'سهراب احمدی',
-    phone: '۰۹۱۱-۵۶۷۸۹۰۱',
+    phone: '۰۹۱۱-۰۰۰۰۰۲۸',
     areaM2: 4500,
     status: 'فعال',
     itemsCount: 42,
@@ -134,7 +125,7 @@ export const mockMaterialItems: MaterialItem[] = [
   {
     id: 'mat-001',
     code: 'MAT-STE-001',
-    name: 'میلگرد آجدار A3 نمره ۲۰ - ذوب‌آهن اصفهان',
+    name: 'میلگرد آجدار A3 نمره ۲۰ - کارخانه نمونه الف',
     category: 'آهن‌آلات و میلگرد',
     unit: 'کیلوگرم',
     specifications: 'طول ۱۲ متری، تنش تسلیم ۴۰۰ مگاپاسکال، استاندارد ملی ۳۱۳۲',
@@ -151,7 +142,7 @@ export const mockMaterialItems: MaterialItem[] = [
   {
     id: 'mat-002',
     code: 'MAT-STE-002',
-    name: 'میلگرد آجدار A3 نمره ۱۶ - فولاد کویر کاشان',
+    name: 'میلگرد آجدار A3 نمره ۱۶ - کارخانه نمونه ب',
     category: 'آهن‌آلات و میلگرد',
     unit: 'کیلوگرم',
     specifications: 'طول ۱۲ متری، آج جناقی، مقاومت کششی استاندارد',
@@ -168,7 +159,7 @@ export const mockMaterialItems: MaterialItem[] = [
   {
     id: 'mat-003',
     code: 'MAT-STE-003',
-    name: 'تیرآهن نمره ۲۴ IPE - ذوب‌آهن اصفهان',
+    name: 'تیرآهن نمره ۲۴ IPE - کارخانه نمونه الف',
     category: 'آهن‌آلات و میلگرد',
     unit: 'شاخه',
     specifications: 'طول ۱۲ متری، وزن هر شاخه ۳۷۰ کیلوگرم، استاندارد EN 10025',
@@ -185,7 +176,7 @@ export const mockMaterialItems: MaterialItem[] = [
   {
     id: 'mat-004',
     code: 'MAT-CEM-001',
-    name: 'سیمان پرتلند تیپ ۲ - سیمان تهران (کیسه‌ای)',
+    name: 'سیمان پرتلند تیپ ۲ - کارخانه نمونه ج (کیسه‌ای)',
     category: 'سیمان، بتن و فرآورده‌های بتنی',
     unit: 'کیسه ۵۰ کیلویی',
     specifications: 'مقاومت فشاری ۲۸ روزه بالای ۴۲.۵ مگاپاسکال، بسته‌بندی ۳ لایه ضد رطوبت',
@@ -307,7 +298,7 @@ export const mockMaterialItems: MaterialItem[] = [
     name: 'قالب فلزی مدولار بتن‌ریزی لبه ۵ سانت ۵۰×۱۰۰',
     category: 'ابزارآلات و تجهیزات قالب‌بندی',
     unit: 'عدد',
-    specifications: 'ورق فولادی ۳ میل مبارکه، جوش CO2 تمیز، تسمه‌ای تقویت‌شده',
+    specifications: 'ورق فولادی ۳ میل، جوش CO2 تمیز، تسمه‌ای تقویت‌شده',
     standardGrade: 'Modular Formwork 3mm',
     reorderLevel: 200,
     minSafetyStock: 100,
@@ -353,9 +344,9 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
     supplierName: 'تأمین‌کننده نمونه ۱ (فولاد و آهن‌آلات)',
     invoiceNumber: 'INV-ZOB-98214',
     waybillNumber: 'BL-887412-IR',
-    truckPlateNumber: '۱۲ ع ۷۸۵ ایران ۶۸',
+    truckPlateNumber: '۰۰ ب ۰۰۱ ایران ۰۰',
     driverName: 'قدرت‌الله صفایی',
-    driverPhone: '۰۹۱۳-۲۱۴۸۸۹۰',
+    driverPhone: '۰۹۱۳-۰۰۰۰۰۲۹',
     weighbridgeSlipNumber: 'WB-101-0941',
     grossWeightKg: 42180,
     tareWeightKg: 16420,
@@ -368,7 +359,7 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
       {
         materialId: 'mat-001',
         materialCode: 'MAT-STE-001',
-        materialName: 'میلگرد آجدار A3 نمره ۲۰ - ذوب‌آهن اصفهان',
+        materialName: 'میلگرد آجدار A3 نمره ۲۰ - کارخانه نمونه الف',
         unit: 'کیلوگرم',
         orderedQty: 25500,
         deliveredQty: 25760,
@@ -398,12 +389,12 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
     projectId: 'prj-103',
     projectName: 'بیمارستان تخصصی البرز',
     supplierId: 'sup-tehrancement',
-    supplierName: 'شرکت سیمان تهران',
+    supplierName: 'تأمین‌کننده نمونه ۹ (سیمان)',
     invoiceNumber: 'INV-CEM-44120',
     waybillNumber: 'BL-993214-IR',
-    truckPlateNumber: '۵۴ ج ۱۲۳ ایران ۲۱',
+    truckPlateNumber: '۰۰ ب ۰۰۲ ایران ۰۰',
     driverName: 'رضا خدابنده',
-    driverPhone: '۰۹۱۲-۹۸۷۴۵۶۱',
+    driverPhone: '۰۹۱۲-۰۰۰۰۰۳۰',
     weighbridgeSlipNumber: 'WB-103-0782',
     grossWeightKg: 38400,
     tareWeightKg: 14400,
@@ -416,7 +407,7 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
       {
         materialId: 'mat-004',
         materialCode: 'MAT-CEM-001',
-        materialName: 'سیمان پرتلند تیپ ۲ - سیمان تهران (کیسه‌ای)',
+        materialName: 'سیمان پرتلند تیپ ۲ - کارخانه نمونه ج (کیسه‌ای)',
         unit: 'کیسه ۵۰ کیلویی',
         orderedQty: 480,
         deliveredQty: 480,
@@ -449,9 +440,9 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
     supplierName: 'تأمین‌کننده نمونه ۵ (تجهیزات و اتصالات)',
     invoiceNumber: 'INV-ALV-7712',
     waybillNumber: 'BL-110943-IR',
-    truckPlateNumber: '۸۵ د ۴۵۶ ایران ۵۴',
+    truckPlateNumber: '۰۰ ب ۰۰۳ ایران ۰۰',
     driverName: 'جلال بلوچ',
-    driverPhone: '۰۹۱۵-۷۸۹۰۱۲۳',
+    driverPhone: '۰۹۱۵-۰۰۰۰۰۳۱',
     qualityCertificateNumber: 'CERT-ASTM-106',
     qcApprovalStatus: 'تأیید کامل',
     qcInspectorName: 'مهندس رسول دانایی (ناظر تاسیسات)',
@@ -493,9 +484,9 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
     supplierName: 'تأمین‌کننده نمونه ۱ (فولاد و آهن‌آلات)',
     invoiceNumber: 'INV-KAV-6631',
     waybillNumber: 'BL-445890-IR',
-    truckPlateNumber: '۳۴ ط ۹۲۱ ایران ۱۱',
+    truckPlateNumber: '۰۰ ب ۰۰۴ ایران ۰۰',
     driverName: 'اسماعیل فراهانی',
-    driverPhone: '۰۹۱۲-۱۱۸۴۵۶۷',
+    driverPhone: '۰۹۱۲-۰۰۰۰۰۳۲',
     weighbridgeSlipNumber: 'WB-CEN-1204',
     grossWeightKg: 39500,
     tareWeightKg: 15200,
@@ -507,7 +498,7 @@ const rawGoodsReceipts: GoodsReceiptNote[] = [
       {
         materialId: 'mat-002',
         materialCode: 'MAT-STE-002',
-        materialName: 'میلگرد آجدار A3 نمره ۱۶ - فولاد کویر کاشان',
+        materialName: 'میلگرد آجدار A3 نمره ۱۶ - کارخانه نمونه ب',
         unit: 'کیلوگرم',
         orderedQty: 24300,
         deliveredQty: 24300,
@@ -552,7 +543,7 @@ const rawStoreIssues: StoreIssueVoucher[] = [
       {
         materialId: 'mat-001',
         materialCode: 'MAT-STE-001',
-        materialName: 'میلگرد آجدار A3 نمره ۲۰ - ذوب‌آهن اصفهان',
+        materialName: 'میلگرد آجدار A3 نمره ۲۰ - کارخانه نمونه الف',
         unit: 'کیلوگرم',
         requestedQty: 12000,
         issuedQty: 12000,
@@ -611,7 +602,7 @@ const rawStoreIssues: StoreIssueVoucher[] = [
       {
         materialId: 'mat-004',
         materialCode: 'MAT-CEM-001',
-        materialName: 'سیمان پرتلند تیپ ۲ - سیمان تهران (کیسه‌ای)',
+        materialName: 'سیمان پرتلند تیپ ۲ - کارخانه نمونه ج (کیسه‌ای)',
         unit: 'کیسه ۵۰ کیلویی',
         requestedQty: 120,
         issuedQty: 120,
@@ -637,7 +628,7 @@ const rawStoreIssues: StoreIssueVoucher[] = [
     costCenter: 'پایپینگ صنعتی و خطوط انتقال',
     wbsSection: 'حوضچه‌های ته‌نشینی شماره ۱ و ۲',
     subcontractorId: 'sub-pipe-03',
-    subcontractorName: 'شرکت فنی مهندسی اروند سازه جنوب',
+    subcontractorName: 'پیمانکار جزء نمونه ۸ (سازه)',
     tradeType: 'لوله کشی صنعتی مانیسمان و فیتینگ',
     isSubcontractorContra: true,
     subcontractorStatementDeductionRef: 'ماده ۴ قرارداد - کسر متریال فاکتور شده کارگاهی',
@@ -676,7 +667,7 @@ const rawInterTransfers: InterWarehouseTransfer[] = [
     targetProjectId: 'prj-103',
     waybillNumber: 'TRF-BL-88120',
     driverName: 'رمضان خسروی',
-    truckPlate: '۳۳ ب ۷۷۸ ایران ۱۱',
+    truckPlate: '۰۰ ب ۰۰۵ ایران ۰۰',
     items: [
       {
         materialId: 'mat-009',
@@ -713,12 +704,12 @@ const rawInterTransfers: InterWarehouseTransfer[] = [
     targetProjectId: 'prj-102',
     waybillNumber: 'TRF-BL-99214',
     driverName: 'مجید بهرامی',
-    truckPlate: '۶۱ د ۲۳۴ ایران ۶۸',
+    truckPlate: '۰۰ ب ۰۰۶ ایران ۰۰',
     items: [
       {
         materialId: 'mat-001',
         materialCode: 'MAT-STE-001',
-        materialName: 'میلگرد آجدار A3 نمره ۲۰ - ذوب‌آهن اصفهان',
+        materialName: 'میلگرد آجدار A3 نمره ۲۰ - کارخانه نمونه الف',
         unit: 'کیلوگرم',
         quantity: 8500,
         unitCost: 29500,
@@ -792,7 +783,7 @@ const rawKardexRecords: KardexEntry[] = [
     docType: 'رسید ورود انبار',
     docNumber: 'GRN-1403-055',
     warehouseName: 'انبار برج رونیکا',
-    counterparty: 'ذوب‌آهن اصفهان',
+    counterparty: 'تأمین‌کننده نمونه ۶',
     inQty: 30000,
     outQty: 0,
     balanceQty: 30000,
@@ -820,7 +811,7 @@ const rawKardexRecords: KardexEntry[] = [
     docType: 'رسید ورود انبار',
     docNumber: 'GRN-1403-084',
     warehouseName: 'انبار برج رونیکا',
-    counterparty: 'ذوب‌آهن اصفهان',
+    counterparty: 'تأمین‌کننده نمونه ۶',
     inQty: 25760,
     outQty: 0,
     balanceQty: 45760,
@@ -857,8 +848,8 @@ const rawKardexRecords: KardexEntry[] = [
   },
 ];
 
-export const mockWarehouses: Warehouse[] = isDev() ? rawWarehouses : [];
-export const mockGoodsReceipts: GoodsReceiptNote[] = isDev() ? rawGoodsReceipts : [];
-export const mockStoreIssues: StoreIssueVoucher[] = isDev() ? rawStoreIssues : [];
-export const mockInterTransfers: InterWarehouseTransfer[] = isDev() ? rawInterTransfers : [];
-export const mockKardexRecords: KardexEntry[] = isDev() ? rawKardexRecords : [];
+export const mockWarehouses: Warehouse[] = demoDataEnabled() ? rawWarehouses : [];
+export const mockGoodsReceipts: GoodsReceiptNote[] = demoDataEnabled() ? rawGoodsReceipts : [];
+export const mockStoreIssues: StoreIssueVoucher[] = demoDataEnabled() ? rawStoreIssues : [];
+export const mockInterTransfers: InterWarehouseTransfer[] = demoDataEnabled() ? rawInterTransfers : [];
+export const mockKardexRecords: KardexEntry[] = demoDataEnabled() ? rawKardexRecords : [];

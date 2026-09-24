@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { Project, UserProfile, PayrollSlip } from '../../types';
 import { useAppState } from '../../store/AppStore';
-import { usePermission } from '../../store/session';
+import { usePermission, useCompany } from '../../store/session';
 import { Dialog } from '../common/Dialog';
 import { useWorkflows } from '../../store/useWorkflows';
 import { useNavigate } from 'react-router-dom';
@@ -46,6 +46,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   currentUser,
   onToast,
 }) => {
+  const company = useCompany();
   const wf = useWorkflows();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'payroll_slips' | 'employees' | 'timesheets'>('payroll_slips');
@@ -484,7 +485,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
             {/* Header of Slip */}
             <div className="flex items-center justify-between pb-4 border-b-2 border-slate-900 mb-4">
               <div>
-                <span className="text-[10px] text-slate-400 font-mono block">شرکت سازه گستران پارس (سهامی خاص)</span>
+                <span className="text-[10px] text-slate-400 font-mono block">{company.legalName}</span>
                 <h3 className="text-base font-bold text-slate-900">فیش حقوق و دستمزد ماهانه پرسنل</h3>
                 <span className="text-xs text-slate-600 font-mono">دوره: {selectedSlipForModal.monthYear} • شماره فیش: {selectedSlipForModal.slipNumber}</span>
               </div>

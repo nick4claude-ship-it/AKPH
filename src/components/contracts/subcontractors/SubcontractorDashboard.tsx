@@ -30,6 +30,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { formatMoneyCompact, moneyUnitLabel, formatInt } from '../../../utils/money';
+import { useCompany } from '../../../store/session';
 
 interface SubcontractorDashboardProps {
   contracts: SubcontractorContract[];
@@ -56,6 +57,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
   onGoToApprovals,
   onPayStatement,
 }) => {
+  const company = useCompany();
   // Interactive Filter state
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedTrade, setSelectedTrade] = useState<string>('all');
@@ -147,7 +149,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                 </span>
               </div>
               <p className="text-xs text-amber-100/90 mt-1">
-                کنترل مالی و گردش کار مطالبات جوشکاران، آرماتوربندان، اکیپ‌های بتن‌ریزی، تأسیسات و نازک‌کاری پروژه‌های AKPH
+                کنترل مالی و گردش کار مطالبات جوشکاران، آرماتوربندان، اکیپ‌های بتن‌ریزی، تأسیسات و نازک‌کاری پروژه‌های {company.name}
               </p>
             </div>
           </div>

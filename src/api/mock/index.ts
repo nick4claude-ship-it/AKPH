@@ -10,7 +10,7 @@ import { getCurrentFiscalYear } from '../../utils/date';
 import type { DataSource, PortalSession, StoreChange } from '../types';
 import { buildMockState } from './buildState';
 import { registerDocNumbers } from '../../utils/ids';
-import { mockUsers } from './seeds';
+import { demoCompany, mockUsers } from './seeds';
 
 /** Project ids a project manager may see; undefined for roles that see every project. */
 function projectScope(user: UserProfile, state: AppState): string[] | undefined {
@@ -64,6 +64,7 @@ export function createMockDataSource(): DataSource {
         user: { ...base, projectIds: projectScope(base, state) },
         currency: 'toman',
         fiscalYear: getCurrentFiscalYear(),
+        company: demoCompany,
       };
     },
 

@@ -60,7 +60,7 @@ import { ContractReportsView } from './ContractReportsView';
 import { ContractDocumentsView } from './ContractDocumentsView';
 import { useAppState, useStoreSlice } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { usePermission } from '../../store/session';
+import { usePermission, useCompany } from '../../store/session';
 import { generateUUID } from '../../utils/ids';
 import { toPersianDate, toPersianTime } from '../../utils/date';
 import { selectStatementPayments } from '../../store/domainSelectors';
@@ -102,6 +102,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   onPosted,
   onToast,
 }) => {
+  const company = useCompany();
   const appState = useAppState();
   const wf = useWorkflows();
   const { can } = usePermission();
@@ -276,8 +277,8 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     <div className="space-y-6">
       {/* =========================================================================
           TOP LEVEL PRIMARY DUAL MODE SELECTOR (Requested explicitly by USER):
-          1. صورت‌وضعیت کارفرما (Client Progress Statements - پول ورودی به AKPH)
-          2. صورت‌وضعیت پیمانکاران جزء (Subcontractor Progress Statements - پول خروجی از AKPH)
+          1. صورت‌وضعیت کارفرما (Client Progress Statements - پول ورودی به {company.name})
+          2. صورت‌وضعیت پیمانکاران جزء (Subcontractor Progress Statements - پول خروجی از {company.name})
           ========================================================================= */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-2.5 text-white shadow-md border border-slate-700">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -295,7 +296,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
               <div className="text-right">
                 <span className="block">صورت‌وضعیت و مطالبات کارفرما (Client)</span>
                 <span className={`text-[10px] block font-normal ${mainMode === 'client' ? 'text-slate-900' : 'text-slate-400'}`}>
-                  پولی که AKPH از کارفرما مطالبه می‌کند (درآمد و وصولی)
+                  پولی که {company.name} از کارفرما مطالبه می‌کند (درآمد و وصولی)
                 </span>
               </div>
               <span
@@ -320,7 +321,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
               <div className="text-right">
                 <span className="block">صورت‌وضعیت و تعهدات پیمانکاران جزء (Subcontractors)</span>
                 <span className={`text-[10px] block font-normal ${mainMode === 'subcontractor' ? 'text-slate-900' : 'text-slate-400'}`}>
-                  پولی که جوشکار، آرماتوربند، بنّا، تأسیسات و... از AKPH مطالبه می‌کنند
+                  پولی که جوشکار، آرماتوربند، بنّا، تأسیسات و... از {company.name} مطالبه می‌کنند
                 </span>
               </div>
               <div className="flex items-center gap-1 mr-1">

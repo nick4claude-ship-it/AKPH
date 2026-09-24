@@ -27,6 +27,7 @@ import { Dialog } from '../common/Dialog';
 import { formatMoney, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
 import { downloadCsv } from '../../utils/export';
 import { formatPercent } from '../../utils/formatters';
+import { useCompany } from '../../store/session';
 
 interface StatementDetailAndPrintModalProps {
   statement: DetailedProgressStatement;
@@ -43,6 +44,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   onUpdateStatus,
   onIssueAccountingEntry,
 }) => {
+  const company = useCompany();
   const [activeView, setActiveView] = useState<'detail' | 'print_preview'>('detail');
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
@@ -419,7 +421,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                   <div className="flex items-center gap-2">
                     <Building className="w-6 h-6 text-slate-900" />
                     <span className="text-base font-black text-slate-900 tracking-tight">
-                      شرکت مهندسی و پیمانکاری سازه گستران پارس
+                      {company.legalName}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-600 block mt-1">
@@ -467,7 +469,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">پیمانکار:</span>
-                  <span className="font-bold">سازه گستران پارس</span>
+                  <span className="font-bold">{company.name}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">تعدیل آحادبها:</span>
@@ -545,7 +547,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               <div className="pt-6 border-t-2 border-slate-400 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-[10px]">
                 <div className="space-y-12">
                   <div>
-                    <span className="font-bold text-slate-800 block">پیمانکار - سازه گستران پارس</span>
+                    <span className="font-bold text-slate-800 block">پیمانکار - {company.name}</span>
                     <span className="text-slate-500 block">سرپرست کارگاه و مدیر پروژه</span>
                   </div>
                   <div className="border-t border-dashed border-slate-400 pt-1 text-slate-400">

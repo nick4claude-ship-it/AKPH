@@ -228,7 +228,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
           <span className="text-base font-black text-rose-700">
             {formatMoneyCompact(totalRemaining)}
           </span>
-          <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">تعهد فوری AKPH</span>
+          <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">تعهد فوری شرکت</span>
         </div>
       </div>
 

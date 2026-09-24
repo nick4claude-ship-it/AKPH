@@ -8,17 +8,9 @@ import {
   UserProfile,
 } from '../../../types';
 import { getRelativePersianDate } from '../../../utils/date';
-import { executiveAvatar, projectFajrInterchange, projectRonikaTower } from '../../../assets/images';
+import { defaultAvatar, projectFajrInterchange, projectRonikaTower } from '../../../assets/images';
+import { demoDataEnabled } from '../demoFlag';
 
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
 
 /** Demo users, one per paydar-portal role (used only by the DEV role switcher). */
 export const mockUsers: UserProfile[] = [
@@ -27,35 +19,35 @@ export const mockUsers: UserProfile[] = [
     name: 'کاربر مدیر ارشد نمونه',
     role: 'مدیر ارشد',
     email: 'ceo@example.com',
-    avatar: executiveAvatar,
+    avatar: defaultAvatar,
   },
   {
     id: 'usr-002',
     name: 'کاربر حسابدار نمونه',
     role: 'حسابدار',
     email: 'accountant@example.com',
-    avatar: executiveAvatar,
+    avatar: defaultAvatar,
   },
   {
     id: 'usr-003',
     name: 'کاربر مدیر پروژه نمونه ۱',
     role: 'مدیر پروژه',
     email: 'pm1@example.com',
-    avatar: executiveAvatar,
+    avatar: defaultAvatar,
   },
   {
     id: 'usr-005',
     name: 'کاربر مدیر پروژه نمونه ۲',
     role: 'مدیر پروژه',
     email: 'pm2@example.com',
-    avatar: executiveAvatar,
+    avatar: defaultAvatar,
   },
   {
     id: 'usr-004',
     name: 'کاربر مدیر سیستم نمونه',
     role: 'مدیر سیستم',
     email: 'admin@example.com',
-    avatar: executiveAvatar,
+    avatar: defaultAvatar,
   },
 ];
 
@@ -115,7 +107,7 @@ const rawProjects: Project[] = [
     siteSupervisor: 'کاربر سرپرست کارگاه نمونه ۱',
     costCenterIds: ['cc-prj102-01', 'cc-prj102-02'],
     contractIds: ['cnt-02'],
-    client: 'کارفرمای نمونه ۲ (شهرداری تهران)',
+    client: 'کارفرمای نمونه ۲ (شهرداری)',
     contractAmount: 94_000_000_000,
     recordedRevenue: 68_000_000_000,
     cost: 59_200_000_000,
@@ -284,4 +276,4 @@ const rawProjects: Project[] = [
   },
 ];
 
-export const mockProjects: Project[] = isDev() ? rawProjects : [];
+export const mockProjects: Project[] = demoDataEnabled() ? rawProjects : [];
