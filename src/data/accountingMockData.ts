@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 import {
   AccountNode,
   BankAccount,
@@ -72,6 +82,7 @@ export const mockChartOfAccounts: AccountNode[] = [
               { code: '11301', title: 'سپرده حسن انجام کار نزد کارفرما (۱۰٪)', level: 'تفصیلی', nature: 'بدهکار', balance: 32_100_000_000, turnoverDebit: 35_000_000_000, turnoverCredit: 2_900_000_000 },
               { code: '11302', title: 'سپرده بیمه ماده ۳۸ نزد کارفرما (۵٪)', level: 'تفصیلی', nature: 'بدهکار', balance: 15_400_000_000, turnoverDebit: 18_000_000_000, turnoverCredit: 2_600_000_000 },
               { code: '11303', title: 'مساعده و وام کارکنان و کارگاه', level: 'تفصیلی', nature: 'بدهکار', balance: 1_000_000_000, turnoverDebit: 9_000_000_000, turnoverCredit: 8_000_000_000 },
+              { code: '11304', title: 'مالیات بر ارزش افزوده خرید (اعتبار مالیاتی)', level: 'تفصیلی', nature: 'بدهکار', balance: 4_200_000_000, turnoverDebit: 12_000_000_000, turnoverCredit: 7_800_000_000 },
             ],
           },
           {
@@ -177,12 +188,40 @@ export const mockChartOfAccounts: AccountNode[] = [
           },
           {
             code: '214',
+            title: 'کالای دریافتی فاکتورنشده (حساب موقت انبار)',
+            level: 'معین',
+            nature: 'بستانکار',
+            balance: 18_400_000_000,
+            turnoverDebit: 52_000_000_000,
+            turnoverCredit: 70_400_000_000,
+            children: [
+              { code: '21401', title: 'کالای دریافتی فاکتورنشده (رسید انبار باز)', level: 'تفصیلی', nature: 'بستانکار', balance: 18_400_000_000, turnoverDebit: 52_000_000_000, turnoverCredit: 70_400_000_000 },
+            ],
+          },
+          {
+            code: '215',
             title: 'حقوق و دستمزد پرداختنی پرسنل ستاد و کارگاه',
             level: 'معین',
             nature: 'بستانکار',
             balance: 5_000_000_000,
             turnoverDebit: 12_000_000_000,
             turnoverCredit: 17_000_000_000,
+            children: [
+              { code: '21501', title: 'حقوق و مزایای پرداختنی پرسنل', level: 'تفصیلی', nature: 'بستانکار', balance: 5_000_000_000, turnoverDebit: 12_000_000_000, turnoverCredit: 17_000_000_000 },
+            ],
+          },
+          {
+            code: '216',
+            title: 'سپرده‌های مکسوره پیمانکاران جزء',
+            level: 'معین',
+            nature: 'بستانکار',
+            balance: 8_200_000_000,
+            turnoverDebit: 2_000_000_000,
+            turnoverCredit: 10_200_000_000,
+            children: [
+              { code: '21601', title: 'سپرده حسن انجام کار مکسوره پیمانکاران جزء', level: 'تفصیلی', nature: 'بستانکار', balance: 5_200_000_000, turnoverDebit: 1_000_000_000, turnoverCredit: 6_200_000_000 },
+              { code: '21602', title: 'سپرده بیمه مکسوره پیمانکاران جزء (ماده ۳۸)', level: 'تفصیلی', nature: 'بستانکار', balance: 3_000_000_000, turnoverDebit: 1_000_000_000, turnoverCredit: 4_000_000_000 },
+            ],
           },
         ],
       },
@@ -232,7 +271,18 @@ export const mockChartOfAccounts: AccountNode[] = [
         turnoverDebit: 0,
         turnoverCredit: 410_500_000_000,
         children: [
-          { code: '411', title: 'درآمد صورت‌وضعیت‌های کارکرد موقت و قطعی', level: 'معین', nature: 'بستانکار', balance: 388_000_000_000, turnoverDebit: 0, turnoverCredit: 388_000_000_000 },
+          {
+            code: '411',
+            title: 'درآمد صورت‌وضعیت‌های کارکرد موقت و قطعی',
+            level: 'معین',
+            nature: 'بستانکار',
+            balance: 388_000_000_000,
+            turnoverDebit: 0,
+            turnoverCredit: 388_000_000_000,
+            children: [
+              { code: '41101', title: 'درآمد تأییدشده کارکرد پروژه‌های عمرانی', level: 'تفصیلی', nature: 'بستانکار', balance: 388_000_000_000, turnoverDebit: 0, turnoverCredit: 388_000_000_000 },
+            ],
+          },
           { code: '412', title: 'درآمد حاصل از تعدیل نرخ پیمان و مابه‌التفاوت مصالح', level: 'معین', nature: 'بستانکار', balance: 22_500_000_000, turnoverDebit: 0, turnoverCredit: 22_500_000_000 },
         ],
       },
@@ -256,9 +306,42 @@ export const mockChartOfAccounts: AccountNode[] = [
         turnoverDebit: 295_700_000_000,
         turnoverCredit: 0,
         children: [
-          { code: '511', title: 'هزینه مصالح مصرفی مستقیم در کارگاه‌ها', level: 'معین', nature: 'بدهکار', balance: 138_000_000_000, turnoverDebit: 138_000_000_000, turnoverCredit: 0 },
-          { code: '512', title: 'دستمزد مستقیم نیروی انسانی و اکیپ‌های بتن‌ریزی و آرماتور', level: 'معین', nature: 'بدهکار', balance: 52_400_000_000, turnoverDebit: 52_400_000_000, turnoverCredit: 0 },
-          { code: '513', title: 'هزینه قراردادهای پیمانکاران جزء و تخصصی', level: 'معین', nature: 'بدهکار', balance: 41_200_000_000, turnoverDebit: 41_200_000_000, turnoverCredit: 0 },
+          {
+            code: '511',
+            title: 'هزینه مصالح مصرفی مستقیم در کارگاه‌ها',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 138_000_000_000,
+            turnoverDebit: 138_000_000_000,
+            turnoverCredit: 0,
+            children: [
+              { code: '51101', title: 'مصالح مصرفی پای کار و انبار کارگاه', level: 'تفصیلی', nature: 'بدهکار', balance: 138_000_000_000, turnoverDebit: 138_000_000_000, turnoverCredit: 0 },
+            ],
+          },
+          {
+            code: '512',
+            title: 'دستمزد مستقیم نیروی انسانی و اکیپ‌های بتن‌ریزی و آرماتور',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 52_400_000_000,
+            turnoverDebit: 52_400_000_000,
+            turnoverCredit: 0,
+            children: [
+              { code: '51201', title: 'حقوق و دستمزد مستقیم اکیپ‌های اجرایی کارگاه', level: 'تفصیلی', nature: 'بدهکار', balance: 52_400_000_000, turnoverDebit: 52_400_000_000, turnoverCredit: 0 },
+            ],
+          },
+          {
+            code: '513',
+            title: 'هزینه قراردادهای پیمانکاران جزء و تخصصی',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 41_200_000_000,
+            turnoverDebit: 41_200_000_000,
+            turnoverCredit: 0,
+            children: [
+              { code: '51301', title: 'کارکرد پیمانکاران جزء و اکیپ‌های پیمانکاری', level: 'تفصیلی', nature: 'بدهکار', balance: 41_200_000_000, turnoverDebit: 41_200_000_000, turnoverCredit: 0 },
+            ],
+          },
           { code: '514', title: 'اجاره و بهره‌برداری ماشین‌آلات و تجهیزات سنگین', level: 'معین', nature: 'بدهکار', balance: 28_600_000_000, turnoverDebit: 28_600_000_000, turnoverCredit: 0 },
           { code: '515', title: 'هزینه کرایه حمل، باربری و باسکول مصالح', level: 'معین', nature: 'بدهکار', balance: 19_500_000_000, turnoverDebit: 19_500_000_000, turnoverCredit: 0 },
           { code: '516', title: 'سوخت، روغن و روانکارهای ماشین‌آلات کارگاهی', level: 'معین', nature: 'بدهکار', balance: 9_200_000_000, turnoverDebit: 9_200_000_000, turnoverCredit: 0 },
@@ -285,7 +368,18 @@ export const mockChartOfAccounts: AccountNode[] = [
         turnoverDebit: 38_100_000_000,
         turnoverCredit: 0,
         children: [
-          { code: '611', title: 'حقوق و مزایای ستاد مرکزی، مهندسی و مدیران', level: 'معین', nature: 'بدهکار', balance: 22_500_000_000, turnoverDebit: 22_500_000_000, turnoverCredit: 0 },
+          {
+            code: '611',
+            title: 'حقوق و مزایای ستاد مرکزی، مهندسی و مدیران',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 22_500_000_000,
+            turnoverDebit: 22_500_000_000,
+            turnoverCredit: 0,
+            children: [
+              { code: '61101', title: 'حقوق و دستمزد ناخالص پرسنل ستادی و مدیریت', level: 'تفصیلی', nature: 'بدهکار', balance: 22_500_000_000, turnoverDebit: 22_500_000_000, turnoverCredit: 0 },
+            ],
+          },
           { code: '612', title: 'اجاره‌بها، قبوض و خدمات دفتر مرکزی تهران', level: 'معین', nature: 'بدهکار', balance: 6_800_000_000, turnoverDebit: 6_800_000_000, turnoverCredit: 0 },
           { code: '613', title: 'هزینه‌های حقوقی، مشاوره مهندسی، داوری و حسابرسی', level: 'معین', nature: 'بدهکار', balance: 4_600_000_000, turnoverDebit: 4_600_000_000, turnoverCredit: 0 },
           { code: '614', title: 'بیمه پرسنل ستادی و مسئولیت مدنی', level: 'معین', nature: 'بدهکار', balance: 4_200_000_000, turnoverDebit: 4_200_000_000, turnoverCredit: 0 },
@@ -300,7 +394,18 @@ export const mockChartOfAccounts: AccountNode[] = [
         turnoverDebit: 6_500_000_000,
         turnoverCredit: 0,
         children: [
-          { code: '621', title: 'کارمزد تمدید ضمانت‌نامه‌های بانکی شرکت در مناقصه و انجام تعهدات', level: 'معین', nature: 'بدهکار', balance: 4_100_000_000, turnoverDebit: 4_100_000_000, turnoverCredit: 0 },
+          {
+            code: '621',
+            title: 'کارمزد تمدید ضمانت‌نامه‌های بانکی شرکت در مناقصه و انجام تعهدات',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 4_100_000_000,
+            turnoverDebit: 4_100_000_000,
+            turnoverCredit: 0,
+            children: [
+              { code: '62101', title: 'کارمزد خدمات بانکی و صدور ضمانت‌نامه‌ها', level: 'تفصیلی', nature: 'بدهکار', balance: 4_100_000_000, turnoverDebit: 4_100_000_000, turnoverCredit: 0 },
+            ],
+          },
           { code: '622', title: 'سود و کارمزد تسهیلات بانکی', level: 'معین', nature: 'بدهکار', balance: 2_400_000_000, turnoverDebit: 2_400_000_000, turnoverCredit: 0 },
         ],
       },
@@ -377,13 +482,14 @@ export const mockCashDesks: CashDesk[] = [
 
 // ==================== 3. COST CENTERS & SUBLEDGERS ====================
 export const mockCostCenters: CostCenter[] = [
-  { id: 'cc-hq', code: 'CC-001', name: 'دفتر مرکزی و ستاد راهبری', type: 'دفتر مرکزی', manager: 'مهندس رادمنش', allocatedCost: 38_100_000_000, budget: 42_000_000_000 },
-  { id: 'cc-prj1', code: 'CC-101', name: 'کارگاه برج تجاری رونیکا', type: 'کارگاه پروژه', manager: 'مهندس شایان پور', allocatedCost: 110_400_000_000, budget: 140_000_000_000 },
-  { id: 'cc-prj2', code: 'CC-102', name: 'کارگاه تقاطع غیرهمسطح بزرگراه فجر', type: 'کارگاه پروژه', manager: 'مهندس کاظمی', allocatedCost: 78_200_000_000, budget: 90_000_000_000 },
-  { id: 'cc-prj3', code: 'CC-103', name: 'کارگاه بیمارستان تخصصی البرز', type: 'کارگاه پروژه', manager: 'دکتر صمدیان', allocatedCost: 92_600_000_000, budget: 110_000_000_000 },
-  { id: 'cc-prj4', code: 'CC-104', name: 'کارگاه مجتمع مسکونی نیلوفر', type: 'کارگاه پروژه', manager: 'مهندس پورحسینی', allocatedCost: 44_200_000_000, budget: 46_000_000_000 },
-  { id: 'cc-prj5', code: 'CC-105', name: 'کارگاه خط انتقال گاز پایانه عسلویه', type: 'کارگاه پروژه', manager: 'مهندس عباسی', allocatedCost: 14_900_000_000, budget: 35_000_000_000 },
-  { id: 'cc-wh', code: 'CC-090', name: 'انبار مرکزی مصالح شورآباد', type: 'انبار مرکزی', manager: 'آقای بهرامی', allocatedCost: 8_200_000_000, budget: 10_000_000_000 },
+  { id: 'cc-hq', projectId: 'prj-101', code: 'CC-001', name: 'دفتر مرکزی و ستاد راهبری', type: 'دفتر مرکزی', manager: 'مهندس نمونه', allocatedCost: 38_100_000_000, budget: 42_000_000_000 },
+  { id: 'cc-prj101-01', projectId: 'prj-101', code: 'CC-101-1', name: 'کارگاه سازه برج رونیکا', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 110_400_000_000, budget: 140_000_000_000 },
+  { id: 'cc-prj101-02', projectId: 'prj-101', code: 'CC-101-2', name: 'کارگاه تأسیسات برج رونیکا', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 40_000_000_000, budget: 50_000_000_000 },
+  { id: 'cc-prj102-01', projectId: 'prj-102', code: 'CC-102-1', name: 'کارگاه پل تقاطع فجر', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 78_200_000_000, budget: 90_000_000_000 },
+  { id: 'cc-prj103-01', projectId: 'prj-103', code: 'CC-103-1', name: 'کارگاه ساختمان بیمارستان البرز', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 92_600_000_000, budget: 110_000_000_000 },
+  { id: 'cc-prj104-01', projectId: 'prj-104', code: 'CC-104-1', name: 'کارگاه مجتمع مسکونی نیلوفر', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 44_200_000_000, budget: 46_000_000_000 },
+  { id: 'cc-prj105-01', projectId: 'prj-105', code: 'CC-105-1', name: 'کارگاه تصفیه‌خانه جنوب', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 14_900_000_000, budget: 35_000_000_000 },
+  { id: 'cc-wh', projectId: 'prj-101', code: 'CC-090', name: 'انبار مرکزی مصالح شورآباد', type: 'انبار مرکزی', manager: 'مهندس نمونه', allocatedCost: 8_200_000_000, budget: 10_000_000_000 },
 ];
 
 export const mockSubledgers: Subledger[] = [
@@ -959,7 +1065,7 @@ export const mockAccountsPayable: AccountsPayableItem[] = [
     id: 'ap-2',
     creditorName: 'سازمان تأمین اجتماعی (حق بیمه پرسنل و پیمان‌ها)',
     type: 'سازمان تأمین اجتماعی',
-    projectId: 'all',
+    projectId: 'prj-101',
     projectName: 'دفتر مرکزی و کلیه پروژه‌ها',
     incurredDebt: 18_200_000_000,
     paidAmount: 4_000_000_000,

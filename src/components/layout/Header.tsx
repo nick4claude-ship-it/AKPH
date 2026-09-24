@@ -12,6 +12,11 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Project, TimeRange, UserProfile, ManagementAlert } from '../../types';
+import {
+  getCurrentFiscalYear,
+  getFormattedCurrentPersianDate,
+  getCurrentPersianMonthName,
+} from '../../utils/date';
 
 interface HeaderProps {
   title: string;
@@ -48,11 +53,14 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
 
+  const currentFiscalYear = getCurrentFiscalYear();
+  const currentMonthName = getCurrentPersianMonthName();
+
   const timeRangeLabels: Record<TimeRange, string> = {
-    this_month: 'این ماه (مهر)',
+    this_month: `این ماه (${currentMonthName})`,
     last_3_months: '۳ ماه اخیر',
     last_6_months: '۶ ماه اخیر',
-    current_year: 'سال جاری (۱۴۰۳)',
+    current_year: `سال جاری (${currentFiscalYear})`,
     custom: 'بازه سفارشی',
   };
 
@@ -66,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
           <h2 className="text-lg font-bold text-slate-900 tracking-tight">{title}</h2>
           <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded font-medium border border-slate-200/80">
             <Calendar className="w-3 h-3 text-slate-400" />
-            چهارشنبه ۲ مهر ۱۴۰۳
+            {getFormattedCurrentPersianDate()}
           </span>
         </div>
         {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}

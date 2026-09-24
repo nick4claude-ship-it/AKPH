@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 import {
   Supplier,
   PurchaseRequisition,
@@ -6,7 +16,7 @@ import {
   VendorInvoice,
 } from '../types';
 
-export const mockSuppliers: Supplier[] = [
+const rawSuppliers: Supplier[] = [
   {
     id: 'sup-101',
     code: 'VEN-101',
@@ -337,7 +347,7 @@ export const mockSuppliers: Supplier[] = [
   },
 ];
 
-export const mockRequisitions: PurchaseRequisition[] = [
+const rawRequisitions: PurchaseRequisition[] = [
   {
     id: 'pr-101',
     requisitionNumber: 'PR-1403-082',
@@ -538,7 +548,7 @@ export const mockRequisitions: PurchaseRequisition[] = [
   },
 ];
 
-export const mockRfqs: RequestForQuotation[] = [
+const rawRfqs: RequestForQuotation[] = [
   {
     id: 'rfq-101',
     rfqNumber: 'RFQ-1403-045',
@@ -752,9 +762,11 @@ export const mockRfqs: RequestForQuotation[] = [
   },
 ];
 
-export const mockPurchaseOrders: PurchaseOrder[] = [
+const rawPurchaseOrders: PurchaseOrder[] = [
   {
     id: 'po-101',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-sup-01',
     poNumber: 'PO-1403-088',
     issueDate: '۱۴۰۳/۰۶/۱۵',
     deliveryDueDate: '۱۴۰۳/۰۶/۲۵',
@@ -805,6 +817,8 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
   },
   {
     id: 'po-102',
+    costCenterId: 'cc-prj103-01',
+    counterpartyId: 'cp-sup-04',
     poNumber: 'PO-1403-089',
     issueDate: '۱۴۰۳/۰۶/۳۰',
     deliveryDueDate: '۱۴۰۳/۰۷/۱۰',
@@ -854,6 +868,8 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
   },
   {
     id: 'po-103',
+    costCenterId: 'cc-prj104-01',
+    counterpartyId: 'cp-sup-05',
     poNumber: 'PO-1403-090',
     issueDate: '۱۴۰۳/۰۶/۲۵',
     deliveryDueDate: '۱۴۰۳/۰۷/۰۵',
@@ -899,6 +915,8 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
   },
   {
     id: 'po-104',
+    costCenterId: 'cc-prj102-01',
+    counterpartyId: 'cp-sup-03',
     poNumber: 'PO-1403-091',
     issueDate: '۱۴۰۳/۰۶/۲۸',
     deliveryDueDate: '۱۴۰۳/۰۷/۰۱',
@@ -944,6 +962,8 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
   },
   {
     id: 'po-105',
+    costCenterId: 'cc-prj104-01',
+    counterpartyId: 'cp-sup-02',
     poNumber: 'PO-1403-092',
     issueDate: '۱۴۰۳/۰۶/۱۸',
     deliveryDueDate: '۱۴۰۳/۰۶/۲۸',
@@ -991,9 +1011,11 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
   },
 ];
 
-export const mockVendorInvoices: VendorInvoice[] = [
+const rawVendorInvoices: VendorInvoice[] = [
   {
     id: 'vinv-101',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-sup-01',
     invoiceNumber: 'INV-ESF-88219',
     systemRefNumber: 'BILL-1403-049',
     invoiceDate: '۱۴۰۳/۰۶/۲۵',
@@ -1004,7 +1026,7 @@ export const mockVendorInvoices: VendorInvoice[] = [
     projectName: 'برج تجاری رونیکا',
     poId: 'po-101',
     poNumber: 'PO-1403-088',
-    grnId: 'grn-01',
+    grnId: 'grn-1403-084',
     grnNumber: 'GRN-1403-094',
     taxRegistrationNumber: '411139485712',
     subtotal: 1_650_000_000,
@@ -1027,6 +1049,8 @@ export const mockVendorInvoices: VendorInvoice[] = [
   },
   {
     id: 'vinv-102',
+    costCenterId: 'cc-prj103-01',
+    counterpartyId: 'cp-sup-04',
     invoiceNumber: 'SAFA-INV-9901',
     systemRefNumber: 'BILL-1403-050',
     invoiceDate: '۱۴۰۳/۰۷/۰۱',
@@ -1037,7 +1061,7 @@ export const mockVendorInvoices: VendorInvoice[] = [
     projectName: 'بیمارستان ۲۵۰ تختخوابی البرز',
     poId: 'po-102',
     poNumber: 'PO-1403-089',
-    grnId: 'grn-02',
+    grnId: 'grn-1403-085',
     grnNumber: 'GRN-1403-102',
     taxRegistrationNumber: '411301948291',
     subtotal: 720_000_000,
@@ -1059,6 +1083,8 @@ export const mockVendorInvoices: VendorInvoice[] = [
   },
   {
     id: 'vinv-103',
+    costCenterId: 'cc-prj104-01',
+    counterpartyId: 'cp-sup-05',
     invoiceNumber: 'INV-PARS-104',
     systemRefNumber: 'BILL-1403-051',
     invoiceDate: '۱۴۰۳/۰۶/۲۸',
@@ -1069,7 +1095,7 @@ export const mockVendorInvoices: VendorInvoice[] = [
     projectName: 'مجتمع مسکونی نیلوفر',
     poId: 'po-105',
     poNumber: 'PO-1403-092',
-    grnId: 'grn-03',
+    grnId: 'grn-1403-086',
     grnNumber: 'GRN-1403-087',
     taxRegistrationNumber: '411684920194',
     subtotal: 280_000_000,
@@ -1092,6 +1118,9 @@ export const mockVendorInvoices: VendorInvoice[] = [
   },
   {
     id: 'vinv-104',
+    costCenterId: 'cc-prj102-01',
+    counterpartyId: 'cp-sup-03',
+    grnId: 'grn-1403-087',
     invoiceNumber: 'CONC-INV-5519',
     systemRefNumber: 'BILL-1403-052',
     invoiceDate: '۱۴۰۳/۰۷/۰۲',
@@ -1121,3 +1150,9 @@ export const mockVendorInvoices: VendorInvoice[] = [
     },
   },
 ];
+
+export const mockSuppliers: Supplier[] = isDev() ? rawSuppliers : [];
+export const mockRequisitions: PurchaseRequisition[] = isDev() ? rawRequisitions : [];
+export const mockRfqs: RequestForQuotation[] = isDev() ? rawRfqs : [];
+export const mockPurchaseOrders: PurchaseOrder[] = isDev() ? rawPurchaseOrders : [];
+export const mockVendorInvoices: VendorInvoice[] = isDev() ? rawVendorInvoices : [];

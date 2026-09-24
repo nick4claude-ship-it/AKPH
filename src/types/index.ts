@@ -1,10 +1,34 @@
 export type ProjectStatus = 'در حال اجرا' | 'تجهیز کارگاه' | 'تحویل موقت' | 'تعلیق' | 'اختتام';
 
+export type CounterpartyKind = 'client' | 'supplier' | 'subcontractor' | 'employee' | 'bank' | 'other';
+
+export interface Counterparty {
+  id: string;
+  kind: CounterpartyKind;
+  name: string;
+  nationalId?: string;
+  economicCode?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  accountNumber?: string;
+  shebaNumber?: string;
+  bankName?: string;
+  tradeType?: string;
+  status?: 'active' | 'inactive';
+}
+
 export interface Project {
   id: string;
   code: string;
   name: string;
-  client: string; // کارفرما
+  clientId: string; // ارجاع به Counterparty با نوع client
+  consultantId: string; // ارجاع به Counterparty با نوع other/مشاور
+  managerUserId: string; // ارجاع به UserProfile
+  siteSupervisor: string; // سرپرست کارگاه
+  costCenterIds: string[]; // شناسه‌های مراکز هزینه پروژه
+  contractIds: string[]; // شناسه‌های قراردادهای پروژه
+  client: string; // نام کارفرما برای نمایش
   contractAmount: number; // مبلغ قرارداد
   recordedRevenue: number; // کارکرد / درآمد ثبت‌شده
   cost: number; // هزینه کل
@@ -88,8 +112,10 @@ export interface PendingApproval {
   docNumber: string; // شماره سند
   projectId: string;
   projectName: string;
-  submitter: string; // ثبت‌کننده
-  costCenter: string; // مرکز هزینه
+  costCenterId: string; // شناسه مرکز هزینه
+  costCenter?: string; // مرکز هزینه برای سازگاری
+  submitter?: string; // ثبت‌کننده
+  counterpartyId?: string; // طرف‌حساب مرتبط
   expenseType: string; // نوع هزینه (فاکتور تنخواه، خرید مستقیم، صورت‌وضعیت پیمانکار جزء...)
   category: ExpenseCategory;
   costClassification: 'مستقیم پروژه' | 'سربار و ستادی';
@@ -99,7 +125,7 @@ export interface PendingApproval {
   date: string;
   status: ApprovalStatus;
   attachmentName: string;
-  counterparty: string; // طرف حساب / فروشنده
+  counterparty?: string; // طرف حساب / فروشنده
   notes?: string;
 }
 
@@ -115,7 +141,9 @@ export interface ProgressStatement {
   number: string; // شماره صورت‌وضعیت
   projectId: string;
   projectName: string;
-  client: string;
+  costCenterId: string; // شناسه مرکز هزینه
+  counterpartyId: string; // شناسه طرف‌حساب (کارفرما)
+  client?: string; // اختیاری برای سازگاری نمایش
   submittedAmount: number; // مبلغ ارسالی پیمانکار
   approvedAmount: number; // مبلغ تأییدشده کارفرما
   receivedAmount: number; // مبلغ دریافتی (Receipt)
@@ -276,12 +304,13 @@ export interface Subledger {
 
 export interface CostCenter {
   id: string;
+  projectId?: string;
   code: string;
   name: string;
-  type: 'کارگاه پروژه' | 'دفتر مرکزی' | 'انبار مرکزی' | 'کارگاه ماشین‌آلات' | 'دفتر فنی';
-  manager: string;
-  allocatedCost: number;
-  budget: number;
+  type?: 'کارگاه پروژه' | 'دفتر مرکزی' | 'انبار مرکزی' | 'کارگاه ماشین‌آلات' | 'دفتر فنی' | string;
+  manager?: string;
+  allocatedCost?: number;
+  budget?: number;
 }
 
 export interface BankAccount {
@@ -314,6 +343,8 @@ export interface ReceiptRecord {
   docNumber: string;
   date: string;
   amount: number;
+  counterpartyId?: string; // شناسه طرف‌حساب واریزکننده
+  costCenterId?: string; // شناسه مرکز هزینه
   payer: string;
   receiver: string;
   projectId?: string;
@@ -331,6 +362,8 @@ export interface PaymentRecord {
   docNumber: string;
   date: string;
   amount: number;
+  counterpartyId?: string; // شناسه طرف‌حساب دریافت‌کننده
+  costCenterId?: string; // شناسه مرکز هزینه
   payee: string;
   payerAccount: string;
   projectId?: string;
@@ -458,12 +491,14 @@ export interface PettyCashExpense {
   pettyCashTitle: string;
   projectId: string;
   projectName: string;
-  costCenter: string;
+  costCenterId?: string; // شناسه مرکز هزینه
+  costCenter?: string; // سازگاری با نمایش
   date: string;
   category: string;
   subCategory: string;
   amount: number;
-  vendor: string; // فروشنده / طرف‌حساب
+  counterpartyId?: string; // ارجاع به طرف‌حساب (فروشنده)
+  vendor?: string; // فروشنده / طرف‌حساب
   vendorNationalId?: string;
   invoiceNumber: string;
   invoiceDate: string;
@@ -605,9 +640,12 @@ export interface Contract {
   projectTitle: string; // عنوان قرارداد و شرح موضوع
   projectId: string;
   projectName: string;
-  employer: string; // کارفرما
-  executiveBody: string; // دستگاه اجرایی
-  consultant: string; // مهندس مشاور
+  counterpartyId: string; // ارجاع به شناسه Counterparty کارفرما
+  costCenterId: string; // ارجاع به شناسه CostCenter
+  employer: string; // کارفرما (برای سازگاری نمایش)
+  executiveBody?: string; // دستگاه اجرایی
+  consultant?: string; // مهندس مشاور
+  consultantId?: string; // ارجاع به مشاور
   contractor: string; // پیمانکار (سازه گستران پارس)
   initialValue: number; // مبلغ اولیه قرارداد
   approvedChangesValue: number; // مبلغ الحاقیه‌ها و دستورکارهای مصوب
@@ -862,7 +900,9 @@ export interface SubcontractorContract {
   title: string; // شرح عملیات (مثلاً جوشکاری اتصالات اسکلت فلزی طبقات ۱ تا ۱۰)
   projectId: string;
   projectName: string;
-  subcontractorName: string; // نام پیمانکار جزء (مثلاً صنایع جوش پارس - قادری)
+  costCenterId: string; // شناسه مرکز هزینه
+  counterpartyId: string; // ارجاع به Counterparty پیمانکار جزء
+  subcontractorName: string; // نام پیمانکار برای نمایش
   subcontractorPhone?: string;
   tradeType: SubcontractorTradeType;
   contractValue: number; // مبلغ کل قرارداد پیمانکار جزء (مثلاً ۲ میلیارد تومان)
@@ -911,7 +951,9 @@ export interface SubcontractorProgressStatement {
   statementNumber: string; // شماره صورت‌وضعیت (مثلاً صورت‌وضعیت شماره ۲ جوشکاری)
   subcontractorContractId: string;
   subcontractorContractNumber: string;
-  subcontractorName: string;
+  costCenterId: string; // شناسه مرکز هزینه
+  counterpartyId: string; // ارجاع به Counterparty پیمانکار جزء
+  subcontractorName: string; // نام پیمانکار برای نمایش
   tradeType: SubcontractorTradeType;
   projectId: string;
   projectName: string;
@@ -975,6 +1017,8 @@ export interface DetailedProgressStatement {
   contractNumber: string;
   projectId: string;
   projectName: string;
+  counterpartyId?: string;
+  costCenterId?: string;
   client: string; // کارفرما
   consultant: string; // مشاور
   type: StatementType;
@@ -1091,10 +1135,13 @@ export interface GoodsReceiptNote {
   id: string;
   receiptNumber: string;
   date: string;
+  poId?: string; // شناسه سفارش خرید ارجاعی
   warehouseId: string;
   warehouseName: string;
   projectId: string;
   projectName: string;
+  costCenterId?: string; // شناسه مرکز هزینه
+  counterpartyId?: string; // شناسه تأمین‌کننده در Counterparty
   supplierId?: string;
   supplierName: string;
   invoiceNumber: string;
@@ -1137,7 +1184,9 @@ export interface StoreIssueVoucher {
   warehouseName: string;
   projectId: string;
   projectName: string;
-  costCenter: string;
+  costCenterId?: string; // شناسه مرکز هزینه
+  costCenter: string; // سازگاری
+  counterpartyId?: string; // ارجاع به پیمانکار جزء / تحویل‌گیرنده
   wbsSection: string;
   subcontractorId?: string;
   subcontractorName?: string;
@@ -1327,7 +1376,8 @@ export interface PurchaseRequisition {
   projectId: string;
   projectName: string;
   wbsCode: string;
-  costCenter: string;
+  costCenterId?: string; // شناسه مرکز هزینه
+  costCenter?: string; // اختیاری برای سازگاری
   priority: RequisitionPriority;
   status: RequisitionStatus;
   requesterName: string;
@@ -1425,6 +1475,8 @@ export interface PurchaseOrder {
   rfqId?: string;
   projectId: string;
   projectName: string;
+  costCenterId?: string; // شناسه مرکز هزینه
+  counterpartyId?: string; // ارجاع به Counterparty تأمین‌کننده
   destinationWarehouse: string;
   supplierId: string;
   supplierName: string;
@@ -1455,13 +1507,15 @@ export interface VendorInvoice {
   systemRefNumber: string;
   invoiceDate: string;
   dueDate: string;
-  supplierId: string;
-  supplierName: string;
   projectId: string;
   projectName: string;
-  poId: string;
+  costCenterId?: string; // شناسه مرکز هزینه
+  counterpartyId?: string; // ارجاع به Counterparty تأمین‌کننده
+  supplierId: string;
+  supplierName: string;
+  poId: string; // ارجاع اجباری به سفارش خرید
   poNumber: string;
-  grnId?: string;
+  grnId: string; // ارجاع اجباری به رسید انبار واقعی
   grnNumber?: string;
   taxRegistrationNumber: string;
   subtotal: number;
@@ -1490,6 +1544,44 @@ export type ProcurementSubTab =
   | 'purchase_orders'
   | 'invoices'
   | 'suppliers';
+
+export type FinancialEventType =
+  | 'GOODS_RECEIPT'
+  | 'VENDOR_INVOICE'
+  | 'STORE_ISSUE'
+  | 'CLIENT_STATEMENT_APPROVED'
+  | 'SUBCONTRACTOR_STATEMENT_APPROVED'
+  | 'PAYROLL_APPROVED'
+  | 'PETTY_CASH_EXPENSE_APPROVED'
+  | 'TREASURY_PAYMENT'
+  | 'TREASURY_RECEIPT'
+  | 'BANK_RECONCILIATION_MATCH';
+
+export type FinancialEventModule =
+  | 'procurement'
+  | 'inventory'
+  | 'contracts'
+  | 'subcontractors'
+  | 'petty_cash'
+  | 'payroll'
+  | 'treasury'
+  | 'accounting';
+
+export interface FinancialEvent {
+  id: string;
+  type: FinancialEventType;
+  sourceModule: FinancialEventModule;
+  sourceId: string;
+  projectId: string;
+  costCenterId: string;
+  counterpartyId: string;
+  amount: number;
+  date: string;
+  status: 'draft' | 'posted' | 'rejected';
+  details?: Record<string, any>;
+  journalEntryId?: string;
+  docNumber?: string;
+}
 
 
 

@@ -58,6 +58,8 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
       projectTitle,
       projectId,
       projectName: proj?.name || projectTitle,
+      counterpartyId: proj?.clientId || 'cp-cl-01',
+      costCenterId: proj?.costCenterIds?.[0] || 'cc-prj101-01',
       employer,
       executiveBody: executiveBody || employer,
       consultant: consultant || 'مهندسین مشاور همکار',

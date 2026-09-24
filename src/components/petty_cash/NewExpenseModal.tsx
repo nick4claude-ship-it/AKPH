@@ -102,7 +102,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     (e) =>
       vendor.trim() !== '' &&
       invoiceNumber.trim() !== '' &&
-      e.vendor.toLowerCase().trim() === vendor.toLowerCase().trim() &&
+      (e.vendor || '').toLowerCase().trim() === vendor.toLowerCase().trim() &&
       e.invoiceNumber.toLowerCase().trim() === invoiceNumber.toLowerCase().trim() &&
       e.amount === amount
   );

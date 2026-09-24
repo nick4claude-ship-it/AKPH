@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -101,7 +111,7 @@ export interface PayrollSlip {
   paymentRequestId?: string;
 }
 
-export const mockEmployees: Employee[] = [
+const rawEmployees: Employee[] = [
   {
     id: 'emp-001',
     personnelCode: 'EMP-1001',
@@ -116,7 +126,7 @@ export const mockEmployees: Employee[] = [
     department: 'مدیریت و کنترل پروژه',
     assignedProjectId: 'all',
     assignedProjectName: 'دفتر مرکزی و ستاد',
-    costCenterId: 'CC-HQ-100',
+    costCenterId: 'cc-hq',
     hireDate: '۱۳۹۵/۰۱/۰۱',
     contractType: 'پیمانی تمام‌وقت',
     baseSalary: 65_000_000,
@@ -148,7 +158,7 @@ export const mockEmployees: Employee[] = [
     department: 'مالی و اداری',
     assignedProjectId: 'all',
     assignedProjectName: 'دفتر مرکزی و ستاد',
-    costCenterId: 'CC-HQ-100',
+    costCenterId: 'cc-hq',
     hireDate: '۱۳۹۷/۰۳/۰۱',
     contractType: 'پیمانی تمام‌وقت',
     baseSalary: 45_000_000,
@@ -421,9 +431,9 @@ export const mockPayrollSlips: PayrollSlip[] = [
     personnelCode: 'EMP-1001',
     role: 'مدیرعامل',
     department: 'مدیریت و کنترل پروژه',
-    projectId: 'all',
+    projectId: 'prj-101',
     projectName: 'دفتر مرکزی و ستاد',
-    costCenterId: 'CC-HQ-100',
+    costCenterId: 'cc-hq',
     issueDate: '۱۴۰۳/۰۶/۳۱',
     actualWorkDays: 30,
     overtimeHours: 0,
@@ -456,9 +466,9 @@ export const mockPayrollSlips: PayrollSlip[] = [
     personnelCode: 'EMP-1002',
     role: 'مدیر مالی',
     department: 'مالی و اداری',
-    projectId: 'all',
+    projectId: 'prj-101',
     projectName: 'دفتر مرکزی و ستاد',
-    costCenterId: 'CC-HQ-100',
+    costCenterId: 'cc-hq',
     issueDate: '۱۴۰۳/۰۶/۳۱',
     actualWorkDays: 30,
     overtimeHours: 15,
@@ -587,3 +597,5 @@ export const mockPayrollSlips: PayrollSlip[] = [
     paymentRequestId: 'PR-1403-06-05',
   },
 ];
+
+export const mockEmployees: Employee[] = isDev() ? rawEmployees : [];

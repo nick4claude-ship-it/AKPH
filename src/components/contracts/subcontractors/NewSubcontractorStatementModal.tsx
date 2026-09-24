@@ -126,6 +126,8 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
       statementNumber,
       subcontractorContractId: selectedContract.id,
       subcontractorContractNumber: selectedContract.contractNumber,
+      costCenterId: selectedContract.costCenterId || 'cc-prj101-01',
+      counterpartyId: selectedContract.counterpartyId || 'cp-sub-01',
       subcontractorName: selectedContract.subcontractorName,
       tradeType: selectedContract.tradeType,
       projectId: selectedContract.projectId,

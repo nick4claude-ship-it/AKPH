@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -26,6 +36,8 @@ export interface SystemDocument {
   projectName: string;
   contractId?: string;
   contractNumber?: string;
+  costCenterId?: string;
+  counterpartyId?: string;
   partnerId?: string;
   partnerName?: string;
   partnerType?: 'کارفرما' | 'پیمانکار جزء' | 'تأمین‌کننده' | 'بانک/بیمه';
@@ -41,18 +53,20 @@ export interface SystemDocument {
   description: string;
 }
 
-export const mockSystemDocuments: SystemDocument[] = [
+const rawSystemDocuments: SystemDocument[] = [
   {
     id: 'doc-001',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-cl-01',
     docNumber: 'CTR-DOC-1402-185',
     title: 'قرارداد اصلی پیمانکاری عمومی احداث برج تجاری رونیکا',
     category: 'قرارداد اصلی کارفرما',
     date: '۱۴۰۲/۰۳/۱۵',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    contractId: 'ctr-01',
-    contractNumber: 'CTR-1402-185',
-    partnerId: 'cli-02',
+    contractId: 'cnt-01',
+    contractNumber: '۹۸/۲۴۰۵/ص',
+    partnerId: 'cp-cl-01',
     partnerName: 'شرکت سرمایه‌گذاری توسعه ساختمان تابان',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
@@ -65,15 +79,17 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-002',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-bnk-01',
     docNumber: 'BG-DOC-MEL-8491',
     title: 'ضمانت‌نامه حسن انجام تعهدات قرارداد رونیکا (۵٪ مبلغ پیمان)',
     category: 'ضمانت‌نامه بانکی',
     date: '۱۴۰۲/۰۳/۱۰',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    contractId: 'ctr-01',
-    contractNumber: 'CTR-1402-185',
-    partnerId: 'bnk-01',
+    contractId: 'cnt-01',
+    contractNumber: '۹۸/۲۴۰۵/ص',
+    partnerId: 'cp-bnk-01',
     partnerName: 'بانک ملت - شعبه مرکزی',
     partnerType: 'بانک/بیمه',
     fileFormat: 'PDF',
@@ -86,15 +102,18 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-003',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-cl-01',
+    contractId: 'cnt-01',
     docNumber: 'ST-DOC-RONIKA-08',
     title: 'صورت‌وضعیت موقت شماره ۸ برج رونیکا به همراه ریزمتره و مالی',
     category: 'صورت‌وضعیت کارفرما',
     date: '۱۴۰۳/۰۶/۲۵',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    statementId: 'st-01',
+    statementId: 'stm-04',
     statementNumber: 'صورت‌وضعیت ۸',
-    partnerId: 'cli-02',
+    partnerId: 'cp-cl-01',
     partnerName: 'شرکت سرمایه‌گذاری تابان',
     partnerType: 'کارفرما',
     fileFormat: 'XLSX',
@@ -107,13 +126,16 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-004',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-sub-02',
+    contractId: 'cnt-01',
     docNumber: 'SUB-DOC-ARMAN-01',
     title: 'قرارداد دستمزدی اجرای آرماتوربندی و قالب‌بندی سازه رونیکا',
     category: 'قرارداد پیمانکار جزء',
     date: '۱۴۰۲/۰۴/۰۱',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    partnerId: 'sub-01',
+    partnerId: 'cp-sub-02',
     partnerName: 'شرکت آرمان بتن سازه',
     partnerType: 'پیمانکار جزء',
     fileFormat: 'PDF',
@@ -126,6 +148,8 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-005',
+    costCenterId: 'cc-prj101-01',
+    contractId: 'cnt-01',
     docNumber: 'DWG-RON-S-220',
     title: 'نقشه شاپ‌دراوینگ دیتیل اتصالات تیرهای بتنی طبقه ۲۴ برج',
     category: 'نقشه اجرایی و ازبیلت',
@@ -142,13 +166,16 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-006',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-sup-01',
+    contractId: 'cnt-01',
     docNumber: 'INV-DOC-ZOB-101',
     title: 'فاکتور رسمی الکترونیکی سامانه مودیان خرید میلگرد از ذوب‌آهن',
     category: 'فاکتور خرید تأمین‌کننده',
     date: '۱۴۰۳/۰۶/۲۸',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    partnerId: 'sup-101',
+    partnerId: 'cp-sup-01',
     partnerName: 'شرکت سهامی ذوب‌آهن اصفهان',
     partnerType: 'تأمین‌کننده',
     fileFormat: 'PDF',
@@ -161,13 +188,16 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-007',
+    costCenterId: 'cc-prj102-01',
+    counterpartyId: 'cp-cl-02',
+    contractId: 'cnt-02',
     docNumber: 'QC-DOC-FAJR-391',
     title: 'نتایج آزمایش مقاومت فشاری نمونه‌های بتن ۲۸ روزه شمع‌های تقاطع فجر',
     category: 'گزارش کنترل کیفیت و آزمایشگاه',
     date: '۱۴۰۳/۰۶/۲۰',
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
-    partnerId: 'cli-01',
+    partnerId: 'cp-cl-02',
     partnerName: 'معاونت فنی و عمرانی شهرداری تهران',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
@@ -180,13 +210,16 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-008',
+    costCenterId: 'cc-prj102-01',
+    counterpartyId: 'cp-cl-02',
+    contractId: 'cnt-02',
     docNumber: 'LET-DOC-FAJR-84',
     title: 'نامه اخطار تاخیر در پرداخت صورت‌وضعیت شماره ۸ به کارفرمای شهرداری',
     category: 'نامه و مکاتبات رسمی',
     date: '۱۴۰۳/۰۶/۱۸',
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
-    partnerId: 'cli-01',
+    partnerId: 'cp-cl-02',
     partnerName: 'معاونت فنی و عمرانی شهرداری تهران',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
@@ -199,13 +232,16 @@ export const mockSystemDocuments: SystemDocument[] = [
   },
   {
     id: 'doc-009',
+    costCenterId: 'cc-prj104-01',
+    counterpartyId: 'cp-cl-04',
+    contractId: 'cnt-04',
     docNumber: 'MOM-DOC-NIL-12',
     title: 'صورتجلسه تحویل موقت اولیه تاسیسات مکانیکی مجتمع نیلوفر',
     category: 'صورتجلسه کارگاهی',
     date: '۱۴۰۳/۰۶/۲۹',
-    projectId: 'prj-103',
+    projectId: 'prj-104',
     projectName: 'مجتمع مسکونی نیلوفر (۱۲۰ واحدی)',
-    partnerId: 'cli-04',
+    partnerId: 'cp-cl-04',
     partnerName: 'تعاونی مسکن کارکنان دانشگاه علوم پزشکی',
     partnerType: 'کارفرما',
     fileFormat: 'PDF',
@@ -217,3 +253,5 @@ export const mockSystemDocuments: SystemDocument[] = [
     description: 'امضای کمیسیون تحویل موقت موتورخانه، چیلرها و پمپ‌های آبرسانی با درج رفع نواقص جزیی ظرف مدت ۱۵ روز.',
   },
 ];
+
+export const mockSystemDocuments: SystemDocument[] = isDev() ? rawSystemDocuments : [];

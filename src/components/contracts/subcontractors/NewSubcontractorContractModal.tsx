@@ -27,7 +27,7 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
   currentUser,
   onSave,
 }) => {
-  const [projectId, setProjectId] = useState<string>(projects[0]?.id || 'prj-01');
+  const [projectId, setProjectId] = useState<string>(projects[0]?.id || 'prj-101');
   const [subcontractorName, setSubcontractorName] = useState('');
   const [subcontractorPhone, setSubcontractorPhone] = useState('');
   const [tradeType, setTradeType] = useState<SubcontractorTradeType>('جوشکاری و اسکلت فلزی');
@@ -54,6 +54,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
       title: title || `عملیات ${tradeType} پروژه ${selectedProject.name}`,
       projectId: selectedProject.id,
       projectName: selectedProject.name,
+      costCenterId: selectedProject.costCenterIds?.[0] || 'cc-prj101-01',
+      counterpartyId: 'cp-sub-01',
       subcontractorName,
       subcontractorPhone,
       tradeType,

@@ -99,8 +99,10 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         sourceType: 'حقوق و دستمزد ماهانه',
         sourceRefId: 'BATCH-PAY-140306',
         sourceRefNumber: 'لیست حقوق واریزی شهریور ۱۴۰۳',
-        projectId: 'all',
-        projectName: 'کلیه پروژه‌ها و ستاد',
+        projectId: 'prj-101',
+        projectName: 'ستاد مرکزی و دفتر راهبری',
+        costCenterId: 'cc-hq',
+        counterpartyId: 'cp-bnk-01',
         beneficiaryName: 'بانک عامل - فایل پایا واریز گروهی پرسنل',
         totalAmount: totalNetPayable,
       });

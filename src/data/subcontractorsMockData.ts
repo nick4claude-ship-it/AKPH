@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -8,14 +18,16 @@ import {
   SubcontractorProgressStatement,
 } from '../types';
 
-export const mockSubcontractorContracts: SubcontractorContract[] = [
+const rawSubcontractorContracts: SubcontractorContract[] = [
   {
     id: 'sub-cnt-01',
+    counterpartyId: 'cp-sub-01',
+    costCenterId: 'cc-prj101-01',
     contractNumber: 'SUB-RON-WELD-01',
     title: 'عملیات جوشکاری، برش‌کاری و مونتاژ اتصالات اسکلت فلزی برج',
-    projectId: 'prj-01',
+    projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
-    subcontractorName: 'صنایع جوش و اتصالات پیشگام (مهندس قادری)',
+    subcontractorName: 'پیمانکار جزء نمونه ۱ (جوش و اسکلت فلزی)',
     subcontractorPhone: '۰۹۱۲۳۴۵۶۷۸۹',
     tradeType: 'جوشکاری و اسکلت فلزی',
     contractValue: 2_000_000_000, // ۲ میلیارد تومان (مطابق درخواست کاربر)
@@ -35,11 +47,13 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
   {
     id: 'sub-cnt-02',
+    counterpartyId: 'cp-sub-02',
+    costCenterId: 'cc-prj101-01',
     contractNumber: 'SUB-RON-REBAR-02',
     title: 'آرماتوربندی، خم و برش میلگرد و قالب‌بندی دیوارهای حائل و سقف‌ها',
-    projectId: 'prj-01',
+    projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
-    subcontractorName: 'گروه آرماتوربندی صابر (صابر مرادی)',
+    subcontractorName: 'پیمانکار جزء نمونه ۲ (آرماتوربندی و قالب‌بندی)',
     subcontractorPhone: '۰۹۱۹۸۷۶۵۴۳۲',
     tradeType: 'آرماتوربندی و قالب‌بندی',
     contractValue: 1_500_000_000, // ۱.۵ میلیارد تومان
@@ -59,11 +73,13 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
   {
     id: 'sub-cnt-03',
+    counterpartyId: 'cp-sub-03',
+    costCenterId: 'cc-prj101-01',
     contractNumber: 'SUB-RON-CONC-03',
     title: 'عملیات پمپاژ، بتن‌ریزی، ویبره و عمل‌آوری فونداسیون و سقف‌های کامپوزیت',
-    projectId: 'prj-01',
+    projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
-    subcontractorName: 'شرکت خدمات بتن سهند بتن البرز',
+    subcontractorName: 'پیمانکار جزء نمونه ۳ (بتن‌ریزی و پمپاژ)',
     subcontractorPhone: '۰۲۱۸۸۸۸۱۹۲۰',
     tradeType: 'بتن‌ریزی و پمپاژ',
     contractValue: 1_200_000_000,
@@ -83,11 +99,13 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
   {
     id: 'sub-cnt-04',
+    counterpartyId: 'cp-sub-04',
+    costCenterId: 'cc-prj102-01',
     contractNumber: 'SUB-FAJ-PILING-01',
     title: 'حفاری شمع‌های عمیق، تزریق بنتونیت و اجرای بتن پلاستیک تقاطع',
-    projectId: 'prj-02',
+    projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
-    subcontractorName: 'شرکت مهندسی ژئوتکنیک پی‌کاو زاگرس',
+    subcontractorName: 'پیمانکار جزء نمونه ۴ (ژئوتکنیک و نیلینگ)',
     subcontractorPhone: '۰۲۱۲۲۵۵۳۳۴۴',
     tradeType: 'خاک‌برداری و نیلینگ',
     contractValue: 3_500_000_000,
@@ -107,11 +125,13 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
   {
     id: 'sub-cnt-05',
+    counterpartyId: 'cp-sub-05',
+    costCenterId: 'cc-prj102-01',
     contractNumber: 'SUB-FAJ-ELEC-02',
     title: 'تأسیسات برقی، کابل‌کشی فشار قوی، نصب پایه‌های روشنایی و ارتینگ پل',
-    projectId: 'prj-02',
+    projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
-    subcontractorName: 'توسعه تأسیسات برق نورآوران شهر',
+    subcontractorName: 'پیمانکار جزء نمونه ۵ (تأسیسات الکتریکی)',
     subcontractorPhone: '۰۹۳۵۱۲۳۴۵۶۷',
     tradeType: 'تأسیسات الکتریکی',
     contractValue: 900_000_000,
@@ -131,11 +151,13 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
   {
     id: 'sub-cnt-06',
+    counterpartyId: 'cp-sub-06',
+    costCenterId: 'cc-prj103-01',
     contractNumber: 'SUB-ALB-MECH-01',
     title: 'لوله‌کشی گازهای طبی، موتورخانه مرکزی، چیلرها و سیستم هوارسانی بیمارستان',
-    projectId: 'prj-03',
+    projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی البرز',
-    subcontractorName: 'مهندسی تهویه گستر البرز (مهندس اسدی)',
+    subcontractorName: 'پیمانکار جزء نمونه ۶ (تأسیسات مکانیکی)',
     subcontractorPhone: '۰۲۶۳۲۴۰۵۰۶۰',
     tradeType: 'تأسیسات مکانیکی',
     contractValue: 4_000_000_000,
@@ -155,11 +177,13 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
   {
     id: 'sub-cnt-07',
+    counterpartyId: 'cp-sub-02',
+    costCenterId: 'cc-prj103-01',
     contractNumber: 'SUB-ALB-MASON-02',
     title: 'دیوارچینی پیرامونی و داخلی با بلوک سبک بتنی هبلکس و وال‌پست',
-    projectId: 'prj-03',
+    projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی البرز',
-    subcontractorName: 'اکیپ بنّایی و سفت‌کاری استاد رضایی',
+    subcontractorName: 'پیمانکار جزء نمونه ۲ (بنّایی و تیغه‌چینی)',
     subcontractorPhone: '۰۹۱۸۳۳۳۴۴۵۵',
     tradeType: 'بنّایی و تیغه‌چینی',
     contractValue: 850_000_000,
@@ -179,17 +203,19 @@ export const mockSubcontractorContracts: SubcontractorContract[] = [
   },
 ];
 
-export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
+const rawSubcontractorStatements: SubcontractorProgressStatement[] = [
   // Example matching user request:
   // پروژه رونیکا -> پیمانکار جوشکاری -> صورت‌وضعیت شماره ۲ (تأییدشده و پرداخت‌نشده / در انتظار پرداخت)
   {
     id: 'sub-stm-01',
+    counterpartyId: 'cp-sub-01',
+    costCenterId: 'cc-prj101-01',
     statementNumber: 'صورت‌وضعیت شماره ۰۲ جوشکاری',
     subcontractorContractId: 'sub-cnt-01',
     subcontractorContractNumber: 'SUB-RON-WELD-01',
-    subcontractorName: 'صنایع جوش و اتصالات پیشگام (مهندس قادری)',
+    subcontractorName: 'پیمانکار جزء نمونه ۱ (جوش و اسکلت فلزی)',
     tradeType: 'جوشکاری و اسکلت فلزی',
-    projectId: 'prj-01',
+    projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
     periodStartDate: '۱۴۰۳/۰۵/۰۱',
     periodEndDate: '۱۴۰۳/۰۵/۳۱',
@@ -309,12 +335,14 @@ export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
   // صورت‌وضعیت شماره ۱ جوشکاری - پرداخت شده و ثبت هزینه پروژه
   {
     id: 'sub-stm-02',
+    counterpartyId: 'cp-sub-01',
+    costCenterId: 'cc-prj101-01',
     statementNumber: 'صورت‌وضعیت شماره ۰۱ جوشکاری',
     subcontractorContractId: 'sub-cnt-01',
     subcontractorContractNumber: 'SUB-RON-WELD-01',
-    subcontractorName: 'صنایع جوش و اتصالات پیشگام (مهندس قادری)',
+    subcontractorName: 'پیمانکار جزء نمونه ۱ (جوش و اسکلت فلزی)',
     tradeType: 'جوشکاری و اسکلت فلزی',
-    projectId: 'prj-01',
+    projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
     periodStartDate: '۱۴۰۳/۰۴/۰۱',
     periodEndDate: '۱۴۰۳/۰۴/۳۱',
@@ -430,12 +458,14 @@ export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
   // صورت‌وضعیت شماره ۳ آرماتوربندی - در حال بررسی کارگاه
   {
     id: 'sub-stm-03',
+    counterpartyId: 'cp-sub-02',
+    costCenterId: 'cc-prj101-01',
     statementNumber: 'صورت‌وضعیت شماره ۰۳ آرماتوربندی',
     subcontractorContractId: 'sub-cnt-02',
     subcontractorContractNumber: 'SUB-RON-REBAR-02',
-    subcontractorName: 'گروه آرماتوربندی صابر (صابر مرادی)',
+    subcontractorName: 'پیمانکار جزء نمونه ۲ (آرماتوربندی و قالب‌بندی)',
     tradeType: 'آرماتوربندی و قالب‌بندی',
-    projectId: 'prj-01',
+    projectId: 'prj-101',
     projectName: 'برج مسکونی-تجاری رونیکا (الهیه)',
     periodStartDate: '۱۴۰۳/۰۶/۰۱',
     periodEndDate: '۱۴۰۳/۰۶/۳۰',
@@ -500,12 +530,14 @@ export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
   // صورت‌وضعیت شماره ۴ حفاری شمع بزرگراه فجر - تأیید مدیر پروژه (در انتظار مدیریت)
   {
     id: 'sub-stm-04',
+    counterpartyId: 'cp-sub-04',
+    costCenterId: 'cc-prj102-01',
     statementNumber: 'صورت‌وضعیت شماره ۰۴ حفاری و شمع‌ریزی',
     subcontractorContractId: 'sub-cnt-04',
     subcontractorContractNumber: 'SUB-FAJ-PILING-01',
-    subcontractorName: 'شرکت مهندسی ژئوتکنیک پی‌کاو زاگرس',
+    subcontractorName: 'پیمانکار جزء نمونه ۴ (ژئوتکنیک و نیلینگ)',
     tradeType: 'خاک‌برداری و نیلینگ',
-    projectId: 'prj-02',
+    projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
     periodStartDate: '۱۴۰۳/۰۵/۱۵',
     periodEndDate: '۱۴۰۳/۰۶/۱۵',
@@ -594,12 +626,14 @@ export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
   // صورت‌وضعیت شماره ۲ تأسیسات مکانیکی بیمارستان البرز - ثبت اولیه (submitted)
   {
     id: 'sub-stm-05',
+    counterpartyId: 'cp-sub-06',
+    costCenterId: 'cc-prj103-01',
     statementNumber: 'صورت‌وضعیت شماره ۰۲ تأسیسات بیمارستان',
     subcontractorContractId: 'sub-cnt-06',
     subcontractorContractNumber: 'SUB-ALB-MECH-01',
-    subcontractorName: 'مهندسی تهویه گستر البرز (مهندس اسدی)',
+    subcontractorName: 'پیمانکار جزء نمونه ۶ (تأسیسات مکانیکی)',
     tradeType: 'تأسیسات مکانیکی',
-    projectId: 'prj-03',
+    projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی البرز',
     periodStartDate: '۱۴۰۳/۰۶/۰۱',
     periodEndDate: '۱۴۰۳/۰۶/۳۱',
@@ -663,12 +697,14 @@ export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
   // صورت‌وضعیت شماره ۲ بنّایی بیمارستان - پرداخت شده
   {
     id: 'sub-stm-06',
+    counterpartyId: 'cp-sub-02',
+    costCenterId: 'cc-prj103-01',
     statementNumber: 'صورت‌وضعیت شماره ۰۲ دیوارچینی هبلکس',
     subcontractorContractId: 'sub-cnt-07',
     subcontractorContractNumber: 'SUB-ALB-MASON-02',
-    subcontractorName: 'اکیپ بنّایی و سفت‌کاری استاد رضایی',
+    subcontractorName: 'پیمانکار جزء نمونه ۲ (بنّایی و تیغه‌چینی)',
     tradeType: 'بنّایی و تیغه‌چینی',
-    projectId: 'prj-03',
+    projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی البرز',
     periodStartDate: '۱۴۰۳/۰۵/۰۱',
     periodEndDate: '۱۴۰۳/۰۵/۳۰',
@@ -754,3 +790,6 @@ export const mockSubcontractorStatements: SubcontractorProgressStatement[] = [
     ],
   },
 ];
+
+export const mockSubcontractorContracts: SubcontractorContract[] = isDev() ? rawSubcontractorContracts : [];
+export const mockSubcontractorStatements: SubcontractorProgressStatement[] = isDev() ? rawSubcontractorStatements : [];

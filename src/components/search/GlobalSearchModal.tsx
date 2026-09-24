@@ -60,8 +60,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     (a) =>
       a.docNumber.toLowerCase().includes(q) ||
       a.projectName.toLowerCase().includes(q) ||
-      a.counterparty.toLowerCase().includes(q) ||
-      a.submitter.toLowerCase().includes(q) ||
+      (a.counterparty || '').toLowerCase().includes(q) ||
+      (a.submitter || '').toLowerCase().includes(q) ||
       a.expenseType.toLowerCase().includes(q)
   );
 
@@ -70,7 +70,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     (s) =>
       s.number.toLowerCase().includes(q) ||
       s.projectName.toLowerCase().includes(q) ||
-      s.client.toLowerCase().includes(q)
+      (s.client || '').toLowerCase().includes(q)
   );
 
   // Matched Petty Cash

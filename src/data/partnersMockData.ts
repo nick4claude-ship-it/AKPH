@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -32,7 +42,7 @@ export interface ClientPartner {
   }[];
 }
 
-export const mockClients: ClientPartner[] = [
+const rawClients: ClientPartner[] = [
   {
     id: 'cli-01',
     code: 'CLI-101',
@@ -42,7 +52,7 @@ export const mockClients: ClientPartner[] = [
     economicCode: '411239847101',
     representative: 'دکتر علیرضا صبوری (معاونت نظارت بر پروژه‌های بزرگ)',
     phone: '۰۲۱-۹۶۰۱۵۵۰۰',
-    email: 'technical@omran.tehran.ir',
+    email: 'technical@example.com',
     address: 'تهران، خیابان بهشت، ساختمان مرکزی شهرداری تهران',
     activeProjectsCount: 1,
     totalContractValue: 94_000_000_000,
@@ -72,7 +82,7 @@ export const mockClients: ClientPartner[] = [
     economicCode: '411192837465',
     representative: 'مهندس محمدرضا شریفی (مدیرعامل هلدینگ تابان)',
     phone: '۰۲۱-۸۸۷۷۶۶۵۵',
-    email: 'info@taban-invest.com',
+    email: 'info@example.com',
     address: 'تهران، خیابان ولیعصر، بالاتر از پارک ساعی، برج تابان، طبقه ۱۴',
     activeProjectsCount: 1,
     totalContractValue: 185_000_000_000,
@@ -102,7 +112,7 @@ export const mockClients: ClientPartner[] = [
     economicCode: '411394857102',
     representative: 'مهندس احمد کریمی (مجری خطوط انتقال گاز)',
     phone: '۰۲۱-۸۸۹۹۰۰۱۱',
-    email: 'contracts@nigc-eng.ir',
+    email: 'contracts@example.com',
     address: 'تهران، خیابان طالقانی، نبش خیابان شهید سپهبد قرنی',
     activeProjectsCount: 1,
     totalContractValue: 62_000_000_000,
@@ -132,7 +142,7 @@ export const mockClients: ClientPartner[] = [
     economicCode: '411928374019',
     representative: 'دکتر سید مهدی حسینی (رئیس هیئت مدیره تعاونی)',
     phone: '۰۲۱-۶۶۴۴۲۲۱۱',
-    email: 'maskan@sbmu-coop.ir',
+    email: 'maskan@example.com',
     address: 'تهران، ولنجک، خیابان یمن، دانشگاه علوم پزشکی، ساختمان تعاونی',
     activeProjectsCount: 1,
     totalContractValue: 48_000_000_000,
@@ -162,7 +172,7 @@ export const mockClients: ClientPartner[] = [
     economicCode: '411293847561',
     representative: 'مهندس بیژن افشار (معاونت زیرساخت و توسعه اسکله‌ها)',
     phone: '۰۷۶-۳۲۲۴۴۰۰۰',
-    email: 'ports@pmo.ir',
+    email: 'ports@example.com',
     address: 'بندرعباس، مجتمع بندری شهید رجایی، ساختمان اداری',
     activeProjectsCount: 1,
     totalContractValue: 21_500_000_000,
@@ -184,3 +194,5 @@ export const mockClients: ClientPartner[] = [
     ],
   },
 ];
+
+export const mockClients: ClientPartner[] = isDev() ? rawClients : [];

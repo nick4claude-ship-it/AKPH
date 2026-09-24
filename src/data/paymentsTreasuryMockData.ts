@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -31,7 +41,8 @@ export interface PaymentRequest {
   projectId: string;
   projectName: string;
   costCenterId: string;
-  beneficiaryName: string; // دریافت‌کننده وجه
+  beneficiaryName: string;
+  counterpartyId?: string; // دریافت‌کننده وجه
   beneficiaryType: 'پیمانکار جزء' | 'تأمین‌کننده' | 'مسئول تنخواه' | 'پرسنل' | 'سازمان تامین اجتماعی' | 'سازمان امور مالیاتی';
   beneficiaryAccount: {
     bankName: string;
@@ -87,9 +98,10 @@ export interface CashDesk {
   lastAuditDate: string;
 }
 
-export const mockPaymentRequests: PaymentRequest[] = [
+const rawPaymentRequests: PaymentRequest[] = [
   {
     id: 'pr-101',
+    counterpartyId: 'cp-sub-01',
     requestNumber: 'PR-1403-0701',
     sourceType: 'صورت‌وضعیت پیمانکار جزء',
     sourceRefId: 'sub-st-01',
@@ -98,7 +110,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
     dueDate: '۱۴۰۳/۰۷/۱۰',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    costCenterId: 'CC-101',
+    costCenterId: 'cc-prj101-01',
     beneficiaryName: 'شرکت آرمان بتن سازه (پیمانکار اسکلت)',
     beneficiaryType: 'پیمانکار جزء',
     beneficiaryAccount: {
@@ -121,6 +133,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
   },
   {
     id: 'pr-102',
+    counterpartyId: 'cp-sup-01',
     requestNumber: 'PR-1403-0702',
     sourceType: 'فاکتور خرید تأمین‌کننده',
     sourceRefId: 'inv-101',
@@ -129,7 +142,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
     dueDate: '۱۴۰۳/۰۷/۰۵',
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
-    costCenterId: 'CC-101',
+    costCenterId: 'cc-prj101-01',
     beneficiaryName: 'شرکت سهامی ذوب‌آهن اصفهان',
     beneficiaryType: 'تأمین‌کننده',
     beneficiaryAccount: {
@@ -150,6 +163,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
   },
   {
     id: 'pr-103',
+    counterpartyId: 'cp-emp-01',
     requestNumber: 'PR-1403-0703',
     sourceType: 'شارژ و تسویه تنخواه',
     sourceRefId: 'pc-03',
@@ -158,7 +172,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
     dueDate: '۱۴۰۳/۰۷/۰۲',
     projectId: 'prj-103',
     projectName: 'مجتمع مسکونی نیلوفر (۱۲۰ واحدی)',
-    costCenterId: 'CC-103',
+    costCenterId: 'cc-prj103-01',
     beneficiaryName: 'مهندس مهران پورحسینی (تنخواه‌دار کارگاه)',
     beneficiaryType: 'مسئول تنخواه',
     beneficiaryAccount: {
@@ -183,9 +197,10 @@ export const mockPaymentRequests: PaymentRequest[] = [
     sourceRefNumber: 'PAY-140306-BATCH',
     date: '۱۴۰۳/۰۶/۳۰',
     dueDate: '۱۴۰۳/۰۷/۰۵',
-    projectId: 'all',
-    projectName: 'کلیه پروژه‌ها و ستاد',
-    costCenterId: 'CC-HQ-100',
+    projectId: 'prj-101',
+    projectName: 'ستاد مرکزی و دفتر راهبری',
+    costCenterId: 'cc-hq',
+    counterpartyId: 'cp-bnk-01',
     beneficiaryName: 'بانک رفاه کارگران (لیست حقوق پرسنل)',
     beneficiaryType: 'پرسنل',
     beneficiaryAccount: {
@@ -211,6 +226,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
   },
   {
     id: 'pr-105',
+    counterpartyId: 'cp-oth-01',
     requestNumber: 'PR-1403-0705',
     sourceType: 'صورت‌وضعیت پیمانکار جزء',
     sourceRefId: 'sub-st-02',
@@ -219,7 +235,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
     dueDate: '۱۴۰۳/۰۷/۱۵',
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
-    costCenterId: 'CC-102',
+    costCenterId: 'cc-prj102-01',
     beneficiaryName: 'پیمانکاری برق و تاسیسات نیروگستر',
     beneficiaryType: 'پیمانکار جزء',
     beneficiaryAccount: {
@@ -237,7 +253,7 @@ export const mockPaymentRequests: PaymentRequest[] = [
   },
 ];
 
-export const mockTreasuryChecks: TreasuryCheck[] = [
+const rawTreasuryChecks: TreasuryCheck[] = [
   {
     id: 'chk-01',
     checkType: 'صادره (پرداختی)',
@@ -309,13 +325,13 @@ export const mockTreasuryChecks: TreasuryCheck[] = [
   },
 ];
 
-export const mockCashDesks: CashDesk[] = [
+const rawCashDesks: CashDesk[] = [
   {
     id: 'csh-01',
     code: 'CSH-HQ',
     title: 'صندوق نقدی دفتر مرکزی',
     keeperName: 'آقای اصغر مرادی (مسئول تنخواه ستادی)',
-    projectId: 'all',
+    projectId: 'prj-101',
     projectName: 'دفتر مرکزی',
     balance: 85_000_000,
     ceilingLimit: 100_000_000,
@@ -347,3 +363,7 @@ export const mockCashDesks: CashDesk[] = [
     lastAuditDate: '۱۴۰۳/۰۶/۲۸',
   },
 ];
+
+export const mockPaymentRequests: PaymentRequest[] = isDev() ? rawPaymentRequests : [];
+export const mockTreasuryChecks: TreasuryCheck[] = isDev() ? rawTreasuryChecks : [];
+export const mockCashDesks: CashDesk[] = isDev() ? rawCashDesks : [];

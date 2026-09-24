@@ -54,7 +54,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
     if (selectedProjectId !== 'all' && st.projectId !== selectedProjectId) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return st.number.toLowerCase().includes(q) || st.projectName.toLowerCase().includes(q) || st.client.toLowerCase().includes(q);
+      return st.number.toLowerCase().includes(q) || st.projectName.toLowerCase().includes(q) || (st.client || '').toLowerCase().includes(q);
     }
     return true;
   });

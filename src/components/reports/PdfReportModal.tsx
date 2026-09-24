@@ -1,6 +1,7 @@
 import React from 'react';
 import { Project, KpiItem, PettyCash, ProgressStatement } from '../../types';
 import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
+import { toPersianDate, getCurrentFiscalYear } from '../../utils/date';
 import { X, Printer, Download, Building2, CheckCircle2 } from 'lucide-react';
 
 interface PdfReportModalProps {
@@ -89,13 +90,13 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
 
             <div className="text-left font-mono text-[11px] text-slate-600 space-y-1">
               <div>
-                شماره گزارش: <strong className="text-slate-900">REP-1403-07-02</strong>
+                شماره گزارش: <strong className="text-slate-900">{`REP-${getCurrentFiscalYear()}-${toPersianDate(new Date()).replace(/\//g, '-')}`}</strong>
               </div>
               <div>
-                تاریخ صدور: <strong className="text-slate-900">۱۴۰۳/۰۷/۰۲</strong>
+                تاریخ صدور: <strong className="text-slate-900">{toPersianDate(new Date())}</strong>
               </div>
               <div>
-                بازه گزارش: <span className="text-slate-800">سال مالی جاری (۱۴۰۳)</span>
+                بازه گزارش: <span className="text-slate-800">{`سال مالی جاری (${getCurrentFiscalYear()})`}</span>
               </div>
               <div>
                 طبقه‌بندی: <span className="bg-slate-100 px-1.5 py-0.5 rounded font-sans text-[10px] text-red-700 font-bold">محرمانه - مدیران ارشد</span>

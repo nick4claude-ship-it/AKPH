@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -13,7 +23,7 @@ import {
   KardexEntry,
 } from '../types';
 
-export const mockWarehouses: Warehouse[] = [
+const rawWarehouses: Warehouse[] = [
   {
     id: 'wh-central',
     code: 'WH-00',
@@ -312,9 +322,12 @@ export const mockMaterialItems: MaterialItem[] = [
   },
 ];
 
-export const mockGoodsReceipts: GoodsReceiptNote[] = [
+const rawGoodsReceipts: GoodsReceiptNote[] = [
   {
     id: 'grn-1403-084',
+    poId: 'po-101',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-sup-01',
     receiptNumber: 'رسید انبار ۱۴۰۳/۰۸۴',
     date: '۱۴۰۳/۰۷/۰۱',
     warehouseId: 'wh-prj-101',
@@ -322,7 +335,7 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
     projectId: 'prj-101',
     projectName: 'برج تجاری-اداری رونیکا',
     supplierId: 'sup-zobahan',
-    supplierName: 'شرکت سهامی ذوب‌آهن اصفهان',
+    supplierName: 'تأمین‌کننده نمونه ۱ (فولاد و آهن‌آلات)',
     invoiceNumber: 'INV-ZOB-98214',
     waybillNumber: 'BL-887412-IR',
     truckPlateNumber: '۱۲ ع ۷۸۵ ایران ۶۸',
@@ -360,6 +373,9 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
   },
   {
     id: 'grn-1403-085',
+    poId: 'po-102',
+    costCenterId: 'cc-prj103-01',
+    counterpartyId: 'cp-sup-04',
     receiptNumber: 'رسید انبار ۱۴۰۳/۰۸۵',
     date: '۱۴۰۳/۰۷/۰۲',
     warehouseId: 'wh-prj-103',
@@ -405,6 +421,9 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
   },
   {
     id: 'grn-1403-086',
+    poId: 'po-103',
+    costCenterId: 'cc-prj104-01',
+    counterpartyId: 'cp-sup-05',
     receiptNumber: 'رسید انبار ۱۴۰۳/۰۸۶',
     date: '۱۴۰۳/۰۷/۰۳',
     warehouseId: 'wh-prj-104',
@@ -412,7 +431,7 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
     projectId: 'prj-104',
     projectName: 'تصفیه‌خانه صنعتی چابهار',
     supplierId: 'sup-alvandpipes',
-    supplierName: 'صنایع لوله و تجهیزات الوند',
+    supplierName: 'تأمین‌کننده نمونه ۵ (تجهیزات و اتصالات)',
     invoiceNumber: 'INV-ALV-7712',
     waybillNumber: 'BL-110943-IR',
     truckPlateNumber: '۸۵ د ۴۵۶ ایران ۵۴',
@@ -446,6 +465,9 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
   },
   {
     id: 'grn-1403-087',
+    poId: 'po-104',
+    costCenterId: 'cc-prj102-01',
+    counterpartyId: 'cp-sup-03',
     receiptNumber: 'رسید انبار ۱۴۰۳/۰۸۷',
     date: '۱۴۰۳/۰۷/۰۳',
     warehouseId: 'wh-central',
@@ -453,7 +475,7 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
     projectId: 'prj-101',
     projectName: 'ستاد مرکزی و تدارکات کل',
     supplierId: 'sup-kavir-kashan',
-    supplierName: 'مجتمع فولاد کویر کاشان',
+    supplierName: 'تأمین‌کننده نمونه ۱ (فولاد و آهن‌آلات)',
     invoiceNumber: 'INV-KAV-6631',
     waybillNumber: 'BL-445890-IR',
     truckPlateNumber: '۳۴ ط ۹۲۱ ایران ۱۱',
@@ -489,9 +511,11 @@ export const mockGoodsReceipts: GoodsReceiptNote[] = [
   },
 ];
 
-export const mockStoreIssues: StoreIssueVoucher[] = [
+const rawStoreIssues: StoreIssueVoucher[] = [
   {
     id: 'siv-1403-112',
+    costCenterId: 'cc-prj101-01',
+    counterpartyId: 'cp-sub-02',
     issueNumber: 'حواله خروج ۱۴۰۳/۱۱۲',
     date: '۱۴۰۳/۰۷/۰۲',
     warehouseId: 'wh-prj-101',
@@ -539,6 +563,8 @@ export const mockStoreIssues: StoreIssueVoucher[] = [
   },
   {
     id: 'siv-1403-113',
+    costCenterId: 'cc-prj102-01',
+    counterpartyId: 'cp-sub-04',
     issueNumber: 'حواله خروج ۱۴۰۳/۱۱۳',
     date: '۱۴۰۳/۰۷/۰۲',
     warehouseId: 'wh-prj-103',
@@ -585,6 +611,8 @@ export const mockStoreIssues: StoreIssueVoucher[] = [
   },
   {
     id: 'siv-1403-114',
+    costCenterId: 'cc-prj103-01',
+    counterpartyId: 'cp-sub-06',
     issueNumber: 'حواله خروج ۱۴۰۳/۱۱۴',
     date: '۱۴۰۳/۰۷/۰۳',
     warehouseId: 'wh-prj-104',
@@ -620,7 +648,7 @@ export const mockStoreIssues: StoreIssueVoucher[] = [
   },
 ];
 
-export const mockInterTransfers: InterWarehouseTransfer[] = [
+const rawInterTransfers: InterWarehouseTransfer[] = [
   {
     id: 'trf-1403-019',
     transferNumber: 'انتقال بین کارگاهی ۰۱۹',
@@ -741,7 +769,7 @@ export const mockStocktakeAudits: StocktakeAudit[] = [
   },
 ];
 
-export const mockKardexRecords: KardexEntry[] = [
+const rawKardexRecords: KardexEntry[] = [
   {
     id: 'kdx-001',
     materialId: 'mat-001',
@@ -813,3 +841,9 @@ export const mockKardexRecords: KardexEntry[] = [
     balanceValuation: 745_170_000,
   },
 ];
+
+export const mockWarehouses: Warehouse[] = isDev() ? rawWarehouses : [];
+export const mockGoodsReceipts: GoodsReceiptNote[] = isDev() ? rawGoodsReceipts : [];
+export const mockStoreIssues: StoreIssueVoucher[] = isDev() ? rawStoreIssues : [];
+export const mockInterTransfers: InterWarehouseTransfer[] = isDev() ? rawInterTransfers : [];
+export const mockKardexRecords: KardexEntry[] = isDev() ? rawKardexRecords : [];

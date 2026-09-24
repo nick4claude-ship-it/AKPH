@@ -14,6 +14,17 @@ const persianDateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
   day: '2-digit',
 });
 
+const persianFullDateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+const persianMonthFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  month: 'long',
+});
+
 const persianDateTimeFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
   year: 'numeric',
   month: '2-digit',
@@ -35,13 +46,24 @@ const persianYearFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn
 });
 
 /**
- * Parse any date representation safely into Date object
+ * Parse any date representation safely into Date object.
+ * Returns null if input is invalid or missing (does NOT default to today).
  */
-export function safeParseDate(input?: string | number | Date | null): Date {
-  if (!input) return new Date();
-  if (input instanceof Date) return isNaN(input.getTime()) ? new Date() : input;
-  const parsed = new Date(input);
-  return isNaN(parsed.getTime()) ? new Date() : parsed;
+export function safeParseDate(input?: string | number | Date | null): Date | null {
+  if (input === null || input === undefined || input === '') return null;
+  if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
+  if (typeof input === 'number') {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -55,12 +77,13 @@ export function getCurrentIsoDate(): string {
  * Convert ISO / Date to formatted Persian date string (e.g., ۱۴۰۳/۰۷/۰۱)
  */
 export function toPersianDate(input?: string | number | Date | null): string {
-  if (!input) return '';
+  if (input === null || input === undefined || input === '') return '';
   // If it is already in Persian date format (like ۱۴۰۳/۰۶/۱۵ or 1403/06/15)
   if (typeof input === 'string' && input.includes('/')) {
     return input;
   }
   const date = safeParseDate(input);
+  if (!date) return '';
   try {
     return persianDateFormatter.format(date);
   } catch {
@@ -72,8 +95,9 @@ export function toPersianDate(input?: string | number | Date | null): string {
  * Convert ISO / Date to Persian date and time string
  */
 export function toPersianDateTime(input?: string | number | Date | null): string {
-  if (!input) return '';
+  if (input === null || input === undefined || input === '') return '';
   const date = safeParseDate(input);
+  if (!date) return '';
   try {
     return persianDateTimeFormatter.format(date);
   } catch {
@@ -85,8 +109,9 @@ export function toPersianDateTime(input?: string | number | Date | null): string
  * Convert ISO / Date to Persian time string (HH:mm)
  */
 export function toPersianTime(input?: string | number | Date | null): string {
-  if (!input) return '';
+  if (input === null || input === undefined || input === '') return '';
   const date = safeParseDate(input);
+  if (!date) return '';
   try {
     return persianTimeFormatter.format(date);
   } catch {
@@ -95,7 +120,7 @@ export function toPersianTime(input?: string | number | Date | null): string {
 }
 
 /**
- * Get current Jalali (Persian) year as Latin number (e.g. 1403, 1404)
+ * Get current Jalali (Persian) year as Latin number (e.g. 1403, 1404, 1405)
  */
 export function getCurrentPersianYear(): number {
   try {
@@ -109,8 +134,51 @@ export function getCurrentPersianYear(): number {
 }
 
 /**
+ * Get current fiscal year as number
+ */
+export function getCurrentFiscalYear(): number {
+  return getCurrentPersianYear();
+}
+
+/**
+ * Get formatted current Persian date string with full weekday, day, month, and year
+ * e.g., 'چهارشنبه ۲ مهر ۱۴۰۵'
+ */
+export function getFormattedCurrentPersianDate(): string {
+  try {
+    return persianFullDateFormatter.format(new Date());
+  } catch {
+    return toPersianDate(new Date());
+  }
+}
+
+/**
+ * Get name of current Persian month (e.g. فروردین, مهر, ...)
+ */
+export function getCurrentPersianMonthName(): string {
+  try {
+    return persianMonthFormatter.format(new Date());
+  } catch {
+    return 'مهر';
+  }
+}
+
+/**
+ * Generates Persian date string offset by N days from today.
+ * e.g., getRelativePersianDate(0) => today
+ * getRelativePersianDate(-30) => 30 days ago
+ */
+export function getRelativePersianDate(daysOffset: number = 0): string {
+  const d = new Date();
+  if (daysOffset !== 0) {
+    d.setDate(d.getDate() + daysOffset);
+  }
+  return toPersianDate(d);
+}
+
+/**
  * Format prefix with current fiscal year (e.g., prefix='ACC' -> 'ACC-1403')
  */
 export function formatDocumentYearCode(prefix: string): string {
-  return `${prefix}-${getCurrentPersianYear()}`;
+  return `${prefix}-${getCurrentFiscalYear()}`;
 }

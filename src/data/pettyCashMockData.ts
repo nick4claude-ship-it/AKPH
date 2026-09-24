@@ -1,3 +1,13 @@
+const isDev = (): boolean => {
+  try {
+    return typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV)
+      : true;
+  } catch {
+    return true;
+  }
+};
+
 import {
   PettyCashAccount,
   PettyCashExpense,
@@ -18,7 +28,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     holderPhone: '0912-1102948',
     projectId: 'prj-101',
     projectName: 'برج تجاری رونیکا',
-    costCenterId: 'cc-prj1',
+    costCenterId: 'cc-prj101-01',
     costCenterName: 'کارگاه برج رونیکا',
     ceilingLimit: 200_000_000,
     minBalanceWarning: 50_000_000,
@@ -43,7 +53,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     holderPhone: '0912-3349182',
     projectId: 'prj-102',
     projectName: 'تقاطع غیرهمسطح بزرگراه فجر',
-    costCenterId: 'cc-prj2',
+    costCenterId: 'cc-prj102-01',
     costCenterName: 'کارگاه تقاطع فجر',
     ceilingLimit: 120_000_000,
     minBalanceWarning: 40_000_000,
@@ -68,7 +78,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     holderPhone: '0912-5509123',
     projectId: 'prj-103',
     projectName: 'بیمارستان ۲۰۰ تختخوابی تخصصی البرز',
-    costCenterId: 'cc-prj3',
+    costCenterId: 'cc-prj103-01',
     costCenterName: 'کارگاه بیمارستان البرز',
     ceilingLimit: 150_000_000,
     minBalanceWarning: 40_000_000,
@@ -93,7 +103,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     holderPhone: '0912-7712904',
     projectId: 'prj-104',
     projectName: 'مجتمع مسکونی نیلوفر',
-    costCenterId: 'cc-prj4',
+    costCenterId: 'cc-prj104-01',
     costCenterName: 'کارگاه مجتمع نیلوفر',
     ceilingLimit: 80_000_000,
     minBalanceWarning: 25_000_000,
@@ -116,7 +126,7 @@ export const initialPettyCashAccounts: PettyCashAccount[] = [
     holderName: 'آقای مجتبی رحمانی',
     holderRole: 'کارپرداز ارشد ستادی',
     holderPhone: '0912-8890123',
-    projectId: 'all',
+    projectId: 'prj-101',
     projectName: 'دفتر مرکزی تهران',
     costCenterId: 'cc-hq',
     costCenterName: 'دفتر مرکزی و ستاد راهبری',
@@ -428,9 +438,11 @@ export const initialPettyCashExpenses: PettyCashExpense[] = [
     expenseNumber: 'EXP-1403-0208',
     pettyCashId: 'pc-hq',
     pettyCashTitle: 'تنخواه تدارکات ستاد مرکزی تهران',
-    projectId: 'all',
+    projectId: 'prj-101',
     projectName: 'دفتر مرکزی تهران',
     costCenter: 'دفتر مرکزی و ستاد راهبری',
+    costCenterId: 'cc-hq',
+    counterpartyId: 'cp-sup-05',
     date: '۱۴۰۳/۰۶/۲۶',
     category: 'اداری',
     subCategory: 'ملزومات مصرفی و چاپ',
@@ -784,3 +796,6 @@ export const initialPettyCashCategories: PettyCashCategoryItem[] = [
     subcategories: ['عوارض متفرقه', 'هزینه آزمایشگاه محلی بتن', 'هزینه‌های پیش‌بینی‌نشده'],
   },
 ];
+
+export const mockPettyCashAccounts: PettyCashAccount[] = isDev() ? initialPettyCashAccounts : [];
+export const mockPettyCashExpenses: PettyCashExpense[] = isDev() ? initialPettyCashExpenses : [];
