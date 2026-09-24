@@ -44,7 +44,7 @@ import { validateSubcontractorStatement } from './subcontractLines';
 import { checkPermission, PETTY_STEP_ACTION, UserAction, ActionContext } from '../utils/permissions';
 import { formatMoney, formatInt } from '../utils/money';
 import { toPersianDigits } from '../utils/formatters';
-import { generateUUID, nextDocNumber, fiscalYearOf } from '../utils/ids';
+import { generateUUID, nextDocNumber, tryFiscalYearOf } from '../utils/ids';
 import { finalizeManualEntry, reversedEntryIds } from './postingEngine';
 import { ACCOUNTS } from './postingRules';
 import { dayIndex, toPersianDate, toPersianTime } from '../utils/date';
@@ -951,7 +951,9 @@ export function createManualJournalEntry(env: WorkflowEnv, entry: JournalEntry):
   const state = env.getState();
   const deny = guard(env, 'journal.create', { projectId: entry.projectId });
   if (deny) return deny;
-  if (state.financeSettings.closedFiscalYears.includes(fiscalYearOf(entry.date))) return fail(`سال مالی ${toPersianDigits(fiscalYearOf(entry.date))} بسته شده است.`);
+  const year = tryFiscalYearOf(entry.date);
+  if (year === null) return fail(`تاریخ سند «${entry.date}» تاریخ شمسی معتبر نیست.`);
+  if (state.financeSettings.closedFiscalYears.includes(year)) return fail(`سال مالی ${toPersianDigits(year)} بسته شده است.`);
   const rows = entry.rows.filter((r) => r.debit > 0 || r.credit > 0);
   if (rows.some((r) => !Number.isSafeInteger(r.debit) || !Number.isSafeInteger(r.credit) || r.debit < 0 || r.credit < 0 || (r.debit > 0 && r.credit > 0))) {
     return fail('هر ردیف فقط یک مبلغ صحیح مثبت (بدهکار یا بستانکار) دارد.');
@@ -962,7 +964,8 @@ export function createManualJournalEntry(env: WorkflowEnv, entry: JournalEntry):
   const saved: JournalEntry = {
     ...entry,
     id: entry.id || generateUUID(),
-    docNumber: nextDocNumber(state.journalEntries.map((j) => j.docNumber), 'ACC', entry.date),
+    // Temporary number; the permanent ACC number is issued on approval, in date order.
+    docNumber: nextDocNumber(state.journalEntries.map((j) => j.docNumber), 'DRF', entry.date),
     rows,
     totalDebit: debit,
     totalCredit: credit,
@@ -986,7 +989,7 @@ export function approveJournalEntry(env: WorkflowEnv, id: string): WorkflowResul
   env.set('bankAccounts', result.state.bankAccounts);
   env.set('cashDesks', result.state.cashDesks);
   env.set('pettyCashAccounts', result.state.pettyCashAccounts);
-  return ok(`سند ${j.docNumber} تأیید و قطعی شد.`, { docNumber: j.docNumber });
+  return ok(`سند ${result.entry.docNumber} تأیید و قطعی شد.`, { docNumber: result.entry.docNumber });
 }
 
 /**
@@ -1051,7 +1054,7 @@ export function closeFiscalYear(env: WorkflowEnv, year: number): WorkflowResult 
   const deny = guard(env, 'fiscal.close');
   if (deny) return deny;
   if (state.financeSettings.closedFiscalYears.includes(year)) return fail(`سال مالی ${toPersianDigits(year)} قبلاً بسته شده است.`);
-  const inYear = state.journalEntries.filter((j) => fiscalYearOf(j.date) === year);
+  const inYear = state.journalEntries.filter((j) => tryFiscalYearOf(j.date) === year);
   const pending = inYear.filter((j) => j.status === 'در انتظار تأیید' || j.status === 'پیش‌نویس');
   if (pending.length) return fail(`${fa(pending.length)} سند در انتظار تأیید در این سال وجود دارد؛ ابتدا تعیین تکلیف کنید.`);
 

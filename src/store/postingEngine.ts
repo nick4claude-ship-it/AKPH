@@ -6,7 +6,8 @@
 import { AccountNode, FinancialEvent, JournalEntry, JournalEntryRow } from '../types';
 import { AppState, FinancialEventInput, PostingResult } from './types';
 import { POSTING_RULES, PostingContext, ACCOUNTS } from './postingRules';
-import { generateUUID, nextDocNumber, fiscalYearOf } from '../utils/ids';
+import { generateUUID, nextDocNumber, tryFiscalYearOf } from '../utils/ids';
+import { dayIndex } from '../utils/date';
 import { formatMoney } from '../utils/money';
 import { toPersianDate, toPersianTime } from '../utils/date';
 
@@ -59,7 +60,7 @@ function buildContext(state: AppState, event: FinancialEvent): PostingContext {
 export function preparePosting(
   state: AppState,
   input: FinancialEventInput,
-  options: { submitter?: string; checkBalances?: boolean } = {}
+  options: { submitter?: string; checkBalances?: boolean; enforceDateOrder?: boolean } = {}
 ): PostingResult {
   const existing = findPostedEvent(state, input);
   if (existing) {
@@ -77,15 +78,18 @@ export function preparePosting(
   }
 
   const now = new Date();
+  // The entry is dated on the day it is approved/posted, not on the source document's date.
+  const postingDate = input.postingDate || toPersianDate(now);
   const event: FinancialEvent = {
     ...input,
     id: generateUUID(),
-    date: input.date || toPersianDate(now),
+    date: input.date || postingDate,
+    postingDate,
     status: 'posted',
   };
 
-  const closedYear = closedYearError(state, event.date);
-  if (closedYear) return { ok: false, duplicate: false, error: closedYear };
+  const dateError = postingDateError(state, postingDate, options.enforceDateOrder !== false);
+  if (dateError) return { ok: false, duplicate: false, error: dateError };
 
   try {
     const { entryType, title, rows: rawRows } = rule(event, buildContext(state, event));
@@ -120,14 +124,14 @@ export function preparePosting(
     const docNumber = nextDocNumber(
       state.journalEntries.map((j) => j.docNumber),
       'ACC',
-      event.date
+      postingDate
     );
     const projectName = state.projects.find((p) => p.id === event.projectId)?.name;
     const costCenterName = state.costCenters.find((c) => c.id === event.costCenterId)?.name;
     const entry: JournalEntry = {
       id: generateUUID(),
       docNumber,
-      date: event.date,
+      date: postingDate,
       title,
       type: entryType,
       projectId: event.projectId || undefined,
@@ -166,11 +170,42 @@ export function preparePosting(
 
 /** Documents dated in a closed fiscal year cannot be posted. */
 function closedYearError(state: AppState, date: string): string | null {
-  const year = fiscalYearOf(date);
+  const year = tryFiscalYearOf(date);
+  if (year === null) return `[PostingEngine] تاریخ سند «${date}» تاریخ شمسی معتبر نیست.`;
   return state.financeSettings.closedFiscalYears.includes(year)
     ? `[PostingEngine] سال مالی ${year} بسته شده است؛ ثبت سند با تاریخ ${date} ممکن نیست.`
     : null;
 }
+
+/** Latest date among final entries of the fiscal year of `date` (numbers follow dates within a year). */
+export function lastFinalEntryDate(state: Pick<AppState, 'journalEntries'>, year: number): number {
+  let last = 0;
+  for (const j of state.journalEntries) {
+    if (!FINAL_STATUSES.has(j.status) || tryFiscalYearOf(j.date) !== year) continue;
+    last = Math.max(last, dayIndex(j.date) || 0);
+  }
+  return last;
+}
+
+/**
+ * A posting date must be a valid Jalali date in an open year and, so that numbers follow dates, not earlier
+ * than the last final entry of the same year.
+ */
+export function postingDateError(state: AppState, date: string, enforceOrder = true): string | null {
+  const closed = closedYearError(state, date);
+  if (closed) return closed;
+  if (!enforceOrder) return null;
+  const year = tryFiscalYearOf(date)!;
+  if ((dayIndex(date) || 0) > (dayIndex(toPersianDate(new Date())) || 0)) {
+    return `[PostingEngine] تاریخ سند (${date}) نمی‌تواند بعد از امروز باشد.`;
+  }
+  if ((dayIndex(date) || 0) < lastFinalEntryDate(state, year)) {
+    return `[PostingEngine] تاریخ سند (${date}) نمی‌تواند قبل از آخرین سند قطعی سال ${year} باشد؛ شماره اسناد به ترتیب تاریخ است.`;
+  }
+  return null;
+}
+
+const FINAL_STATUSES: ReadonlySet<JournalEntry['status']> = new Set<JournalEntry['status']>(['ثبت قطعی', 'تأیید شده', 'برگشت خورده']);
 
 /** Cash control: a posting may not take a bank account, cash desk or petty cash fund below zero. */
 function findCashShortage(state: AppState, rows: JournalEntryRow[]): string | null {
@@ -282,8 +317,8 @@ export function finalizeManualEntry(
 ): { ok: true; state: AppState; entry: JournalEntry } | { ok: false; error: string } {
   const entry = state.journalEntries.find((j) => j.id === entryId);
   if (!entry || entry.status !== 'در انتظار تأیید') return { ok: false, error: 'سند در انتظار تأیید نیست.' };
-  const closedYear = closedYearError(state, entry.date);
-  if (closedYear) return { ok: false, error: closedYear.replace('[PostingEngine] ', '') };
+  const dateError = postingDateError(state, entry.date);
+  if (dateError) return { ok: false, error: dateError.replace('[PostingEngine] ', '') };
   const debit = entry.rows.reduce((a, r) => a + r.debit, 0);
   const credit = entry.rows.reduce((a, r) => a + r.credit, 0);
   if (debit !== credit || debit <= 0) return { ok: false, error: 'سند نامتوازن است و قابل تأیید نیست.' };
@@ -293,8 +328,10 @@ export function finalizeManualEntry(
   if (shortage) return { ok: false, error: shortage.replace('[PostingEngine] ', '') };
 
   const now = new Date();
+  // Drafts carry a temporary DRF number; the permanent ACC number is issued when the entry becomes final.
   const approved: JournalEntry = {
     ...entry,
+    docNumber: entry.docNumber.startsWith('ACC-') ? entry.docNumber : nextDocNumber(state.journalEntries.map((j) => j.docNumber), 'ACC', entry.date),
     status: 'تأیید شده',
     history: [...entry.history, { date: toPersianDate(now), time: toPersianTime(now), user: approver, action: 'تأیید نهایی و درج در دفاتر قانونی' }],
   };
@@ -311,7 +348,7 @@ export function reversedEntryIds(state: Pick<AppState, 'journalEntries'>): Set<s
 export function postFinancialEventToState(
   state: AppState,
   input: FinancialEventInput,
-  options: { submitter?: string; syncBalances?: boolean } = {}
+  options: { submitter?: string; syncBalances?: boolean; enforceDateOrder?: boolean } = {}
 ): { state: AppState; result: PostingResult } {
   const result = preparePosting(state, input, { ...options, checkBalances: options.syncBalances !== false });
   if (!result.ok || result.duplicate || !result.event || !result.entry) return { state, result };

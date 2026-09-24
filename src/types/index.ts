@@ -1652,7 +1652,13 @@ export interface FinancialEvent {
   costCenterId: string;
   counterpartyId: string;
   amount: number;
+  /** Date of the source document (statement, invoice, receipt …). */
   date: string;
+  /**
+   * Date of the accounting entry: the approval/posting day. Defaults to today; only an authorised user
+   * may pick another day inside an open fiscal year.
+   */
+  postingDate?: string;
   status: 'draft' | 'posted' | 'rejected';
   details?: Record<string, any>;
   journalEntryId?: string;

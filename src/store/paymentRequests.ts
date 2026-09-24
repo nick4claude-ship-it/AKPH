@@ -37,7 +37,7 @@ export function buildPaymentRequest(existing: PaymentRequest[], input: NewPaymen
   return {
     ...input,
     id: generateUUID(),
-    requestNumber: nextDocNumber(existing.map((r) => r.requestNumber), 'PR', input.date || today),
+    requestNumber: nextDocNumber(existing.map((r) => r.requestNumber), 'PAY', input.date || today),
     date: input.date || today,
     dueDate: input.dueDate || today,
     beneficiaryAccount: input.beneficiaryAccount || { bankName: '-', shebaNumber: '-', accountNumber: '-' },

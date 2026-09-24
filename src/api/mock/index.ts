@@ -9,6 +9,7 @@ import { scopeStateToProjects } from '../../store/state';
 import { getCurrentFiscalYear } from '../../utils/date';
 import type { DataSource, PortalSession, StoreChange } from '../types';
 import { buildMockState } from './buildState';
+import { registerDocNumbers } from '../../utils/ids';
 import { mockUsers } from './seeds';
 
 /** Project ids a project manager may see; undefined for roles that see every project. */
@@ -37,6 +38,13 @@ function applyChanges(state: AppState, changes: StoreChange[]): AppState {
   return next as unknown as AppState;
 }
 
+/** Every string in the dataset; registerDocNumbers keeps only document numbers. */
+function* strings(v: unknown): Generator<string> {
+  if (typeof v === 'string') yield v;
+  else if (Array.isArray(v)) for (const x of v) yield* strings(x);
+  else if (v && typeof v === 'object') for (const x of Object.values(v)) yield* strings(x);
+}
+
 /**
  * Demo data source. It keeps one in-memory "server" copy of the full dataset; every save is merged
  * into it, so switching roles in DEV keeps the work done in this browser tab.
@@ -60,11 +68,15 @@ export function createMockDataSource(): DataSource {
     },
 
     async loadState(session: PortalSession): Promise<AppState> {
+      // Numbers are issued against the whole dataset, not the user's scoped view: a project manager's
+      // new document must never reuse a number taken by a headquarters document they cannot see.
+      registerDocNumbers(strings(ensure()));
       return scopeStateToProjects(ensure(), session.user.projectIds);
     },
 
     async saveChanges(changes: StoreChange[]): Promise<void> {
       server = applyChanges(ensure(), changes);
+      registerDocNumbers(strings(changes));
     },
 
     devUsers: () => mockUsers,

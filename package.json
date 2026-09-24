@@ -13,7 +13,8 @@
     "test:workflows": "node scripts/run-ts.mjs scripts/workflow-scenarios.ts",
     "test:api": "node scripts/run-ts.mjs scripts/api-contract.ts",
     "test:money": "node scripts/run-ts.mjs scripts/money-schema.ts",
-    "test": "npm run test:money && npm run test:posting && npm run test:workflows && npm run test:api"
+    "test:numbering": "node scripts/run-ts.mjs scripts/dates-numbering.ts",
+    "test": "npm run test:money && npm run test:numbering && npm run test:posting && npm run test:workflows && npm run test:api"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

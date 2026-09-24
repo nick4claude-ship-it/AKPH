@@ -16,6 +16,7 @@ import { AppState, SliceKey } from '../src/store/types';
 import { UserProfile, StoreIssueVoucher, InterWarehouseTransfer, StocktakeAudit } from '../src/types';
 import { getNextSequentialDocNumber, DOC_SEQUENCE_DIGITS } from '../src/utils/ids';
 import { parseIntegerAmount, parseMoneyInput } from '../src/utils/money';
+import { toPersianDate } from '../src/utils/date';
 import { can } from '../src/utils/permissions';
 
 let state: AppState = buildMockState();
@@ -224,7 +225,7 @@ assert.ok(state.kardex.some((k) => k.docType === 'تعدیل انبارگردا�
 // ---------------------------------------------------------------------------
 console.log('\n۵) دفتر: سند دستی، تأیید، معکوس، بستن سال');
 const manual = wf.createManualJournalEntry(env(ACC), {
-  id: '', docNumber: '', date: '۱۴۰۵/۰۷/۱۵', title: 'سند آزمون', type: 'عمومی', submitter: '', status: 'پیش‌نویس',
+  id: '', docNumber: '', date: toPersianDate(new Date()), title: 'سند آزمون', type: 'عمومی', submitter: '', status: 'پیش‌نویس',
   rows: [
     { id: 'r1', accountCode: '612', accountName: 'اجاره', description: 'اجاره', debit: 5_000_000, credit: 0 },
     { id: 'r2', accountCode: '11101', accountName: 'بانک', description: 'پرداخت', debit: 0, credit: 5_000_000, subledgerCode: state.bankAccounts[0].id },

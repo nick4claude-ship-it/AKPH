@@ -3,7 +3,7 @@ import { CalendarCheck, ShieldCheck, History, Lock, CheckCircle2, AlertTriangle,
 import { AuditLog, JournalEntry } from '../../types';
 import { formatMoney, parseIntegerAmount } from '../../utils/money';
 import { toPersianDigits } from '../../utils/formatters';
-import { fiscalYearOf } from '../../utils/ids';
+import { tryFiscalYearOf } from '../../utils/ids';
 import { getCurrentFiscalYear } from '../../utils/date';
 import { usePermission } from '../../store/session';
 import type { WorkflowResult } from '../../store/workflows';
@@ -28,7 +28,7 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
   const { can } = usePermission();
   const [activeTab, setActiveTab] = useState<'closing' | 'audit' | 'roles'>('closing');
   const years = useMemo(() => {
-    const set = new Set(journalEntries.map((j) => fiscalYearOf(j.date)));
+    const set = new Set(journalEntries.map((j) => tryFiscalYearOf(j.date)).filter((y): y is number => y !== null));
     set.add(getCurrentFiscalYear());
     return [...set].sort((a, b) => b - a);
   }, [journalEntries]);
@@ -36,7 +36,7 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const yearEntries = journalEntries.filter((j) => fiscalYearOf(j.date) === year);
+  const yearEntries = journalEntries.filter((j) => tryFiscalYearOf(j.date) === year);
   const pending = yearEntries.filter((j) => j.status === 'در انتظار تأیید' || j.status === 'پیش‌نویس');
   const final = yearEntries.filter((j) => j.status === 'ثبت قطعی' || j.status === 'تأیید شده' || j.status === 'برگشت خورده');
   let revenue = 0;

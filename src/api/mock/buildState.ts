@@ -5,6 +5,8 @@
 
 import { AppState, FinancialEventInput } from '../../store/types';
 import { postFinancialEventToState } from '../../store/postingEngine';
+import { DOC_SEQUENCE_DIGITS, tryFiscalYearOf } from '../../utils/ids';
+import { dayIndex } from '../../utils/date';
 import {
   clientStatementApprovedEvent,
   subcontractorStatementApprovedEvent,
@@ -26,7 +28,7 @@ import {
   OPENING_BALANCE_SUBLEDGER,
   DEFAULT_FINANCE_SETTINGS,
 } from '../../store/state';
-import { AppDocument, DocumentCategory, DocumentLink, ReceiptRecord, StockBalance, PaymentRequest } from '../../types';
+import { AppDocument, DocumentCategory, DocumentLink, ReceiptRecord, StockBalance, PaymentRequest, JournalEntry } from '../../types';
 import { getRelativePersianDate } from '../../utils/date';
 import type { SeedContractDocument } from './data/contractsMockData';
 import type { SeedDocument } from './data/documentsMockData';
@@ -473,15 +475,63 @@ export function buildMockState(): AppState {
   };
 
   for (const input of seedEvents(state)) {
-    const { state: next, result } = postFinancialEventToState(state, input, {
+    // Historical events keep their own dates; numbers are put in date order afterwards.
+    const { state: next, result } = postFinancialEventToState(state, { ...input, postingDate: input.postingDate ?? input.date }, {
       submitter: 'انتقال مانده‌های افتتاحیه',
       syncBalances: false,
+      enforceDateOrder: false,
     });
     if (!result.ok) console.warn('[Seed]', result.error);
     state = next;
   }
   state = { ...state, paymentRequests: seedPaymentRequests(state) };
-  return linkSourceDocuments(state);
+  return normalizeSeedNumbers(linkSourceDocuments(state));
+}
+
+/**
+ * Seed document numbers in the live format: every journal entry is renumbered ACC-YYYY-NNNNN per fiscal
+ * year in date order, other series (PO-1403-12 …) are padded to the same width, and every reference to
+ * an old number anywhere in the dataset is rewritten.
+ */
+function normalizeSeedNumbers(state: AppState): AppState {
+  const map = new Map<string, string>();
+  const byYear = new Map<number, JournalEntry[]>();
+  for (const j of state.journalEntries) {
+    const y = tryFiscalYearOf(j.date);
+    if (y === null) throw new Error(`[Seed] سند ${j.docNumber} تاریخ نامعتبر دارد: ${j.date}`);
+    byYear.set(y, [...(byYear.get(y) || []), j]);
+  }
+  for (const [y, list] of byYear) {
+    const sorted = list
+      .map((j, i) => ({ j, i }))
+      .sort((a, b) => (dayIndex(a.j.date) || 0) - (dayIndex(b.j.date) || 0) || a.i - b.i);
+    sorted.forEach(({ j }, n) => map.set(j.docNumber, `ACC-${y}-${String(n + 1).padStart(DOC_SEQUENCE_DIGITS, '0')}`));
+  }
+  const pad = (code: string) => {
+    const m = code.match(/^([A-Z]{2,4})-(1[34]\d{2})-(\d{1,4})$/);
+    return m ? `${m[1]}-${m[2]}-${m[3].padStart(DOC_SEQUENCE_DIGITS, '0')}` : code;
+  };
+  const oldCodes = [...map.keys()].filter(Boolean).sort((a, b) => b.length - a.length);
+  const pattern = oldCodes.length ? new RegExp(oldCodes.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g') : null;
+  const rewrite = (text: string): string => {
+    if (map.has(text)) return map.get(text)!;
+    const padded = pad(text);
+    if (padded !== text) return padded;
+    return pattern && text.length > 8 ? text.replace(pattern, (m) => map.get(m) || m) : text;
+  };
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return rewrite(v);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = k === 'id' ? x : walk(x);
+      return out;
+    }
+    return v;
+  };
+  const next = walk(state) as AppState;
+  // Keep entries sorted newest first, as the live ledger lists them.
+  return { ...next, journalEntries: [...next.journalEntries].sort((a, b) => b.docNumber.localeCompare(a.docNumber)) };
 }
 
 /** Stamps each operational record with the accounting document created for it. */
