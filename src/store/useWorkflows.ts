@@ -42,6 +42,7 @@ const WORKFLOW_ACTIONS = [
   'updateFinanceSettings',
   'updatePettyCashSettings',
   'reconcilePettyCash',
+  'reconcileBankItem',
   'addDocument',
   'linkDocument',
   'receiveGoodsFromPO',
@@ -71,7 +72,7 @@ function dryRun(state: AppState, user: WorkflowEnv['user'], fn: (env: WorkflowEn
       scratch = appReducer(scratch, { type: 'SET_SLICE', key, updater });
     },
     post: (input, options) => {
-      const result = preparePosting(scratch, input, options);
+      const result = preparePosting(scratch, input, { ...options, actor: user });
       if (result.ok && !result.duplicate && result.event && result.entry) scratch = applyPosting(scratch, result.event, result.entry);
       return result;
     },
@@ -92,7 +93,7 @@ export function useWorkflows(): WorkflowApi {
     const env: WorkflowEnv = {
       getState,
       set: (key, updater) => dispatch({ type: 'SET_SLICE', key, updater }),
-      post,
+      post: (input, options) => post(input, { ...options, actor: user }),
       user,
     };
     const commands = dataSource?.commands;

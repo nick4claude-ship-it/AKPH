@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AccountingSubTab, AuditLog, UserProfile } from '../../types';
-import { useAppState, useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { useAppState, useStoreSlice } from '../../store/AppStore';
 import { selectProjects, selectLedgerTotals, selectCashFlowByMonth } from '../../store/selectors';
 import { selectReceivablesAging, selectPayablesAging } from '../../store/domainSelectors';
 import { reversedEntryIds } from '../../store/postingEngine';
@@ -20,6 +20,7 @@ import { FinancialReportsView } from './FinancialReportsView';
 import { PeriodClosingAndAuditView } from './PeriodClosingAndAuditView';
 import { generateUUID } from '../../utils/ids';
 import { toPersianDate, toPersianTime } from '../../utils/date';
+import { emitToast } from '../../store/toast';
 
 interface AccountingModuleProps {
   currentUser: UserProfile;
@@ -37,7 +38,6 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   const { can } = usePermission();
 
   const appState = useAppState();
-  const postFinancialEvent = usePostFinancialEvent();
   const { bankAccounts, cashDesks, costCenters, chartOfAccounts, counterparties, journalEntries, receipts, payments, subledgers, financialEvents } = appState;
   const projects = useMemo(() => selectProjects(appState), [appState]);
   const receivables = useMemo(() => selectReceivablesAging(appState), [appState]);
@@ -68,32 +68,13 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
 
   const projectName = useCallback((id?: string) => projects.find((p) => p.id === id)?.name, [projects]);
 
-  // Bank reconciliation: a statement line without a ledger document is posted through the engine.
+  // Bank reconciliation: a statement line without a ledger document becomes a pending voucher (second approval).
   const handleReconcile = (itemId: string) => {
     const item = reconciliationItems.find((r) => r.id === itemId);
-    if (!item || item.matched || !can('journal.create')) return;
-    let matchedDocNumber = item.matchedDocNumber;
-    if (item.discrepancyType !== 'سند حسابداری بدون گردش بانکی') {
-      const bank = bankAccounts.find((b) => b.id === item.bankAccountId);
-      const posting = postFinancialEvent(
-        {
-          type: 'BANK_RECONCILIATION_MATCH',
-          sourceModule: 'accounting',
-          sourceId: item.id,
-          projectId: '',
-          costCenterId: '',
-          counterpartyId: '',
-          amount: item.amount,
-          date: item.date,
-          details: { bankAccountId: item.bankAccountId, bankName: bank?.bankName, direction: item.type, description: item.description },
-        },
-        { submitter: currentUser.name }
-      );
-      if (!posting.ok) return;
-      matchedDocNumber = posting.event?.docNumber;
-    }
-    setReconciliationItems((prev) => prev.map((r) => (r.id === itemId ? { ...r, matched: true, matchedDocNumber, discrepancyType: 'تطبیق شده' } : r)));
-    logAudit('تطبیق بانکی', matchedDocNumber || item.id, `تطبیق قلم صورت‌حساب بانکی: ${item.description}`);
+    if (!item) return;
+    const result = wf.reconcileBankItem(itemId);
+    emitToast(result.message);
+    if (result.ok) logAudit('تطبیق بانکی', result.docNumber || item.id, `تطبیق قلم صورت‌حساب بانکی: ${item.description}`);
   };
 
   const pendingApprovalsCount = journalEntries.filter((e) => e.status === 'در انتظار تأیید').length;

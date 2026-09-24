@@ -110,7 +110,28 @@ const LEDGER_SLICES = new Set([
   'bankReconciliations',
   'auditLogs',
   'treasuryChecks',
+  // Head-office cash and stock: a project manager sees only the funds and warehouses of own projects.
+  'pettyCashAccounts',
+  'pettyCashExpenses',
+  'pettyCashReplenishments',
+  'pettyCashRequests',
+  'pettyCashReconciliations',
+  'warehouses',
+  'storeIssues',
+  'goodsReceipts',
+  'purchaseOrders',
+  'purchaseRequisitions',
+  'vendorInvoices',
+  'stockReturns',
 ]);
+
+/** Slices a project manager never sees: company bank accounts, cash desks and their balances. */
+const HEAD_OFFICE_ONLY = new Set(['bankAccounts', 'cashDesks', 'subledgers']);
+
+/** Chart of accounts without balances: a project manager sees the codes, not company-wide balances. */
+function withoutBalances<T extends { balance: number; turnoverDebit: number; turnoverCredit: number; children?: T[] }>(nodes: T[]): T[] {
+  return nodes.map((n) => ({ ...n, balance: 0, turnoverDebit: 0, turnoverCredit: 0, children: n.children ? withoutBalances(n.children) : undefined }));
+}
 
 /**
  * Keeps only the records a user may see. Project managers see their own projects: records of other
@@ -128,6 +149,14 @@ export function scopeStateToProjects(state: AppState, projectIds: string[] | und
     const rows = value as Row[];
     if (key === 'projects') {
       out[key] = rows.filter((p) => p.id && allowed.has(p.id));
+    } else if (HEAD_OFFICE_ONLY.has(key)) {
+      out[key] = [];
+    } else if (key === 'chartOfAccounts') {
+      out[key] = withoutBalances(state.chartOfAccounts);
+    } else if (key === 'interTransfers') {
+      out[key] = (rows as unknown as { sourceProjectId?: string; targetProjectId?: string }[]).filter(
+        (t) => (!!t.sourceProjectId && allowed.has(t.sourceProjectId)) || (!!t.targetProjectId && allowed.has(t.targetProjectId))
+      );
     } else if (LEDGER_SLICES.has(key)) {
       out[key] = rows.filter((r) => !!r.projectId && allowed.has(r.projectId));
     } else if (key === 'documents') {

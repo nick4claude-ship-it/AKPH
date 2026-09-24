@@ -50,6 +50,7 @@ const TAB_PATHS: Partial<Record<TreasuryTab, string>> = {
 import { formatCurrencyCompact } from '../../utils/formatters';
 import { Dialog } from '../common/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { paymentApprovalContext, paymentExecutionContext } from '../../store/approvalContext';
 
 interface PaymentsTreasuryModuleProps {
   /** Initial tab from the route (payments, receipts, banks, cash). */
@@ -504,7 +505,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                         </td>
                         <td className="py-3 px-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            {req.status === 'در انتظار تأیید مالی' && can('payment_request.approve', { projectId: req.projectId || undefined, createdBy: req.requestedBy }) && (
+                            {req.status === 'در انتظار تأیید مالی' && can('payment_request.approve', paymentApprovalContext(req)) && (
                               <>
                                 <button
                                   onClick={() => handleApproveRequest(req.id)}
@@ -521,7 +522,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                               </>
                             )}
 
-                            {(req.status === 'تأیید مدیر ارشد' || req.status === 'در صف پرداخت خزانه') && can('payment.execute') && (
+                            {(req.status === 'تأیید مدیر ارشد' || req.status === 'در صف پرداخت خزانه') && can('payment.execute', paymentExecutionContext(req)) && (
                               <button
                                 onClick={() => openPayment(req)}
                                 className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"

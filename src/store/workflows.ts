@@ -27,7 +27,7 @@ import {
   PettyCashReconciliation,
   JournalEntry,
 } from '../types';
-import { AppState, SliceKey, SliceUpdater, PostingResult } from './types';
+import { AppState, FinancialEventInput, SliceKey, SliceUpdater, PostingResult } from './types';
 import type { PostFinancialEvent } from './AppStore';
 import {
   clientStatementApprovedEvent,
@@ -46,6 +46,17 @@ import { formatMoney, formatInt } from '../utils/money';
 import { toPersianDigits } from '../utils/formatters';
 import { generateUUID, nextDocNumber, tryFiscalYearOf } from '../utils/ids';
 import { finalizeManualEntry, reversedEntryIds } from './postingEngine';
+import {
+  journalContext,
+  paymentApprovalContext,
+  paymentExecutionContext,
+  payrollContext,
+  pettyContext,
+  requisitionContext,
+  statementContext,
+  storeIssueContext,
+  vendorInvoiceContext,
+} from './approvalContext';
 import { ACCOUNTS } from './postingRules';
 import { dayIndex, toPersianDate, toPersianTime } from '../utils/date';
 
@@ -57,7 +68,8 @@ import { dayIndex, toPersianDate, toPersianTime } from '../utils/date';
 export interface WorkflowEnv {
   getState: () => AppState;
   set: <K extends SliceKey>(key: K, updater: SliceUpdater<K>) => void;
-  post: PostFinancialEvent;
+  /** Posts a financial event as env.user (the engine checks that user's permission). */
+  post: (input: FinancialEventInput, options?: { submitter?: string }) => PostingResult;
   user: UserProfile;
 }
 
@@ -83,8 +95,7 @@ function guard(env: WorkflowEnv, action: UserAction, context?: ActionContext): W
 
 type PettyCashSettingsChain = PettyCashSettings['approvalChains'][PettyCashApprovalLevel];
 
-/** The user who created a record with a workflow history (its first history entry). */
-export const creatorOf = (history?: { user?: string }[]) => history?.[0]?.user;
+export { creatorOf } from './approvalContext';
 
 function postingFailure(r: PostingResult): WorkflowResult {
   return fail(r.error?.replace('[PostingEngine] ', '') || 'ثبت سند حسابداری انجام نشد.');
@@ -97,7 +108,7 @@ function queuePayment(env: WorkflowEnv, input: NewPaymentRequestInput): PaymentR
   if (exists) return exists;
   let created: PaymentRequest | undefined;
   env.set('paymentRequests', (prev) => {
-    created = { ...buildPaymentRequest(prev, input, today()), requestedBy: env.user.name };
+    created = { ...buildPaymentRequest(prev, input, today()), requestedBy: env.user.name, requestedById: env.user.id };
     return [created, ...prev];
   });
   return created;
@@ -146,8 +157,15 @@ export const CLIENT_STATEMENT_APPROVAL_STATUSES: StatementWorkflowStatus[] = [
   'submitted_to_employer',
 ];
 
-function historyEntry<S extends string>(env: WorkflowEnv, from: S, to: S, action: string, comment?: string) {
-  return { date: today(), time: now(), user: env.user.name, role: env.user.role, fromStatus: from, toStatus: to, action, comment };
+function historyEntry<S extends string>(env: WorkflowEnv, from: S, to: S, action: string, comment?: string, stepAction?: UserAction) {
+  return { date: today(), time: now(), user: env.user.name, userId: env.user.id, stepAction, role: env.user.role, fromStatus: from, toStatus: to, action, comment };
+}
+
+/** The creator of a statement is the signed-in user, whatever the form put in the first history row. */
+function stampCreator<T extends { workflowHistory: { user: string; userId?: string; role: string }[] }>(env: WorkflowEnv, record: T): T {
+  const [first, ...rest] = record.workflowHistory;
+  if (!first) return record;
+  return { ...record, workflowHistory: [{ ...first, user: env.user.name, userId: env.user.id, role: env.user.role }, ...rest] };
 }
 
 export function advanceClientStatement(env: WorkflowEnv, id: string, comment?: string): WorkflowResult {
@@ -155,13 +173,13 @@ export function advanceClientStatement(env: WorkflowEnv, id: string, comment?: s
   if (!s) return fail('صورت‌وضعیت یافت نشد.');
   const step = CLIENT_STATEMENT_FLOW[s.status];
   if (!step) return fail('این صورت‌وضعیت مرحله تأیید بعدی ندارد.');
-  const deny = guard(env, step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) });
+  const deny = guard(env, step.action, statementContext(s));
   if (deny) return deny;
 
   let updated: DetailedProgressStatement = {
     ...s,
     status: step.next,
-    workflowHistory: [...s.workflowHistory, historyEntry(env, s.status, step.next, step.label, comment)],
+    workflowHistory: [...s.workflowHistory, historyEntry(env, s.status, step.next, step.label, comment, step.action)],
   };
   let docNumber: string | undefined;
 
@@ -344,6 +362,10 @@ export function createClientStatement(env: WorkflowEnv, statement: DetailedProgr
   const contract = env.getState().contracts.find((c) => c.id === statement.contractId);
   if (!contract) return fail('قرارداد صورت‌وضعیت یافت نشد.');
   if (!(statement.grossAmount > 0) || statement.totalDeductions > statement.grossAmount) return fail('مبالغ صورت‌وضعیت نامعتبر است.');
+  if (!statement.workflowHistory.length) {
+    statement = { ...statement, workflowHistory: [historyEntry(env, statement.status, statement.status, 'ایجاد صورت‌وضعیت')] };
+  }
+  statement = stampCreator(env, statement);
   env.set('clientStatements', (prev) => [statement, ...prev]);
   env.set('contracts', (prev) =>
     prev.map((c) => (c.id === contract.id ? { ...c, billedValue: c.billedValue + statement.grossAmount, executedValue: Math.max(c.executedValue, c.billedValue + statement.grossAmount) } : c))
@@ -371,6 +393,10 @@ export function createSubcontractorStatement(env: WorkflowEnv, statement: Subcon
   if (deny) return deny;
   const error = validateSubcontractorStatement(env.getState(), statement);
   if (error) return fail(error);
+  if (!statement.workflowHistory.length) {
+    statement = { ...statement, workflowHistory: [historyEntry(env, statement.status, statement.status, 'ثبت کارکرد')] };
+  }
+  statement = stampCreator(env, statement);
   env.set('subcontractorStatements', (prev) => [statement, ...prev]);
   env.set('subcontractorContracts', (prev) =>
     prev.map((c) => {
@@ -388,14 +414,14 @@ export function advanceSubcontractorStatement(env: WorkflowEnv, id: string, comm
   if (!s) return fail('صورت‌وضعیت یافت نشد.');
   const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
   if (!step) return fail('این صورت‌وضعیت مرحله تأیید بعدی ندارد.');
-  const deny = guard(env, step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) });
+  const deny = guard(env, step.action, statementContext(s));
   if (deny) return deny;
 
   const d = today();
   const updated: SubcontractorProgressStatement = {
     ...s,
     status: step.next,
-    workflowHistory: [...s.workflowHistory, historyEntry(env, s.status, step.next, step.label, comment || step.label)],
+    workflowHistory: [...s.workflowHistory, historyEntry(env, s.status, step.next, step.label, comment || step.label, step.action)],
   };
   if (step.next === 'measured') Object.assign(updated, { measuredByName: env.user.name, measurementDate: d });
   if (step.next === 'site_review') Object.assign(updated, { siteReviewerName: env.user.name, siteReviewDate: d, siteReviewNote: comment });
@@ -507,6 +533,8 @@ export function submitPettyCashExpense(env: WorkflowEnv, expense: PettyCashExpen
   const taken = state.pettyCashExpenses.map((e) => e.expenseNumber);
   const saved: PettyCashExpense = {
     ...expense,
+    submitterName: env.user.name,
+    submitterId: env.user.id,
     expenseNumber: expense.expenseNumber && !taken.includes(expense.expenseNumber) ? expense.expenseNumber : nextDocNumber(taken, 'EXP', expense.date),
     status: 'pending_approval',
     approvalLevelRequired: level,
@@ -537,12 +565,12 @@ export function approvePettyCashExpense(env: WorkflowEnv, id: string, comment?: 
   const chain = pettyApprovalChain(state, exp.approvalLevelRequired);
   const idx = Math.max(0, chain.indexOf(exp.currentApprovalStep as PettyCashSettingsChain[number]));
   const role = chain[idx];
-  const deny = guard(env, PETTY_STEP_ACTION[role], { projectId: exp.projectId, createdBy: exp.submitterName });
+  const deny = guard(env, PETTY_STEP_ACTION[role], pettyContext(exp));
   if (deny) return deny;
 
   const history = [
     ...exp.approvalHistory,
-    { level: role, approverName: env.user.name, approverRole: env.user.role, date: today(), time: now(), action: 'approved' as const, comment },
+    { level: role, approverName: env.user.name, approverId: env.user.id, approverRole: env.user.role, date: today(), time: now(), action: 'approved' as const, comment },
   ];
   const nextRole = chain[idx + 1];
   if (nextRole) {
@@ -593,7 +621,7 @@ export function rejectPettyCashExpense(env: WorkflowEnv, id: string, reason: str
             currentApprovalStep: returnToUser ? 'بازگشت به کاربر' : 'رد شده',
             approvalHistory: [
               ...e.approvalHistory,
-              { level: e.currentApprovalStep, approverName: env.user.name, approverRole: env.user.role, date: today(), time: now(), action: returnToUser ? 'returned_for_correction' : 'rejected', comment: reason },
+              { level: e.currentApprovalStep, approverName: env.user.name, approverId: env.user.id, approverRole: env.user.role, date: today(), time: now(), action: returnToUser ? 'returned_for_correction' : 'rejected', comment: reason },
             ],
           }
         : e
@@ -656,7 +684,7 @@ export function requestPettyCashReplenishment(env: WorkflowEnv, fundId: string, 
 export function approveVendorInvoice(env: WorkflowEnv, id: string): WorkflowResult {
   const inv = env.getState().vendorInvoices.find((i) => i.id === id);
   if (!inv) return fail('فاکتور یافت نشد.');
-  const deny = guard(env, 'vendor_invoice.approve', { projectId: inv.projectId });
+  const deny = guard(env, 'vendor_invoice.approve', vendorInvoiceContext(inv));
   if (deny) return deny;
   if (!inv.grnId) return fail('فاکتور بدون رسید انبار قابل تأیید نیست.');
   const posting = env.post(vendorInvoiceEvent(inv), { submitter: env.user.name });
@@ -668,6 +696,7 @@ export function approveVendorInvoice(env: WorkflowEnv, id: string): WorkflowResu
             ...i,
             status: i.paidAmount > 0 ? i.status : 'تأیید تطبیق سه‌جانبه',
             accountingEntryNumber: posting.event?.docNumber,
+            approvedById: env.user.id,
             threeWayMatching: { ...i.threeWayMatching, status: 'تأیید نهایی مالی' },
           }
         : i
@@ -719,12 +748,12 @@ export function approveRequisition(env: WorkflowEnv, id: string): WorkflowResult
   if (!r) return fail('درخواست خرید یافت نشد.');
   const step = nextRequisitionStep(r);
   if (!step) return fail('این درخواست مرحله تأیید باز ندارد.');
-  const deny = guard(env, step.action, { projectId: r.projectId, createdBy: r.requesterName });
+  const deny = guard(env, step.action, requisitionContext(r));
   if (deny) return deny;
   env.set('purchaseRequisitions', (prev) =>
     prev.map((x) =>
       x.id === id
-        ? { ...x, status: step.status, approvals: { ...x.approvals, [step.key]: { approved: true, date: today(), signedBy: env.user.name } } }
+        ? { ...x, status: step.status, approvals: { ...x.approvals, [step.key]: { approved: true, date: today(), signedBy: env.user.name, signedById: env.user.id } } }
         : x
     )
   );
@@ -747,10 +776,10 @@ export function cancelRequisition(env: WorkflowEnv, id: string): WorkflowResult 
 export function approvePaymentRequest(env: WorkflowEnv, id: string): WorkflowResult {
   const r = env.getState().paymentRequests.find((x) => x.id === id);
   if (!r || r.status !== 'در انتظار تأیید مالی') return fail('این درخواست در انتظار تأیید نیست.');
-  const deny = guard(env, 'payment_request.approve', { projectId: r.projectId || undefined, createdBy: r.requestedBy });
+  const deny = guard(env, 'payment_request.approve', paymentApprovalContext(r));
   if (deny) return deny;
   env.set('paymentRequests', (prev) =>
-    prev.map((x) => (x.id === id ? { ...x, status: 'تأیید مدیر ارشد', approvedBy: `${env.user.name} (${env.user.role})`, approvedDate: today() } : x))
+    prev.map((x) => (x.id === id ? { ...x, status: 'تأیید مدیر ارشد', approvedBy: `${env.user.name} (${env.user.role})`, approvedById: env.user.id, approvedDate: today() } : x))
   );
   return ok(`درخواست پرداخت ${r.requestNumber} تأیید شد و در صف پرداخت خزانه قرار گرفت.`);
 }
@@ -758,7 +787,7 @@ export function approvePaymentRequest(env: WorkflowEnv, id: string): WorkflowRes
 export function rejectPaymentRequest(env: WorkflowEnv, id: string, reason: string): WorkflowResult {
   const r = env.getState().paymentRequests.find((x) => x.id === id);
   if (!r || r.status === 'پرداخت شده' || r.paidAmount > 0) return fail('درخواست قابل رد نیست.');
-  const deny = guard(env, 'payment_request.approve', { projectId: r.projectId || undefined });
+  const deny = guard(env, 'payment_request.approve', { projectId: r.projectId || null });
   if (deny) return deny;
   env.set('paymentRequests', (prev) => prev.map((x) => (x.id === id ? { ...x, status: 'رد شده', notes: reason } : x)));
   if (r.sourceType === 'شارژ و تسویه تنخواه') {
@@ -780,7 +809,7 @@ export function executePayment(env: WorkflowEnv, requestId: string, input: Payme
   const state = env.getState();
   const req = state.paymentRequests.find((r) => r.id === requestId);
   if (!req) return fail('درخواست پرداخت یافت نشد.');
-  const deny = guard(env, 'payment.execute', { projectId: req.projectId || undefined });
+  const deny = guard(env, 'payment.execute', paymentExecutionContext(req));
   if (deny) return deny;
   if (req.status !== 'تأیید مدیر ارشد' && req.status !== 'در صف پرداخت خزانه') return fail('فقط درخواست تأییدشده قابل پرداخت است.');
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > req.remainingAmount) {
@@ -915,9 +944,9 @@ export function executePayment(env: WorkflowEnv, requestId: string, input: Payme
 // =============================================================================
 
 export function approvePayrollPeriod(env: WorkflowEnv, period: string): WorkflowResult {
-  const deny = guard(env, 'payroll.approve');
-  if (deny) return deny;
   const pending = env.getState().payrollSlips.filter((s) => s.monthYear === period && s.status === 'محاسبه شده');
+  const deny = guard(env, 'payroll.approve', payrollContext(pending));
+  if (deny) return deny;
   if (!pending.length) return fail('فیش محاسبه‌شده‌ای برای تأیید در این دوره وجود ندارد.');
   const batchId = `${payrollPeriodId(period)}:${pending.map((s) => s.id).sort().join(',')}`;
   const posting = env.post(payrollApprovedEvent(batchId, period, pending), { submitter: env.user.name });
@@ -936,7 +965,7 @@ export function approvePayrollPeriod(env: WorkflowEnv, period: string): Workflow
   });
   env.set('payrollSlips', (prev) =>
     prev.map((s) =>
-      ids.has(s.id) ? { ...s, status: 'صادر شده جهت پرداخت', journalEntryId: posting.event?.docNumber, paymentRequestId: request?.id } : s
+      ids.has(s.id) ? { ...s, status: 'صادر شده جهت پرداخت', approvedById: env.user.id, journalEntryId: posting.event?.docNumber, paymentRequestId: request?.id } : s
     )
   );
   return ok(`حقوق ${period} تأیید شد؛ سند ${posting.event?.docNumber} صادر و درخواست پرداخت به خزانه ارسال شد.`, { docNumber: posting.event?.docNumber });
@@ -971,6 +1000,7 @@ export function createManualJournalEntry(env: WorkflowEnv, entry: JournalEntry):
     totalCredit: credit,
     isBalanced: true,
     submitter: env.user.name,
+    submitterId: env.user.id,
     status: 'در انتظار تأیید',
     history: [{ date: today(), time: now(), user: env.user.name, action: 'ثبت سند دستی و ارسال برای تأیید' }],
   };
@@ -981,9 +1011,9 @@ export function createManualJournalEntry(env: WorkflowEnv, entry: JournalEntry):
 export function approveJournalEntry(env: WorkflowEnv, id: string): WorkflowResult {
   const j = env.getState().journalEntries.find((x) => x.id === id);
   if (!j || j.status !== 'در انتظار تأیید') return fail('سند در انتظار تأیید نیست.');
-  const deny = guard(env, 'journal.approve', { projectId: j.projectId, createdBy: j.submitter });
+  const deny = guard(env, 'journal.approve', journalContext(j));
   if (deny) return deny;
-  const result = finalizeManualEntry(env.getState(), id, env.user.name);
+  const result = finalizeManualEntry(env.getState(), id, env.user.name, env.user.id);
   if (!result.ok) return fail(result.error);
   env.set('journalEntries', result.state.journalEntries);
   env.set('bankAccounts', result.state.bankAccounts);
@@ -1122,6 +1152,57 @@ export function updateFinanceSettings(env: WorkflowEnv, patch: Partial<Pick<AppS
 }
 
 /**
+ * Bank reconciliation: a bank-statement line without a ledger document becomes a pending voucher
+ * (deposit: Dr bank / Cr unidentified deposits; withdrawal: Dr bank fees / Cr bank) that another user
+ * approves. Nothing is booked final here.
+ */
+export function reconcileBankItem(env: WorkflowEnv, itemId: string): WorkflowResult {
+  const state = env.getState();
+  const item = state.bankReconciliations.find((r) => r.id === itemId);
+  if (!item || item.matched) return fail('قلم مغایرت یافت نشد یا قبلاً تطبیق شده است.');
+  const deny = guard(env, 'journal.create', { projectId: null });
+  if (deny) return deny;
+  let docNumber = item.matchedDocNumber;
+  if (item.discrepancyType !== 'سند حسابداری بدون گردش بانکی') {
+    const bank = state.bankAccounts.find((b) => b.id === item.bankAccountId);
+    const bankRow = { accountCode: ACCOUNTS.bank, accountName: 'بانک', subledgerCode: item.bankAccountId, subledgerName: bank?.bankName };
+    const rows =
+      item.type === 'واریز'
+        ? [
+            { id: generateUUID(), ...bankRow, description: `شناسایی واریز طبق صورت‌حساب بانک: ${item.description}`, debit: item.amount, credit: 0 },
+            { id: generateUUID(), accountCode: ACCOUNTS.bankSuspense, accountName: 'واریزهای نامشخص', description: `واریز نامشخص در انتظار تعیین تکلیف: ${item.description}`, debit: 0, credit: item.amount },
+          ]
+        : [
+            { id: generateUUID(), accountCode: ACCOUNTS.bankFees, accountName: 'کارمزد بانکی', description: `کارمزد/برداشت بانکی: ${item.description}`, debit: item.amount, credit: 0 },
+            { id: generateUUID(), ...bankRow, description: `برداشت طبق صورت‌حساب بانک: ${item.description}`, debit: 0, credit: item.amount },
+          ];
+    const voucher = createManualJournalEntry(env, {
+      id: generateUUID(),
+      docNumber: '',
+      date: today(),
+      title: `سند رفع مغایرت بانکی: ${item.type === 'واریز' ? 'واریز' : 'برداشت'} فاقد سند دفتری`,
+      type: item.type === 'واریز' ? 'دریافت' : 'پرداخت',
+      rows,
+      totalDebit: item.amount,
+      totalCredit: item.amount,
+      isBalanced: true,
+      submitter: env.user.name,
+      status: 'در انتظار تأیید',
+      history: [],
+    });
+    if (!voucher.ok) return voucher;
+    docNumber = voucher.docNumber;
+  }
+  env.set('bankReconciliations', (prev) => prev.map((r) => (r.id === itemId ? { ...r, matched: true, matchedDocNumber: docNumber, discrepancyType: 'تطبیق شده' } : r)));
+  return ok(
+    docNumber && docNumber !== item.matchedDocNumber
+      ? `قلم تطبیق شد؛ سند ${docNumber} در انتظار تأیید کاربر دیگر است.`
+      : 'قلم تطبیق شد.',
+    { docNumber }
+  );
+}
+
+/**
  * Petty cash count: the expected balance is the fund's book balance. A difference is not booked directly:
  * it becomes a pending adjustment voucher (deficit Dr cash shortage / Cr fund, surplus Dr fund / Cr other
  * income) that an accountant other than the preparer approves.
@@ -1230,7 +1311,7 @@ export function updatePettyCashSettings(env: WorkflowEnv, settings: PettyCashSet
 export function rejectJournalEntry(env: WorkflowEnv, id: string, reason: string): WorkflowResult {
   const j = env.getState().journalEntries.find((x) => x.id === id);
   if (!j || j.status !== 'در انتظار تأیید') return fail('فقط سند در انتظار تأیید قابل رد است.');
-  const deny = guard(env, 'journal.approve', { projectId: j.projectId, createdBy: j.submitter });
+  const deny = guard(env, 'journal.approve', journalContext(j));
   if (deny) return deny;
   env.set('journalEntries', (prev) =>
     prev.map((x) =>
@@ -1507,9 +1588,11 @@ export function requestStoreIssue(env: WorkflowEnv, issue: StoreIssueVoucher): W
     }
   }
   const number = issue.issueNumber || nextDocNumber(state.storeIssues.map((v) => v.issueNumber), 'SIV', issue.date);
+  // The requester never confirms their own issue: a voucher marked "final" still waits for another user.
   const saved: StoreIssueVoucher = {
     ...issue,
     issueNumber: number,
+    requestedById: env.user.id,
     status: issue.status === 'خروج قطعی از انبار' ? 'تأیید مدیر کارگاه' : issue.status,
   };
   env.set('storeIssues', (prev) => [saved, ...prev]);
@@ -1527,8 +1610,7 @@ export function requestStoreIssue(env: WorkflowEnv, issue: StoreIssueVoucher): W
     ...prev,
   ]);
   for (const i of saved.items) adjustStock(env, saved.warehouseId, i.materialId, 0, i.issuedQty);
-  if (issue.status === 'خروج قطعی از انبار') return confirmStoreIssue(env, saved.id);
-  return ok(`درخواست حواله ${saved.issueNumber} ثبت و کالا رزرو شد.`, { id: saved.id });
+  return ok(`درخواست حواله ${saved.issueNumber} ثبت و کالا رزرو شد؛ خروج قطعی با تأیید کاربر دیگر انجام می‌شود.`, { id: saved.id });
 }
 
 /** Confirms an issue at weighted-average cost: reservation consumed, stock ↓, Dr project cost / Cr inventory. */
@@ -1537,7 +1619,7 @@ export function confirmStoreIssue(env: WorkflowEnv, issueId: string): WorkflowRe
   const issue = state.storeIssues.find((v) => v.id === issueId);
   if (!issue) return fail('حواله یافت نشد.');
   if (issue.status === 'خروج قطعی از انبار') return fail('این حواله قبلاً خارج شده است.');
-  const deny = guard(env, 'inventory.issue_confirm', { projectId: issue.projectId });
+  const deny = guard(env, 'inventory.issue_confirm', storeIssueContext(issue));
   if (deny) return deny;
   // Never issue more than is physically in the warehouse (its own reservation included).
   for (const [materialId, { qty }] of sumByMaterial(issue.items, (i) => i.materialId, (i) => i.issuedQty)) {
@@ -1552,7 +1634,7 @@ export function confirmStoreIssue(env: WorkflowEnv, issueId: string): WorkflowRe
     return { ...i, unitCost, totalCost: Math.round(i.issuedQty * unitCost) };
   });
   const totalCost = items.reduce((a, i) => a + i.totalCost, 0);
-  const costed: StoreIssueVoucher = { ...issue, items, totalCost, status: 'خروج قطعی از انبار' };
+  const costed: StoreIssueVoucher = { ...issue, items, totalCost, status: 'خروج قطعی از انبار', confirmedById: env.user.id };
   const posting = env.post(storeIssueEvent(costed, totalCost), { submitter: env.user.name });
   if (!posting.ok) return postingFailure(posting);
   costed.accountingJournalEntryId = posting.event?.docNumber;

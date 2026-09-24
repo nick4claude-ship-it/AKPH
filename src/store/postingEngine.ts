@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AccountNode, FinancialEvent, JournalEntry, JournalEntryRow } from '../types';
+import { AccountNode, FinancialEvent, FinancialEventType, JournalEntry, JournalEntryRow, UserProfile } from '../types';
+import { checkPermission, UserAction } from '../utils/permissions';
 import { AppState, FinancialEventInput, PostingResult } from './types';
 import { POSTING_RULES, PostingContext, ACCOUNTS } from './postingRules';
 import { generateUUID, nextDocNumber, tryFiscalYearOf } from '../utils/ids';
@@ -60,8 +61,13 @@ function buildContext(state: AppState, event: FinancialEvent): PostingContext {
 export function preparePosting(
   state: AppState,
   input: FinancialEventInput,
-  options: { submitter?: string; checkBalances?: boolean; enforceDateOrder?: boolean } = {}
+  options: { submitter?: string; checkBalances?: boolean; enforceDateOrder?: boolean; actor?: UserProfile } = {}
 ): PostingResult {
+  // A posting made on behalf of a user needs the permission of the operation behind the event.
+  if (options.actor) {
+    const denied = eventPermissionError(options.actor, input);
+    if (denied) return { ok: false, duplicate: false, error: denied };
+  }
   const existing = findPostedEvent(state, input);
   if (existing) {
     const entry = state.journalEntries.find((j) => j.id === existing.journalEntryId);
@@ -166,6 +172,34 @@ export function preparePosting(
   } catch (err: unknown) {
     return { ok: false, duplicate: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/** Operation permissions that may produce each event type (any one of them is enough). */
+export const EVENT_PERMISSIONS: Record<FinancialEventType, UserAction[]> = {
+  GOODS_RECEIPT: ['inventory.receive'],
+  VENDOR_INVOICE: ['vendor_invoice.approve'],
+  STORE_ISSUE: ['inventory.issue_confirm'],
+  CLIENT_STATEMENT_APPROVED: ['client_statement.employer_approval'],
+  SUBCONTRACTOR_STATEMENT_APPROVED: ['sub_statement.ceo_approval'],
+  PAYROLL_APPROVED: ['payroll.approve'],
+  PETTY_CASH_EXPENSE_APPROVED: ['petty.approve_pm', 'petty.approve_finance', 'petty.approve_ceo'],
+  TREASURY_PAYMENT: ['payment.execute'],
+  TREASURY_RECEIPT: ['receipt.record'],
+  PETTY_CASH_REPLENISHMENT: ['payment.execute'],
+  STOCKTAKE_ADJUSTMENT: ['inventory.stocktake'],
+  STORE_RETURN: ['inventory.return'],
+  PURCHASE_RETURN: ['inventory.return'],
+  BANK_RECONCILIATION_MATCH: ['journal.create'],
+  JOURNAL_REVERSAL: ['journal.reverse'],
+  FISCAL_YEAR_CLOSE: ['fiscal.close'],
+};
+
+function eventPermissionError(actor: UserProfile, input: FinancialEventInput): string | null {
+  const actions = EVENT_PERMISSIONS[input.type] || [];
+  const context = { projectId: input.projectId || null };
+  if (actions.some((a) => checkPermission(actor, a, context).ok)) return null;
+  const reason = actions.length ? checkPermission(actor, actions[0], context).reason : undefined;
+  return `[PostingEngine] ${reason || 'اجازه ثبت این رویداد مالی را ندارید.'}`;
 }
 
 /** Documents dated in a closed fiscal year cannot be posted. */
@@ -313,7 +347,8 @@ function syncCashBalances(state: AppState, rows: JournalEntryRow[]): AppState {
 export function finalizeManualEntry(
   state: AppState,
   entryId: string,
-  approver: string
+  approver: string,
+  approverId?: string
 ): { ok: true; state: AppState; entry: JournalEntry } | { ok: false; error: string } {
   const entry = state.journalEntries.find((j) => j.id === entryId);
   if (!entry || entry.status !== 'در انتظار تأیید') return { ok: false, error: 'سند در انتظار تأیید نیست.' };
@@ -333,6 +368,7 @@ export function finalizeManualEntry(
     ...entry,
     docNumber: entry.docNumber.startsWith('ACC-') ? entry.docNumber : nextDocNumber(state.journalEntries.map((j) => j.docNumber), 'ACC', entry.date),
     status: 'تأیید شده',
+    approvedById: approverId,
     history: [...entry.history, { date: toPersianDate(now), time: toPersianTime(now), user: approver, action: 'تأیید نهایی و درج در دفاتر قانونی' }],
   };
   const next: AppState = { ...state, journalEntries: state.journalEntries.map((j) => (j.id === entryId ? approved : j)) };

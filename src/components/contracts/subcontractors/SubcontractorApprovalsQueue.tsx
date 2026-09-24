@@ -26,7 +26,8 @@ import {
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
 import { usePermission } from '../../../store/session';
-import { SUBCONTRACTOR_STATEMENT_FLOW, creatorOf } from '../../../store/workflows';
+import { SUBCONTRACTOR_STATEMENT_FLOW } from '../../../store/workflows';
+import { statementContext } from '../../../store/approvalContext';
 import { Dialog } from '../../common/Dialog';
 
 interface SubcontractorApprovalsQueueProps {
@@ -59,7 +60,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
   // The workflow re-checks on submit; the buttons only reflect the same rules (role, project, no self-approval).
   const stepPermission = (s: SubcontractorProgressStatement) => {
     const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
-    return step ? check(step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) }) : { ok: false, reason: 'مرحله تأیید باز نیست.' };
+    return step ? check(step.action, statementContext(s)) : { ok: false, reason: 'مرحله تأیید باز نیست.' };
   };
   const canReturn = (s: SubcontractorProgressStatement) => check('sub_statement.return', { projectId: s.projectId }).ok;
 

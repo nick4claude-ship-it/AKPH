@@ -8,7 +8,7 @@ import { AppAction, AppState, FinancialEventInput, PostingResult, SliceKey, Slic
 import { applyPosting, preparePosting } from './postingEngine';
 import type { DataSource, StoreChange } from '../api/types';
 import { isFinalJournalEntry } from '../api/types';
-import type { JournalEntry } from '../types';
+import type { JournalEntry, UserProfile } from '../types';
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
@@ -40,7 +40,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-export type PostFinancialEvent = (input: FinancialEventInput, options?: { submitter?: string }) => PostingResult;
+/** Posts an event on behalf of `actor`; the engine checks that user's permission for the operation. */
+export type PostFinancialEvent = (input: FinancialEventInput, options: { submitter?: string; actor: UserProfile }) => PostingResult;
 
 interface AppStoreValue {
   state: AppState;
@@ -188,6 +189,7 @@ export const AppStoreProvider: React.FC<{
   const postFinancialEvent = useCallback<PostFinancialEvent>(
     (input, options) => {
       if (serverOwned) return { ok: false, duplicate: false, error: SERVER_REQUIRED_MESSAGE };
+      if (!options?.actor) return { ok: false, duplicate: false, error: '[PostingEngine] ثبت رویداد مالی بدون کاربر مجاز ممکن نیست.' };
       const result = preparePosting(latest.current, input, options);
       if (result.ok && !result.duplicate && result.event && result.entry) {
         dispatch({ type: 'APPLY_POSTING', event: result.event, entry: result.entry });

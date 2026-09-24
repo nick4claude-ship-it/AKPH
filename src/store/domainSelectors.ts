@@ -24,8 +24,16 @@ import {
   CLIENT_STATEMENT_APPROVAL_STATUSES,
   SUBCONTRACTOR_STATEMENT_FLOW,
   nextRequisitionStep,
-  creatorOf,
 } from './workflows';
+import {
+  journalContext,
+  paymentApprovalContext,
+  payrollContext,
+  pettyContext,
+  requisitionContext,
+  statementContext,
+  vendorInvoiceContext,
+} from './approvalContext';
 import { PETTY_STEP_ACTION } from '../utils/permissions';
 import { CLIENT_APPROVED_STATUSES, VENDOR_INVOICE_APPROVED_STATUSES } from './state';
 import { dayIndex, toPersianDate } from '../utils/date';
@@ -134,7 +142,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: s.statementNumber, title: s.description || s.statementNumber, amount: s.netPayable,
       requester: s.preparerName, projectId: s.projectId, projectName: s.projectName, costCenterName: ccName(s.costCenterId),
       counterpartyName: s.client, date: s.preparationDate, stage: step.label, approverRole: step.role,
-      action: step.action, createdBy: creatorOf(s.workflowHistory),
+      action: step.action, context: statementContext(s),
       classification: 'مالی', documentCount: documentCount(state, 'client_statement', s.id),
     });
   }
@@ -147,7 +155,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: s.statementNumber, title: `${s.tradeType} - ${s.subcontractorName}`, amount: s.netPayable,
       requester: s.subcontractorName, projectId: s.projectId, projectName: s.projectName, costCenterName: ccName(s.costCenterId),
       counterpartyName: s.subcontractorName, date: s.submissionDate, stage: step.label, approverRole: step.role,
-      action: step.action, createdBy: creatorOf(s.workflowHistory),
+      action: step.action, context: statementContext(s),
       classification: 'مستقیم پروژه', documentCount: documentCount(state, 'subcontractor_statement', s.id),
     });
   }
@@ -159,7 +167,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: e.expenseNumber, title: e.description, amount: e.amount, requester: e.submitterName,
       projectId: e.projectId, projectName: e.projectName, costCenterName: ccName(e.costCenterId) || e.costCenter,
       counterpartyName: e.vendor, date: e.date, stage: `تأیید ${e.currentApprovalStep}`, approverRole: e.currentApprovalStep,
-      action: PETTY_STEP_ACTION[e.currentApprovalStep as keyof typeof PETTY_STEP_ACTION] ?? 'petty.approve_ceo', createdBy: e.submitterName,
+      action: PETTY_STEP_ACTION[e.currentApprovalStep as keyof typeof PETTY_STEP_ACTION] ?? 'petty.approve_ceo', context: pettyContext(e),
       classification: e.projectId ? 'مستقیم پروژه' : 'سربار و ستادی', documentCount: documentCount(state, 'petty_cash_expense', e.id),
     });
   }
@@ -171,7 +179,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: inv.invoiceNumber, title: `فاکتور ${inv.supplierName} - سفارش ${inv.poNumber}`, amount: inv.totalAmount,
       requester: 'واحد تدارکات', projectId: inv.projectId, projectName: inv.projectName, costCenterName: ccName(inv.costCenterId),
       counterpartyName: inv.supplierName, date: inv.invoiceDate, stage: 'تطبیق سه‌جانبه و تأیید مالی', approverRole: 'حسابدار',
-      action: 'vendor_invoice.approve',
+      action: 'vendor_invoice.approve', context: vendorInvoiceContext(inv),
       classification: 'مالی', documentCount: documentCount(state, 'vendor_invoice', inv.id),
     });
   }
@@ -183,7 +191,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `purchase_requisition:${r.id}`, module: 'purchase_requisition', moduleLabel: 'درخواست خرید', recordId: r.id,
       docNumber: r.requisitionNumber, title: r.justification || r.items.map((i) => i.materialName).join('، '), amount: r.totalEstimatedAmount,
       requester: r.requesterName, projectId: r.projectId, projectName: r.projectName, costCenterName: ccName(r.costCenterId) || r.costCenter,
-      date: r.date, stage: step.label, approverRole: step.role, action: step.action, createdBy: r.requesterName,
+      date: r.date, stage: step.label, approverRole: step.role, action: step.action, context: requisitionContext(r),
       classification: 'مستقیم پروژه', documentCount: 0,
     });
   }
@@ -195,7 +203,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       docNumber: p.requestNumber, title: `${p.sourceType} - ${p.beneficiaryName}`, amount: p.remainingAmount,
       requester: p.requestedBy || 'خزانه‌داری', projectId: p.projectId, projectName: p.projectName || projectName(p.projectId),
       counterpartyName: p.beneficiaryName || partyName(p.counterpartyId), date: p.date, stage: 'تأیید پرداخت', approverRole: 'مدیر ارشد',
-      action: 'payment_request.approve', createdBy: p.requestedBy,
+      action: 'payment_request.approve', context: paymentApprovalContext(p),
       classification: 'مالی', documentCount: documentCount(state, 'payment_request', p.id),
     });
   }
@@ -207,7 +215,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `payroll:${period}`, module: 'payroll', moduleLabel: 'حقوق و دستمزد', recordId: period,
       docNumber: `لیست حقوق ${period}`, title: `${fa(slips.length)} فیش حقوق محاسبه‌شده`, amount: slips.reduce((a, s) => a + s.totalCostForCompany, 0),
       requester: 'منابع انسانی', projectId: '', projectName: 'ستاد و کارگاه‌ها', date: slips[0].issueDate,
-      stage: 'تأیید مالی حقوق', approverRole: 'حسابدار', action: 'payroll.approve', classification: 'سربار و ستادی', documentCount: 0,
+      stage: 'تأیید مالی حقوق', approverRole: 'حسابدار', action: 'payroll.approve', context: payrollContext(slips), classification: 'سربار و ستادی', documentCount: 0,
     });
   }
 
@@ -217,7 +225,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `journal_entry:${j.id}`, module: 'journal_entry', moduleLabel: 'سند حسابداری', recordId: j.id,
       docNumber: j.docNumber, title: j.title, amount: j.totalDebit, requester: j.submitter,
       projectId: j.projectId || '', projectName: j.projectName || '-', costCenterName: j.costCenterName, date: j.date,
-      stage: 'تأیید سند', approverRole: 'حسابدار', action: 'journal.approve', createdBy: j.submitter, classification: 'مالی', documentCount: documentCount(state, 'journal_entry', j.id),
+      stage: 'تأیید سند', approverRole: 'حسابدار', action: 'journal.approve', context: journalContext(j), classification: 'مالی', documentCount: documentCount(state, 'journal_entry', j.id),
     });
   }
 

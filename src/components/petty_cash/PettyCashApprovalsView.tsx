@@ -20,6 +20,7 @@ import { PettyCashExpense, PortalRole, User as AppUser } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { usePermission } from '../../store/session';
 import { PETTY_STEP_ACTION } from '../../utils/permissions';
+import { pettyContext } from '../../store/approvalContext';
 import { Dialog } from '../common/Dialog';
 import { selectDocumentsFor } from '../../store/domainSelectors';
 import { formatCurrency, formatNumber, toPersianDigits } from '../../utils/formatters';
@@ -76,10 +77,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
   const policy = appState.pettyCashSettings;
   const { check } = usePermission();
   const approvePermission = activeExpense
-    ? check(PETTY_STEP_ACTION[activeExpense.currentApprovalStep as PortalRole] ?? 'petty.approve_ceo', {
-        projectId: activeExpense.projectId,
-        createdBy: activeExpense.submitterName,
-      })
+    ? check(PETTY_STEP_ACTION[activeExpense.currentApprovalStep as PortalRole] ?? 'petty.approve_ceo', pettyContext(activeExpense))
     : { ok: false };
   const canReject = activeExpense ? check('petty.reject', { projectId: activeExpense.projectId }).ok : false;
   const activeDocs = activeExpense ? selectDocumentsFor(appState, 'petty_cash_expense', activeExpense.id) : [];

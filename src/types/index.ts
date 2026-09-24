@@ -113,8 +113,8 @@ export interface ApprovalItem {
   approverRole: string;
   /** Permission the approver needs; checked with the record's project and creator. */
   action: import('../utils/permissions').UserAction;
-  /** Who created the record (the creator can never approve it). */
-  createdBy?: string;
+  /** Separation-of-duties facts (creator, previous approver, project) for the permission check. */
+  context: import('../utils/permissions').ActionContext;
   classification: 'مستقیم پروژه' | 'سربار و ستادی' | 'مالی';
   documentCount: number;
 }
@@ -237,6 +237,8 @@ export interface JournalEntry {
   costCenterId?: string;
   costCenterName?: string;
   submitter: string; // ثبت‌کننده
+  submitterId?: string;
+  approvedById?: string;
   status: JournalEntryStatus;
   rows: JournalEntryRow[];
   totalDebit: number;
@@ -551,6 +553,7 @@ export interface PettyCashExpense {
   approvalHistory: {
     level: string;
     approverName: string;
+    approverId?: string;
     approverRole: string;
     date: string;
     time: string;
@@ -559,6 +562,7 @@ export interface PettyCashExpense {
   }[];
   rejectionReason?: string;
   submitterName: string;
+  submitterId?: string;
   submitterRole: string;
   inventoryTarget: 'direct_consumption' | 'send_to_warehouse';
   inventoryItemCode?: string;
@@ -865,6 +869,10 @@ export interface StatementWorkflowHistory {
   date: string;
   time: string;
   user: string;
+  /** User id of the actor; separation of duties compares ids, never display names. */
+  userId?: string;
+  /** Permission the step used (tells approvals apart from preparation steps). */
+  stepAction?: string;
   role: string;
   fromStatus: StatementWorkflowStatus;
   toStatus: StatementWorkflowStatus;
@@ -1016,6 +1024,8 @@ export interface SubcontractorProgressStatement {
     date: string;
     time: string;
     user: string;
+    userId?: string;
+    stepAction?: string;
     role: string;
     fromStatus: SubcontractorStatementWorkflowStatus;
     toStatus: SubcontractorStatementWorkflowStatus;
@@ -1261,6 +1271,8 @@ export interface StoreIssueVoucher {
   receivedByCrewLeaderName: string;
   items: StoreIssueItem[];
   totalCost: number;
+  requestedById?: string;
+  confirmedById?: string;
   status: 'درخواست اولیه' | 'تأیید مدیر کارگاه' | 'خروج قطعی از انبار';
   accountingJournalEntryId?: string;
 }
@@ -1451,12 +1463,13 @@ export interface PurchaseRequisition {
   priority: RequisitionPriority;
   status: RequisitionStatus;
   requesterName: string;
+  requesterId?: string;
   requesterRole: string;
   approvals: {
-    siteSupervisor?: { approved: boolean; date?: string; signedBy?: string };
-    projectManager?: { approved: boolean; date?: string; signedBy?: string };
-    procurementManager?: { approved: boolean; date?: string; signedBy?: string };
-    financialDirector?: { approved: boolean; date?: string; signedBy?: string };
+    siteSupervisor?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
+    projectManager?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
+    procurementManager?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
+    financialDirector?: { approved: boolean; date?: string; signedBy?: string; signedById?: string };
   };
   items: RequisitionItem[];
   totalEstimatedAmount: number;
@@ -1595,6 +1608,8 @@ export interface VendorInvoice {
   totalAmount: number;
   paidAmount: number;
   remainingBalance: number;
+  registeredById?: string;
+  approvedById?: string;
   status: 'در حال تطبیق' | 'تأیید تطبیق سه‌جانبه' | 'پرداخت شده' | 'پرداخت ناقص' | 'دارای مغایرت و متوقف';
   threeWayMatching: {
     poMatched: boolean;
@@ -1708,6 +1723,7 @@ export interface PaymentRequest {
   priority: 'فوری / بحرانی' | 'عادی' | 'پایین';
   status: 'پیش‌نویس' | 'در انتظار تأیید مالی' | 'تأیید مدیر ارشد' | 'در صف پرداخت خزانه' | 'پرداخت شده' | 'رد شده';
   approvedBy?: string;
+  approvedById?: string;
   approvedDate?: string;
   paymentMethod?: PaymentMethodType;
   payerBankAccountId?: string;
@@ -1718,6 +1734,7 @@ export interface PaymentRequest {
   notes?: string;
   /** User who created the request (the approver must be someone else). */
   requestedBy?: string;
+  requestedById?: string;
 }
 
 export interface TreasuryCheck {
@@ -1903,6 +1920,8 @@ export interface PayrollSlip {
   totalCostForCompany: number; // هزینه تمام‌شده پرسنل برای پروژه (Gross + Employer Insurance)
 
   // Financial status
+  calculatedById?: string;
+  approvedById?: string;
   status: 'محاسبه شده' | 'تأیید مالی' | 'صادر شده جهت پرداخت' | 'پرداخت شده';
   journalEntryId?: string;
   paymentRequestId?: string;

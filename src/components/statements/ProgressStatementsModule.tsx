@@ -23,7 +23,8 @@ import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { useCurrentUser, usePermission } from '../../store/session';
 import { Dialog } from '../common/Dialog';
-import { CLIENT_STATEMENT_FLOW, SUBCONTRACTOR_STATEMENT_FLOW, creatorOf } from '../../store/workflows';
+import { CLIENT_STATEMENT_FLOW, SUBCONTRACTOR_STATEMENT_FLOW } from '../../store/workflows';
+import { statementContext } from '../../store/approvalContext';
 import { selectDocumentsFor } from '../../store/domainSelectors';
 import { CLIENT_APPROVED_STATUSES } from '../../store/state';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
@@ -117,7 +118,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
   const clientAction = (s: DetailedProgressStatement) => {
     const step = CLIENT_STATEMENT_FLOW[s.status];
     if (step) {
-      const permission = check(step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) });
+      const permission = check(step.action, statementContext(s));
       const canReturn = check('client_statement.return', { projectId: s.projectId }).ok;
       return (
         <div className="flex items-center gap-1 justify-end">
@@ -151,7 +152,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
   const subAction = (s: SubcontractorProgressStatement) => {
     const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
     if (step) {
-      const permission = check(step.action, { projectId: s.projectId, createdBy: creatorOf(s.workflowHistory) });
+      const permission = check(step.action, statementContext(s));
       const canReturn = check('sub_statement.return', { projectId: s.projectId }).ok;
       return (
         <div className="flex items-center gap-1 justify-end">

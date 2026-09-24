@@ -104,6 +104,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
       priority,
       status: 'پیش‌نویس کارگاه',
       requesterName: currentUser.name,
+      requesterId: currentUser.id,
       requesterRole: currentUser.role,
       justification: justification.trim(),
       totalEstimatedAmount: totalAmount,

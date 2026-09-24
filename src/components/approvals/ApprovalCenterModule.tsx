@@ -27,7 +27,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
   const state = useAppState();
   const user = useCurrentUser();
   const { check } = usePermission();
-  const permissionFor = (a: ApprovalItem) => check(a.action, { projectId: a.projectId || undefined, createdBy: a.createdBy });
+  const permissionFor = (a: ApprovalItem) => check(a.action, a.context);
   const navigate = useNavigate();
   const { approve, reject } = useApprovalActions();
   const approvals = useMemo(() => selectApprovals(state), [state]);

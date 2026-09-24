@@ -114,6 +114,11 @@ const APPROVAL_ACTIONS: ReadonlySet<UserAction> = new Set<UserAction>([
   'inventory.issue_confirm',
 ]);
 
+/** true for actions that approve someone else's work. */
+export function isApprovalAction(action: string): boolean {
+  return APPROVAL_ACTIONS.has(action as UserAction);
+}
+
 const ALL = '*' as const;
 
 const ROLE_PERMISSIONS: Record<PortalRole, typeof ALL | ReadonlySet<UserAction>> = {
@@ -184,9 +189,17 @@ export const PETTY_STEP_ACTION: Record<PortalRole, UserAction> = {
 };
 
 export interface ActionContext {
-  /** Creator of the record being acted on (user id or display name). */
+  /** User id of the record's creator (the creator never approves it). */
   createdBy?: string | null;
-  /** Project of the record; project managers may act only inside their own projects. */
+  /** User id of whoever approved the previous step of the same document (no two consecutive approvals). */
+  lastApprovedBy?: string | null;
+  /** User id that approved the record (a payer may not be the approver of the payment request). */
+  approvedBy?: string | null;
+  /**
+   * Project of the record. When the key is present the check is about a concrete record: a project
+   * manager may act only on records of own projects, and a record without a project (headquarters) is
+   * outside a project manager's scope. When the key is absent it is a capability check (show a menu, a button).
+   */
   projectId?: string | null;
   amount?: number;
   status?: string;
@@ -197,29 +210,28 @@ export interface PermissionCheck {
   reason?: string;
 }
 
-const sameUser = (user: UserProfile, who?: string | null) => {
-  const w = (who || '').trim();
-  if (!w) return false;
-  return w === user.id || w === user.name.trim() || w.startsWith(`${user.name.trim()} (`);
-};
+/** Separation of duties compares user ids only; a display name can be shared or changed. */
+const sameUser = (user: UserProfile, id?: string | null) => Boolean(id) && id === user.id;
 
-/** true when the user may see/act on data of this project (project managers: own projects only). */
+/**
+ * true when the user may see/act on data of this project. Project managers: own projects only, and
+ * never records without a project (headquarters banks, funds, warehouses, entries).
+ */
 export function canAccessProject(user: UserProfile | null | undefined, projectId?: string | null): boolean {
   if (!user) return false;
-  if (!projectId || user.role !== 'مدیر پروژه') return true;
-  return (user.projectIds || []).includes(projectId);
+  if (user.role !== 'مدیر پروژه') return true;
+  return Boolean(projectId) && (user.projectIds || []).includes(projectId!);
 }
 
 /**
  * Central permission check used by every approve / pay / post handler (through the workflow layer)
  * and by the UI to hide actions.
  *
- * Order matters:
- * 1. Separation of duties — nobody approves a record they created. This rule is checked first and
- *    cannot be overridden, not even by window.PaydarPortal.can.
- * 2. Project scope — a project manager acts only inside own projects.
- * 3. The WordPress runtime may decide the remaining cases (window.PaydarPortal.can).
- * 4. Otherwise the local role matrix, mirrored from the paydar-portal plugin.
+ * 1. Separation of duties (cannot be overridden): nobody approves a record they created, nobody approves
+ *    two consecutive steps of one document, the payer is not the approver.
+ * 2. Project scope — a project manager acts only inside own projects (records without a project excluded).
+ * 3. The role matrix, mirrored from the paydar-portal plugin.
+ * 4. window.PaydarPortal.can may only restrict further; it never grants what the matrix denies.
  */
 export function checkPermission(user: UserProfile | undefined | null, action: UserAction, context: ActionContext = {}): PermissionCheck {
   if (!user) return { ok: false, reason: 'کاربر وارد سامانه نشده است.' };
@@ -227,20 +239,30 @@ export function checkPermission(user: UserProfile | undefined | null, action: Us
   if (APPROVAL_ACTIONS.has(action) && sameUser(user, context.createdBy)) {
     return { ok: false, reason: 'تأیید سندی که خودتان ایجاد کرده‌اید مجاز نیست (تفکیک وظایف).' };
   }
-
-  if (!canAccessProject(user, context.projectId)) {
-    return { ok: false, reason: 'این رکورد متعلق به پروژه‌ای است که مدیریت آن با شما نیست.' };
+  if (APPROVAL_ACTIONS.has(action) && sameUser(user, context.lastApprovedBy)) {
+    return { ok: false, reason: 'تأیید دو مرحله پشت‌سرهم یک سند توسط یک نفر مجاز نیست (تفکیک وظایف).' };
+  }
+  if (sameUser(user, context.approvedBy)) {
+    return { ok: false, reason: 'تأییدکننده درخواست نمی‌تواند پرداخت یا اجرای همان درخواست را انجام دهد (تفکیک وظایف).' };
   }
 
-  const portal = typeof window !== 'undefined' ? window.PaydarPortal : undefined;
-  if (portal && typeof portal.can === 'function') {
-    const allowed = Boolean(portal.can(action, user, context));
-    return allowed ? { ok: true } : { ok: false, reason: 'سامانه وردپرس اجازه این عملیات را به شما نمی‌دهد.' };
+  if ('projectId' in context && !canAccessProject(user, context.projectId)) {
+    return {
+      ok: false,
+      reason: context.projectId ? 'این رکورد متعلق به پروژه‌ای است که مدیریت آن با شما نیست.' : 'رکوردهای ستادی (بدون پروژه) در دسترس مدیر پروژه نیست.',
+    };
   }
 
   const granted = ROLE_PERMISSIONS[user.role];
-  if (granted === ALL || (granted && granted.has(action))) return { ok: true };
-  return { ok: false, reason: `نقش «${user.role}» مجاز به این عملیات نیست.` };
+  if (!(granted === ALL || (granted && granted.has(action)))) {
+    return { ok: false, reason: `نقش «${user.role}» مجاز به این عملیات نیست.` };
+  }
+
+  const portal = typeof window !== 'undefined' ? window.PaydarPortal : undefined;
+  if (portal && typeof portal.can === 'function' && portal.can(action, user, context) === false) {
+    return { ok: false, reason: 'سامانه وردپرس اجازه این عملیات را به شما نمی‌دهد.' };
+  }
+  return { ok: true };
 }
 
 export function can(user: UserProfile | undefined | null, action: UserAction, context?: ActionContext): boolean {

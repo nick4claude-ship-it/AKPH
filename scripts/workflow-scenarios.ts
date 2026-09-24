@@ -63,10 +63,18 @@ assert.equal(getNextSequentialDocNumber(['ACC-1404-00007'], 'ACC', 1405), `ACC-1
 console.log('  ✔ parseIntegerAmount / شماره سند سال‌به‌سال');
 const g = globalThis as unknown as { window?: { PaydarPortal?: { can?: () => boolean } } };
 g.window = { PaydarPortal: { can: () => true } };
-assert.equal(can(ACC, 'journal.approve', { createdBy: ACC.name }), false, 'self-approval stays forbidden even if WordPress allows everything');
-assert.equal(can(ACC, 'journal.approve', { createdBy: 'someone else' }), true, 'WordPress hook decides the other cases');
+assert.equal(can(ACC, 'journal.approve', { createdBy: ACC.id }), false, 'self-approval stays forbidden even if WordPress allows everything');
+assert.equal(can(ACC, 'journal.approve', { createdBy: 'someone-else' }), true);
+assert.equal(can(ACC, 'journal.approve', { createdBy: ACC.name }), true, 'duties compare user ids, not display names');
+assert.equal(can(ACC, 'journal.approve', { lastApprovedBy: ACC.id }), false, 'no two consecutive approvals by one user');
+assert.equal(can(PM, 'fiscal.close'), false, 'PaydarPortal.can cannot grant what the role matrix denies');
+assert.equal(can(ACC, 'payment.execute', { approvedBy: ACC.id }), false, 'payer ≠ approver');
+g.window = { PaydarPortal: { can: () => false } };
+assert.equal(can(CEO, 'journal.approve', { createdBy: 'x' }), false, 'PaydarPortal.can may restrict');
 delete g.window;
 assert.equal(can(PM_OTHER, 'sub_statement.pm_approval', { projectId: 'prj-101' }), false, 'project manager limited to own projects');
+assert.equal(can(PM, 'inventory.transfer', { projectId: '' }), false, 'a record without a project is outside a project manager scope');
+assert.equal(can(PM, 'inventory.transfer'), true, 'capability check without a record');
 console.log('  ✔ قاعده «تأییدنکردن سند خود» با PaydarPortal.can قابل لغو نیست؛ مدیر پروژه فقط پروژه خودش');
 
 // ---------------------------------------------------------------------------

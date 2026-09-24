@@ -21,7 +21,7 @@ export const PendingApprovalsWidget: React.FC<PendingApprovalsWidgetProps> = ({
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const { check } = usePermission();
-  const permissionFor = (item: ApprovalItem) => check(item.action, { projectId: item.projectId || undefined, createdBy: item.createdBy });
+  const permissionFor = (item: ApprovalItem) => check(item.action, item.context);
 
   const pendingList = approvals;
 

@@ -32,6 +32,7 @@ import { usePermission } from '../../store/session';
 import type { WorkflowResult } from '../../store/workflows';
 import { Dialog } from '../common/Dialog';
 import { MoneyInput } from '../common/NumberInput';
+import { journalContext } from '../../store/approvalContext';
 
 interface JournalEntriesViewProps {
   entries: JournalEntry[];
@@ -516,7 +517,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
             <div className="flex items-center gap-2">
               {selectedEntry.status === 'در انتظار تأیید' &&
                 (() => {
-                  const permission = check('journal.approve', { projectId: selectedEntry.projectId, createdBy: selectedEntry.submitter });
+                  const permission = check('journal.approve', journalContext(selectedEntry));
                   if (!permission.ok) {
                     return <span className="text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg font-medium">{permission.reason}</span>;
                   }
