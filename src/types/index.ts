@@ -74,6 +74,8 @@ export interface KpiItem {
   unit: string;
   icon: string;
   description: string;
+  changePeriod?: string;
+  color?: string;
 }
 
 export type PettyCashStatus = 'normal' | 'warning' | 'critical';
@@ -220,7 +222,11 @@ export type JournalEntryType =
   | 'بستن حساب‌ها'
   | 'سند افتتاحیه'
   | 'سند اختتامیه'
-  | 'سند اصلاحی و معکوس';
+  | 'سند اصلاحی و معکوس'
+  | 'انبارداری'
+  | 'خرید'
+  | 'فروش'
+  | 'تنخواه';
 
 export interface JournalEntryRow {
   id: string;
@@ -1582,6 +1588,10 @@ export interface FinancialEvent {
   journalEntryId?: string;
   docNumber?: string;
 }
+
+export type { PaymentRequest, PaymentSourceType, PaymentMethodType } from '../data/paymentsTreasuryMockData';
+export type { SystemDocument, DocumentCategory } from '../data/documentsMockData';
+export type { PayrollSlip, Employee, MonthlyTimesheet } from '../data/hrPayrollMockData';
 
 
 

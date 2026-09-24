@@ -53,8 +53,13 @@ export function selectProjectFinancials(projectId: string, state: AppState): Pro
   if (recordedRevenue === 0) {
     const projStatements = state.clientStatements.filter((s) => s.projectId === projectId);
     recordedRevenue = projStatements.reduce((sum, s) => {
-      if (s.status === 'تأیید نهایی کارفرما' || s.status === 'تسویه شده') {
-        return sum + (s.siteVerifiedAmount || s.grossAmount || 0);
+      const isApproved =
+        s.status === 'approved_by_employer' ||
+        s.status === 'paid' ||
+        (s.status as any) === 'تأیید نهایی کارفرما' ||
+        (s.status as any) === 'تسویه شده';
+      if (isApproved) {
+        return sum + (s.approvedNetPayable || s.grossAmount || 0);
       }
       return sum;
     }, 0);
@@ -70,7 +75,9 @@ export function selectProjectFinancials(projectId: string, state: AppState): Pro
   if (receivables === 0) {
     const projStatements = state.clientStatements.filter((s) => s.projectId === projectId);
     receivables = projStatements.reduce((sum, s) => {
-      const net = (s.siteVerifiedAmount || s.grossAmount || 0) - (s.retentionAmount || 0) - (s.insuranceDeduction || 0);
+      const retention = s.deductions?.find((d) => d.type === 'retention')?.calculatedAmount ?? 0;
+      const insurance = s.deductions?.find((d) => d.type === 'insurance')?.calculatedAmount ?? 0;
+      const net = s.approvedNetPayable || (s.grossAmount - (s.totalDeductions || (retention + insurance)));
       return sum + Math.max(0, net - (s.receivedAmount || 0));
     }, 0);
   }
@@ -96,11 +103,11 @@ export function selectEnhancedProjects(state: AppState): Project[] {
     const fin = selectProjectFinancials(proj.id, state);
     return {
       ...proj,
-      revenue: fin.recordedRevenue > 0 ? fin.recordedRevenue : proj.revenue,
-      invoicedAmount: fin.recordedRevenue > 0 ? fin.recordedRevenue : proj.invoicedAmount,
+      recordedRevenue: fin.recordedRevenue > 0 ? fin.recordedRevenue : proj.recordedRevenue,
       cost: fin.actualCost > 0 ? fin.actualCost : proj.cost,
       actualCost: fin.actualCost > 0 ? fin.actualCost : proj.actualCost,
-      margin: fin.profitMargin !== 0 ? Math.round(fin.profitMargin * 10) / 10 : proj.margin,
+      profit: fin.profit,
+      profitMargin: fin.profitMargin !== 0 ? Math.round(fin.profitMargin * 10) / 10 : proj.profitMargin,
     };
   });
 }
@@ -135,7 +142,7 @@ export function selectKpiItems(state: AppState): KpiItem[] {
 
   // Fallbacks if journal entries are not yet populated
   if (totalRevenue === 0) {
-    totalRevenue = state.projects.reduce((sum, p) => sum + (p.revenue || 0), 0);
+    totalRevenue = state.projects.reduce((sum, p) => sum + (p.recordedRevenue || 0), 0);
   }
   if (totalCost === 0) {
     totalCost = state.projects.reduce((sum, p) => sum + (p.actualCost || 0), 0);
@@ -153,10 +160,10 @@ export function selectKpiItems(state: AppState): KpiItem[] {
   // Liquid cash in bank accounts and cash desks
   const totalCashAndBank = state.bankAccounts.reduce((sum, b) => sum + b.balance, 0) +
     state.cashDesks.reduce((sum, c) => sum + c.balance, 0) +
-    state.pettyCashAccounts.reduce((sum, pc) => sum + pc.balance, 0);
+    state.pettyCashAccounts.reduce((sum, pc) => sum + (pc.actualBalance || 0), 0);
 
   // In-flight progress statements count
-  const inFlightStatements = state.clientStatements.filter((s) => s.status !== 'تسویه شده');
+  const inFlightStatements = state.clientStatements.filter((s) => s.status !== 'paid' && (s.status as any) !== 'تسویه شده');
   const inFlightStatementsAmount = inFlightStatements.reduce((sum, s) => sum + (s.grossAmount || 0), 0);
 
   return [
@@ -164,6 +171,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-1',
       title: 'کل درآمد کارکرد پروژه‌ها',
       value: totalRevenue,
+      previousValue: Math.round(totalRevenue / 1.148),
+      isPositiveGood: true,
       unit: 'تومان',
       changePercent: 14.8,
       changePeriod: 'نسبت به دوره مالی قبل',
@@ -175,6 +184,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-2',
       title: 'بهای تمام‌شده و هزینه‌ها',
       value: totalCost,
+      previousValue: Math.round(totalCost / 1.082),
+      isPositiveGood: false,
       unit: 'تومان',
       changePercent: 8.2,
       changePeriod: 'نسبت به برآورد اولیه بودجه',
@@ -186,6 +197,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-3',
       title: 'سود ناخالص عملیاتی شرکت',
       value: grossProfit,
+      previousValue: Math.round(grossProfit / 1.224),
+      isPositiveGood: true,
       unit: 'تومان',
       changePercent: 22.4,
       changePeriod: 'عملکرد نسبت به هدف مالی سالانه',
@@ -197,6 +210,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-4',
       title: 'حاشیه سود ناخالص میانگین',
       value: Math.round(avgMargin * 10) / 10,
+      previousValue: Math.max(0, avgMargin - 3.5),
+      isPositiveGood: true,
       unit: 'درصد',
       changePercent: 3.5,
       changePeriod: 'بهبود بهره‌وری و کنترل ضایعات',
@@ -208,6 +223,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-5',
       title: 'مطالبات معوق و تجاری از کارفرما',
       value: totalReceivables,
+      previousValue: Math.round(totalReceivables / 0.959),
+      isPositiveGood: false,
       unit: 'تومان',
       changePercent: -4.1,
       changePeriod: 'کاهش مطالبات با پیگیری وصولی‌ها',
@@ -219,6 +236,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-6',
       title: 'صورت‌وضعیت‌های در جریان',
       value: inFlightStatementsAmount,
+      previousValue: Math.round(inFlightStatementsAmount / 1.12),
+      isPositiveGood: true,
       unit: 'تومان',
       changePercent: 12.0,
       changePeriod: `${inFlightStatements.length} فقره در کارتابل رسیدگی`,
@@ -230,6 +249,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-7',
       title: 'کل موجودی نقد و بانک‌ها',
       value: totalCashAndBank,
+      previousValue: Math.round(totalCashAndBank / 1.056),
+      isPositiveGood: true,
       unit: 'تومان',
       changePercent: 5.6,
       changePeriod: 'مانده قابل استفاده تجاری',
@@ -241,6 +262,8 @@ export function selectKpiItems(state: AppState): KpiItem[] {
       id: 'kpi-8',
       title: 'تعهدات و بدهی‌های جاری',
       value: totalLiabilities,
+      previousValue: Math.round(totalLiabilities / 0.927),
+      isPositiveGood: false,
       unit: 'تومان',
       changePercent: -7.3,
       changePeriod: 'کاهش بدهی با تسویه منظم فاکتورها',
