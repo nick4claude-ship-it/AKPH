@@ -45,30 +45,57 @@ export function normalizeDigits(value: string | number): string {
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
 }
 
+/** An amount too large to be an exact integer (beyond Number.MAX_SAFE_INTEGER). */
+export class AmountOverflowError extends Error {
+  readonly farsiMessage = 'مبلغ واردشده بیش از حد بزرگ است.';
+  constructor(input: unknown) {
+    super(`Amount out of safe integer range: ${String(input)}`);
+    this.name = 'AmountOverflowError';
+  }
+}
+
 /**
  * Parse any numeric input (Persian/Arabic/Latin digits, thousand separators) into a
  * non-negative integer. Anything that is not a digit is ignored; empty input gives 0.
+ * A number beyond the safe integer range throws AmountOverflowError instead of turning into 0.
  */
 export function parseIntegerAmount(input: string | number | undefined | null): number {
   if (input === null || input === undefined) return 0;
   if (typeof input === 'number') {
-    if (!Number.isFinite(input) || input < 0) return 0;
+    if (Number.isNaN(input) || input < 0) return 0;
+    if (!Number.isFinite(input) || input > Number.MAX_SAFE_INTEGER) throw new AmountOverflowError(input);
     return Math.floor(input);
   }
-  const digitsOnly = normalizeDigits(input.trim()).replace(/[^\d]/g, '');
+  const digitsOnly = normalizeDigits(input.trim()).replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
   if (!digitsOnly) return 0;
-  const parsed = parseInt(digitsOnly, 10);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+  const parsed = Number(digitsOnly);
+  if (digitsOnly.length > 16 || !Number.isSafeInteger(parsed)) throw new AmountOverflowError(input);
+  return parsed;
 }
 
-/** Rial → Toman (integer, truncated). */
+/** parseIntegerAmount for form fields: an overflow is reported, never thrown. */
+export function tryParseIntegerAmount(input: string | number | undefined | null): { ok: true; value: number } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: parseIntegerAmount(input) };
+  } catch (err) {
+    if (err instanceof AmountOverflowError) return { ok: false, error: err.farsiMessage };
+    throw err;
+  }
+}
+
+/** Half away from zero; the single rounding rule for every Rial→Toman display. */
+const roundHalfAway = (x: number) => Math.sign(x) * Math.round(Math.abs(x));
+
+/** Rial → Toman for display (rounded the same way everywhere). */
 export function rialToToman(rial: number): number {
-  return Math.trunc((rial || 0) / 10);
+  return roundHalfAway((rial || 0) / 10);
 }
 
-/** Toman → Rial. */
+/** Toman → Rial. Throws AmountOverflowError beyond the safe integer range. */
 export function tomanToRial(toman: number): number {
-  return Math.round((toman || 0) * 10);
+  const rial = Math.round(toman || 0) * 10;
+  if (!Number.isSafeInteger(rial)) throw new AmountOverflowError(toman);
+  return rial;
 }
 
 /** Stored Rial amount → number in the display currency (for charts and pre-filled inputs). */
@@ -78,7 +105,15 @@ export function toDisplayAmount(rial: number): number {
 
 /** Number typed in the display currency → stored Rial amount. */
 export function fromDisplayAmount(amount: number): number {
-  return displayUnit === 'rial' ? Math.round(amount || 0) : tomanToRial(amount);
+  if (displayUnit === 'toman') return tomanToRial(amount);
+  const rial = Math.round(amount || 0);
+  if (!Number.isSafeInteger(rial)) throw new AmountOverflowError(amount);
+  return rial;
+}
+
+/** Largest amount a money field accepts in the display currency (its Rial value must stay a safe integer). */
+export function maxMoneyInput(): number {
+  return displayUnit === 'toman' ? Math.floor(Number.MAX_SAFE_INTEGER / 10) : Number.MAX_SAFE_INTEGER;
 }
 
 /** Text typed in a money field (display currency) → integer Rials. */
@@ -103,13 +138,13 @@ export function formatInt(value: number): string {
 
 /** Format a Rial amount. */
 export function formatRial(rial: number, withSuffix: boolean = true): string {
-  const formatted = formatInt(Math.round(rial || 0));
+  const formatted = formatInt(roundHalfAway(rial || 0));
   return withSuffix ? `${formatted} ریال` : formatted;
 }
 
 /** Format a Toman amount (the caller converts from Rials). */
 export function formatToman(toman: number, withSuffix: boolean = true): string {
-  const formatted = formatInt(Math.trunc(toman || 0));
+  const formatted = formatInt(roundHalfAway(toman || 0));
   return withSuffix ? `${formatted} تومان` : formatted;
 }
 

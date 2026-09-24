@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { scaleMoney } from '../moneyFields';
+import { seedTomansToRials } from '../moneyFields';
 import { mockProjects, mockUsers } from './data/mockData';
 import {
   mockChartOfAccounts,
@@ -120,7 +120,7 @@ export function loadMockSeeds() {
     pettyCashCategories: initialPettyCashCategories,
   };
 
-  return scaleMoney({ ...reference, operational }, 10);
+  return seedTomansToRials({ ...reference, operational });
 }
 
 export type MockSeeds = ReturnType<typeof loadMockSeeds>;

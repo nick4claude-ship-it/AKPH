@@ -55,6 +55,7 @@ console.log('\n۰) ورودی عددی، شماره‌گذاری و دسترسی
 assert.equal(parseIntegerAmount('۱۲٬۳۴۵'), 12345);
 assert.equal(parseIntegerAmount('-5'), 5);
 assert.equal(parseIntegerAmount('abc'), 0);
+assert.throws(() => parseIntegerAmount('123456789012345678901'), /بزرگ|safe/i);
 assert.equal(parseMoneyInput('۱۰۰۰'), 10_000, 'toman input is stored as rials');
 assert.equal(getNextSequentialDocNumber(['ACC-1404-00007', 'ACC-1405-00002'], 'ACC', 1405), 'ACC-1405-00003');
 assert.equal(getNextSequentialDocNumber(['ACC-1404-00007'], 'ACC', 1405), `ACC-1405-${'1'.padStart(DOC_SEQUENCE_DIGITS, '0')}`, 'counter restarts every fiscal year');
