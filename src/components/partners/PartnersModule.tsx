@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { Project, Supplier } from '../../types';
 import { ClientPartner, mockClients } from '../../data/partnersMockData';
-import { mockSubcontractorContracts } from '../../data/subcontractorsMockData';
+import { useStoreSlice } from '../../store/AppStore';
 import { mockSuppliers } from '../../data/procurementMockData';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 
@@ -45,7 +45,7 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({
   const [activeTab, setActiveTab] = useState<'clients' | 'subcontractors' | 'suppliers'>('clients');
 
   const [clients, setClients] = useState<ClientPartner[]>(mockClients);
-  const [subcontracts] = useState(mockSubcontractorContracts);
+  const [subcontracts] = useStoreSlice('subcontractorContracts');
   const [suppliers] = useState<Supplier[]>(mockSuppliers);
 
   const [searchQuery, setSearchQuery] = useState('');

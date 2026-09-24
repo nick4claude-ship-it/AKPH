@@ -62,20 +62,18 @@ import { PaymentsReceivablesView } from './PaymentsReceivablesView';
 import { ContractReportsView } from './ContractReportsView';
 import { ContractDocumentsView } from './ContractDocumentsView';
 import {
-  mockContracts,
   mockContractBOQ,
-  mockDetailedStatements,
   mockAmendments,
   mockAdvancePayments,
   mockPriceAdjustments,
-  mockStatementPayments,
   mockContractDocuments,
   mockContractAuditLogs,
 } from '../../data/contractsMockData';
-import {
-  mockSubcontractorContracts,
-  mockSubcontractorStatements,
-} from '../../data/subcontractorsMockData';
+import { useAppState, useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { clientStatementApprovedEvent, subcontractorStatementApprovedEvent } from '../../store/events';
+import { buildPaymentRequest } from '../../store/paymentRequests';
+import { generateUUID } from '../../utils/ids';
+import { toPersianDate } from '../../utils/date';
 import { SubcontractorDashboard } from './subcontractors/SubcontractorDashboard';
 import { SubcontractorStatementsListView } from './subcontractors/SubcontractorStatementsListView';
 import { SubcontractorContractsListView } from './subcontractors/SubcontractorContractsListView';
@@ -88,10 +86,8 @@ import { SubcontractorStatementDetailModal } from './subcontractors/Subcontracto
 
 interface ContractsModuleProps {
   projects: Project[];
-  bankAccounts: BankAccount[];
   currentUser: UserProfile;
-  onAddJournalEntry?: (entry: any) => void;
-  onUpdateBankBalance?: (bankId: string, amount: number, type: 'credit' | 'debit') => void;
+  onPosted?: (docNumber: string) => void;
 }
 
 export type ContractsSubTab =
@@ -108,30 +104,32 @@ export type ContractsSubTab =
 
 export const ContractsModule: React.FC<ContractsModuleProps> = ({
   projects,
-  bankAccounts,
   currentUser,
-  onAddJournalEntry,
-  onUpdateBankBalance,
+  onPosted,
 }) => {
+  const { bankAccounts } = useAppState();
+  const postFinancialEvent = usePostFinancialEvent();
+  const [, setPaymentRequests] = useStoreSlice('paymentRequests');
+  const [, setReceipts] = useStoreSlice('receipts');
   // Top-Level Mode: 'client' (مطالبات از کارفرما) vs 'subcontractor' (تعهدات پیمانکاران جزء)
   const [mainMode, setMainMode] = useState<ContractsMainViewMode>('client');
 
   // Client Section States
   const [activeTab, setActiveTab] = useState<ContractsSubTab>('dashboard');
-  const [contracts, setContracts] = useState<Contract[]>(mockContracts);
+  const [contracts, setContracts] = useStoreSlice('contracts');
   const [boqItems, setBOQItems] = useState<ContractBOQItem[]>(mockContractBOQ);
-  const [statements, setStatements] = useState<DetailedProgressStatement[]>(mockDetailedStatements);
+  const [statements, setStatements] = useStoreSlice('clientStatements');
   const [amendments, setAmendments] = useState<ContractAmendment[]>(mockAmendments);
   const [advancePayments, setAdvancePayments] = useState<AdvancePaymentRecord[]>(mockAdvancePayments);
   const [adjustments, setAdjustments] = useState<PriceAdjustment[]>(mockPriceAdjustments);
-  const [payments, setPayments] = useState<StatementPayment[]>(mockStatementPayments);
+  const [payments, setPayments] = useStoreSlice('statementPayments');
   const [documents, setDocuments] = useState<ContractDocument[]>(mockContractDocuments);
   const [auditLogs, setAuditLogs] = useState<ContractAuditLog[]>(mockContractAuditLogs);
 
   // Subcontractor Section States
   const [subTab, setSubTab] = useState<SubcontractorSubTab>('dashboard');
-  const [subContracts, setSubContracts] = useState<SubcontractorContract[]>(mockSubcontractorContracts);
-  const [subStatements, setSubStatements] = useState<SubcontractorProgressStatement[]>(mockSubcontractorStatements);
+  const [subContracts, setSubContracts] = useStoreSlice('subcontractorContracts');
+  const [subStatements, setSubStatements] = useStoreSlice('subcontractorStatements');
   const [selectedSubContract, setSelectedSubContract] = useState<SubcontractorContract | null>(null);
   const [selectedSubStatement, setSelectedSubStatement] = useState<SubcontractorProgressStatement | null>(null);
 
@@ -193,63 +191,87 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     newStatus: SubcontractorStatementWorkflowStatus,
     comment?: string
   ) => {
-    setSubStatements((prev) =>
-      prev.map((s) => {
-        if (s.id === statementId) {
-          const updated: SubcontractorProgressStatement = {
-            ...s,
-            status: newStatus,
-            workflowHistory: [
-              ...s.workflowHistory,
-              {
-                date: '۱۴۰۳/۰۷/۰۳',
-                time: '۱۴:۳۰',
-                user: currentUser.name,
-                role: currentUser.role,
-                fromStatus: s.status,
-                toStatus: newStatus,
-                action: `تغییر وضعیت به ${newStatus}`,
-                comment: comment || 'تأیید مرحله در گردش کار',
-              },
-            ],
-          };
+    const current = subStatements.find((s) => s.id === statementId);
+    if (!current) return;
 
-          if (newStatus === 'site_review') {
-            updated.siteReviewNote = comment || updated.siteReviewNote;
-            updated.siteReviewerName = currentUser.name;
-            updated.siteReviewDate = '۱۴۰۳/۰۷/۰۳';
-          } else if (newStatus === 'pm_approved') {
-            updated.pmApprovalNote = comment || updated.pmApprovalNote;
-            updated.pmApproverName = currentUser.name;
-            updated.pmApprovalDate = '۱۴۰۳/۰۷/۰۳';
-          } else if (newStatus === 'management_approved') {
-            updated.managementApprovalNote = comment || updated.managementApprovalNote;
-            updated.managementApproverName = currentUser.name;
-            updated.managementApprovalDate = '۱۴۰۳/۰۷/۰۳';
+    const updated: SubcontractorProgressStatement = {
+      ...current,
+      status: newStatus,
+      workflowHistory: [
+        ...current.workflowHistory,
+        {
+          date: '۱۴۰۳/۰۷/۰۳',
+          time: '۱۴:۳۰',
+          user: currentUser.name,
+          role: currentUser.role,
+          fromStatus: current.status,
+          toStatus: newStatus,
+          action: `تغییر وضعیت به ${newStatus}`,
+          comment: comment || 'تأیید مرحله در گردش کار',
+        },
+      ],
+    };
 
-            // When management approves, add to contract's approvedStatementsValue & remainingPayableValue
-            setSubContracts((prevContracts) =>
-              prevContracts.map((c) => {
-                if (c.id === s.subcontractorContractId) {
-                  return {
-                    ...c,
-                    approvedStatementsValue: c.approvedStatementsValue + s.netPayable,
-                    remainingPayableValue: c.remainingPayableValue + s.netPayable,
-                  };
+    if (newStatus === 'site_review') {
+      updated.siteReviewNote = comment || updated.siteReviewNote;
+      updated.siteReviewerName = currentUser.name;
+      updated.siteReviewDate = '۱۴۰۳/۰۷/۰۳';
+    } else if (newStatus === 'pm_approved') {
+      updated.pmApprovalNote = comment || updated.pmApprovalNote;
+      updated.pmApproverName = currentUser.name;
+      updated.pmApprovalDate = '۱۴۰۳/۰۷/۰۳';
+    } else if (newStatus === 'management_approved') {
+      updated.managementApprovalNote = comment || updated.managementApprovalNote;
+      updated.managementApproverName = currentUser.name;
+      updated.managementApprovalDate = '۱۴۰۳/۰۷/۰۳';
+
+      // CEO approval is the financial trigger: Dr project cost / Cr subcontractor payable and deductions.
+      const posting = postFinancialEvent(subcontractorStatementApprovedEvent(updated), { submitter: currentUser.name });
+      if (!posting.ok) return;
+      updated.projectExpenseRecordId = posting.event?.docNumber;
+
+      if (!posting.duplicate) {
+        setSubContracts((prevContracts) =>
+          prevContracts.map((c) =>
+            c.id === current.subcontractorContractId
+              ? {
+                  ...c,
+                  approvedStatementsValue: c.approvedStatementsValue + current.netPayable,
+                  remainingPayableValue: c.remainingPayableValue + current.netPayable,
                 }
-                return c;
-              })
-            );
-          }
-
-          if (selectedSubStatement?.id === statementId) {
-            setSelectedSubStatement(updated);
-          }
-          return updated;
+              : c
+          )
+        );
+        const remaining = current.netPayable - current.paidAmount;
+        if (remaining > 0) {
+          setPaymentRequests((prev) => [
+            buildPaymentRequest(
+              prev,
+              {
+                sourceType: 'صورت‌وضعیت پیمانکار جزء',
+                sourceRefId: current.id,
+                sourceRefNumber: current.statementNumber,
+                projectId: current.projectId,
+                projectName: current.projectName,
+                costCenterId: current.costCenterId,
+                counterpartyId: current.counterpartyId,
+                beneficiaryName: current.subcontractorName,
+                beneficiaryType: 'پیمانکار جزء',
+                totalAmount: remaining,
+              },
+              toPersianDate(new Date())
+            ),
+            ...prev,
+          ]);
         }
-        return s;
-      })
-    );
+        if (posting.event?.docNumber) onPosted?.(posting.event.docNumber);
+      }
+    }
+
+    setSubStatements((prev) => prev.map((s) => (s.id === statementId ? updated : s)));
+    if (selectedSubStatement?.id === statementId) {
+      setSelectedSubStatement(updated);
+    }
   };
 
   const handleConfirmSubPayment = (
@@ -313,43 +335,46 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
       setSelectedSubStatement(updatedStatement);
     }
 
-    // 3. Double-entry accounting for project cost:
-    // بدهکار: بهای تمام شده / هزینه اجرای پروژه (پیمانکاران جزء)
-    // بستانکار: موجودی بانک
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        date,
-        description: `ثبت هزینه پیمانکار جزء (${statement.subcontractorName}) بابت ${statement.statementNumber} در پروژه ${statement.projectName}`,
-        type: 'payment',
+    // 3. Payment belongs to the financial layer only: Dr subcontractor payable / Cr bank.
+    //    The project cost was already recognised when the statement was approved.
+    const posting = postFinancialEvent(
+      {
+        type: 'TREASURY_PAYMENT',
+        sourceModule: 'treasury',
+        sourceId: expenseRecordId,
         projectId: statement.projectId,
-        projectName: statement.projectName,
-        status: 'Approved',
-        sourceModule: 'Contracts & Subcontractors',
-        referenceId: expenseRecordId,
-        items: [
-          {
-            accountId: 'acc-cost-subcontractors',
-            accountCode: '۵۰۲۰۱',
-            accountName: `بهای تمام شده - هزینه پیمانکاران جزء (${statement.tradeType})`,
-            debit: amount,
-            credit: 0,
-            description: `تسویه کارکرد ${statement.statementNumber} - ${statement.subcontractorName}`,
-          },
-          {
-            accountId: bankId,
-            accountCode: '۱۰۱۰۱',
-            accountName: `موجودی بانک (${selectedBank?.bankName || 'بانک'})`,
-            debit: 0,
-            credit: amount,
-            description: `پرداخت وجه پیمانکار جزء - رهگیری ${refNumber}`,
-          },
-        ],
-      });
-    }
-
-    // 4. Update bank account balance
-    if (onUpdateBankBalance && bankId) {
-      onUpdateBankBalance(bankId, amount, 'credit');
+        costCenterId: statement.costCenterId,
+        counterpartyId: statement.counterpartyId,
+        amount,
+        date,
+        details: {
+          docNumber: statement.statementNumber,
+          payableType: 'subcontractor',
+          bankAccountId: bankId,
+          bankName: selectedBank?.bankName,
+          trackingNumber: refNumber,
+        },
+      },
+      { submitter: currentUser.name }
+    );
+    if (posting.ok && !posting.duplicate) {
+      setPaymentRequests((prev) =>
+        prev.map((r) =>
+          r.sourceType === 'صورت‌وضعیت پیمانکار جزء' && r.sourceRefId === statement.id && r.status !== 'پرداخت شده'
+            ? {
+                ...r,
+                paidAmount: r.paidAmount + amount,
+                remainingAmount: Math.max(0, r.remainingAmount - amount),
+                status: r.remainingAmount - amount <= 0 ? 'پرداخت شده' : r.status,
+                payerBankAccountId: bankId,
+                paymentDate: date,
+                trackingNumber: refNumber,
+                journalEntryId: posting.event?.docNumber,
+              }
+            : r
+        )
+      );
+      if (posting.event?.docNumber) onPosted?.(posting.event.docNumber);
     }
   };
 
@@ -429,49 +454,82 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
       setSelectedContract(updatedContract);
     }
 
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        date: newPayment.date,
-        description: `وصول وجه ${newPayment.statementNumber} بابت پیمان ${updatedContract.code} (${newPayment.method})`,
-        type: 'receipt',
+    // Receipt is posted in the financial layer: Dr bank / Cr receivables.
+    const bank = bankAccounts.find((b) => b.id === destinationBankId) || bankAccounts[0];
+    const posting = postFinancialEvent(
+      {
+        type: 'TREASURY_RECEIPT',
+        sourceModule: 'treasury',
+        sourceId: newPayment.id,
         projectId: updatedContract.projectId,
-        projectName: updatedContract.projectName,
-        status: 'Approved',
-        sourceModule: 'Contracts & Statements',
-        referenceId: newPayment.id,
-        items: [
-          {
-            accountId: destinationBankId || 'acc-bank-mellat',
-            accountCode: '۱۰۱۰۱',
-            accountName: `موجودی نزد بانک‌ها (${newPayment.destinationBank})`,
-            debit: newPayment.amount,
-            credit: 0,
-            description: `واریز به بانک - رهگیری ${newPayment.referenceNumber}`,
-          },
-          {
-            accountId: 'acc-rec-clients',
-            accountCode: '۱۰۳۰۱',
-            accountName: `حساب‌های دریافتنی تجاری - ${updatedContract.employer}`,
-            debit: 0,
-            credit: newPayment.amount,
-            description: `تسویه مطالبات ${newPayment.statementNumber}`,
-          },
-        ],
-      });
-    }
-
-    if (onUpdateBankBalance && destinationBankId) {
-      onUpdateBankBalance(destinationBankId, newPayment.amount, 'debit');
+        costCenterId: updatedStatement.costCenterId || updatedContract.costCenterId,
+        counterpartyId: updatedStatement.counterpartyId || updatedContract.counterpartyId,
+        amount: newPayment.amount,
+        date: newPayment.date,
+        details: {
+          docNumber: newPayment.statementNumber,
+          bankAccountId: bank?.id,
+          bankName: bank?.bankName || newPayment.destinationBank,
+          trackingNumber: newPayment.referenceNumber,
+        },
+      },
+      { submitter: currentUser.name }
+    );
+    if (posting.ok && !posting.duplicate && posting.event) {
+      setPayments((prev) => prev.map((p) => (p.id === newPayment.id ? { ...p, journalEntryId: posting.event!.docNumber } : p)));
+      setReceipts((prev) => [
+        {
+          id: generateUUID(),
+          docNumber: posting.event!.docNumber!,
+          date: newPayment.date,
+          amount: newPayment.amount,
+          counterpartyId: posting.event!.counterpartyId,
+          costCenterId: posting.event!.costCenterId,
+          payer: updatedContract.employer,
+          receiver: bank?.bankName || newPayment.destinationBank,
+          projectId: updatedContract.projectId,
+          projectName: updatedContract.projectName,
+          destinationAccount: bank ? `${bank.bankName} - ${bank.accountNumber}` : newPayment.destinationBank,
+          method: newPayment.method === 'چک صیادی' ? 'چک صیادی' : newPayment.method === 'حواله ساتنا/پایا' ? 'حواله بانکی' : 'تهاتر',
+          trackingNumber: newPayment.referenceNumber,
+          description: `وصول ${newPayment.statementNumber} - پیمان ${updatedContract.code}`,
+          journalEntryId: posting.event!.journalEntryId,
+          status: 'وصول شده',
+        },
+        ...prev,
+      ]);
+      onPosted?.(posting.event.docNumber!);
     }
   };
 
+  // Employer approval is the financial trigger for a client statement.
+  const postClientStatement = (statement: DetailedProgressStatement): string | undefined => {
+    const contract = contracts.find((c) => c.id === statement.contractId);
+    const posting = postFinancialEvent(
+      clientStatementApprovedEvent(
+        statement,
+        statement.costCenterId || contract?.costCenterId || '',
+        statement.counterpartyId || contract?.counterpartyId || ''
+      ),
+      { submitter: currentUser.name }
+    );
+    if (!posting.ok) return undefined;
+    if (!posting.duplicate && posting.event?.docNumber) onPosted?.(posting.event.docNumber);
+    return posting.event?.docNumber;
+  };
+
   const handleUpdateStatementStatus = (statementId: string, newStatus: any, reason?: string) => {
+    const target = statements.find((s) => s.id === statementId);
+    const accountingDoc =
+      target && newStatus === 'approved_by_employer' ? postClientStatement(target) : undefined;
+    if (target && newStatus === 'approved_by_employer' && !accountingDoc) return;
     setStatements(
       statements.map((s) => {
         if (s.id === statementId) {
           const updated: DetailedProgressStatement = {
             ...s,
             status: newStatus,
+            accountingJournalEntryId: accountingDoc || s.accountingJournalEntryId,
             rejectionReason: reason || s.rejectionReason,
             workflowHistory: [
               ...s.workflowHistory,
@@ -498,56 +556,10 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   };
 
   const handleIssueAccountingEntryForStatement = (statement: DetailedProgressStatement) => {
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        date: statement.preparationDate,
-        description: `شناسایی درآمد پیمانکاری و ایجاد حساب‌های دریافتنی بابت ${statement.statementNumber}`,
-        type: 'journal',
-        projectId: statement.projectId,
-        projectName: statement.projectName,
-        status: 'Approved',
-        sourceModule: 'Contracts & Statements',
-        referenceId: statement.id,
-        items: [
-          {
-            accountId: 'acc-rec-clients',
-            accountCode: '۱۰۳۰۱',
-            accountName: `حساب‌های دریافتنی کارفرما (${statement.client})`,
-            debit: statement.netPayable,
-            credit: 0,
-            description: `مطالبه ناخالص پس از کسر کسورات قانونی`,
-          },
-          {
-            accountId: 'acc-deposit-retention',
-            accountCode: '۱۰۴۰۱',
-            accountName: 'سپرده حسن انجام کار نزد کارفرما (۱۰٪)',
-            debit: Math.round(statement.grossAmount * 0.1),
-            credit: 0,
-            description: `سپرده تضمین کیفیت منضم به پیمان ${statement.contractCode}`,
-          },
-          {
-            accountId: 'acc-advance-payment',
-            accountCode: '۱۰۵۰۱',
-            accountName: 'استرداد پیش‌پرداخت سرمایه‌ای',
-            debit: Math.round(statement.grossAmount * 0.1),
-            credit: 0,
-            description: `مستهلک‌سازی قسط پیش‌پرداخت دریافتی`,
-          },
-          {
-            accountId: 'acc-revenue-contract',
-            accountCode: '۴۰۱۰۱',
-            accountName: `درآمد حاصل از پیمانکاری (${statement.projectName})`,
-            debit: 0,
-            credit: statement.grossAmount,
-            description: `شناسایی درآمد ناخالص بر اساس درصد پیشرفت فیزیکی متره`,
-          },
-        ],
-      });
-    }
-
-    setStatements(
-      statements.map((s) => (s.id === statement.id ? { ...s, accountingJournalEntryId: `ACC-STM-${s.id}` } : s))
-    );
+    if (statement.status !== 'approved_by_employer') return;
+    const docNumber = postClientStatement(statement);
+    if (!docNumber) return;
+    setStatements((prev) => prev.map((s) => (s.id === statement.id ? { ...s, accountingJournalEntryId: docNumber } : s)));
   };
 
   // Subcontractor Pending Counts

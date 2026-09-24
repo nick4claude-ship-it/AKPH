@@ -11,7 +11,6 @@ const isDev = (): boolean => {
 import {
   AccountNode,
   BankAccount,
-  CashDesk,
   CostCenter,
   Subledger,
   JournalEntry,
@@ -83,6 +82,10 @@ export const mockChartOfAccounts: AccountNode[] = [
               { code: '11302', title: 'سپرده بیمه ماده ۳۸ نزد کارفرما (۵٪)', level: 'تفصیلی', nature: 'بدهکار', balance: 15_400_000_000, turnoverDebit: 18_000_000_000, turnoverCredit: 2_600_000_000 },
               { code: '11303', title: 'مساعده و وام کارکنان و کارگاه', level: 'تفصیلی', nature: 'بدهکار', balance: 1_000_000_000, turnoverDebit: 9_000_000_000, turnoverCredit: 8_000_000_000 },
               { code: '11304', title: 'مالیات بر ارزش افزوده خرید (اعتبار مالیاتی)', level: 'تفصیلی', nature: 'بدهکار', balance: 4_200_000_000, turnoverDebit: 12_000_000_000, turnoverCredit: 7_800_000_000 },
+              { code: '11305', title: 'مالیات تکلیفی مکسوره توسط کارفرما (پیش‌پرداخت مالیات)', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+              { code: '11306', title: 'کسورات مصالح تحویلی کارفرما', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+              { code: '11307', title: 'ارزش افزوده مکسوره نزد کارفرما', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+              { code: '11308', title: 'سایر کسورات مکسوره کارفرما', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
           {
@@ -184,6 +187,7 @@ export const mockChartOfAccounts: AccountNode[] = [
             turnoverCredit: 85_000_000_000,
             children: [
               { code: '21301', title: 'پیش‌دریافت تجهیز کارگاه و اقساط قرارداد', level: 'تفصیلی', nature: 'بستانکار', balance: 70_000_000_000, turnoverDebit: 15_000_000_000, turnoverCredit: 85_000_000_000 },
+              { code: '21302', title: 'علی‌الحساب‌های دریافتی از کارفرما', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
           {
@@ -221,6 +225,19 @@ export const mockChartOfAccounts: AccountNode[] = [
             children: [
               { code: '21601', title: 'سپرده حسن انجام کار مکسوره پیمانکاران جزء', level: 'تفصیلی', nature: 'بستانکار', balance: 5_200_000_000, turnoverDebit: 1_000_000_000, turnoverCredit: 6_200_000_000 },
               { code: '21602', title: 'سپرده بیمه مکسوره پیمانکاران جزء (ماده ۳۸)', level: 'تفصیلی', nature: 'بستانکار', balance: 3_000_000_000, turnoverDebit: 1_000_000_000, turnoverCredit: 4_000_000_000 },
+              { code: '21603', title: 'جرائم و سایر کسورات مکسوره پیمانکاران جزء', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+            ],
+          },
+          {
+            code: '217',
+            title: 'بستانکاران متفرقه و حساب‌های معلق',
+            level: 'معین',
+            nature: 'بستانکار',
+            balance: 0,
+            turnoverDebit: 0,
+            turnoverCredit: 0,
+            children: [
+              { code: '21701', title: 'واریزهای نامشخص بانکی در انتظار تعیین تکلیف', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
         ],
@@ -284,6 +301,18 @@ export const mockChartOfAccounts: AccountNode[] = [
             ],
           },
           { code: '412', title: 'درآمد حاصل از تعدیل نرخ پیمان و مابه‌التفاوت مصالح', level: 'معین', nature: 'بستانکار', balance: 22_500_000_000, turnoverDebit: 0, turnoverCredit: 22_500_000_000 },
+          {
+            code: '413',
+            title: 'سایر درآمدهای عملیاتی',
+            level: 'معین',
+            nature: 'بستانکار',
+            balance: 0,
+            turnoverDebit: 0,
+            turnoverCredit: 0,
+            children: [
+              { code: '41301', title: 'اضافات انبارگردانی', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+            ],
+          },
         ],
       },
     ],
@@ -407,6 +436,30 @@ export const mockChartOfAccounts: AccountNode[] = [
             ],
           },
           { code: '622', title: 'سود و کارمزد تسهیلات بانکی', level: 'معین', nature: 'بدهکار', balance: 2_400_000_000, turnoverDebit: 2_400_000_000, turnoverCredit: 0 },
+          {
+            code: '623',
+            title: 'جرائم و خسارات پیمان',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 0,
+            turnoverDebit: 0,
+            turnoverCredit: 0,
+            children: [
+              { code: '62301', title: 'جرائم تأخیر مکسوره کارفرما', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+            ],
+          },
+          {
+            code: '624',
+            title: 'کسری و ضایعات انبار',
+            level: 'معین',
+            nature: 'بدهکار',
+            balance: 0,
+            turnoverDebit: 0,
+            turnoverCredit: 0,
+            children: [
+              { code: '62401', title: 'کسری انبارگردانی', level: 'تفصیلی', nature: 'بدهکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
+            ],
+          },
         ],
       },
     ],
@@ -459,26 +512,6 @@ export const mockBankAccounts: BankAccount[] = [
   },
 ];
 
-export const mockCashDesks: CashDesk[] = [
-  {
-    id: 'cash-1',
-    code: 'CSH-01',
-    title: 'صندوق مرکزی دفتر مرکزی تهران',
-    keeperName: 'خانم مرادی (خزانه‌دار)',
-    balance: 85_000_000,
-    location: 'ساختمان مرکزی - طبقه ۵',
-    lastCountDate: '۱۴۰۳/۰۷/۰۱',
-  },
-  {
-    id: 'cash-2',
-    code: 'CSH-02',
-    title: 'صندوق نقدی اضطراری کارگاه فجر',
-    keeperName: 'مهندس کاظمی',
-    balance: 65_000_000,
-    location: 'کانکس مدیریت پروژه فجر',
-    lastCountDate: '۱۴۰۳/۰۶/۳۰',
-  },
-];
 
 // ==================== 3. COST CENTERS & SUBLEDGERS ====================
 export const mockCostCenters: CostCenter[] = [
@@ -1155,6 +1188,16 @@ export const mockBankReconciliationItems: BankReconciliationItem[] = [
     matched: false,
     matchedDocNumber: 'ACC-1403-0815',
     discrepancyType: 'سند حسابداری بدون گردش بانکی',
+  },
+  {
+    id: 'recon-5',
+    bankAccountId: 'bank-1',
+    date: '۱۴۰۳/۰۶/۳۱',
+    description: 'واریز سپرده متفرقه بدون شناسه واریز',
+    amount: 500_000_000,
+    type: 'واریز',
+    matched: false,
+    discrepancyType: 'تراکنش بانکی فاقد سند دفتری',
   },
 ];
 

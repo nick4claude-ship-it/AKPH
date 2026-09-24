@@ -36,23 +36,21 @@ import { ApprovalCenterModule } from './components/approvals/ApprovalCenterModul
 import { ReportsBIModule } from './components/reports/ReportsBIModule';
 import { ProjectsModule } from './components/project/ProjectsModule';
 import { ProgressStatementsModule } from './components/statements/ProgressStatementsModule';
-import { mockBankAccounts } from './data/accountingMockData';
-
+import { currentUser as defaultUser } from './data/mockData';
+import { useAppState, useStoreSlice } from './store/AppStore';
 import {
-  mockProjects,
-  mockKpis,
-  mockPettyCashItems,
-  mockPendingApprovals,
-  mockProgressStatements,
-  mockManagementAlerts,
-  currentUser as defaultUser,
-} from './data/mockData';
+  selectProjects,
+  selectKpiItems,
+  selectPettyCashSummaries,
+  selectStatementSummaries,
+  selectMonthlyFinancialTrend,
+  selectExpenseCategoryTotals,
+  selectSidebarCounts,
+} from './store/selectors';
 import {
   Project,
-  KpiItem,
   PettyCash,
   PendingApproval,
-  ProgressStatement,
   ManagementAlert,
   TimeRange,
   UserProfile,
@@ -76,14 +74,17 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [user, setUser] = useState<UserProfile>(defaultUser);
 
-  // Core Data State (Mutable for interactive actions)
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
-  const [kpis, setKpis] = useState<KpiItem[]>(mockKpis);
-  const [pettyCashList, setPettyCashList] = useState<PettyCash[]>(mockPettyCashItems);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(mockPendingApprovals);
-  const [statements, setStatements] = useState<ProgressStatement[]>(mockProgressStatements);
-  const [alerts, setAlerts] = useState<ManagementAlert[]>(mockManagementAlerts);
-  const [bankAccounts, setBankAccounts] = useState(mockBankAccounts);
+  // Core data comes from the central store; every financial figure is a selector over the ledger.
+  const appState = useAppState();
+  const [pendingApprovals, setPendingApprovals] = useStoreSlice('pendingApprovals');
+  const [alerts, setAlerts] = useStoreSlice('alerts');
+  const projects = useMemo(() => selectProjects(appState), [appState]);
+  const kpis = useMemo(() => selectKpiItems(appState, selectedProjectId), [appState, selectedProjectId]);
+  const pettyCashList = useMemo(() => selectPettyCashSummaries(appState), [appState]);
+  const statements = useMemo(() => selectStatementSummaries(appState), [appState]);
+  const monthlyTrend = useMemo(() => selectMonthlyFinancialTrend(appState, 7, selectedProjectId), [appState, selectedProjectId]);
+  const expenseTotals = useMemo(() => selectExpenseCategoryTotals(appState, selectedProjectId), [appState, selectedProjectId]);
+  const sidebarCounts = useMemo(() => selectSidebarCounts(appState), [appState]);
 
   // Modals & Drawers State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -135,26 +136,10 @@ export default function App() {
     const item = pendingApprovals.find((a) => a.id === approvalId);
     if (!item) return;
 
+    // Approval status only: balances change exclusively through postFinancialEvent in the source modules.
     setPendingApprovals((prev) =>
       prev.map((a) => (a.id === approvalId ? { ...a, status: 'approved' } : a))
     );
-
-    // If it's a petty cash voucher, update usable balance in that fund
-    if (item.expenseType.includes('تنخواه')) {
-      setPettyCashList((prev) =>
-        prev.map((pc) => {
-          if (pc.projectId === item.projectId) {
-            const newPending = Math.max(0, pc.pendingExpenses - item.amount);
-            return {
-              ...pc,
-              pendingExpenses: newPending,
-              usableBalance: pc.actualBalance - newPending,
-            };
-          }
-          return pc;
-        })
-      );
-    }
 
     showToast(`سند شماره ${item.docNumber} به مبلغ ${item.amount.toLocaleString('fa-IR')} تومان توسط ${user.name} تأیید گردید.`);
   };
@@ -223,6 +208,7 @@ export default function App() {
         user={user}
         onOpenLogout={() => setIsLoginOpen(true)}
         onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
+        counts={sidebarCounts}
       />
 
       {/* Main Content Viewport */}
@@ -385,10 +371,11 @@ export default function App() {
                   {/* 3. Financial Charts & Expense Breakdown (2 Columns) */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <FinancialCharts
+                      data={monthlyTrend}
                       timeRange={timeRange}
                       onChangeTimeRange={(r) => setTimeRange(r)}
                     />
-                    <ExpenseBreakdown />
+                    <ExpenseBreakdown totals={expenseTotals} />
                   </div>
 
                   {/* 4. Projects Financial Overview Modern Table */}
@@ -458,21 +445,8 @@ export default function App() {
                 /* Phase 3 & Architecture Point 3: Dedicated Contracts Module */
                 <ContractsModule
                   projects={projects}
-                  bankAccounts={bankAccounts}
                   currentUser={user}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند حسابداری با موفقیت صادر شد: ${entry.description}`);
-                  }}
-                  onUpdateBankBalance={(bankId, amount, type) => {
-                    setBankAccounts((prev) =>
-                      prev.map((b) =>
-                        b.id === bankId
-                          ? { ...b, balance: type === 'debit' ? b.balance + amount : b.balance - amount }
-                          : b
-                      )
-                    );
-                    showToast(`تراکنش بانکی ثبت و مانده حساب به‌روزرسانی شد.`);
-                  }}
+                  onPosted={(docNumber) => showToast(`سند حسابداری ${docNumber} با موفقیت صادر شد.`)}
                 />
               ) : currentTab === 'statements' ? (
                 /* Phase 4 & Architecture Point 4: Progress Statements Module (Client & Subcontractor) */
@@ -486,77 +460,27 @@ export default function App() {
                 <ProcurementModule
                   projects={projects}
                   currentUser={user}
-                  onUpdateProjectCost={(projectId: string, amount: number) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`بهای تمام‌شده پروژه افزایش یافت: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
-                  onAddJournalEntry={(entry: any) => {
-                    showToast(`سند حسابداری فاکتور خرید صادر گردید: ${entry.description}`);
-                  }}
+                  onPosted={(docNumber) => showToast(`سند حسابداری فاکتور خرید ${docNumber} صادر گردید.`)}
                 />
               ) : currentTab === 'inventory' ? (
                 /* Phase 6 & Architecture Point 6: Warehouse, Materials & Inventory Module */
                 <InventoryModule
                   currentUser={user}
                   projects={projects}
-                  onUpdateProjectCost={(projectId, amount) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`هزینه مصالح به پروژه اضافه شد: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند انبارداری در حسابداری صادر شد: ${entry.description}`);
-                  }}
                 />
               ) : currentTab === 'petty_cash' ? (
                 /* Phase 7 & Architecture Point 7: Petty Cash Module */
                 <PettyCashModule
                   currentUser={user}
                   projects={projects}
-                  bankAccounts={bankAccounts}
-                  onUpdateProjectCost={(projectId, amount) => {
-                    setProjects((prev) =>
-                      prev.map((p) =>
-                        p.id === projectId
-                          ? { ...p, cost: p.cost + amount, actualCost: p.actualCost + amount }
-                          : p
-                      )
-                    );
-                    showToast(`هزینه پروژه به روزرسانی شد: +${amount.toLocaleString('fa-IR')} تومان`);
-                  }}
-                  onUpdateBankBalance={(bankAccountId, newBalance) => {
-                    setBankAccounts((prev) =>
-                      prev.map((b) => (b.id === bankAccountId ? { ...b, balance: newBalance } : b))
-                    );
-                  }}
+                  onPosted={(docNumber) => showToast(`سند حسابداری ${docNumber} صادر شد.`)}
                 />
               ) : currentTab === 'finance' ? (
                 /* Phase 8 & Architecture Point 9: Treasury & Payments Module */
                 <PaymentsTreasuryModule
                   projects={projects}
-                  bankAccounts={bankAccounts}
                   currentUser={user}
-                  onUpdateBankBalance={(bankId: string, amount: number, type: 'credit' | 'debit') => {
-                    setBankAccounts((prev) =>
-                      prev.map((b) =>
-                        b.id === bankId
-                          ? { ...b, balance: type === 'debit' ? b.balance + amount : Math.max(0, b.balance - amount) }
-                          : b
-                      )
-                    );
-                    showToast(`پرداخت به مبلغ ${amount.toLocaleString('fa-IR')} تومان انجام و مانده بانک به‌روزرسانی شد.`);
-                  }}
+                  onPosted={(docNumber) => showToast(`پرداخت انجام و سند ${docNumber} صادر شد.`)}
                 />
               ) : currentTab === 'accounting' ? (
                 /* Phase 2 & Architecture Point 8: Full Enterprise Accounting Engine */
@@ -573,12 +497,6 @@ export default function App() {
                 <PayrollModule
                   projects={projects}
                   currentUser={user}
-                  onAddJournalEntry={(entry) => {
-                    showToast(`سند حسابداری حقوق و دستمزد ماهانه صادر گردید.`);
-                  }}
-                  onAddPaymentRequest={(req) => {
-                    showToast(`دستور پرداخت حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.`);
-                  }}
                 />
               ) : currentTab === 'documents' ? (
                 /* Phase 11 & Architecture Point 14: Unified Document Management DMS */

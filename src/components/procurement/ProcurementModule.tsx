@@ -36,28 +36,26 @@ import { NewRequisitionModal } from './NewRequisitionModal';
 import { NewPurchaseOrderModal } from './NewPurchaseOrderModal';
 import { NewSupplierModal } from './NewSupplierModal';
 import { PurchaseOrderPrintModal } from './PurchaseOrderPrintModal';
+import { useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { vendorInvoiceEvent } from '../../store/events';
+import { buildPaymentRequest } from '../../store/paymentRequests';
+import { toPersianDate } from '../../utils/date';
 import {
   mockSuppliers,
   mockRequisitions,
   mockRfqs,
-  mockPurchaseOrders,
-  mockVendorInvoices,
 } from '../../data/procurementMockData';
 
 interface ProcurementModuleProps {
   projects: Project[];
   currentUser: UserProfile;
-  onUpdateProjectCost?: (projectId: string, amount: number) => void;
-  onAddJournalEntry?: (entry: any) => void;
-  onAddPaymentRequest?: (request: any) => void;
+  onPosted?: (docNumber: string) => void;
 }
 
 export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   projects,
   currentUser,
-  onUpdateProjectCost,
-  onAddJournalEntry,
-  onAddPaymentRequest,
+  onPosted,
 }) => {
   const [activeTab, setActiveTab] = useState<ProcurementSubTab>('dashboard');
 
@@ -65,8 +63,10 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>(mockRequisitions);
   const [rfqs, setRfqs] = useState<RequestForQuotation[]>(mockRfqs);
-  const [orders, setOrders] = useState<PurchaseOrder[]>(mockPurchaseOrders);
-  const [invoices, setInvoices] = useState<VendorInvoice[]>(mockVendorInvoices);
+  const postFinancialEvent = usePostFinancialEvent();
+  const [orders, setOrders] = useStoreSlice('purchaseOrders');
+  const [invoices, setInvoices] = useStoreSlice('vendorInvoices');
+  const [paymentRequests, setPaymentRequests] = useStoreSlice('paymentRequests');
 
   // Modals state
   const [isNewRequisitionOpen, setIsNewRequisitionOpen] = useState(false);
@@ -223,13 +223,25 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
     );
   };
 
+  // Invoice approval posts Dr GRNI + VAT / Cr supplier payable. Project cost is not touched here:
+  // stocked materials reach the project only when they are issued from the warehouse.
   const handleApproveInvoice = (invoiceId: string) => {
+    const targetInvoice = invoices.find((inv) => inv.id === invoiceId);
+    if (!targetInvoice) return;
+
+    const posting = postFinancialEvent(vendorInvoiceEvent(targetInvoice), { submitter: currentUser.name });
+    if (!posting.ok) {
+      console.error(posting.error);
+      return;
+    }
+
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.id === invoiceId
           ? {
               ...inv,
-              status: 'تأیید تطبیق سه‌جانبه',
+              status: inv.paidAmount > 0 ? inv.status : 'تأیید تطبیق سه‌جانبه',
+              accountingEntryNumber: posting.event?.docNumber,
               threeWayMatching: {
                 ...inv.threeWayMatching,
                 status: 'تأیید نهایی مالی',
@@ -238,40 +250,37 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           : inv
       )
     );
-
-    const targetInvoice = invoices.find((inv) => inv.id === invoiceId);
-    if (targetInvoice) {
-      if (onUpdateProjectCost) {
-        onUpdateProjectCost(targetInvoice.projectId, targetInvoice.totalAmount);
-      }
-      if (onAddPaymentRequest) {
-        onAddPaymentRequest({
-          sourceType: 'فاکتور خرید تأمین‌کننده',
-          sourceRefId: targetInvoice.id,
-          sourceRefNumber: targetInvoice.invoiceNumber,
-          projectId: targetInvoice.projectId,
-          projectName: targetInvoice.projectName,
-          beneficiaryName: targetInvoice.supplierName,
-          totalAmount: targetInvoice.totalAmount,
-        });
-      }
-    }
+    if (!posting.duplicate && posting.event?.docNumber) onPosted?.(posting.event.docNumber);
   };
 
+  // Settlement is requested from treasury; the invoice's paid amount changes when treasury pays.
   const handleRecordPayment = (invoiceId: string, amount: number) => {
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id !== invoiceId) return inv;
-        const newPaid = inv.paidAmount + amount;
-        const newRemaining = Math.max(0, inv.totalAmount - newPaid);
-        return {
-          ...inv,
-          paidAmount: newPaid,
-          remainingBalance: newRemaining,
-          status: newRemaining === 0 ? 'پرداخت شده' : 'پرداخت ناقص',
-        };
-      })
+    const inv = invoices.find((i) => i.id === invoiceId);
+    if (!inv || amount <= 0) return;
+    const alreadyRequested = paymentRequests.some(
+      (r) => r.sourceType === 'فاکتور خرید تأمین‌کننده' && r.sourceRefId === inv.id && r.status !== 'رد شده' && r.status !== 'پرداخت شده'
     );
+    if (alreadyRequested) return;
+    setPaymentRequests((prev) => [
+      buildPaymentRequest(
+        prev,
+        {
+          sourceType: 'فاکتور خرید تأمین‌کننده',
+          sourceRefId: inv.id,
+          sourceRefNumber: inv.invoiceNumber,
+          projectId: inv.projectId,
+          projectName: inv.projectName,
+          costCenterId: inv.costCenterId || '',
+          counterpartyId: inv.counterpartyId || inv.supplierId,
+          beneficiaryName: inv.supplierName,
+          beneficiaryType: 'تأمین‌کننده',
+          totalAmount: amount,
+          dueDate: inv.dueDate,
+        },
+        toPersianDate(new Date())
+      ),
+      ...prev,
+    ]);
   };
 
   const tabs = [

@@ -23,14 +23,15 @@ import {
   X,
 } from 'lucide-react';
 import { Project } from '../../types';
-import { SystemDocument, DocumentCategory, mockSystemDocuments } from '../../data/documentsMockData';
+import { SystemDocument, DocumentCategory } from '../../data/documentsMockData';
+import { useStoreSlice } from '../../store/AppStore';
 
 interface DocumentCenterModuleProps {
   projects: Project[];
 }
 
 export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ projects }) => {
-  const [documents, setDocuments] = useState<SystemDocument[]>(mockSystemDocuments);
+  const [documents, setDocuments] = useStoreSlice('documents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');

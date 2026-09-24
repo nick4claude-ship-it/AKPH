@@ -37,33 +37,34 @@ import {
   PaymentRequest,
   TreasuryCheck,
   CashDesk,
-  mockPaymentRequests,
   mockTreasuryChecks,
-  mockCashDesks,
 } from '../../data/paymentsTreasuryMockData';
+import { useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { payableTypeForRequest } from '../../store/paymentRequests';
+import { toPersianDate } from '../../utils/date';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 
 interface PaymentsTreasuryModuleProps {
   projects: Project[];
-  bankAccounts: BankAccount[];
   currentUser: UserProfile;
-  onUpdateBankBalance?: (bankId: string, amount: number, type: 'credit' | 'debit') => void;
-  onAddJournalEntry?: (entry: any) => void;
+  onPosted?: (docNumber: string) => void;
 }
 
 export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   projects,
-  bankAccounts: initialBankAccounts,
   currentUser,
-  onUpdateBankBalance,
-  onAddJournalEntry,
+  onPosted,
 }) => {
   const [activeTab, setActiveTab] = useState<'payment_requests' | 'receipts' | 'bank_accounts' | 'checks' | 'cash_desks' | 'liquidity_calendar'>('payment_requests');
 
-  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>(mockPaymentRequests);
+  const postFinancialEvent = usePostFinancialEvent();
+  const [paymentRequests, setPaymentRequests] = useStoreSlice('paymentRequests');
   const [checks, setChecks] = useState<TreasuryCheck[]>(mockTreasuryChecks);
-  const [cashDesks, setCashDesks] = useState<CashDesk[]>(mockCashDesks);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initialBankAccounts);
+  const [cashDesks] = useStoreSlice('cashDesks');
+  const [bankAccounts] = useStoreSlice('bankAccounts');
+  const [, setVendorInvoices] = useStoreSlice('vendorInvoices');
+  const [, setSubcontractorStatements] = useStoreSlice('subcontractorStatements');
+  const [, setSubcontractorContracts] = useStoreSlice('subcontractorContracts');
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,25 +129,39 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
     if (!selectedRequestForPay) return;
 
     const bank = bankAccounts.find((b) => b.id === paymentBankId) || bankAccounts[0];
-    const amount = selectedRequestForPay.remainingAmount;
+    const req = selectedRequestForPay;
+    const amount = req.remainingAmount;
+    const paymentDate = toPersianDate(new Date());
+    const trackingNumber = paymentTrackingNo || `TRK-${Date.now().toString().slice(-6)}`;
 
-    // Deduct from bank
-    setBankAccounts((prev) =>
-      prev.map((b) =>
-        b.id === bank.id
-          ? { ...b, balance: b.balance - amount, totalPayments: b.totalPayments + amount }
-          : b
-      )
+    // The bank balance and the settled payable change only through this posting (Dr payable / Cr bank).
+    const posting = postFinancialEvent(
+      {
+        type: 'TREASURY_PAYMENT',
+        sourceModule: 'treasury',
+        sourceId: req.id,
+        projectId: req.projectId,
+        costCenterId: req.costCenterId,
+        counterpartyId: req.counterpartyId || '',
+        amount,
+        date: paymentDate,
+        details: {
+          docNumber: req.requestNumber,
+          payableType: payableTypeForRequest(req),
+          bankAccountId: bank.id,
+          bankName: bank.bankName,
+          pettyCashId: req.sourceType === 'شارژ و تسویه تنخواه' ? req.sourceRefId : undefined,
+          pettyCashTitle: req.sourceType === 'شارژ و تسویه تنخواه' ? req.beneficiaryName : undefined,
+          trackingNumber,
+        },
+      },
+      { submitter: currentUser.name }
     );
+    if (!posting.ok) return;
 
-    if (onUpdateBankBalance) {
-      onUpdateBankBalance(bank.id, amount, 'credit');
-    }
-
-    // Update payment request
     setPaymentRequests((prev) =>
       prev.map((r) =>
-        r.id === selectedRequestForPay.id
+        r.id === req.id
           ? {
               ...r,
               status: 'پرداخت شده',
@@ -154,22 +169,56 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               remainingAmount: 0,
               payerBankAccountId: bank.id,
               payerBankAccountName: `${bank.bankName} - ${bank.accountNumber}`,
-              paymentDate: '۱۴۰۳/۰۷/۰۳',
-              trackingNumber: paymentTrackingNo || `TRK-${Date.now().toString().slice(-6)}`,
+              paymentDate,
+              trackingNumber,
+              journalEntryId: posting.event?.docNumber,
               notes: paymentNotes || r.notes,
             }
           : r
       )
     );
 
-    // Trigger Accounting Journal Entry
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        title: `پرداخت وجه بابت ${selectedRequestForPay.sourceType} - ${selectedRequestForPay.beneficiaryName}`,
-        amount,
-        type: 'پرداخت',
-        description: `پرداخت از ${bank.bankName} به شماره رهگیری ${paymentTrackingNo || 'انجام شد'}`,
-      });
+    // Reflect the settlement on the operational source document.
+    if (!posting.duplicate) {
+      if (req.sourceType === 'فاکتور خرید تأمین‌کننده') {
+        setVendorInvoices((prev) =>
+          prev.map((inv) => {
+            if (inv.id !== req.sourceRefId) return inv;
+            const paidAmount = inv.paidAmount + amount;
+            const remainingBalance = Math.max(0, inv.totalAmount - paidAmount);
+            return { ...inv, paidAmount, remainingBalance, status: remainingBalance === 0 ? 'پرداخت شده' : 'پرداخت ناقص' };
+          })
+        );
+      } else if (req.sourceType === 'صورت‌وضعیت پیمانکار جزء') {
+        let contractId: string | undefined;
+        setSubcontractorStatements((prev) =>
+          prev.map((st) => {
+            if (st.id !== req.sourceRefId) return st;
+            contractId = st.subcontractorContractId;
+            const remainingPayable = Math.max(0, st.remainingPayable - amount);
+            return {
+              ...st,
+              paidAmount: st.paidAmount + amount,
+              remainingPayable,
+              status: remainingPayable === 0 ? 'paid' : st.status,
+              paymentDate,
+              paymentRefNumber: trackingNumber,
+              payingBankId: bank.id,
+              payingBankTitle: bank.bankName,
+            };
+          })
+        );
+        if (contractId) {
+          setSubcontractorContracts((prev) =>
+            prev.map((c) =>
+              c.id === contractId
+                ? { ...c, paidValue: c.paidValue + amount, remainingPayableValue: Math.max(0, c.remainingPayableValue - amount) }
+                : c
+            )
+          );
+        }
+      }
+      if (posting.event?.docNumber) onPosted?.(posting.event.docNumber);
     }
 
     setSelectedRequestForPay(null);

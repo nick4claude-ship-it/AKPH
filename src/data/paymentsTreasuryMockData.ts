@@ -13,6 +13,8 @@ const isDev = (): boolean => {
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { CashDesk as BaseCashDesk } from '../types';
+
 export type PaymentSourceType =
   | 'صورت‌وضعیت پیمانکار جزء'
   | 'فاکتور خرید تأمین‌کننده'
@@ -85,16 +87,10 @@ export interface TreasuryCheck {
   clearedDate?: string;
 }
 
-export interface CashDesk {
-  id: string;
-  code: string;
-  title: string;
-  keeperName: string;
+export interface CashDesk extends BaseCashDesk {
   projectId: string;
   projectName: string;
-  balance: number;
   ceilingLimit: number;
-  location: string;
   lastAuditDate: string;
 }
 
@@ -337,6 +333,7 @@ const rawCashDesks: CashDesk[] = [
     ceilingLimit: 100_000_000,
     location: 'ساختمان مرکزی، طبقه سوم، اتاق مالی',
     lastAuditDate: '۱۴۰۳/۰۶/۳۱',
+    lastCountDate: '۱۴۰۳/۰۶/۳۱',
   },
   {
     id: 'csh-02',
@@ -349,6 +346,7 @@ const rawCashDesks: CashDesk[] = [
     ceilingLimit: 80_000_000,
     location: 'کانکس سرپرستی کارگاه رونیکا',
     lastAuditDate: '۱۴۰۳/۰۶/۳۱',
+    lastCountDate: '۱۴۰۳/۰۶/۳۱',
   },
   {
     id: 'csh-03',
@@ -361,6 +359,7 @@ const rawCashDesks: CashDesk[] = [
     ceilingLimit: 60_000_000,
     location: 'دفتر فنی کارگاه فجر',
     lastAuditDate: '۱۴۰۳/۰۶/۲۸',
+    lastCountDate: '۱۴۰۳/۰۶/۲۸',
   },
 ];
 

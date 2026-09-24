@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { TimeRange } from '../../types';
-import { monthlyFinancialTrend } from '../../data/mockData';
+import { MonthlyTrendPoint } from '../../store/selectors';
 import { formatCurrencyCompact, formatPercent } from '../../utils/formatters';
 import { BarChart3, TrendingUp, Info } from 'lucide-react';
 
 interface FinancialChartsProps {
+  data: MonthlyTrendPoint[];
   timeRange: TimeRange;
   onChangeTimeRange: (range: TimeRange) => void;
 }
 
 export const FinancialCharts: React.FC<FinancialChartsProps> = ({
+  data,
   timeRange,
   onChangeTimeRange,
 }) => {
@@ -17,8 +19,8 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Filter or scale data based on timeframe
-  const displayData = monthlyFinancialTrend;
-  const maxVal = Math.max(...displayData.map((d) => Math.max(d.revenue, d.cost)));
+  const displayData = data;
+  const maxVal = Math.max(1, ...displayData.map((d) => Math.max(d.revenue, d.cost)));
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -107,7 +109,7 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
           {displayData.map((d, index) => {
             const revHeight = (d.revenue / maxVal) * 100;
             const costHeight = (d.cost / maxVal) * 100;
-            const profHeight = (d.profit / maxVal) * 100;
+            const profHeight = (Math.max(0, d.profit) / maxVal) * 100;
             const isHovered = hoveredIndex === index;
 
             return (

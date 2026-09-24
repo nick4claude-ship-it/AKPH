@@ -10,19 +10,13 @@ import {
   UserProfile,
 } from '../../types';
 import {
-  mockBankAccounts,
-  mockCashDesks,
-  mockJournalEntries,
-  mockReceipts,
-  mockPayments,
   mockAccountsReceivable,
   mockAccountsPayable,
-  mockChartOfAccounts,
   mockSubledgers,
-  mockCostCenters,
   mockAuditLogs,
 } from '../../data/accountingMockData';
-import { mockProjects } from '../../data/mockData';
+import { useAppState, useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { selectProjects } from '../../store/selectors';
 import { AccountingNav } from './AccountingNav';
 import { AccountingDashboardView } from './AccountingDashboardView';
 import { JournalEntriesView } from './JournalEntriesView';
@@ -43,12 +37,15 @@ interface AccountingModuleProps {
 export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<AccountingSubTab>('dashboard');
 
-  // Accounting State
-  const [bankAccounts, setBankAccounts] = useState(mockBankAccounts);
-  const [cashDesks, setCashDesks] = useState(mockCashDesks);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(mockJournalEntries);
-  const [receipts, setReceipts] = useState<ReceiptRecord[]>(mockReceipts);
-  const [payments, setPayments] = useState<PaymentRecord[]>(mockPayments);
+  // Accounting State (single copy in the central store)
+  const appState = useAppState();
+  const postFinancialEvent = usePostFinancialEvent();
+  const { bankAccounts, cashDesks, costCenters, chartOfAccounts, counterparties } = appState;
+  const projects = selectProjects(appState);
+  const [journalEntries, setJournalEntries] = useStoreSlice('journalEntries');
+  const [receipts, setReceipts] = useStoreSlice('receipts');
+  const [payments, setPayments] = useStoreSlice('payments');
+  const [reconciliationItems, setReconciliationItems] = useStoreSlice('bankReconciliations');
   const [receivables, setReceivables] = useState<AccountsReceivableItem[]>(mockAccountsReceivable);
   const [payables, setPayables] = useState<AccountsPayableItem[]>(mockAccountsPayable);
   const [subledgers, setSubledgers] = useState(mockSubledgers);
@@ -264,60 +261,26 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       })
     );
 
-    // Create balanced journal entry: Debit Bank / Credit Accounts Receivable
-    const docNum = getNextSequentialDocNumber(
-      journalEntries.map((e) => e.docNumber),
-      'ACC',
-      4,
-      getCurrentPersianYear()
+    // Posted through the financial layer: Dr bank / Cr receivables.
+    const bank = bankAccounts.find((b) => b.bankName === rec.destinationAccount || b.id === rec.destinationAccount) || bankAccounts[0];
+    const payer = counterparties.find((c) => c.id === rec.counterpartyId || c.name === rec.payer.trim());
+    const posting = postFinancialEvent(
+      {
+        type: 'TREASURY_RECEIPT',
+        sourceModule: 'treasury',
+        sourceId: rec.id,
+        projectId: rec.projectId || '',
+        costCenterId: rec.costCenterId || '',
+        counterpartyId: payer?.id || '',
+        amount: rec.amount,
+        date: rec.date,
+        details: { docNumber: rec.docNumber, bankAccountId: bank?.id, bankName: bank?.bankName, trackingNumber: rec.trackingNumber },
+      },
+      { submitter: currentUser.name }
     );
-
-    const receiptJournalDoc: JournalEntry = {
-      id: generateUUID(),
-      docNumber: docNum,
-      date: rec.date || toPersianDate(new Date()),
-      title: `وصول وجه از ${rec.payer} - رهگیری ${rec.trackingNumber}`,
-      type: 'دریافت',
-      projectId: rec.projectId,
-      projectName: rec.projectName,
-      submitter: currentUser.name,
-      status: 'ثبت قطعی',
-      rows: [
-        {
-          id: generateUUID(),
-          accountCode: '11101',
-          accountName: 'موجودی نزد بانک‌ها',
-          subledgerCode: rec.destinationAccount,
-          subledgerName: rec.destinationAccount,
-          description: `واریز به حساب ${rec.destinationAccount} توسط ${rec.payer}`,
-          debit: rec.amount,
-          credit: 0,
-        },
-        {
-          id: generateUUID(),
-          accountCode: '11201',
-          accountName: 'مطالبات از کارفرمایان و اشخاص',
-          subledgerCode: '',
-          subledgerName: rec.payer,
-          description: `بستانکاری طرف حساب ${rec.payer} بابت وصول مطالبات`,
-          debit: 0,
-          credit: rec.amount,
-        },
-      ],
-      totalDebit: rec.amount,
-      totalCredit: rec.amount,
-      isBalanced: true,
-      history: [
-        {
-          date: toPersianDate(new Date()),
-          time: toPersianTime(new Date()),
-          user: currentUser.name,
-          action: 'صدور خودکار سند حسابداری متوازن دریافت وجه',
-        },
-      ],
-    };
-
-    setJournalEntries((prev) => [receiptJournalDoc, ...prev]);
+    if (posting.ok && posting.event) {
+      setReceipts((prev) => prev.map((r) => (r.id === rec.id ? { ...r, journalEntryId: posting.event!.journalEntryId } : r)));
+    }
 
     logAudit(
       'ایجاد سند',
@@ -347,66 +310,67 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       })
     );
 
-    // Create balanced journal entry: Debit Accounts Payable / Credit Bank
-    const docNum = getNextSequentialDocNumber(
-      journalEntries.map((e) => e.docNumber),
-      'ACC',
-      4,
-      getCurrentPersianYear()
+    // Posted through the financial layer: Dr payable / Cr bank.
+    const bank = bankAccounts.find((b) => b.bankName === pay.payerAccount || b.id === pay.payerAccount) || bankAccounts[0];
+    const payee = counterparties.find((c) => c.id === pay.counterpartyId || c.name === pay.payee.trim());
+    const payableType =
+      payee?.kind === 'subcontractor' ? 'subcontractor' : payee?.kind === 'employee' ? 'payroll' : 'supplier';
+    const posting = postFinancialEvent(
+      {
+        type: 'TREASURY_PAYMENT',
+        sourceModule: 'treasury',
+        sourceId: pay.id,
+        projectId: pay.projectId || '',
+        costCenterId: pay.costCenterId || '',
+        counterpartyId: payee?.id || '',
+        amount: pay.amount,
+        date: pay.date,
+        details: { docNumber: pay.docNumber, payableType, bankAccountId: bank?.id, bankName: bank?.bankName, trackingNumber: pay.referenceNumber },
+      },
+      { submitter: currentUser.name }
     );
-
-    const paymentJournalDoc: JournalEntry = {
-      id: generateUUID(),
-      docNumber: docNum,
-      date: pay.date || toPersianDate(new Date()),
-      title: `تادیه وجه به ${pay.payee} - رهگیری ${pay.referenceNumber}`,
-      type: 'پرداخت',
-      projectId: pay.projectId,
-      projectName: pay.projectName,
-      submitter: currentUser.name,
-      status: 'ثبت قطعی',
-      rows: [
-        {
-          id: generateUUID(),
-          accountCode: '21101',
-          accountName: 'بستانکاران تجاری و پیمانکاران',
-          subledgerCode: '',
-          subledgerName: pay.payee,
-          description: `بدهکار کردن حساب بستانکار ${pay.payee} بابت پرداخت بدهی`,
-          debit: pay.amount,
-          credit: 0,
-        },
-        {
-          id: generateUUID(),
-          accountCode: '11101',
-          accountName: 'موجودی نزد بانک‌ها',
-          subledgerCode: pay.payerAccount,
-          subledgerName: pay.payerAccount,
-          description: `برداشت از حساب بانکی شرکت ${pay.payerAccount}`,
-          debit: 0,
-          credit: pay.amount,
-        },
-      ],
-      totalDebit: pay.amount,
-      totalCredit: pay.amount,
-      isBalanced: true,
-      history: [
-        {
-          date: toPersianDate(new Date()),
-          time: toPersianTime(new Date()),
-          user: currentUser.name,
-          action: 'صدور خودکار سند حسابداری متوازن پرداخت وجه',
-        },
-      ],
-    };
-
-    setJournalEntries((prev) => [paymentJournalDoc, ...prev]);
+    if (posting.ok && posting.event) {
+      setPayments((prev) => prev.map((p) => (p.id === pay.id ? { ...p, journalEntryId: posting.event!.journalEntryId } : p)));
+    }
 
     logAudit(
       'ایجاد سند',
       pay.docNumber,
       `تادیه وجه به مبلغ ${pay.amount.toLocaleString('fa-IR')} تومان به ${pay.payee}`
     );
+  };
+
+  // Bank reconciliation: each statement line is matched once and its status is stored.
+  const handleReconcile = (itemId: string) => {
+    const item = reconciliationItems.find((r) => r.id === itemId);
+    if (!item || item.matched) return;
+
+    let matchedDocNumber = item.matchedDocNumber;
+    if (item.discrepancyType !== 'سند حسابداری بدون گردش بانکی') {
+      // Bank line without a ledger document: the missing entry is posted through the engine.
+      const bank = bankAccounts.find((b) => b.id === item.bankAccountId);
+      const posting = postFinancialEvent(
+        {
+          type: 'BANK_RECONCILIATION_MATCH',
+          sourceModule: 'accounting',
+          sourceId: item.id,
+          projectId: '',
+          costCenterId: '',
+          counterpartyId: '',
+          amount: item.amount,
+          date: item.date,
+          details: { bankAccountId: item.bankAccountId, bankName: bank?.bankName, direction: item.type, description: item.description },
+        },
+        { submitter: currentUser.name }
+      );
+      if (!posting.ok) return;
+      matchedDocNumber = posting.event?.docNumber;
+    }
+
+    setReconciliationItems((prev) =>
+      prev.map((r) => (r.id === itemId ? { ...r, matched: true, matchedDocNumber, discrepancyType: 'تطبیق شده' } : r))
+    );
+    logAudit('تطبیق بانکی', matchedDocNumber || item.id, `تطبیق قلم صورت‌حساب بانکی: ${item.description}`);
   };
 
   const pendingApprovalsCount = journalEntries.filter(
@@ -451,8 +415,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       {activeSubTab === 'journal_entries' && (
         <JournalEntriesView
           entries={journalEntries}
-          projects={mockProjects}
-          costCenters={mockCostCenters}
+          projects={projects}
+          costCenters={costCenters}
           subledgers={subledgers}
           currentUser={currentUser}
           onSaveNewEntry={handleSaveNewEntry}
@@ -467,8 +431,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       {activeSubTab === 'revenues' && (
         <RevenuesAndExpensesView
           type="revenues"
-          projects={mockProjects}
-          costCenters={mockCostCenters}
+          projects={projects}
+          costCenters={costCenters}
           onOpenNewDocForExpense={() => {
             setActiveSubTab('journal_entries');
             setIsNewDocModalOpen(true);
@@ -479,8 +443,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       {activeSubTab === 'expenses' && (
         <RevenuesAndExpensesView
           type="expenses"
-          projects={mockProjects}
-          costCenters={mockCostCenters}
+          projects={projects}
+          costCenters={costCenters}
           onOpenNewDocForExpense={() => {
             setActiveSubTab('journal_entries');
             setIsNewDocModalOpen(true);
@@ -494,7 +458,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
           receipts={receipts}
           payments={payments}
           bankAccounts={bankAccounts}
-          projects={mockProjects}
+          projects={projects}
           subledgers={subledgers}
           onAddReceipt={handleAddReceipt}
           onAddPayment={handleAddPayment}
@@ -509,7 +473,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
           receipts={receipts}
           payments={payments}
           bankAccounts={bankAccounts}
-          projects={mockProjects}
+          projects={projects}
           subledgers={subledgers}
           onAddReceipt={handleAddReceipt}
           onAddPayment={handleAddPayment}
@@ -522,90 +486,8 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
         <BankAndCashView
           bankAccounts={bankAccounts}
           cashDesks={cashDesks}
-          reconciliationItems={[
-            {
-              id: 'rec-item-1',
-              bankAccountId: 'bank-1',
-              date: '۱۴۰۳/۰۶/۲۹',
-              description: 'واریز ساتنا - سرمایه‌گذاری تابان مسکن',
-              type: 'واریز',
-              amount: 14_000_000_000,
-              matched: true,
-              matchedDocNumber: 'REC-1403-0182',
-            },
-            {
-              id: 'rec-item-2',
-              bankAccountId: 'bank-2',
-              date: '۱۴۰۳/۰۶/۳۰',
-              description: 'برداشت پایا - بیمه تامین اجتماعی شعبه ۱',
-              type: 'برداشت',
-              amount: 2_450_000_000,
-              matched: true,
-              matchedDocNumber: 'PAY-1403-0491',
-            },
-            {
-              id: 'rec-item-3',
-              bankAccountId: 'bank-1',
-              date: '۱۴۰۳/۰۶/۳۱',
-              description: 'واریز سپرده متفرقه بدون شناسه واریز',
-              type: 'واریز',
-              amount: 500_000_000,
-              matched: false,
-              discrepancyType: 'تراکنش بانکی فاقد سند دفتری',
-            },
-          ]}
-          onTriggerReconciliation={(id) => {
-            const docNum = getNextSequentialDocNumber(
-              journalEntries.map((e) => e.docNumber),
-              'ACC',
-              4,
-              getCurrentPersianYear()
-            );
-            const reconDoc: JournalEntry = {
-              id: generateUUID(),
-              docNumber: docNum,
-              date: toPersianDate(new Date()),
-              title: 'سند رفع مغایرت بانکی: واریز فاقد سند دفتری',
-              type: 'دریافت',
-              submitter: currentUser.name,
-              status: 'ثبت قطعی',
-              rows: [
-                {
-                  id: generateUUID(),
-                  accountCode: '11101',
-                  accountName: 'موجودی نزد بانک‌ها',
-                  subledgerCode: 'بانک ملت - جاری مرکزی',
-                  subledgerName: 'بانک ملت - جاری مرکزی',
-                  description: 'شناسایی واریز وجه بانکی نامشخص طبق صورت‌حساب',
-                  debit: 500_000_000,
-                  credit: 0,
-                },
-                {
-                  id: generateUUID(),
-                  accountCode: '21199',
-                  accountName: 'بستانکاران متفرقه و سپرده‌های تعیین تکلیف‌نشده',
-                  subledgerCode: '',
-                  subledgerName: 'سپرده متفرقه نامشخص',
-                  description: 'طرف حساب بستانکار جهت پیگیری منشأ واریزی',
-                  debit: 0,
-                  credit: 500_000_000,
-                },
-              ],
-              totalDebit: 500_000_000,
-              totalCredit: 500_000_000,
-              isBalanced: true,
-              history: [
-                {
-                  date: toPersianDate(new Date()),
-                  time: toPersianTime(new Date()),
-                  user: currentUser.name,
-                  action: 'صدور خودکار سند رفع مغایرت بانکی',
-                },
-              ],
-            };
-            setJournalEntries((prev) => [reconDoc, ...prev]);
-            logAudit('تطبیق بانکی', docNum, 'صدور سند دفتری متوازن برای واریز بانکی فاقد سند');
-          }}
+          reconciliationItems={reconciliationItems}
+          onTriggerReconciliation={handleReconcile}
         />
       )}
 
@@ -670,7 +552,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       )}
 
       {activeSubTab === 'chart_of_accounts' && (
-        <ChartOfAccountsView chart={mockChartOfAccounts} />
+        <ChartOfAccountsView chart={chartOfAccounts} />
       )}
 
       {activeSubTab === 'subledgers' && (
@@ -686,16 +568,16 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
 
       {activeSubTab === 'projects_cost_centers' && (
         <FinancialReportsView
-          projects={mockProjects}
-          costCenters={mockCostCenters}
+          projects={projects}
+          costCenters={costCenters}
           journalEntries={journalEntries}
         />
       )}
 
       {activeSubTab === 'financial_reports' && (
         <FinancialReportsView
-          projects={mockProjects}
-          costCenters={mockCostCenters}
+          projects={projects}
+          costCenters={costCenters}
           journalEntries={journalEntries}
         />
       )}

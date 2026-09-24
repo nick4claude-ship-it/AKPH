@@ -24,8 +24,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { Project, ProgressStatement, SubcontractorProgressStatement } from '../../types';
-import { mockProgressStatements } from '../../data/mockData';
-import { mockSubcontractorStatements } from '../../data/subcontractorsMockData';
+import { useAppState } from '../../store/AppStore';
+import { selectStatementSummaries } from '../../store/selectors';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 
 interface ProgressStatementsModuleProps {
@@ -41,8 +41,10 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<'client_statements' | 'subcontractor_statements'>('client_statements');
 
-  const [clientStatements, setClientStatements] = useState<ProgressStatement[]>(mockProgressStatements);
-  const [subcontractorStatements, setSubcontractorStatements] = useState<SubcontractorProgressStatement[]>(mockSubcontractorStatements);
+  // Read-only views over the single copy of client and subcontractor statements in the store.
+  const appState = useAppState();
+  const clientStatements: ProgressStatement[] = selectStatementSummaries(appState);
+  const subcontractorStatements: SubcontractorProgressStatement[] = appState.subcontractorStatements;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');

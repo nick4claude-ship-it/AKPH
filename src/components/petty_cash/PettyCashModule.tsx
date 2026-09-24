@@ -8,13 +8,9 @@ import {
   PettyCashCategoryItem,
   PettyCashSubTab,
   Project,
-  BankAccount,
   User,
-  JournalEntry,
 } from '../../types';
 import {
-  initialPettyCashAccounts,
-  initialPettyCashExpenses,
   initialPettyCashReplenishments,
   initialPettyCashRequests,
   initialPettyCashReconciliations,
@@ -30,29 +26,27 @@ import { PettyCashPeriodClosingView } from './PettyCashPeriodClosingView';
 import { PettyCashReportsView } from './PettyCashReportsView';
 import { PettyCashSettingsView } from './PettyCashSettingsView';
 import { NewExpenseModal } from './NewExpenseModal';
+import { useAppState, useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { pettyCashExpenseApprovedEvent } from '../../store/events';
 
 interface PettyCashModuleProps {
   currentUser: User;
   projects: Project[];
-  bankAccounts: BankAccount[];
-  onAddJournalEntry?: (entry: JournalEntry) => void;
-  onUpdateProjectCost?: (projectId: string, amount: number) => void;
-  onUpdateBankBalance?: (bankAccountId: string, newBalance: number) => void;
+  onPosted?: (docNumber: string) => void;
 }
 
 export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   currentUser,
   projects,
-  bankAccounts,
-  onAddJournalEntry,
-  onUpdateProjectCost,
-  onUpdateBankBalance,
+  onPosted,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<PettyCashSubTab>('dashboard');
 
   // Core Data State
-  const [accounts, setAccounts] = useState<PettyCashAccount[]>(initialPettyCashAccounts);
-  const [expenses, setExpenses] = useState<PettyCashExpense[]>(initialPettyCashExpenses);
+  const { bankAccounts } = useAppState();
+  const postFinancialEvent = usePostFinancialEvent();
+  const [accounts, setAccounts] = useStoreSlice('pettyCashAccounts');
+  const [expenses, setExpenses] = useStoreSlice('pettyCashExpenses');
   const [replenishments, setReplenishments] = useState<PettyCashReplenishment[]>(
     initialPettyCashReplenishments
   );
@@ -109,7 +103,7 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   // 2. Approve Expense (Strict Financial Trigger: Decreases Actual Balance, Clears Pending, Posts Accounting)
   const handleApproveExpense = (expenseId: string, comment?: string) => {
     const targetExp = expenses.find((e) => e.id === expenseId);
-    if (!targetExp) return;
+    if (!targetExp || ['approved', 'accounting_posted', 'reconciled', 'rejected'].includes(targetExp.status)) return;
 
     // Update expense record
     setExpenses((prev) =>
@@ -137,22 +131,16 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
       })
     );
 
-    // Update Account Balances:
-    // Actual Balance ↓
-    // Pending Expenses ↓
-    // Usable Balance remains Actual - Pending (which stays the same after reduction, or updates accordingly)
-    // Monthly Spent ↑
+    // Pending ↓ and monthly spend ↑ here; the fund's actual/usable balance and the project cost
+    // change only through the posted accounting entry (Dr project expense / Cr this petty cash fund).
     setAccounts((prev) =>
       prev.map((acc) => {
         if (acc.id === targetExp.pettyCashId) {
-          const newActual = Math.max(0, acc.actualBalance - targetExp.amount);
           const newPending = Math.max(0, acc.pendingExpenses - targetExp.amount);
-          const newUsable = newActual - newPending;
           return {
             ...acc,
-            actualBalance: newActual,
             pendingExpenses: newPending,
-            usableBalance: newUsable,
+            usableBalance: acc.actualBalance - newPending,
             monthlySpent: acc.monthlySpent + targetExp.amount,
           };
         }
@@ -160,60 +148,15 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
       })
     );
 
-    // Update Project Cost
-    if (onUpdateProjectCost && targetExp.projectId && targetExp.projectId !== 'all') {
-      onUpdateProjectCost(targetExp.projectId, targetExp.amount);
-    }
-
-    // Auto-generate Journal Entry in Accounting module
-    if (onAddJournalEntry) {
-      const journalEntry: JournalEntry = {
-        id: `acc-entry-${Date.now()}`,
-        docNumber: `ACC-1403-0${Math.floor(840 + Math.random() * 50)}`,
-        date: targetExp.date,
-        title: `ثبت هزینه تنخواه: ${targetExp.description} (${targetExp.projectName})`,
-        type: 'عمومی',
-        projectId: targetExp.projectId,
-        projectName: targetExp.projectName,
-        costCenterId: targetExp.costCenter,
-        costCenterName: targetExp.costCenter,
-        submitter: currentUser.name,
-        status: 'تأیید شده',
-        totalDebit: targetExp.amount,
-        totalCredit: targetExp.amount,
-        isBalanced: true,
-        history: [
-          {
-            date: '۱۴۰۳/۰۷/۰۲',
-            time: '۱۲:۴۵',
-            user: currentUser.name,
-            action: 'ثبت سند مکانیزه از ماژول تنخواه',
-          },
-        ],
-        rows: [
-          {
-            id: `row-1`,
-            accountCode: targetExp.accountingAccountCode || '511',
-            accountName: targetExp.accountingAccountName || 'هزینه کارگاهی پروژه',
-            debit: targetExp.amount,
-            credit: 0,
-            subledgerName: targetExp.projectName,
-            costCenterName: targetExp.costCenter,
-            description: targetExp.description,
-          },
-          {
-            id: `row-2`,
-            accountCode: '103',
-            accountName: 'موجودی تنخواه‌گردان‌ها',
-            debit: 0,
-            credit: targetExp.amount,
-            subledgerName: targetExp.pettyCashTitle,
-            costCenterName: targetExp.costCenter,
-            description: `کسر از تنخواه بابت فاکتور ${targetExp.invoiceNumber}`,
-          },
-        ],
-      };
-      onAddJournalEntry(journalEntry);
+    const account = accounts.find((a) => a.id === targetExp.pettyCashId);
+    const result = postFinancialEvent(pettyCashExpenseApprovedEvent(targetExp, account), {
+      submitter: currentUser.name,
+    });
+    if (result.ok && result.event) {
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === expenseId ? { ...e, journalEntryId: result.event!.docNumber } : e))
+      );
+      if (!result.duplicate) onPosted?.(result.event.docNumber!);
     }
   };
 
@@ -298,73 +241,42 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   const handleExecuteReplenish = (replenish: PettyCashReplenishment) => {
     setReplenishments((prev) => [replenish, ...prev]);
 
-    // Update target account: Actual Balance ↑, Usable Balance ↑
     setAccounts((prev) =>
-      prev.map((acc) => {
-        if (acc.id === replenish.pettyCashId) {
-          const newActual = acc.actualBalance + replenish.amount;
-          const newUsable = newActual - acc.pendingExpenses;
-          return {
-            ...acc,
-            actualBalance: newActual,
-            usableBalance: newUsable,
-            lastReplenishmentDate: replenish.date,
-            lastReplenishmentAmount: replenish.amount,
-          };
-        }
-        return acc;
-      })
+      prev.map((acc) =>
+        acc.id === replenish.pettyCashId
+          ? { ...acc, lastReplenishmentDate: replenish.date, lastReplenishmentAmount: replenish.amount }
+          : acc
+      )
     );
 
-    // Update Source Bank Account balance in global app
+    // Bank ↓ and petty cash fund ↑ happen only through the posted entry (Dr petty cash / Cr bank).
+    const account = accounts.find((a) => a.id === replenish.pettyCashId);
     const sourceBank = bankAccounts.find((b) => b.id === replenish.sourceBankAccountId);
-    if (sourceBank && onUpdateBankBalance) {
-      onUpdateBankBalance(sourceBank.id, Math.max(0, sourceBank.balance - replenish.amount));
-    }
-
-    // Auto-generate Journal Entry
-    if (onAddJournalEntry) {
-      const journalEntry: JournalEntry = {
-        id: `acc-entry-${Date.now()}`,
-        docNumber: replenish.journalEntryId || `ACC-1403-0${Math.floor(860 + Math.random() * 30)}`,
+    const result = postFinancialEvent(
+      {
+        type: 'PETTY_CASH_REPLENISHMENT',
+        sourceModule: 'petty_cash',
+        sourceId: replenish.id,
+        projectId: account?.projectId || '',
+        costCenterId: account?.costCenterId || '',
+        counterpartyId: '',
+        amount: replenish.amount,
         date: replenish.date,
-        title: `شارژ تنخواه‌گردان: ${replenish.pettyCashTitle} از حساب ${replenish.sourceBankAccountName}`,
-        type: 'پرداخت',
-        submitter: currentUser.name,
-        status: 'تأیید شده',
-        totalDebit: replenish.amount,
-        totalCredit: replenish.amount,
-        isBalanced: true,
-        history: [
-          {
-            date: replenish.date,
-            time: '۱۰:۰۰',
-            user: currentUser.name,
-            action: 'ثبت سند واریز حواله شارژ تنخواه',
-          },
-        ],
-        rows: [
-          {
-            id: `row-1`,
-            accountCode: '103',
-            accountName: 'موجودی تنخواه‌گردان‌ها',
-            debit: replenish.amount,
-            credit: 0,
-            subledgerName: replenish.pettyCashTitle,
-            description: `واریز شارژ دوره تنخواه طبق حواله ${replenish.trackingNumber}`,
-          },
-          {
-            id: `row-2`,
-            accountCode: '102',
-            accountName: 'موجودی بانک‌های ریالی شرکت',
-            debit: 0,
-            credit: replenish.amount,
-            subledgerName: replenish.sourceBankAccountName,
-            description: `برداشت بابت شارژ تنخواه ${replenish.pettyCashTitle}`,
-          },
-        ],
-      };
-      onAddJournalEntry(journalEntry);
+        details: {
+          pettyCashId: replenish.pettyCashId,
+          pettyCashTitle: replenish.pettyCashTitle,
+          bankAccountId: replenish.sourceBankAccountId,
+          bankName: sourceBank?.bankName || replenish.sourceBankAccountName,
+          trackingNumber: replenish.trackingNumber,
+        },
+      },
+      { submitter: currentUser.name }
+    );
+    if (result.ok && result.event) {
+      setReplenishments((prev) =>
+        prev.map((r) => (r.id === replenish.id ? { ...r, journalEntryId: result.event!.docNumber } : r))
+      );
+      if (!result.duplicate) onPosted?.(result.event.docNumber!);
     }
   };
 

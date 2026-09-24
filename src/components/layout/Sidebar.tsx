@@ -32,16 +32,17 @@ interface SidebarProps {
   user: UserProfile;
   onOpenLogout: () => void;
   onOpenAiAgent: () => void;
+  counts?: Record<string, string>;
 }
 
 export const navItems = [
   { id: 'dashboard', label: 'داشبورد مدیریتی', icon: LayoutDashboard, badge: 'زنده' },
-  { id: 'projects', label: 'مدیریت پروژه‌ها', icon: Building2, count: '۵' },
-  { id: 'contracts', label: 'قراردادها (کارفرما و جزء)', icon: Briefcase, count: '۱۱' },
-  { id: 'statements', label: 'صورت‌وضعیت‌ها', icon: FileSpreadsheet, count: '۹' },
+  { id: 'projects', label: 'مدیریت پروژه‌ها', icon: Building2 },
+  { id: 'contracts', label: 'قراردادها (کارفرما و جزء)', icon: Briefcase },
+  { id: 'statements', label: 'صورت‌وضعیت‌ها', icon: FileSpreadsheet },
   { id: 'procurement', label: 'بازرگانی و تدارکات', icon: ShoppingCart },
-  { id: 'inventory', label: 'انبارداری و مصالح', icon: Warehouse, count: '۶' },
-  { id: 'petty_cash', label: 'تنخواه گردان کارگاه‌ها', icon: Coins, count: '۴' },
+  { id: 'inventory', label: 'انبارداری و مصالح', icon: Warehouse },
+  { id: 'petty_cash', label: 'تنخواه گردان کارگاه‌ها', icon: Coins },
   { id: 'finance', label: 'خزانه‌داری و پرداخت‌ها', icon: CreditCard },
   { id: 'accounting', label: 'حسابداری مالی', icon: Calculator },
   { id: 'partners', label: 'شرکا و ذینفعان', icon: Users },
@@ -59,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   user,
   onOpenLogout,
   onOpenAiAgent,
+  counts = {},
 }) => {
   return (
     <aside
@@ -151,9 +153,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {item.badge}
                       </span>
                     )}
-                    {item.count && !isActive && (
+                    {counts[item.id] && !isActive && (
                       <span className="text-[11px] text-slate-400 font-mono">
-                        {item.count}
+                        {counts[item.id]}
                       </span>
                     )}
                   </div>

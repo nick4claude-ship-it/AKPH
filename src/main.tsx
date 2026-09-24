@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { validateMockReferences } from './utils/validation';
+import { AppStoreProvider } from './store/AppStore';
 
 if (import.meta.env.DEV) {
   validateMockReferences();
@@ -10,6 +11,8 @@ if (import.meta.env.DEV) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppStoreProvider>
+      <App />
+    </AppStoreProvider>
   </StrictMode>,
 );

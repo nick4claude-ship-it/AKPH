@@ -342,6 +342,10 @@ export interface CashDesk {
   balance: number;
   location: string;
   lastCountDate: string;
+  projectId?: string;
+  projectName?: string;
+  ceilingLimit?: number;
+  lastAuditDate?: string;
 }
 
 export interface ReceiptRecord {
@@ -1561,6 +1565,8 @@ export type FinancialEventType =
   | 'PETTY_CASH_EXPENSE_APPROVED'
   | 'TREASURY_PAYMENT'
   | 'TREASURY_RECEIPT'
+  | 'PETTY_CASH_REPLENISHMENT'
+  | 'STOCKTAKE_ADJUSTMENT'
   | 'BANK_RECONCILIATION_MATCH';
 
 export type FinancialEventModule =

@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { generateUUID } from '../../utils/ids';
+import { ACCOUNTS } from '../../store/postingRules';
 
 interface NewStoreIssueModalProps {
   isOpen: boolean;
@@ -411,7 +412,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
           <div className="p-3.5 bg-slate-900 text-white rounded-xl flex items-center justify-between">
             <div>
               <span className="font-bold text-xs block">مجموع بهای تمام‌شده مصالح مصرفی حواله:</span>
-              <span className="text-[10px] text-slate-400">سند اتوماتیک هزینه مستقیم پروژه (کد ۵۰۱۰۱)</span>
+              <span className="text-[10px] text-slate-400">سند اتوماتیک هزینه مستقیم پروژه (کد {Number(ACCOUNTS.materialsCost).toLocaleString('fa-IR', { useGrouping: false })})</span>
             </div>
             <span className="font-black text-amber-400 font-mono text-base">
               {totalCost.toLocaleString('fa-IR')} تومان

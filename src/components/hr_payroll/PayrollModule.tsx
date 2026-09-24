@@ -26,35 +26,37 @@ import {
   Building2,
   X,
 } from 'lucide-react';
-import { Project, UserProfile } from '../../types';
+import { Project, UserProfile, PaymentRequest } from '../../types';
 import {
   Employee,
   MonthlyTimesheet,
   PayrollSlip,
   mockEmployees,
   mockTimesheets,
-  mockPayrollSlips,
 } from '../../data/hrPayrollMockData';
+import { useStoreSlice, usePostFinancialEvent } from '../../store/AppStore';
+import { payrollApprovedEvent } from '../../store/events';
+import { payrollPeriodId } from '../../store/initialState';
+import { buildPaymentRequest } from '../../store/paymentRequests';
+import { toPersianDate } from '../../utils/date';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 
 interface PayrollModuleProps {
   projects: Project[];
   currentUser: UserProfile;
-  onAddJournalEntry?: (entry: any) => void;
-  onAddPaymentRequest?: (request: any) => void;
 }
 
 export const PayrollModule: React.FC<PayrollModuleProps> = ({
   projects,
   currentUser,
-  onAddJournalEntry,
-  onAddPaymentRequest,
 }) => {
   const [activeTab, setActiveTab] = useState<'payroll_slips' | 'employees' | 'timesheets'>('payroll_slips');
 
   const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
   const [timesheets, setTimesheets] = useState<MonthlyTimesheet[]>(mockTimesheets);
-  const [slips, setSlips] = useState<PayrollSlip[]>(mockPayrollSlips);
+  const postFinancialEvent = usePostFinancialEvent();
+  const [slips, setSlips] = useStoreSlice('payrollSlips');
+  const [, setPaymentRequests] = useStoreSlice('paymentRequests');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,35 +81,62 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   const totalIncomeTax = slips.reduce((acc, s) => acc + s.incomeTaxDeduction, 0);
   const totalCompanyLaborCost = slips.reduce((acc, s) => acc + s.totalCostForCompany, 0);
 
-  // Trigger Accounting Entry for Payroll
+  // Financial approval of the month's calculated slips posts one payroll entry:
+  // Dr salary cost per cost center / Cr salaries payable, insurance, tax and staff loans.
   const handleGenerateAccountingEntry = () => {
-    if (onAddJournalEntry) {
-      onAddJournalEntry({
-        title: `سند شناسایی حقوق و دستمزد و بیمه شهریورماه ۱۴۰۳`,
-        amount: totalCompanyLaborCost,
-        type: 'حقوق و دستمزد',
-        description: `ثبت هزینه حقوق، بیمه سهم کارفرما ۲۳٪، بیمه سهم کارگر ۷٪ و مالیات حقوق به تفکیک مراکز هزینه کارگاهی و ستادی`,
-      });
-      showNotification('سند حسابداری حقوق و دستمزد با تفکیک هزینه‌های مستقیم پروژه و سربار صادر گردید.');
+    const pending = slips.filter((s) => s.monthYear === selectedMonth && s.status === 'محاسبه شده');
+    if (pending.length === 0) {
+      showNotification('سند حقوق و دستمزد این دوره قبلاً صادر شده است.', 'info');
+      return;
     }
+    const batchId = `${payrollPeriodId(selectedMonth)}:${pending.map((s) => s.id).sort().join(',')}`;
+    const posting = postFinancialEvent(payrollApprovedEvent(batchId, selectedMonth, pending), {
+      submitter: currentUser.name,
+    });
+    if (!posting.ok) {
+      showNotification(`صدور سند حقوق انجام نشد: ${posting.error}`, 'info');
+      return;
+    }
+    const ids = new Set(pending.map((s) => s.id));
+    setSlips((prev) =>
+      prev.map((s) => (ids.has(s.id) ? { ...s, status: 'تأیید مالی', journalEntryId: posting.event?.docNumber } : s))
+    );
+    showNotification(`سند حسابداری حقوق ${posting.event?.docNumber} با تفکیک هزینه‌های مستقیم پروژه و سربار صادر گردید.`);
   };
 
-  // Trigger Payment Request in Treasury
+  // Net salaries of approved slips are sent to treasury; the payment itself is posted there.
   const handleGeneratePaymentBatch = () => {
-    if (onAddPaymentRequest) {
-      onAddPaymentRequest({
-        sourceType: 'حقوق و دستمزد ماهانه',
-        sourceRefId: 'BATCH-PAY-140306',
-        sourceRefNumber: 'لیست حقوق واریزی شهریور ۱۴۰۳',
-        projectId: 'prj-101',
-        projectName: 'ستاد مرکزی و دفتر راهبری',
-        costCenterId: 'cc-hq',
-        counterpartyId: 'cp-bnk-01',
-        beneficiaryName: 'بانک عامل - فایل پایا واریز گروهی پرسنل',
-        totalAmount: totalNetPayable,
-      });
-      showNotification('دستور پرداخت گروهی خالص حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.');
+    const approved = slips.filter((s) => s.monthYear === selectedMonth && s.status === 'تأیید مالی');
+    const total = approved.reduce((acc, s) => acc + s.netPayableSalary, 0);
+    if (total <= 0) {
+      showNotification('فیش تأییدشده‌ای برای ارسال به خزانه در این دوره وجود ندارد.', 'info');
+      return;
     }
+    const batchId = `${payrollPeriodId(selectedMonth)}:${approved.map((s) => s.id).sort().join(',')}`;
+    let request: PaymentRequest | undefined;
+    setPaymentRequests((prev) => {
+      request = buildPaymentRequest(
+        prev,
+        {
+          sourceType: 'حقوق و دستمزد ماهانه',
+          sourceRefId: batchId,
+          sourceRefNumber: `لیست حقوق ${selectedMonth}`,
+          projectId: '',
+          projectName: 'ستاد مرکزی و کارگاه‌ها',
+          costCenterId: '',
+          beneficiaryName: 'بانک عامل - فایل پایا واریز گروهی پرسنل',
+          beneficiaryType: 'پرسنل',
+          totalAmount: total,
+        },
+        toPersianDate(new Date())
+      );
+      return [request, ...prev];
+    });
+    const ids = new Set(approved.map((s) => s.id));
+    setSlips((prev) =>
+      prev.map((s) => (ids.has(s.id) ? { ...s, status: 'صادر شده جهت پرداخت', paymentRequestId: request?.id } : s))
+    );
+    showNotification('دستور پرداخت گروهی خالص حقوق پرسنل در کارتابل خزانه‌داری ایجاد شد.');
   };
 
   const filteredSlips = slips.filter((s) => {

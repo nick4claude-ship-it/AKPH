@@ -29,8 +29,8 @@ import {
 } from 'lucide-react';
 import { Project, PettyCash, ProgressStatement } from '../../types';
 import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
-import { mockSubcontractorContracts } from '../../data/subcontractorsMockData';
-import { mockPettyCashItems } from '../../data/mockData';
+import { useAppState } from '../../store/AppStore';
+import { selectPettyCashSummaries } from '../../store/selectors';
 
 interface ProjectsModuleProps {
   projects: Project[];
@@ -48,6 +48,7 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeProjectSubTab, setActiveProjectSubTab] = useState<'overview' | 'contract' | 'cost_centers' | 'subcontracts' | 'petty_cash' | 'statements'>('overview');
 
+  const appState = useAppState();
   const activeProject = projects.find((p) => p.id === selectedProjectId);
 
   const filteredProjects = projects.filter((p) => {
@@ -60,12 +61,12 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({
   });
 
   // Project linked subcontracts
-  const projectSubcontracts = mockSubcontractorContracts.filter(
+  const projectSubcontracts = appState.subcontractorContracts.filter(
     (s) => s.projectId === selectedProjectId
   );
 
   // Project linked petty cash accounts
-  const projectPettyCash = mockPettyCashItems.filter(
+  const projectPettyCash = selectPettyCashSummaries(appState).filter(
     (pc) => pc.projectId === selectedProjectId
   );
 
