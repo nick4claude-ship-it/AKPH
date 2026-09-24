@@ -123,7 +123,9 @@ export type SliceUpdater<K extends SliceKey> = AppState[K] | ((prev: AppState[K]
 export type AppAction =
   | { type: 'SET_SLICE'; key: SliceKey; updater: unknown }
   | { type: 'APPLY_POSTING'; event: FinancialEvent; entry: JournalEntry }
-  | { type: 'REPLACE_STATE'; state: AppState };
+  | { type: 'REPLACE_STATE'; state: AppState }
+  /** Records returned by the server after a command; replaced (or added) by id. */
+  | { type: 'MERGE_SERVER_RECORDS'; records: { slice: SliceKey; upserted: Record<string, unknown>[] }[] };
 
 /** ورودی postFinancialEvent: شناسه و وضعیت توسط موتور ثبت تعیین می‌شود. */
 export type FinancialEventInput = Omit<FinancialEvent, 'id' | 'status' | 'journalEntryId' | 'docNumber'>;

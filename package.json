@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "test:posting": "node scripts/run-ts.mjs scripts/posting-scenario.ts",
     "test:workflows": "node scripts/run-ts.mjs scripts/workflow-scenarios.ts",
-    "test": "npm run test:posting && npm run test:workflows"
+    "test:api": "node scripts/run-ts.mjs scripts/api-contract.ts",
+    "test": "npm run test:posting && npm run test:workflows && npm run test:api"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

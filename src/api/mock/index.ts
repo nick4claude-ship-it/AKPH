@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { JournalEntry, UserProfile } from '../../types';
+import type { UserProfile } from '../../types';
 import type { AppState } from '../../store/types';
 import { scopeStateToProjects } from '../../store/state';
 import { getCurrentFiscalYear } from '../../utils/date';
@@ -65,10 +65,6 @@ export function createMockDataSource(): DataSource {
 
     async saveChanges(changes: StoreChange[]): Promise<void> {
       server = applyChanges(ensure(), changes);
-    },
-
-    async saveJournalEntry(entry: JournalEntry): Promise<void> {
-      server = applyChanges(ensure(), [{ slice: 'journalEntries', upserted: [entry as unknown as Record<string, unknown>], removedIds: [] }]);
     },
 
     devUsers: () => mockUsers,

@@ -5,7 +5,7 @@
 
 import type { DataSource } from './types';
 
-export type { DataSource, PortalSession, StoreChange } from './types';
+export type { DataSource, PortalSession, StoreChange, CommandGateway, CommandResult } from './types';
 export { isFinalJournalEntry } from './types';
 
 /**

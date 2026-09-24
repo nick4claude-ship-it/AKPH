@@ -91,6 +91,9 @@ const NoAccess: React.FC = () => (
   </div>
 );
 
+/** Sections whose writes the installed paydar-portal server already executes (the rest are read-only there). */
+const SERVER_BACKED_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications'];
+
 /** App shell: the session (user, currency, data source) is provided by main.tsx. */
 export default function App() {
   const user = useCurrentUser();
@@ -191,6 +194,11 @@ export default function App() {
         )}
 
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto">
+          {!isDemoData && !SERVER_BACKED_PATHS.some((p) => (p === '/' ? location.pathname === '/' : location.pathname.startsWith(p))) && (
+            <div className="px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-900 text-xs font-bold" role="status">
+              این بخش در نسخه وردپرس فعلاً فقط‌خواندنی است — ثبت و تأیید به‌زودی (نیازمند پیاده‌سازی در سرور).
+            </div>
+          )}
           <Suspense fallback={<LoadingView />}>
               <Routes>
                 <Route

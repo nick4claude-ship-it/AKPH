@@ -248,6 +248,8 @@ export interface JournalEntry {
   reversedFromDocNumber?: string;
   /** @deprecated legacy seed field; reversal state is derived from reversedFromDocId. */
   reversalDocId?: string;
+  /** Server concurrency token (WordPress); sent back as If-Match with every command on this entry. */
+  version?: number;
   history: {
     date: string;
     time: string;
