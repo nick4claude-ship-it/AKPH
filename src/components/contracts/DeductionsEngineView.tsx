@@ -7,6 +7,8 @@ import React from 'react';
 import { Contract, AdvancePaymentRecord, UserProfile } from '../../types';
 import { ShieldCheck, DollarSign, Calendar, Layers, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatMoneyCompact } from '../../utils/money';
+import { barWidth, formatPercent } from '../../utils/formatters';
+import { advanceAmortizedPercent } from '../../store/views/contracts';
 
 interface DeductionsEngineViewProps {
   contracts: Contract[];
@@ -41,7 +43,7 @@ export const DeductionsEngineView: React.FC<DeductionsEngineViewProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {advancePayments.map((adv) => {
             const contract = contracts.find((c) => c.id === adv.contractId);
-            const amortizedPct = (adv.totalAmortized / adv.totalAdvanceAmount) * 100;
+            const amortizedPct = advanceAmortizedPercent(adv);
             return (
               <div key={adv.id} className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
@@ -75,10 +77,10 @@ export const DeductionsEngineView: React.FC<DeductionsEngineViewProps> = ({
                 <div>
                   <div className="flex justify-between text-[10px] text-slate-500 mb-1">
                     <span>پیشرفت استهلاک:</span>
-                    <span className="font-bold text-emerald-700">{amortizedPct.toFixed(1)}٪</span>
+                    <span className="font-bold text-emerald-700">{formatPercent(amortizedPct)}</span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${amortizedPct}%` }}></div>
+                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: barWidth(amortizedPct) }}></div>
                   </div>
                 </div>
 

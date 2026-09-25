@@ -21,6 +21,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { formatDecimal } from '../../utils/formatters';
 
 interface StocktakeViewProps {
   stocktakes: StocktakeAudit[];
@@ -160,11 +161,11 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                       <td className="p-3 font-medium text-slate-600">{item.unit}</td>
 
                       <td className="p-3 text-center font-mono font-bold text-slate-700 bg-slate-50/50">
-                        {item.systemStock.toLocaleString('fa-IR')}
+                        {formatDecimal(item.systemStock)}
                       </td>
 
                       <td className="p-3 text-center font-mono font-bold text-slate-900 bg-slate-100/50">
-                        {item.physicalCount.toLocaleString('fa-IR')}
+                        {formatDecimal(item.physicalCount)}
                       </td>
 
                       <td className="p-3 text-center font-mono font-bold">
@@ -177,7 +178,7 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                               : 'text-slate-500'
                           }`}
                         >
-                          {item.varianceQty > 0 ? `+${item.varianceQty.toLocaleString('fa-IR')}` : item.varianceQty.toLocaleString('fa-IR')}
+                          {item.varianceQty > 0 ? `+${formatDecimal(item.varianceQty)}` : formatDecimal(item.varianceQty)}
                         </span>
                       </td>
 

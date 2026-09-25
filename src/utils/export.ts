@@ -31,3 +31,14 @@ export function downloadCsv(filename: string, headers: string[], rows: CsvCell[]
   const blob = new Blob(['﻿', lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   downloadBlob(filename.endsWith('.csv') ? filename : `${filename}.csv`, blob);
 }
+
+/** A table ready to download (built by the store's export view models). */
+export interface CsvTable {
+  filename: string;
+  headers: string[];
+  rows: CsvCell[][];
+}
+
+export function downloadTable(table: CsvTable): void {
+  downloadCsv(table.filename, table.headers, table.rows);
+}

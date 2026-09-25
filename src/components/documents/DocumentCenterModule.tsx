@@ -22,14 +22,13 @@ import {
   FileSpreadsheet,
   X,
 } from 'lucide-react';
-import { Project } from '../../types';
-import { AppDocument, DocumentCategory, DocumentEntityType, DocumentLink } from '../../types';
+import { AppDocument, DocumentCategory, DocumentEntityType, DocumentLink, Project } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { useCurrentUser } from '../../store/session';
-import { generateUUID } from '../../utils/ids';
 import { toPersianDate } from '../../utils/date';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
+import { formatInt } from '../../utils/formatters';
 
 /** Labels for what a document can be linked to. */
 const ENTITY_LABELS: Record<DocumentEntityType, string> = {
@@ -153,31 +152,17 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
   const handleUploadDoc = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDocTitle) return;
-
-    const proj = projects.find((p) => p.id === newDocProject) || projects[0];
-
-    const links: DocumentLink[] = [{ entityType: 'project', entityId: proj.id }];
-    if (newDocPartner) links.push({ entityType: 'counterparty', entityId: newDocPartner });
-    if (newDocLinkId) links.push({ entityType: newDocLinkType, entityId: newDocLinkId });
-    const id = generateUUID();
-    wf.addDocument({
-      id,
+    const result = wf.uploadDocument({
       title: newDocTitle,
-      type: newDocCategory,
-      fileName: `${newDocTitle.replace(/[\/\\:*?"<>|]/g, '_')}.${String(newDocFormat).toLowerCase()}`,
-      links,
-      docNumber: `DOC-${id.slice(0, 6).toUpperCase()}`,
-      date: toPersianDate(new Date()),
-      fileFormat: newDocFormat,
-      fileSize: '-',
-      version: '1.0',
-      status: 'معتبر و جاری',
-      confidentiality: 'عادی',
-      registeredBy: user.name,
-      tags: [proj.name],
-      description: newDocDesc || 'سند بارگذاری شده در مرکز اسناد.',
+      category: newDocCategory,
+      format: newDocFormat,
+      projectId: newDocProject,
+      partnerId: newDocPartner,
+      linkType: newDocLinkType,
+      linkId: newDocLinkId,
+      description: newDocDesc,
     });
+    if (!result.ok) return;
     setIsNewDocModalOpen(false);
     setNewDocTitle('');
     setNewDocDesc('');
@@ -268,7 +253,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
         </div>
 
         <span className="text-slate-400 font-mono text-[11px]">
-          تعداد اسناد یافت شده: {filteredDocs.length}
+          تعداد اسناد یافت شده: {formatInt(filteredDocs.length)}
         </span>
       </div>
 
@@ -506,8 +491,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
             <form onSubmit={handleUploadDoc} className="space-y-3 text-xs">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">عنوان سند:</label>
-                <input
+                <label htmlFor="document-center-module-1" className="block font-medium text-slate-700 mb-1">عنوان سند:</label>
+                <input id="document-center-module-1"
                   type="text"
                   placeholder="مثال: قرارداد تکمیلی، صورتجلسه کارگاهی..."
                   value={newDocTitle}
@@ -518,8 +503,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">دسته‌بندی مدرک:</label>
-                <select
+                <label htmlFor="document-center-module-2" className="block font-medium text-slate-700 mb-1">دسته‌بندی مدرک:</label>
+                <select id="document-center-module-2"
                   value={newDocCategory}
                   onChange={(e) => setNewDocCategory(e.target.value as DocumentCategory)}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -533,8 +518,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">پروژه منتسب:</label>
-                <select
+                <label htmlFor="document-center-module-3" className="block font-medium text-slate-700 mb-1">پروژه منتسب:</label>
+                <select id="document-center-module-3"
                   value={newDocProject}
                   onChange={(e) => setNewDocProject(e.target.value)}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -548,8 +533,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">طرف‌حساب مرتبط (کارفرما / پیمانکار / وندور):</label>
-                <select
+                <label htmlFor="document-center-module-4" className="block font-medium text-slate-700 mb-1">طرف‌حساب مرتبط (کارفرما / پیمانکار / وندور):</label>
+                <select id="document-center-module-4"
                   value={newDocPartner}
                   onChange={(e) => setNewDocPartner(e.target.value)}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -565,8 +550,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">اتصال به رکورد:</label>
-                  <select
+                  <label htmlFor="document-center-module-5" className="block font-medium text-slate-700 mb-1">اتصال به رکورد:</label>
+                  <select id="document-center-module-5"
                     value={newDocLinkType}
                     onChange={(e) => {
                       setNewDocLinkType(e.target.value as DocumentEntityType);
@@ -584,8 +569,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                   </select>
                 </div>
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">رکورد:</label>
-                  <select value={newDocLinkId} onChange={(e) => setNewDocLinkId(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs">
+                  <label htmlFor="document-center-module-6" className="block font-medium text-slate-700 mb-1">رکورد:</label>
+                  <select id="document-center-module-6" value={newDocLinkId} onChange={(e) => setNewDocLinkId(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs">
                     <option value="">— بدون اتصال —</option>
                     {entityOptions(newDocLinkType, newDocProject).map((o) => (
                       <option key={o.id} value={o.id}>
@@ -597,8 +582,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">فرمت فایل:</label>
-                <select
+                <label htmlFor="document-center-module-7" className="block font-medium text-slate-700 mb-1">فرمت فایل:</label>
+                <select id="document-center-module-7"
                   value={newDocFormat}
                   onChange={(e) => setNewDocFormat(e.target.value as AppDocument['fileFormat'])}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -612,8 +597,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">توضیحات و خلاصه محتوا:</label>
-                <textarea
+                <label htmlFor="document-center-module-8" className="block font-medium text-slate-700 mb-1">توضیحات و خلاصه محتوا:</label>
+                <textarea id="document-center-module-8"
                   rows={2}
                   placeholder="شرح مختصر..."
                   value={newDocDesc}

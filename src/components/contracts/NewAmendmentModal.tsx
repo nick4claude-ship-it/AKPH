@@ -5,18 +5,21 @@
 
 import React, { useState } from 'react';
 import { Contract, ContractAmendment, AmendmentType, UserProfile } from '../../types';
+import { amendmentChangePercent } from '../../store/views/contracts';
+import type { NewAmendmentInput } from '../../store/recordWorkflows';
 import { X, Plus, FileText, Calendar, DollarSign } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
-import { generateUUID } from '../../utils/ids';
+import { formatPercent } from '../../utils/formatters';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { getRelativePersianDate } from '../../utils/date';
 
 interface NewAmendmentModalProps {
   contract: Contract;
   currentUser: UserProfile;
   onClose: () => void;
-  onSaveAmendment: (amendment: ContractAmendment, updatedContract: Contract) => void;
+  /** Records the amendment through the workflow; an approved one updates the contract value there. */
+  onSaveAmendment: (input: NewAmendmentInput) => { ok: boolean; message: string };
 }
 
 export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
@@ -34,46 +37,12 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
   const [status, setStatus] = useState<ContractAmendment['status']>('تأیید شده');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const changePercentage = contract.initialValue > 0 ? (amount / contract.initialValue) * 100 : 0;
+  const changePercentage = amendmentChangePercent(contract, amount);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!number.trim()) return setFormError('شماره الحاقیه را وارد کنید.');
-    if (amount <= 0 && extendedDays <= 0) return setFormError('مبلغ یا مدت تمدید الحاقیه را وارد کنید.');
-
-    const newAmd: ContractAmendment = {
-      id: generateUUID(),
-      contractId: contract.id,
-      number,
-      type,
-      date,
-      amount,
-      changePercentage: Number(changePercentage.toFixed(2)),
-      extendedDays,
-      description,
-      status,
-      approvedBy: status === 'تأیید شده' ? contract.employer : undefined,
-      approvalDate: status === 'تأیید شده' ? date : undefined,
-    };
-
-    // If approved, update contract current value and duration
-    let updatedContract = { ...contract };
-    if (status === 'تأیید شده') {
-      const newApprovedChanges = contract.approvedChangesValue + amount;
-      const newCurrentValue = contract.initialValue + newApprovedChanges;
-      const newRemainingValue = Math.max(0, newCurrentValue - contract.executedValue);
-      const newExtensionMonths = contract.durationExtensionMonths + Math.round(extendedDays / 30);
-
-      updatedContract = {
-        ...contract,
-        approvedChangesValue: newApprovedChanges,
-        currentValue: newCurrentValue,
-        remainingValue: newRemainingValue,
-        durationExtensionMonths: newExtensionMonths,
-      };
-    }
-
-    onSaveAmendment(newAmd, updatedContract);
+    const result = onSaveAmendment({ number, type, date, amount, extendedDays, description, status });
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
@@ -103,8 +72,8 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">شماره یا عنوان الحاقیه:</label>
-              <input
+              <label htmlFor="new-amendment-modal-1" className="block text-slate-700 font-bold mb-1">شماره یا عنوان الحاقیه:</label>
+              <input id="new-amendment-modal-1"
                 type="text"
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
@@ -113,8 +82,8 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-bold mb-1">نوع تغییر:</label>
-              <select
+              <label htmlFor="new-amendment-modal-2" className="block text-slate-700 font-bold mb-1">نوع تغییر:</label>
+              <select id="new-amendment-modal-2"
                 value={type}
                 onChange={(e) => setType(e.target.value as AmendmentType)}
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white"
@@ -131,21 +100,21 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">مبلغ اثر مالی ({moneyUnitLabel()}):</label>
-              <MoneyInput
+              <label htmlFor="new-amendment-modal-3" className="block text-slate-700 font-bold mb-1">مبلغ اثر مالی ({moneyUnitLabel()}):</label>
+              <MoneyInput id="new-amendment-modal-3"
                 value={amount}
                 onValueChange={(v) => setAmount(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono font-bold"
                 required
               />
               <span className="text-[10px] text-slate-500 mt-0.5 block">
-                {changePercentage.toFixed(2)}٪ از مبلغ اولیه
+                {formatPercent(changePercentage, 2)} از مبلغ اولیه
               </span>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">تمدید مدت (روز):</label>
-              <IntegerInput
+              <label htmlFor="new-amendment-modal-4" className="block text-slate-700 font-bold mb-1">تمدید مدت (روز):</label>
+              <IntegerInput id="new-amendment-modal-4"
                 value={extendedDays}
                 onValueChange={(v) => setExtendedDays(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 font-mono"
@@ -153,8 +122,8 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">تاریخ ابلاغ رسمی:</label>
-              <input
+              <label htmlFor="new-amendment-modal-5" className="block text-slate-700 font-bold mb-1">تاریخ ابلاغ رسمی:</label>
+              <input id="new-amendment-modal-5"
                 type="text"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -165,8 +134,8 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-700 font-bold mb-1">وضعیت ابلاغ و تصویب:</label>
-            <select
+            <label htmlFor="new-amendment-modal-6" className="block text-slate-700 font-bold mb-1">وضعیت ابلاغ و تصویب:</label>
+            <select id="new-amendment-modal-6"
               value={status}
               onChange={(e) => setStatus(e.target.value as ContractAmendment['status'])}
               className="w-full p-2 rounded-lg border border-slate-300 bg-white"
@@ -179,8 +148,8 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-700 font-bold mb-1">توضیحات و مستندات قانونی:</label>
-            <textarea
+            <label htmlFor="new-amendment-modal-7" className="block text-slate-700 font-bold mb-1">توضیحات و مستندات قانونی:</label>
+            <textarea id="new-amendment-modal-7"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}

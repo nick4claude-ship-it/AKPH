@@ -4,11 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import {
-  SubcontractorProgressStatement,
-  SubcontractorStatementWorkflowStatus,
-  UserProfile,
-} from '../../../types';
+import { SubcontractorProgressStatement, UserProfile } from '../../../types';
 import {
   CheckSquare,
   Clock,
@@ -25,21 +21,16 @@ import {
   Building,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
-import { usePermission } from '../../../store/session';
-import { SUBCONTRACTOR_STATEMENT_FLOW } from '../../../store/workflows';
-import { statementContext } from '../../../store/approvalContext';
-import { Dialog } from '../../common/Dialog';
+import { subcontractorQueues, subcontractorStatementActions } from '../../../store/views/contracts';
+import { Dialog } from '../../../ui/Dialog';
+import { formatDecimal, formatInt } from '../../../utils/formatters';
 
 interface SubcontractorApprovalsQueueProps {
   statements: SubcontractorProgressStatement[];
   currentUser: UserProfile;
   onSelectStatement: (statement: SubcontractorProgressStatement) => void;
-  onUpdateStatus: (
-    statementId: string,
-    newStatus: SubcontractorStatementWorkflowStatus,
-    comment?: string,
-    verifiedAmount?: number
-  ) => void;
+  /** Next approval step, or return for revision (runs the store workflow). */
+  onDecide: (statementId: string, decision: 'approve' | 'return' | 'reject', comment?: string) => void;
   onPayStatement: (statement: SubcontractorProgressStatement) => void;
 }
 
@@ -47,7 +38,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
   statements,
   currentUser,
   onSelectStatement,
-  onUpdateStatus,
+  onDecide,
   onPayStatement,
 }) => {
   const [activeStage, setActiveStage] = useState<'site' | 'pm' | 'management' | 'payment'>('site');
@@ -56,44 +47,28 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
     null
   );
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
-  const { check } = usePermission();
   // The workflow re-checks on submit; the buttons only reflect the same rules (role, project, no self-approval).
   const stepPermission = (s: SubcontractorProgressStatement) => {
-    const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
-    return step ? check(step.action, statementContext(s)) : { ok: false, reason: 'مرحله تأیید باز نیست.' };
+    const step = subcontractorStatementActions(currentUser, s).advance;
+    return step ? { ok: step.allowed, reason: step.reason } : { ok: false, reason: 'مرحله تأیید باز نیست.' };
   };
-  const canReturn = (s: SubcontractorProgressStatement) => check('sub_statement.return', { projectId: s.projectId }).ok;
+  const canReturn = (s: SubcontractorProgressStatement) => subcontractorStatementActions(currentUser, s).canReturn;
 
-  // Categorize statements by workflow stage
-  // Site stage: work recorded → measurement → site approval.
-  const siteReviewQueue = statements.filter((s) => s.status === 'submitted' || s.status === 'measured');
-  // PM stage: site-approved statements.
-  const pmReviewQueue = statements.filter((s) => s.status === 'site_review');
-  // Management stage: financial approval then CEO approval.
-  const pmApprovedQueue = statements.filter((s) => s.status === 'pm_approved' || s.status === 'finance_approved');
-  const managementApprovedQueue = statements.filter(
-    (s) => s.status === 'management_approved' && s.remainingPayable > 0
-  );
-  const paidQueue = statements.filter((s) => s.status === 'paid');
+  // Statements by workflow stage: site (recorded, measured) → PM (site-approved) → management (finance, CEO) → payment.
+  const queues = subcontractorQueues(statements);
+  const siteReviewQueue = queues.site;
+  const pmReviewQueue = queues.pm;
+  const pmApprovedQueue = queues.management;
+  const managementApprovedQueue = queues.payment;
 
   const handleExecuteAction = () => {
     if (!selectedStatementForAction || !actionType) return;
 
     if (actionType === 'approve') {
-      if (activeStage === 'site') {
-        onUpdateStatus(selectedStatementForAction.id, 'site_review', actionComment || 'احجام در کارگاه بررسی شد');
-      } else if (activeStage === 'pm') {
-        onUpdateStatus(selectedStatementForAction.id, 'pm_approved', actionComment || 'تایید مدیر پروژه صادر شد');
-      } else if (activeStage === 'management') {
-        onUpdateStatus(
-          selectedStatementForAction.id,
-          'management_approved',
-          actionComment || 'تایید مدیریت و مجوز پرداخت صادر شد'
-        );
-      }
+      onDecide(selectedStatementForAction.id, 'approve', actionComment || undefined);
     } else {
       if (!actionComment.trim()) return;
-      onUpdateStatus(selectedStatementForAction.id, 'returned_for_revision', actionComment.trim());
+      onDecide(selectedStatementForAction.id, 'return', actionComment.trim());
     }
 
     setSelectedStatementForAction(null);
@@ -137,7 +112,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                   activeStage === 'site' ? 'bg-slate-950 text-amber-400' : 'bg-slate-200 text-slate-700'
                 }`}
               >
-                {siteReviewQueue.length}
+                {formatInt(siteReviewQueue.length)}
               </span>
             </div>
             <p className={`text-[10px] ${activeStage === 'site' ? 'text-slate-900' : 'text-slate-500'}`}>
@@ -163,7 +138,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                   activeStage === 'pm' ? 'bg-slate-950 text-amber-400' : 'bg-slate-200 text-slate-700'
                 }`}
               >
-                {siteReviewQueue.length}
+                {formatInt(pmReviewQueue.length)}
               </span>
             </div>
             <p className={`text-[10px] ${activeStage === 'pm' ? 'text-slate-900' : 'text-slate-500'}`}>
@@ -191,7 +166,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                     : 'bg-slate-200 text-slate-700'
                 }`}
               >
-                {pmApprovedQueue.length}
+                {formatInt(pmApprovedQueue.length)}
               </span>
             </div>
             <p className={`text-[10px] ${activeStage === 'management' ? 'text-slate-900' : 'text-slate-500'}`}>
@@ -217,7 +192,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                   activeStage === 'payment' ? 'bg-slate-950 text-amber-400' : 'bg-slate-200 text-slate-700'
                 }`}
               >
-                {managementApprovedQueue.length}
+                {formatInt(managementApprovedQueue.length)}
               </span>
             </div>
             <p className={`text-[10px] ${activeStage === 'payment' ? 'text-slate-900' : 'text-slate-500'}`}>
@@ -233,7 +208,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
               <span>صورت‌وضعیت‌های در انتظار متره و تأیید سرپرست کارگاه</span>
-              <span>{siteReviewQueue.length} مورد</span>
+              <span>{formatInt(siteReviewQueue.length)} مورد</span>
             </div>
 
             {siteReviewQueue.length === 0 ? (
@@ -289,7 +264,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                               <td className="py-1.5 text-slate-800 font-medium">{item.description}</td>
                               <td className="py-1.5 text-center text-slate-600">{item.unit}</td>
                               <td className="py-1.5 text-center font-bold text-slate-900">
-                                {item.currentQuantity.toLocaleString('fa-IR')}
+                                {formatDecimal(item.currentQuantity)}
                               </td>
                               <td className="py-1.5 text-left text-slate-600">
                                 {formatMoney(item.unitRate, false)}
@@ -331,11 +306,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                         disabled={!stepPermission(stmt).ok}
                         title={stepPermission(stmt).reason}
                         onClick={() => {
-                          onUpdateStatus(
-                            stmt.id,
-                            'site_review',
-                            'احجام و متره میدانی توسط سرپرست کارگاه کنترل و تایید شد.'
-                          );
+                          onDecide(stmt.id, 'approve', 'احجام و متره میدانی توسط سرپرست کارگاه کنترل و تایید شد.');
                         }}
                         className="disabled:opacity-40 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
@@ -354,10 +325,10 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
               <span>صورت‌وضعیت‌های تأییدشده در کارگاه — در انتظار تأیید مدیر پروژه</span>
-              <span>{siteReviewQueue.length} مورد</span>
+              <span>{formatInt(pmReviewQueue.length)} مورد</span>
             </div>
 
-            {siteReviewQueue.map((stmt) => (
+            {pmReviewQueue.map((stmt) => (
               <div
                 key={stmt.id}
                 className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4 hover:border-indigo-300 transition-all"
@@ -404,11 +375,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                     disabled={!stepPermission(stmt).ok}
                     title={stepPermission(stmt).reason}
                     onClick={() => {
-                      onUpdateStatus(
-                        stmt.id,
-                        'pm_approved',
-                        'انطباق با برنامه زمانبندی و کیفیت فنی کار مورد تأیید مدیر پروژه است.'
-                      );
+                      onDecide(stmt.id, 'approve', 'انطباق با برنامه زمانبندی و کیفیت فنی کار مورد تأیید مدیر پروژه است.');
                     }}
                     className="disabled:opacity-40 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                   >
@@ -425,7 +392,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
               <span>صورت‌وضعیت‌های تأییدشده توسط مدیر پروژه — در انتظار تأیید نهایی مدیریت و تخصیص بودجه</span>
-              <span>{pmApprovedQueue.length} مورد</span>
+              <span>{formatInt(pmApprovedQueue.length)} مورد</span>
             </div>
 
             {pmApprovedQueue.length === 0 ? (
@@ -486,11 +453,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
                       disabled={!stepPermission(stmt).ok}
                       title={stepPermission(stmt).reason}
                       onClick={() => {
-                        onUpdateStatus(
-                          stmt.id,
-                          'management_approved',
-                          'تأیید مدیریت و صدور مجوز پرداخت توسط مدیریت شرکت صادر شد.'
-                        );
+                        onDecide(stmt.id, 'approve', 'تأیید مدیریت و صدور مجوز پرداخت توسط مدیریت شرکت صادر شد.');
                       }}
                       className="disabled:opacity-40 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                     >
@@ -508,7 +471,7 @@ export const SubcontractorApprovalsQueue: React.FC<SubcontractorApprovalsQueuePr
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-500 px-1">
               <span>صورت‌وضعیت‌های تأییدشده — آماده پرداخت و صدور سند ثبت هزینه پروژه</span>
-              <span>{managementApprovedQueue.length} مورد</span>
+              <span>{formatInt(managementApprovedQueue.length)} مورد</span>
             </div>
 
             {managementApprovedQueue.length === 0 ? (

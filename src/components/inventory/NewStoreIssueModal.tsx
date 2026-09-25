@@ -22,14 +22,18 @@ import {
   User,
   AlertTriangle,
 } from 'lucide-react';
-import { generateUUID } from '../../utils/ids';
-import { ACCOUNTS } from '../../store/postingRules';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatInt, formatMoney, moneyUnitLabel } from '../../utils/money';
-import { IntegerInput } from '../common/NumberInput';
-import { useAppState } from '../../store/AppStore';
-import { availableQty } from '../../store/workflows';
-import { toPersianDate } from '../../utils/date';
+import { IntegerInput } from '../../ui/NumberInput';
+import { useSelector } from '../../store/AppStore';
+import { formatDecimal, toPersianDigits } from '../../utils/formatters';
+import {
+  MATERIALS_COST_ACCOUNT,
+  computeStoreIssueDraft,
+  newIssueLine,
+  type IssueLineInput,
+  type StoreIssueFormInput,
+} from '../../store/views/inventory';
 
 interface NewStoreIssueModalProps {
   isOpen: boolean;
@@ -38,7 +42,8 @@ interface NewStoreIssueModalProps {
   materials: MaterialItem[];
   projects: Project[];
   currentUser: UserProfile;
-  onSubmitIssue: (issue: StoreIssueVoucher) => { ok: boolean; message: string };
+  /** Issues (or reserves) through the workflow, which prices the lines and checks free stock. */
+  onSubmitIssue: (form: StoreIssueFormInput) => { ok: boolean; message: string };
 }
 
 export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
@@ -50,7 +55,6 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
   currentUser,
   onSubmitIssue,
 }) => {
-  const store = useAppState();
   const [warehouseId, setWarehouseId] = useState(warehouses[1]?.id || warehouses[0]?.id || '');
   const [costCenter, setCostCenter] = useState('سازه بتنی و اسکلت');
   const [wbsSection, setWbsSection] = useState('');
@@ -61,136 +65,44 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
   const [receivedByCrewLeaderName, setReceivedByCrewLeaderName] = useState('');
   // Request mode reserves the stock; the issue is confirmed later from the voucher.
   const [reserveOnly, setReserveOnly] = useState(false);
-
-  // Items
-  const [items, setItems] = useState<(StoreIssueItem & { rowKey: string })[]>(() => [
-    {
-      rowKey: generateUUID(),
-      materialId: materials[0]?.id || '',
-      materialCode: materials[0]?.code || '',
-      materialName: materials[0]?.name || '',
-      unit: materials[0]?.unit || 'کیلوگرم',
-      requestedQty: 0,
-      issuedQty: 0,
-      unitCost: materials[0]?.averageUnitPrice || 0,
-      totalCost: 0,
-      remarks: '',
-    },
-  ]);
-
-  const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
-
-  const totalCost = items.reduce((sum, item) => sum + item.totalCost, 0);
-
-  const handleMaterialChange = (index: number, matId: string) => {
-    const mat = materials.find((m) => m.id === matId);
-    if (!mat) return;
-
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              materialId: mat.id,
-              materialCode: mat.code,
-              materialName: mat.name,
-              unit: mat.unit,
-              unitCost: mat.averageUnitPrice,
-              totalCost: mat.averageUnitPrice * item.issuedQty,
-            }
-          : item
-      )
-    );
-  };
-
-  const handleQuantityChange = (index: number, qty: number) => {
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              requestedQty: qty,
-              issuedQty: qty,
-              totalCost: qty * item.unitCost,
-            }
-          : item
-      )
-    );
-  };
-
-  const addItemRow = () => {
-    const defaultMat = materials[0];
-    if (!defaultMat) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        rowKey: generateUUID(),
-        materialId: defaultMat.id,
-        materialCode: defaultMat.code,
-        materialName: defaultMat.name,
-        unit: defaultMat.unit,
-        requestedQty: 0,
-        issuedQty: 0,
-        unitCost: defaultMat.averageUnitPrice,
-        totalCost: 0,
-        remarks: '',
-      },
-    ]);
-  };
-
+  const [rows, setRows] = useState<IssueLineInput[]>(() => [newIssueLine(materials)]);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const removeItemRow = (index: number) => {
-    if (items.length <= 1) return;
-    setItems((prev) => prev.filter((_, i) => i !== index));
+  const form: StoreIssueFormInput = {
+    warehouseId,
+    costCenter,
+    wbsSection,
+    subcontractorName,
+    tradeType,
+    isSubcontractorContra,
+    subcontractorDeductionRef,
+    receivedByCrewLeaderName,
+    reserveOnly,
+    lines: rows,
   };
+  // Lines priced at the weighted average, the free stock of each material and the first problem.
+  const draft = useSelector((s) => computeStoreIssueDraft(s, form), [JSON.stringify(form)]);
+  const items = draft.lines;
+  const totalCost = draft.totalCost;
+  const selectedWarehouse = draft.warehouse;
 
-  // Free stock of each material in the chosen warehouse (reservations already deducted).
-  const freeQty = (materialId: string) => availableQty(store, warehouseId, materialId);
+  const updateRow = (index: number, patch: Partial<IssueLineInput>) =>
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  const handleMaterialChange = (index: number, matId: string) => updateRow(index, { materialId: matId });
+  const handleQuantityChange = (index: number, qty: number) => updateRow(index, { qty });
+  const addItemRow = () => {
+    if (materials.length) setRows((prev) => [...prev, newIssueLine(materials)]);
+  };
+  const removeItemRow = (index: number) => {
+    if (rows.length <= 1) return;
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWarehouse) return setFormError('انبار مبدأ را انتخاب کنید.');
-    const project = projects.find((p) => p.id === selectedWarehouse.projectId);
-    if (!project) return setFormError('این انبار به پروژه‌ای متصل نیست؛ حواله مصرف فقط از انبار پروژه صادر می‌شود.');
-    if (!wbsSection.trim()) return setFormError('لطفاً محل مصرف و فاز WBS را مشخص فرمایید.');
-    if (items.some((i) => i.issuedQty <= 0)) return setFormError('مقدار هر ردیف باید بیش از صفر باشد.');
-    // Rows of the same material are summed before comparing with the free stock.
-    const perMaterial = new Map<string, number>();
-    for (const i of items) perMaterial.set(i.materialId, (perMaterial.get(i.materialId) || 0) + i.issuedQty);
-    for (const [materialId, qty] of perMaterial) {
-      if (qty > freeQty(materialId)) {
-        const name = items.find((i) => i.materialId === materialId)?.materialName;
-        return setFormError(`موجودی آزاد ${name} در این انبار ${formatInt(freeQty(materialId))} است؛ جمع درخواست ${formatInt(qty)}.`);
-      }
-    }
+    if (draft.error) return setFormError(draft.error);
     setFormError(null);
-
-    const newIssue: StoreIssueVoucher = {
-      id: generateUUID(),
-      issueNumber: '',
-      date: toPersianDate(new Date()),
-      warehouseId,
-      warehouseName: selectedWarehouse.name,
-      projectId: project.id,
-      projectName: project.name,
-      costCenterId: project.costCenterIds?.[0],
-      costCenter,
-      wbsSection: wbsSection.trim(),
-      subcontractorName: subcontractorName.trim() || undefined,
-      tradeType: subcontractorName ? tradeType : undefined,
-      isSubcontractorContra: subcontractorName ? isSubcontractorContra : false,
-      subcontractorStatementDeductionRef: subcontractorName && isSubcontractorContra ? subcontractorDeductionRef : undefined,
-      applicantName: currentUser.name,
-      approvedByManagerName: '',
-      dispatchedByKeeperName: selectedWarehouse.keeperName,
-      receivedByCrewLeaderName: receivedByCrewLeaderName.trim(),
-      items: items.map(({ rowKey: _k, ...i }) => i),
-      totalCost,
-      status: reserveOnly ? 'درخواست اولیه' : 'خروج قطعی از انبار',
-    };
-
-    const result = onSubmitIssue(newIssue);
+    const result = onSubmitIssue(form);
     if (!result.ok) return setFormError(result.message);
     onClose();
   };
@@ -233,8 +145,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
           {/* Location & Cost Center */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">انبار و کارگاه مبدأ *</label>
-              <select
+              <label htmlFor="new-store-issue-modal-1" className="font-bold text-slate-700 block mb-1">انبار و کارگاه مبدأ *</label>
+              <select id="new-store-issue-modal-1"
                 value={warehouseId}
                 onChange={(e) => setWarehouseId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 bg-slate-50 cursor-pointer"
@@ -248,8 +160,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">مرکز هزینه پروژه *</label>
-              <select
+              <label htmlFor="new-store-issue-modal-2" className="font-bold text-slate-700 block mb-1">مرکز هزینه پروژه *</label>
+              <select id="new-store-issue-modal-2"
                 value={costCenter}
                 onChange={(e) => setCostCenter(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 bg-slate-50 cursor-pointer"
@@ -265,8 +177,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">محل دقیق مصرف در کارگاه (WBS) *</label>
-              <input
+              <label htmlFor="new-store-issue-modal-3" className="font-bold text-slate-700 block mb-1">محل دقیق مصرف در کارگاه (WBS) *</label>
+              <input id="new-store-issue-modal-3"
                 type="text"
                 required
                 value={wbsSection}
@@ -286,8 +198,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-[11px] text-slate-600 block mb-1">نام اکیپ پیمانکار جزء (اختیاری)</label>
-                <input
+                <label htmlFor="new-store-issue-modal-4" className="text-[11px] text-slate-600 block mb-1">نام اکیپ پیمانکار جزء (اختیاری)</label>
+                <input id="new-store-issue-modal-4"
                   type="text"
                   value={subcontractorName}
                   onChange={(e) => setSubcontractorName(e.target.value)}
@@ -297,8 +209,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-600 block mb-1">رشته کاری پیمانکار</label>
-                <input
+                <label htmlFor="new-store-issue-modal-5" className="text-[11px] text-slate-600 block mb-1">رشته کاری پیمانکار</label>
+                <input id="new-store-issue-modal-5"
                   type="text"
                   value={tradeType}
                   onChange={(e) => setTradeType(e.target.value)}
@@ -308,8 +220,8 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-600 block mb-1">نام سرپرست تحویل‌گیرنده</label>
-                <input
+                <label htmlFor="new-store-issue-modal-6" className="text-[11px] text-slate-600 block mb-1">نام سرپرست تحویل‌گیرنده</label>
+                <input id="new-store-issue-modal-6"
                   type="text"
                   value={receivedByCrewLeaderName}
                   onChange={(e) => setReceivedByCrewLeaderName(e.target.value)}
@@ -386,7 +298,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
                         >
                           {materials.map((m) => (
                             <option key={m.id} value={m.id}>
-                              {m.name} (موجودی: {m.currentStock.toLocaleString('fa-IR')})
+                              {m.name} (موجودی: {formatDecimal(m.currentStock)})
                             </option>
                           ))}
                         </select>
@@ -397,11 +309,11 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
                       <td className="p-2.5">
                         <IntegerInput
                           aria-label={`مقدار ${item.materialName}`}
-                          value={item.issuedQty}
+                          value={item.qty}
                           onValueChange={(v) => handleQuantityChange(idx, v)}
                           className="w-24 px-2 py-1 rounded-lg border border-slate-200 font-mono text-center"
                         />
-                        <span className="block text-[10px] text-slate-400 mt-0.5">آزاد: {formatInt(freeQty(item.materialId))}</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">آزاد: {formatInt(item.freeQty)}</span>
                       </td>
 
                       <td className="p-2.5 font-mono text-slate-700">
@@ -433,7 +345,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
           <div className="p-3.5 bg-slate-900 text-white rounded-xl flex items-center justify-between">
             <div>
               <span className="font-bold text-xs block">مجموع بهای تمام‌شده مصالح مصرفی حواله:</span>
-              <span className="text-[10px] text-slate-400">سند اتوماتیک هزینه مستقیم پروژه (کد {Number(ACCOUNTS.materialsCost).toLocaleString('fa-IR', { useGrouping: false })})</span>
+              <span className="text-[10px] text-slate-400">سند اتوماتیک هزینه مستقیم پروژه (کد {toPersianDigits(MATERIALS_COST_ACCOUNT)})</span>
             </div>
             <span className="font-black text-amber-400 font-mono text-base">
               {formatMoney(totalCost)}

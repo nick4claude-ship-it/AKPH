@@ -4,165 +4,79 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { SubcontractorContract, SubcontractorProgressStatement, SubcontractorStatementItem, UserProfile } from '../../../types';
+import { SubcontractorContract, UserProfile } from '../../../types';
 import { X, Plus, Trash2, FileCheck2, Lock } from 'lucide-react';
-import { Dialog } from '../../common/Dialog';
-import { IntegerInput, MoneyInput } from '../../common/NumberInput';
-import { formatMoney, formatMoneyCompact, formatInt, moneyUnitLabel, roundRial } from '../../../utils/money';
-import { generateUUID } from '../../../utils/ids';
-import { toPersianDate, toPersianTime, getRelativePersianDate } from '../../../utils/date';
-import { toPersianDigits } from '../../../utils/formatters';
-import { useAppState } from '../../../store/AppStore';
-import { lineKey, selectSubcontractLines, subcontractRemainingAdvance, validateSubcontractorStatement } from '../../../store/subcontractLines';
-import type { WorkflowResult } from '../../../store/workflows';
+import { Dialog } from '../../../ui/Dialog';
+import { IntegerInput, MoneyInput, PercentInput } from '../../../ui/NumberInput';
+import { formatMoney, formatMoneyCompact, formatInt, moneyUnitLabel } from '../../../utils/money';
+import { getRelativePersianDate } from '../../../utils/date';
+import { useSelector } from '../../../store/AppStore';
+import {
+  blankSubcontractorLine,
+  capAdvanceDeduction,
+  computeSubcontractorStatementDraft,
+  subcontractorLineError,
+  subcontractorStatementLines,
+  suggestSubcontractorStatementNumber,
+  type SubcontractorStatementFormInput,
+  type SubcontractorStatementLineInput,
+} from '../../../store/views/contracts';
+import type { WorkflowResult } from '../../../store/workflowKit';
 
 interface NewSubcontractorStatementModalProps {
   onClose: () => void;
   contracts: SubcontractorContract[];
   initialContract?: SubcontractorContract | null;
   currentUser: UserProfile;
-  onSave: (statement: SubcontractorProgressStatement) => WorkflowResult;
-}
-
-interface DraftLine {
-  id: string;
-  /** Lines that already have approved history are locked: description, unit, contract qty, rate and previous qty. */
-  locked: boolean;
-  description: string;
-  unit: string;
-  contractQuantity: number;
-  unitRate: number;
-  previousQuantity: number;
-  pendingQuantity: number;
-  currentQuantity: number;
+  /** Saves through the workflow, which recomputes the amounts from the lines. */
+  onSave: (form: SubcontractorStatementFormInput) => WorkflowResult;
 }
 
 export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementModalProps> = ({ onClose, contracts, initialContract, currentUser, onSave }) => {
-  const state = useAppState();
-  const [selectedContractId, setSelectedContractId] = useState<string>(initialContract?.id || contracts[0]?.id || '');
+  const initialId = initialContract?.id || contracts[0]?.id || '';
+  const initial = useSelector((s) => ({ lines: subcontractorStatementLines(s, initialId), number: suggestSubcontractorStatementNumber(s, initialId) }), [initialId]);
+  const linesFor = useSelector((s) => (contractId: string) => subcontractorStatementLines(s, contractId));
+  const numberFor = useSelector((s) => (contractId: string) => suggestSubcontractorStatementNumber(s, contractId));
+  const [selectedContractId, setSelectedContractId] = useState<string>(initialId);
   const selectedContract = contracts.find((c) => c.id === selectedContractId) || contracts[0];
 
-  const linesFor = (contractId: string): DraftLine[] =>
-    selectSubcontractLines(state, contractId).map((l) => ({
-      id: generateUUID(),
-      locked: true,
-      description: l.description,
-      unit: l.unit,
-      contractQuantity: l.contractQuantity,
-      unitRate: l.unitRate,
-      previousQuantity: l.approvedQuantity,
-      pendingQuantity: l.pendingQuantity,
-      currentQuantity: 0,
-    }));
-
-  const statementsOfContract = (contractId: string) => state.subcontractorStatements.filter((s) => s.subcontractorContractId === contractId).length;
-  const [statementNumber, setStatementNumber] = useState<string>(() => `صورت‌وضعیت شماره ${toPersianDigits(statementsOfContract(selectedContract?.id || '') + 1)}`);
+  const [statementNumber, setStatementNumber] = useState<string>(initial.number);
   const [periodStartDate, setPeriodStartDate] = useState<string>(() => getRelativePersianDate(-30));
   const [periodEndDate, setPeriodEndDate] = useState<string>(() => getRelativePersianDate(0));
-  const [lines, setLines] = useState<DraftLine[]>(() => (selectedContract ? linesFor(selectedContract.id) : []));
+  const [lines, setLines] = useState<SubcontractorStatementLineInput[]>(initial.lines);
   const [retentionRate, setRetentionRate] = useState<number>(5);
   const [advanceDeduction, setAdvanceDeduction] = useState<number>(0);
   const [penaltyAmount, setPenaltyAmount] = useState<number>(0);
   const [otherDeduction, setOtherDeduction] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
-  const remainingAdvance = useMemo(() => (selectedContract ? subcontractRemainingAdvance(state, selectedContract.id) : 0), [state, selectedContract]);
+  const form: SubcontractorStatementFormInput = {
+    contractId: selectedContract?.id || '',
+    statementNumber,
+    periodStartDate,
+    periodEndDate,
+    lines,
+    retentionRate,
+    advanceDeduction,
+    penaltyAmount,
+    otherDeduction,
+  };
+  const draft = useSelector((s) => computeSubcontractorStatementDraft(s, form), [JSON.stringify(form)]);
+  const { grossAmount, retentionAmount, totalDeductions, netPayable, remainingAdvance } = draft;
 
   if (!selectedContract) return null;
 
-  const withAmounts = (l: DraftLine): SubcontractorStatementItem => {
-    const cumulativeQuantity = l.previousQuantity + l.currentQuantity;
-    return {
-      id: l.id,
-      description: l.description.trim(),
-      unit: l.unit.trim(),
-      contractQuantity: l.contractQuantity,
-      previousQuantity: l.previousQuantity,
-      currentQuantity: l.currentQuantity,
-      cumulativeQuantity,
-      unitRate: l.unitRate,
-      currentAmount: roundRial(l.currentQuantity * l.unitRate),
-      cumulativeAmount: roundRial(cumulativeQuantity * l.unitRate),
-    };
-  };
-
-  const items = lines.filter((l) => l.currentQuantity > 0).map(withAmounts);
-  const grossAmount = items.reduce((sum, item) => sum + item.currentAmount, 0);
-  const retentionAmount = roundRial((grossAmount * retentionRate) / 100);
-  const totalDeductions = retentionAmount + advanceDeduction + penaltyAmount + otherDeduction;
-  const netPayable = Math.max(0, grossAmount - totalDeductions);
-
-  const update = (id: string, patch: Partial<DraftLine>) => {
+  const update = (id: string, patch: Partial<SubcontractorStatementLineInput>) => {
     setError(null);
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   };
 
-  const addLine = () =>
-    setLines((prev) => [
-      ...prev,
-      { id: generateUUID(), locked: false, description: '', unit: '', contractQuantity: 0, unitRate: 0, previousQuantity: 0, pendingQuantity: 0, currentQuantity: 0 },
-    ]);
-
-  const lineError = (l: DraftLine): string | null => {
-    const committed = l.previousQuantity + l.pendingQuantity + l.currentQuantity;
-    if (committed > l.contractQuantity) return `جمع مقدار (${formatInt(committed)}) از مقدار قرارداد بیشتر است`;
-    return null;
-  };
+  const addLine = () => setLines((prev) => [...prev, blankSubcontractorLine()]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!items.length) return setError('مقدار این دوره حداقل یک ردیف را وارد کنید.');
-    if (lines.some((l) => l.currentQuantity > 0 && (!l.description.trim() || !l.unit.trim() || l.contractQuantity <= 0 || l.unitRate <= 0))) {
-      return setError('برای ردیف‌های جدید شرح، واحد، مقدار قرارداد و نرخ الزامی است.');
-    }
-    const keys = items.map((i) => lineKey(i.description, i.unit));
-    if (new Set(keys).size !== keys.length) return setError('ردیف تکراری وجود دارد.');
-    const now = new Date();
-    const statement: SubcontractorProgressStatement = {
-      id: generateUUID(),
-      statementNumber,
-      subcontractorContractId: selectedContract.id,
-      subcontractorContractNumber: selectedContract.contractNumber,
-      costCenterId: selectedContract.costCenterId,
-      counterpartyId: selectedContract.counterpartyId,
-      subcontractorName: selectedContract.subcontractorName,
-      tradeType: selectedContract.tradeType,
-      projectId: selectedContract.projectId,
-      projectName: selectedContract.projectName,
-      periodStartDate,
-      periodEndDate,
-      submissionDate: toPersianDate(now),
-      items,
-      grossAmount,
-      siteVerifiedAmount: grossAmount,
-      deductions: {
-        retention: retentionAmount,
-        advancePaymentDeduction: advanceDeduction,
-        safetyOrWastePenalty: penaltyAmount,
-        otherDeductions: otherDeduction,
-        description: `کسر ${toPersianDigits(retentionRate)}٪ سپرده حسن انجام کار و استهلاک پیش‌پرداخت`,
-      },
-      totalDeductions,
-      netPayable,
-      paidAmount: 0,
-      remainingPayable: netPayable,
-      status: 'submitted',
-      workflowHistory: [
-        {
-          date: toPersianDate(now),
-          time: toPersianTime(now),
-          user: currentUser.name,
-          role: currentUser.role,
-          fromStatus: 'submitted',
-          toStatus: 'submitted',
-          action: 'ثبت صورت‌وضعیت در سامانه',
-          comment: `کارکرد دوره ${periodStartDate} الی ${periodEndDate}`,
-        },
-      ],
-    };
-    const validation = validateSubcontractorStatement(state, statement);
-    if (validation) return setError(validation);
-    const result = onSave(statement);
+    if (draft.error) return setError(draft.error);
+    const result = onSave(form);
     if (!result.ok) return setError(result.message);
     onClose();
   };
@@ -203,7 +117,7 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
                 setSelectedContractId(e.target.value);
                 setLines(linesFor(e.target.value));
                 setAdvanceDeduction(0);
-                setStatementNumber(`صورت‌وضعیت شماره ${toPersianDigits(statementsOfContract(e.target.value) + 1)}`);
+                setStatementNumber(numberFor(e.target.value));
               }}
               className="mt-1.5 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
             >
@@ -274,7 +188,7 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {lines.map((l) => {
-                  const err = lineError(l);
+                  const err = subcontractorLineError(l);
                   return (
                     <tr key={l.id} className={err ? 'bg-rose-50/60' : 'hover:bg-slate-50'}>
                       <td className="p-2">
@@ -302,7 +216,7 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
                       <td className="p-2 text-left font-mono">
                         {l.locked ? formatMoney(l.unitRate, false) : <MoneyInput aria-label="نرخ واحد" value={l.unitRate} onValueChange={(v) => update(l.id, { unitRate: v })} className={`${input} text-left`} />}
                       </td>
-                      <td className="p-2 text-left font-black text-slate-900 font-mono">{formatMoney(roundRial(l.currentQuantity * l.unitRate), false)}</td>
+                      <td className="p-2 text-left font-black text-slate-900 font-mono">{formatMoney(draft.lineAmounts[l.id] || 0, false)}</td>
                       <td className="p-2 text-center">
                         {!l.locked && (
                           <button type="button" aria-label="حذف ردیف" onClick={() => setLines((prev) => prev.filter((x) => x.id !== l.id))} className="text-slate-400 hover:text-rose-600 cursor-pointer">
@@ -324,7 +238,7 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
             <label className="text-[11px] text-slate-500 block">
               درصد سپرده حسن انجام کار:
-              <IntegerInput value={retentionRate} onValueChange={(v) => setRetentionRate(Math.min(100, v))} className="mt-1 w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold" />
+              <PercentInput value={retentionRate} onValueChange={setRetentionRate} className="mt-1 w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold" />
               <span className="text-[10px] text-slate-400 block mt-0.5">{formatMoney(retentionAmount)}</span>
             </label>
             <label className="text-[11px] text-slate-500 block">
@@ -332,7 +246,7 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
               <MoneyInput
                 value={advanceDeduction}
                 onValueChange={(v) => {
-                  setAdvanceDeduction(Math.min(v, remainingAdvance));
+                  setAdvanceDeduction(capAdvanceDeduction(v, remainingAdvance));
                   setError(null);
                 }}
                 className="mt-1 w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"

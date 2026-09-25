@@ -6,8 +6,9 @@
 import { useMemo } from 'react';
 import { appReducer, SERVER_REQUIRED_MESSAGE, useAppDispatch, useDataSource, useGetState, usePostFinancialEvent } from './AppStore';
 import { useCurrentUser } from './session';
-import * as wf from './workflows';
-import { WorkflowEnv, WorkflowResult } from './workflows';
+import * as workflows from './workflows';
+import * as recordWorkflows from './recordWorkflows';
+import { WorkflowEnv, WorkflowResult } from './workflowKit';
 import { applyPosting, preparePosting } from './postingEngine';
 import { emitToast } from './toast';
 import type { AppState } from './types';
@@ -54,7 +55,40 @@ const WORKFLOW_ACTIONS = [
   'createTransfer',
   'advanceTransfer',
   'applyStocktake',
+  // Master records (recordWorkflows.ts)
+  'createClientContract',
+  'createContractAmendment',
+  'submitClientStatementForm',
+  'decideClientStatement',
+  'createSubcontractorContract',
+  'submitSubcontractorStatementForm',
+  'decideSubcontractorStatement',
+  'createRequisition',
+  'createRfqFromRequisition',
+  'selectWinningBid',
+  'createPurchaseOrderFromRfq',
+  'createPurchaseOrder',
+  'updatePurchaseOrderStatus',
+  'createSupplier',
+  'createMaterial',
+  'submitStoreIssueForm',
+  'submitTransferForm',
+  'applyStocktakeById',
+  'createPettyCashFund',
+  'submitPettyExpenseForm',
+  'updatePettyCashCategories',
+  'submitManualJournalEntryForm',
+  'approveJournalEntryLogged',
+  'rejectJournalEntryLogged',
+  'reverseJournalEntryLogged',
+  'reconcileBankItemLogged',
+  'closeFiscalYearLogged',
+  'payRequestForm',
+  'createManualPaymentRequest',
+  'uploadDocument',
 ] as const;
+
+const wf = { ...workflows, ...recordWorkflows };
 
 type ActionName = (typeof WORKFLOW_ACTIONS)[number];
 type Bound<F> = F extends (env: WorkflowEnv, ...args: infer A) => infer R ? (...args: A) => R : never;

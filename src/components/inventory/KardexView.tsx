@@ -22,6 +22,8 @@ import {
   Scale,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { formatDecimal } from '../../utils/formatters';
+import { kardexTotals } from '../../store/views/inventory';
 
 interface KardexViewProps {
   materials: MaterialItem[];
@@ -46,8 +48,7 @@ export const KardexView: React.FC<KardexViewProps> = ({
     return kardexRecords.filter((k) => k.materialId === selectedMaterialId);
   }, [kardexRecords, selectedMaterialId]);
 
-  const totalIn = records.reduce((s, r) => s + r.inQty, 0);
-  const totalOut = records.reduce((s, r) => s + r.outQty, 0);
+  const { totalIn, totalOut } = kardexTotals(records);
   const currentBalance = selectedMaterial ? selectedMaterial.currentStock : totalIn - totalOut;
 
   const handlePrint = () => {
@@ -83,10 +84,10 @@ export const KardexView: React.FC<KardexViewProps> = ({
         {/* Material Picker Bar */}
         <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
           <div className="sm:col-span-2">
-            <label className="text-[11px] font-bold text-slate-600 block mb-1">
+            <label htmlFor="kardex-view-1" className="text-[11px] font-bold text-slate-600 block mb-1">
               انتخاب کالا / مصالح جهت مشاهده کاردکس:
             </label>
-            <select
+            <select id="kardex-view-1"
               value={selectedMaterialId}
               onChange={(e) => setSelectedMaterialId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 bg-slate-50/70 font-medium cursor-pointer"
@@ -221,17 +222,17 @@ export const KardexView: React.FC<KardexViewProps> = ({
 
                     {/* In Qty */}
                     <td className="p-3 text-center font-mono font-bold text-emerald-700 bg-emerald-50/20">
-                      {r.inQty > 0 ? r.inQty.toLocaleString('fa-IR') : '—'}
+                      {r.inQty > 0 ? formatDecimal(r.inQty) : '—'}
                     </td>
 
                     {/* Out Qty */}
                     <td className="p-3 text-center font-mono font-bold text-amber-600 bg-amber-50/20">
-                      {r.outQty > 0 ? r.outQty.toLocaleString('fa-IR') : '—'}
+                      {r.outQty > 0 ? formatDecimal(r.outQty) : '—'}
                     </td>
 
                     {/* Balance Qty */}
                     <td className="p-3 text-center font-mono font-black text-slate-900 bg-indigo-50/20">
-                      {r.balanceQty.toLocaleString('fa-IR')}
+                      {formatDecimal(r.balanceQty)}
                     </td>
 
                     <td className="p-3 text-left font-mono text-slate-700">

@@ -6,9 +6,9 @@
 import React, { useMemo, useState } from 'react';
 import { X, ArrowDownLeft, Truck, ShieldCheck } from 'lucide-react';
 import { GoodsReceiptNote, MaterialItem, PurchaseOrder, Warehouse } from '../../types';
-import { ReceiveFromPOLine } from '../../store/workflows';
+import type { ReceiveFromPOLine } from '../../store/workflows';
 import { formatNumber } from '../../utils/formatters';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 
 interface NewGoodsReceiptModalProps {

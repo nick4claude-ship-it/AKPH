@@ -13,8 +13,9 @@ import {
   PETTY_CASH_FUND_LABELS,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { fundRoom, openReplenishRequest } from '../../store/views/pettyCash';
 
 interface ReplenishmentViewProps {
   accounts: PettyCashAccount[];
@@ -44,7 +45,7 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
 
   const open = (fund: PettyCashAccount) => {
     setModalFund(fund);
-    setAmount(String(Math.max(0, fund.ceilingLimit - fund.actualBalance)));
+    setAmount(String(fundRoom(fund)));
     setReason('شارژ نوبتی تنخواه بر اساس مخارج مصوب دوره');
     setError(null);
   };
@@ -89,8 +90,8 @@ export const ReplenishmentView: React.FC<ReplenishmentViewProps> = ({
             {accounts
               .filter((a) => a.status === 'active')
               .map((a) => {
-                const room = Math.max(0, a.ceilingLimit - a.actualBalance);
-                const openReq = requests.find((r) => r.pettyCashId === a.id && r.status === 'در انتظار تأیید مالی');
+                const room = fundRoom(a);
+                const openReq = openReplenishRequest(requests, a.id);
                 return (
                   <tr key={a.id}>
                     <td className="py-2.5 px-3">

@@ -21,6 +21,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../../utils/money';
+import { formatDecimal, barWidth, formatPercent, formatInt } from '../../../utils/formatters';
+import { subcontractProgress, sumSubcontracts } from '../../../store/views/contracts';
 
 interface SubcontractorContractsListViewProps {
   contracts: SubcontractorContract[];
@@ -64,11 +66,8 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
     });
   }, [contracts, searchTerm, selectedProjectId, tradeFilter]);
 
-  const totalContractValue = filteredContracts.reduce((sum, c) => sum + c.contractValue, 0);
-  const totalExecuted = filteredContracts.reduce((sum, c) => sum + c.executedValue, 0);
-  const totalApproved = filteredContracts.reduce((sum, c) => sum + c.approvedStatementsValue, 0);
-  const totalPaid = filteredContracts.reduce((sum, c) => sum + c.paidValue, 0);
-  const totalDebt = filteredContracts.reduce((sum, c) => sum + c.remainingPayableValue, 0);
+  const totals = useMemo(() => sumSubcontracts(filteredContracts), [filteredContracts]);
+  const { contractValue: totalContractValue, executed: totalExecuted, approved: totalApproved, paid: totalPaid, debt: totalDebt } = totals;
 
   return (
     <div className="space-y-6">
@@ -78,7 +77,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-black text-slate-900">فهرست قراردادهای پیمانکاران جزء</h3>
             <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-bold">
-              {filteredContracts.length} قرارداد فعال
+              {formatInt(filteredContracts.length)} قرارداد فعال
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -110,7 +109,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
             {formatMoneyCompact(totalExecuted)}
           </span>
           <span className="text-[10px] text-blue-500 block mt-0.5">
-            {totalContractValue > 0 ? Number(((totalExecuted / totalContractValue) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ پیشرفت
+            {formatPercent(totals.executedPercent)} پیشرفت
           </span>
         </div>
 
@@ -127,7 +126,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
             {formatMoneyCompact(totalPaid)}
           </span>
           <span className="text-[10px] text-emerald-500 block mt-0.5">
-            {totalApproved > 0 ? Number(((totalPaid / totalApproved) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ وصولی
+            {formatPercent(totals.settledPercent)} وصولی
           </span>
         </div>
 
@@ -136,7 +135,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
           <span className="text-base font-black text-rose-700">
             {formatMoneyCompact(totalDebt)}
           </span>
-          <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">بدهی فوری AKPH</span>
+          <span className="text-[10px] text-rose-600 block mt-0.5 font-bold">بدهی فوری شرکت</span>
         </div>
       </div>
 
@@ -189,11 +188,8 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
       {/* Contract Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredContracts.map((contract) => {
-          const execPct = (contract.executedValue / contract.contractValue) * 100;
-          const payPct =
-            contract.approvedStatementsValue > 0
-              ? (contract.paidValue / contract.approvedStatementsValue) * 100
-              : 0;
+          const progress = subcontractProgress(contract);
+          const execPct = progress.executedPercent;
 
           return (
             <div
@@ -256,7 +252,7 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
                   <span className="font-bold text-blue-700">
                     {formatMoneyCompact(contract.executedValue)}
                   </span>
-                  <span className="text-[9px] text-blue-600 block">{Math.round(execPct).toLocaleString('fa-IR')}٪ پیشرفت</span>
+                  <span className="text-[9px] text-blue-600 block">{formatPercent(execPct, 0)} پیشرفت</span>
                 </div>
 
                 <div className="bg-rose-50/60 p-2 rounded-lg border border-rose-200">
@@ -272,19 +268,12 @@ export const SubcontractorContractsListView: React.FC<SubcontractorContractsList
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex border border-slate-200">
                   <div
                     className="bg-emerald-500 h-full"
-                    style={{
-                      width: `${Math.min(100, (contract.paidValue / contract.contractValue) * 100)}%`,
-                    }}
+                    style={{ width: barWidth(progress.paidOfContractPercent) }}
                     title="پرداخت‌شده"
                   />
                   <div
                     className="bg-rose-500 h-full"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (contract.remainingPayableValue / contract.contractValue) * 100
-                      )}%`,
-                    }}
+                    style={{ width: barWidth(progress.unpaidApprovedPercent) }}
                     title="مانده بدهی تاییدشده"
                   />
                 </div>

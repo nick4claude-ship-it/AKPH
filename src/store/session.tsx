@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useCallback, useContext } from 'react';
-import { UserProfile } from '../types';
+import { CompanyProfile, UserProfile } from '../types';
 import type { PortalSession } from '../api/types';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
 
@@ -33,6 +33,34 @@ export function useSession(): SessionValue {
 /** The signed-in user; workflows use it for permission checks and audit trails. */
 export function useCurrentUser(): UserProfile {
   return useSession().session.user;
+}
+
+/** The installation's company, for letterheads, print headers and the footer. */
+export function useCompany(): CompanyProfile {
+  return useSession().session.company;
+}
+
+/**
+ * Text of the banner above every page while demo data is loaded; null with real books.
+ * The public GitHub Pages site (VITE_PAGES=true) states that everything on it is made up.
+ */
+export function useDemoBanner(): string | null {
+  const { isDemoData } = useSession();
+  if (!isDemoData) return null;
+  return import.meta.env.VITE_PAGES === 'true'
+    ? 'نسخه نمایشی — داده ساختگی'
+    : 'نسخه نمایشی — اطلاعات با تازه‌کردن صفحه پاک می‌شود';
+}
+
+/** Sections whose writes the installed server already executes; elsewhere the server data is read-only. */
+const SERVER_BACKED_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications'];
+
+/** Notice for a section that is read-only with the current data source (null when writes work there). */
+export function useReadOnlyNotice(pathname: string): string | null {
+  const { isDemoData } = useSession();
+  if (isDemoData) return null;
+  const backed = SERVER_BACKED_PATHS.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
+  return backed ? null : 'این بخش در نسخه وردپرس فعلاً فقط‌خواندنی است — ثبت و تأیید به‌زودی (نیازمند پیاده‌سازی در سرور).';
 }
 
 /** Permission check bound to the signed-in user, for hiding or disabling actions in the UI. */

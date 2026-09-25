@@ -2,9 +2,9 @@ import React from 'react';
 import { ApprovalItem, DocumentEntityType } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
+import { formatCurrencyCompact, formatNumber, formatDecimal } from '../../utils/formatters';
 import { X, FileText, CheckCircle2, ShieldCheck, Download, Printer } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 
 interface DocumentViewerModalProps {
   item: ApprovalItem | null;
@@ -120,7 +120,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               <div>
                 <p className="font-bold text-slate-900">{attachment ? attachment.fileName : 'سندی به این رکورد پیوست نشده است'}</p>
                 <p className="text-[10px] text-slate-500">
-                  {attachment ? `${attachment.type} · حجم ${attachment.fileSize} · ${docs.length.toLocaleString('fa-IR')} سند در مرکز اسناد` : 'از مرکز اسناد پیوست را بارگذاری و متصل کنید.'}
+                  {attachment ? `${attachment.type} · حجم ${attachment.fileSize} · ${formatDecimal(docs.length)} سند در مرکز اسناد` : 'از مرکز اسناد پیوست را بارگذاری و متصل کنید.'}
                 </p>
               </div>
             </div>

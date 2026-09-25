@@ -195,12 +195,12 @@ export function validateMockReferences(): ReferenceValidationResult {
 
   if (result.valid) {
     console.log(
-      `%c[AKPH Reference Validation] SUCCESS: All ${checks} cross-entity references verified with 0 broken references.`,
+      `%c[Demo data reference validation] SUCCESS: All ${checks} cross-entity references verified with 0 broken references.`,
       'color: #10b981; font-weight: bold;'
     );
   } else {
     console.error(
-      `%c[AKPH Reference Validation] FAILED: ${errors.length} broken references found out of ${checks} checks:`,
+      `%c[Demo data reference validation] FAILED: ${errors.length} broken references found out of ${checks} checks:`,
       'color: #ef4444; font-weight: bold;',
       errors
     );

@@ -80,11 +80,18 @@ export function selectWarehouses(state: AppState): Warehouse[] {
   });
 }
 
+/** Stock of one warehouse: quantity, reserved, free, and value at the weighted average price. */
 export function selectStockByWarehouse(state: AppState, warehouseId: string) {
   return state.stockBalances
     .filter((b) => b.warehouseId === warehouseId)
     .map((b) => ({ ...b, material: state.materials.find((m) => m.id === b.materialId) }))
-    .filter((b) => b.material);
+    .filter((b): b is typeof b & { material: MaterialItem } => !!b.material)
+    .map((b) => ({ ...b, freeQty: b.qty - b.reservedQty, value: Math.round(b.qty * b.material.averageUnitPrice) }));
+}
+
+/** Stock reservations of store issue requests not yet confirmed or released. */
+export function selectActiveReservationCount(state: AppState): number {
+  return state.stockReservations.filter((r) => r.status === 'active').length;
 }
 
 // =============================================================================

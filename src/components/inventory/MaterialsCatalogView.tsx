@@ -23,6 +23,8 @@ import {
   Info,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { formatDecimal } from '../../utils/formatters';
+import { catalogFigures } from '../../store/views/inventory';
 
 interface MaterialsCatalogViewProps {
   materials: MaterialItem[];
@@ -72,9 +74,8 @@ export const MaterialsCatalogView: React.FC<MaterialsCatalogViewProps> = ({
     });
   }, [materials, searchQuery, selectedCategory, stockStatusFilter]);
 
-  const totalCatalogValue = useMemo(() => {
-    return filteredMaterials.reduce((s, m) => s + m.totalStockValue, 0);
-  }, [filteredMaterials]);
+  const catalog = useMemo(() => catalogFigures(filteredMaterials), [filteredMaterials]);
+  const totalCatalogValue = catalog.totalValue;
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
@@ -199,7 +200,7 @@ export const MaterialsCatalogView: React.FC<MaterialsCatalogViewProps> = ({
               {filteredMaterials.map((mat) => {
                 const isUnderSafety = mat.currentStock <= mat.minSafetyStock;
                 const isUnderReorder = mat.currentStock <= mat.reorderLevel;
-                const stockPercentOfMax = Math.min(100, Math.round((mat.currentStock / mat.maxCapacity) * 100));
+                const stockPercentOfMax = catalog.fillPercent(mat);
 
                 return (
                   <tr key={mat.id} className="hover:bg-slate-50/70 transition-colors">
@@ -225,9 +226,9 @@ export const MaterialsCatalogView: React.FC<MaterialsCatalogViewProps> = ({
                     <td className="p-3.5">
                       <div className="flex items-baseline gap-1.5">
                         <span className="font-bold text-slate-900 font-mono text-sm">
-                          {mat.currentStock.toLocaleString('fa-IR')}
+                          {formatDecimal(mat.currentStock)}
                         </span>
-                        <span className="text-[10px] text-slate-400">/ سفارش: {mat.reorderLevel.toLocaleString('fa-IR')}</span>
+                        <span className="text-[10px] text-slate-400">/ سفارش: {formatDecimal(mat.reorderLevel)}</span>
                       </div>
                       {/* Mini Bar */}
                       <div className="w-28 bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">

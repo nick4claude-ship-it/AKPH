@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, AlertCircle, ShoppingCart, Check } from 'lucide-react';
-import { Project, ProcurementCategory, RequisitionPriority, PurchaseRequisition } from '../../types';
-import { Dialog } from '../common/Dialog';
-import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
-import { generateUUID, nextDocNumber } from '../../utils/ids';
-import { getRelativePersianDate, toPersianDate } from '../../utils/date';
-import { useAppState } from '../../store/AppStore';
+import { Project, ProcurementCategory, RequisitionPriority } from '../../types';
+import { Dialog } from '../../ui/Dialog';
+import { formatMoney, moneyUnitLabel, formatInt } from '../../utils/money';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { useCurrentUser } from '../../store/session';
+import { blankRequisitionLine, requisitionEstimate, type RequisitionFormInput, type RequisitionLineInput } from '../../store/views/procurement';
 
 interface NewRequisitionModalProps {
   isOpen: boolean;
   onClose: () => void;
   projects: Project[];
-  onAddRequisition: (req: PurchaseRequisition) => void;
+  onAddRequisition: (form: RequisitionFormInput) => { ok: boolean; message: string };
 }
 
 const CATEGORIES: ProcurementCategory[] = [
@@ -28,31 +26,7 @@ const CATEGORIES: ProcurementCategory[] = [
   'خدمات مهندسی و پیمانکاران دست‌دوم',
 ];
 
-type DraftItem = {
-  id: string;
-  materialCode: string;
-  materialName: string;
-  specification: string;
-  category: ProcurementCategory;
-  requestedQty: number;
-  unit: string;
-  estimatedUnitPrice: number;
-  requiredDeliveryDate: string;
-  suggestedVendors?: string;
-};
-
-const emptyItem = (): DraftItem => ({
-  id: generateUUID(),
-  materialCode: '',
-  materialName: '',
-  specification: '',
-  category: 'آهن‌آلات و مقاطع فولادی',
-  requestedQty: 0,
-  unit: 'کیلوگرم',
-  estimatedUnitPrice: 0,
-  requiredDeliveryDate: getRelativePersianDate(14),
-  suggestedVendors: '',
-});
+type DraftItem = RequisitionLineInput;
 
 export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
   isOpen,
@@ -61,17 +35,16 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
   onAddRequisition,
 }) => {
   const currentUser = useCurrentUser();
-  const existingNumbers = useAppState().purchaseRequisitions.map((r) => r.requisitionNumber);
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [priority, setPriority] = useState<RequisitionPriority>('عادی');
   const [costCenter, setCostCenter] = useState('');
   const [justification, setJustification] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [items, setItems] = useState<DraftItem[]>(() => [emptyItem()]);
+  const [items, setItems] = useState<DraftItem[]>(() => [blankRequisitionLine()]);
 
   if (!isOpen) return null;
 
-  const handleAddItem = () => setItems((prev) => [...prev, emptyItem()]);
+  const handleAddItem = () => setItems((prev) => [...prev, blankRequisitionLine()]);
 
   const handleRemoveItem = (id: string) => {
     if (items.length <= 1) return;
@@ -82,50 +55,14 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
   };
 
-  const totalAmount = items.reduce((acc, it) => acc + it.requestedQty * it.estimatedUnitPrice, 0);
+  const totalAmount = requisitionEstimate(items);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedProj = projects.find((p) => p.id === projectId);
-    if (!selectedProj) return setFormError('پروژه را انتخاب کنید.');
-    if (items.some((it) => !it.materialName.trim())) return setFormError('نام کالای هر ردیف را وارد کنید.');
-    if (items.some((it) => it.requestedQty <= 0)) return setFormError('مقدار هر ردیف باید بیش از صفر باشد.');
+    // The requester is the signed-in user; the workflow numbers the request and checks the lines.
+    const result = onAddRequisition({ projectId, priority, costCenter, justification, items });
+    if (!result.ok) return setFormError(result.message);
     setFormError(null);
-
-    // The requester is the signed-in user; no approval is pre-filled (nobody approves their own request).
-    const newReq: PurchaseRequisition = {
-      id: generateUUID(),
-      requisitionNumber: nextDocNumber(existingNumbers, 'PR'),
-      date: toPersianDate(new Date()),
-      projectId,
-      projectName: selectedProj.name,
-      wbsCode: costCenter.trim(),
-      costCenter: costCenter.trim(),
-      priority,
-      status: 'پیش‌نویس کارگاه',
-      requesterName: currentUser.name,
-      requesterId: currentUser.id,
-      requesterRole: currentUser.role,
-      justification: justification.trim(),
-      totalEstimatedAmount: totalAmount,
-      approvals: {},
-      items: items.map((it) => ({
-        id: it.id,
-        materialCode: it.materialCode,
-        materialName: it.materialName.trim(),
-        specification: it.specification,
-        category: it.category,
-        requestedQty: it.requestedQty,
-        approvedQty: it.requestedQty,
-        unit: it.unit,
-        estimatedUnitPrice: it.estimatedUnitPrice,
-        estimatedTotalPrice: it.requestedQty * it.estimatedUnitPrice,
-        requiredDeliveryDate: it.requiredDeliveryDate,
-        suggestedVendors: it.suggestedVendors ? [it.suggestedVendors] : [],
-      })),
-    };
-
-    onAddRequisition(newReq);
     onClose();
   };
 
@@ -156,8 +93,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
           {/* Project & Priority Meta */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">پروژه متقاضی:</label>
-              <select
+              <label htmlFor="new-requisition-modal-1" className="block font-bold text-slate-700 mb-1">پروژه متقاضی:</label>
+              <select id="new-requisition-modal-1"
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
@@ -169,8 +106,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">سطح فوریت سفارش:</label>
-              <select
+              <label htmlFor="new-requisition-modal-2" className="block font-bold text-slate-700 mb-1">سطح فوریت سفارش:</label>
+              <select id="new-requisition-modal-2"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as RequisitionPriority)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
@@ -183,8 +120,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">کد ساختار شکست (WBS) / مرکز هزینه:</label>
-              <input
+              <label htmlFor="new-requisition-modal-3" className="block font-bold text-slate-700 mb-1">کد ساختار شکست (WBS) / مرکز هزینه:</label>
+              <input id="new-requisition-modal-3"
                 type="text"
                 value={costCenter}
                 onChange={(e) => setCostCenter(e.target.value)}
@@ -197,8 +134,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">نام درخواست‌کننده:</label>
-              <input
+              <label htmlFor="new-requisition-modal-4" className="block font-bold text-slate-700 mb-1">نام درخواست‌کننده:</label>
+              <input id="new-requisition-modal-4"
                 type="text"
                 value={currentUser.name}
                 readOnly
@@ -206,8 +143,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">سمت در کارگاه:</label>
-              <input
+              <label htmlFor="new-requisition-modal-5" className="block font-bold text-slate-700 mb-1">سمت در کارگاه:</label>
+              <input id="new-requisition-modal-5"
                 type="text"
                 value={currentUser.role}
                 readOnly
@@ -219,7 +156,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
           {/* Items Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-sm">اقلام درخواستی ({items.length} ردیف):</span>
+              <span className="font-bold text-slate-800 text-sm">اقلام درخواستی ({formatInt(items.length)} ردیف):</span>
               <button
                 type="button"
                 onClick={handleAddItem}
@@ -248,8 +185,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div className="md:col-span-2">
-                      <label className="block text-[11px] text-slate-600 mb-1">نام دقیق کالا / متریال:</label>
-                      <input
+                      <label htmlFor="new-requisition-modal-6" className="block text-[11px] text-slate-600 mb-1">نام دقیق کالا / متریال:</label>
+                      <input id="new-requisition-modal-6"
                         type="text"
                         value={item.materialName}
                         onChange={(e) => handleUpdateItem(item.id, 'materialName', e.target.value)}
@@ -259,8 +196,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">رسته کالا:</label>
-                      <select
+                      <label htmlFor="new-requisition-modal-7" className="block text-[11px] text-slate-600 mb-1">رسته کالا:</label>
+                      <select id="new-requisition-modal-7"
                         value={item.category}
                         onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value as ProcurementCategory)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
@@ -274,8 +211,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">مقدار درخواستی:</label>
-                      <IntegerInput
+                      <label htmlFor="new-requisition-modal-8" className="block text-[11px] text-slate-600 mb-1">مقدار درخواستی:</label>
+                      <IntegerInput id="new-requisition-modal-8"
                         value={item.requestedQty}
                         onValueChange={(v) => handleUpdateItem(item.id, 'requestedQty', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-indigo-500 outline-hidden"
@@ -283,8 +220,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">واحد سنجش:</label>
-                      <input
+                      <label htmlFor="new-requisition-modal-9" className="block text-[11px] text-slate-600 mb-1">واحد سنجش:</label>
+                      <input id="new-requisition-modal-9"
                         type="text"
                         value={item.unit}
                         onChange={(e) => handleUpdateItem(item.id, 'unit', e.target.value)}
@@ -294,8 +231,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">برآورد نرخ فی ({moneyUnitLabel()}):</label>
-                      <MoneyInput
+                      <label htmlFor="new-requisition-modal-10" className="block text-[11px] text-slate-600 mb-1">برآورد نرخ فی ({moneyUnitLabel()}):</label>
+                      <MoneyInput id="new-requisition-modal-10"
                         value={item.estimatedUnitPrice}
                         onValueChange={(v) => handleUpdateItem(item.id, 'estimatedUnitPrice', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
@@ -303,8 +240,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">تاریخ نیاز پای کار:</label>
-                      <input
+                      <label htmlFor="new-requisition-modal-11" className="block text-[11px] text-slate-600 mb-1">تاریخ نیاز پای کار:</label>
+                      <input id="new-requisition-modal-11"
                         type="text"
                         value={item.requiredDeliveryDate}
                         onChange={(e) => handleUpdateItem(item.id, 'requiredDeliveryDate', e.target.value)}
@@ -316,8 +253,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-slate-600 mb-1">مشخصات فنی و استاندارد مورد نیاز:</label>
-                    <input
+                    <label htmlFor="new-requisition-modal-12" className="block text-[11px] text-slate-600 mb-1">مشخصات فنی و استاندارد مورد نیاز:</label>
+                    <input id="new-requisition-modal-12"
                       type="text"
                       value={item.specification}
                       onChange={(e) => handleUpdateItem(item.id, 'specification', e.target.value)}
@@ -332,8 +269,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
 
           {/* Justification Note */}
           <div>
-            <label className="block font-bold text-slate-700 mb-1">دلیل و توجیه نیاز به خرید:</label>
-            <textarea
+            <label htmlFor="new-requisition-modal-13" className="block font-bold text-slate-700 mb-1">دلیل و توجیه نیاز به خرید:</label>
+            <textarea id="new-requisition-modal-13"
               rows={2}
               value={justification}
               onChange={(e) => setJustification(e.target.value)}

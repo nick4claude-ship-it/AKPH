@@ -73,7 +73,7 @@ export const ChartOfAccountsView: React.FC<ChartOfAccountsViewProps> = ({ chart,
           className={`flex items-center justify-between py-2 px-3 hover:bg-slate-50 border-b border-slate-100 transition-colors cursor-pointer text-xs ${
             depth === 0 ? 'bg-slate-50/80 font-bold text-slate-900' : 'text-slate-800'
           }`}
-          style={{ paddingRight: `${Math.max(12, depth * 24 + 12)}px` }}
+          style={{ paddingRight: `${depth * 24 + 12}px` }}
         >
           <div className="flex items-center gap-2">
             {hasChildren ? (

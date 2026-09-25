@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Project } from '../../types';
-import { formatMoney, formatPercent, moneyUnitLabel } from '../../utils/formatters';
-import { useAppState } from '../../store/AppStore';
-import { postedEntries, selectProjectFinancials } from '../../store/selectors';
+import { barWidth, formatMoney, formatPercent, moneyUnitLabel } from '../../utils/formatters';
+import { useSelector } from '../../store/AppStore';
+import { selectExpenseRows, selectRevenueRows } from '../../store/views/accounting';
 
 interface RevenuesAndExpensesViewProps {
   type: 'revenues' | 'expenses';
@@ -13,52 +13,15 @@ interface RevenuesAndExpensesViewProps {
 
 /** Revenue and expense analysis computed only from final journal entries (no manual figures). */
 export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = ({ type, projects, onOpenNewDocForExpense }) => {
-  const state = useAppState();
   const unit = moneyUnitLabel();
 
-  const accountTotals = useMemo(() => {
-    const map = new Map<string, { name: string; amount: number }>();
-    for (const e of postedEntries(state)) {
-      for (const r of e.rows) {
-        if (!/^[456]/.test(r.accountCode)) continue;
-        const cur = map.get(r.accountCode) || { name: r.accountName, amount: 0 };
-        map.set(r.accountCode, { name: cur.name, amount: cur.amount + r.debit - r.credit });
-      }
-    }
-    return map;
-  }, [state]);
-
-  const revenueRows = useMemo(
-    () =>
-      projects.map((p) => {
-        let contractRevenue = 0;
-        let otherRevenue = 0;
-        for (const e of postedEntries(state)) {
-          for (const r of e.rows) {
-            if (r.projectId !== p.id || !r.accountCode.startsWith('4')) continue;
-            const amount = r.credit - r.debit;
-            if (r.accountCode === '41101') contractRevenue += amount;
-            else otherRevenue += amount;
-          }
-        }
-        const receivedCash = state.receipts.filter((x) => x.projectId === p.id).reduce((a, x) => a + x.amount, 0);
-        return {
-          id: p.id,
-          project: p.name,
-          client: p.client,
-          contractRevenue,
-          otherRevenue,
-          totalRevenue: contractRevenue + otherRevenue,
-          receivedCash,
-          receivables: selectProjectFinancials(state, p.id).receivables,
-        };
-      }),
-    [projects, state]
-  );
+  // Revenue per project and expense accounts, from final entries only (store view models).
+  const revenue = useSelector((s) => selectRevenueRows(s, projects), [projects]);
+  const expenses = useSelector(selectExpenseRows);
+  const revenueRows = revenue.rows;
 
   if (type === 'revenues') {
-    const totalContract = revenueRows.reduce((s, r) => s + r.contractRevenue, 0);
-    const totalOther = revenueRows.reduce((s, r) => s + r.otherRevenue, 0);
+    const { totalContract, totalOther } = revenue;
     return (
       <div className="space-y-4 animate-in fade-in duration-150">
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-900">
@@ -124,14 +87,7 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
     );
   }
 
-  const expenseRows = [...accountTotals]
-    .filter(([code, v]) => /^[56]/.test(code) && v.amount !== 0)
-    .map(([code, v]) => ({ code, name: v.name, amount: v.amount, direct: code.startsWith('5') }))
-    .sort((a, b) => b.amount - a.amount);
-  const totalDirect = expenseRows.filter((r) => r.direct).reduce((a, r) => a + r.amount, 0);
-  const totalOverhead = expenseRows.filter((r) => !r.direct).reduce((a, r) => a + r.amount, 0);
-  const total = totalDirect + totalOverhead;
-  const share = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+  const { rows: expenseRows, totalDirect, totalOverhead, total } = expenses;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
@@ -151,12 +107,12 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-[11px] font-sans text-slate-500 block mb-1">هزینه‌های مستقیم پروژه</span>
           <strong className="text-base text-slate-900">{formatMoney(totalDirect)}</strong>
-          <span className="text-[10px] font-sans text-slate-400 block mt-1">{formatPercent(share(totalDirect))} از کل</span>
+          <span className="text-[10px] font-sans text-slate-400 block mt-1">{formatPercent(expenses.directShare)} از کل</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-[11px] font-sans text-slate-500 block mb-1">سربار، عمومی و اداری</span>
           <strong className="text-base text-slate-800">{formatMoney(totalOverhead)}</strong>
-          <span className="text-[10px] font-sans text-slate-400 block mt-1">{formatPercent(share(totalOverhead))} از کل</span>
+          <span className="text-[10px] font-sans text-slate-400 block mt-1">{formatPercent(expenses.overheadShare)} از کل</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-[11px] font-sans text-slate-500 block mb-1">جمع هزینه‌های ثبت‌شده</span>
@@ -192,10 +148,10 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-left tabular-nums font-bold text-slate-900">{formatMoney(row.amount, false)}</td>
-                  <td className="py-2.5 px-3 text-left tabular-nums text-slate-600">{formatPercent(share(row.amount))}</td>
+                  <td className="py-2.5 px-3 text-left tabular-nums text-slate-600">{formatPercent(row.share)}</td>
                   <td className="py-2.5 px-4">
                     <div className="w-32 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, share(row.amount))}%` }} />
+                      <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: barWidth(row.share) }} />
                     </div>
                   </td>
                 </tr>

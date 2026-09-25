@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { JournalEntry } from '../../types';
+import type { CompanyProfile, JournalEntry } from '../../types';
 import type { AppState } from '../../store/types';
 import { emptyState } from '../../store/state';
 import { getCurrentFiscalYear } from '../../utils/date';
@@ -32,6 +32,12 @@ const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
     throw err;
   }
 };
+
+/** The installation's company: the WordPress site title the plugin passes in window.PaydarPortal.siteName. */
+function siteCompany(): CompanyProfile {
+  const name = window.PaydarPortal?.siteName?.trim() || 'پرتال مدیریت پیمانکاری';
+  return { name, legalName: name };
+}
 
 function entryResult(raw: unknown, message: (e: JournalEntry) => string): CommandResult {
   const entry = parseEntry(raw);
@@ -101,6 +107,7 @@ export function createWordPressDataSource(): DataSource {
         user: me.user,
         currency: settings?.currency || me.currency || (window.PaydarPortal?.accounting?.currency === 'rial' ? 'rial' : 'toman'),
         fiscalYear: settings?.fiscalYear || me.fiscalYear || window.PaydarPortal?.accounting?.fiscalYear || getCurrentFiscalYear(),
+        company: siteCompany(),
       };
       return session;
     },

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Landmark,
   Wallet,
@@ -26,9 +26,10 @@ import {
   AccountsReceivableItem,
   AccountsPayableItem,
 } from '../../types';
-import { formatCurrencyCompact, formatInt, formatPercent } from '../../utils/formatters';
+import { formatCurrencyCompact, formatInt, formatPercent, barWidth } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
 import type { Balances, CashFlowPoint } from '../../store/selectors';
+import { selectAccountingDashboard } from '../../store/views/accounting';
 
 interface AccountingDashboardViewProps {
   bankAccounts: BankAccount[];
@@ -64,28 +65,27 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
   onNavigateToTab,
 }) => {
   // Every figure below comes from the store: balances, the ledger and the aging lists.
-  const totalBankBalance = bankAccounts.reduce((sum, b) => sum + b.balance, 0);
-  const totalCashBalance = cashDesks.reduce((sum, c) => sum + c.balance, 0);
-  const totalPettyCash = pettyCashTotal;
-  const totalLiquidity = totalBankBalance + totalCashBalance + totalPettyCash;
-
-  const totalReceipts = receipts.reduce((sum, r) => sum + r.amount, 0);
-  const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
-
-  const totalReceivables = receivables.reduce((sum, r) => sum + r.remainingClaim, 0);
-  const totalPayables = payables.reduce((sum, p) => sum + p.remainingDebt, 0);
-
-  const pendingDocsCount = journalEntries.filter((j) => j.status === 'در انتظار تأیید').length;
-
-  const periodRevenue = ledger.revenue;
-  const periodExpense = ledger.cost;
-  const periodProfit = periodRevenue - periodExpense;
-  const profitMargin = periodRevenue > 0 ? (periodProfit / periodRevenue) * 100 : 0;
-  const pct = (part: number) => (periodRevenue > 0 ? Math.max(0, Math.min(100, (part / periodRevenue) * 100)) : 0);
-
-  const cashFlowData = cashFlow;
-  const maxCashFlow = Math.max(1, ...cashFlowData.flatMap((d) => [d.receipt, d.payment]));
-  const netCashFlow = cashFlowData.reduce((a, d) => a + d.receipt - d.payment, 0);
+  const dash = useMemo(
+    () => selectAccountingDashboard({ bankAccounts, cashDesks, receipts, payments, receivables, payables, journalEntries, pettyCashTotal, ledger, cashFlow }),
+    [bankAccounts, cashDesks, receipts, payments, receivables, payables, journalEntries, pettyCashTotal, ledger, cashFlow]
+  );
+  const {
+    totalBankBalance,
+    totalCashBalance,
+    totalPettyCash,
+    totalLiquidity,
+    totalReceipts,
+    totalPayments,
+    totalReceivables,
+    totalPayables,
+    pendingDocsCount,
+    periodRevenue,
+    periodExpense,
+    periodProfit,
+    profitMargin,
+    netCashFlow,
+  } = dash;
+  const cashFlowData = dash.cashFlowBars;
 
   const kpis: { title: string; value: number; subtitle: string; icon: typeof Wallet; color: string; actionTab: AccountingSubTab; isCount?: boolean }[] = [
     {
@@ -284,8 +284,8 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
           {/* SVG Multi-Bar Visualization */}
           <div className="h-56 w-full pt-4 flex items-end justify-between gap-3 px-2 border-b border-slate-200 font-mono text-xs">
             {cashFlowData.map((d) => {
-              const recHeight = (d.receipt / maxCashFlow) * 100;
-              const payHeight = (d.payment / maxCashFlow) * 100;
+              const recHeight = d.receiptPercent;
+              const payHeight = d.paymentPercent;
 
               return (
                 <div key={d.period} className="flex-1 flex flex-col items-center justify-end h-full group">
@@ -348,7 +348,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
                     className="bg-slate-700 h-2.5 rounded-full"
-                    style={{ width: `${pct(periodExpense)}%` }}
+                    style={{ width: barWidth(dash.expenseOfRevenuePercent) }}
                   />
                 </div>
               </div>
@@ -361,7 +361,7 @@ export const AccountingDashboardView: React.FC<AccountingDashboardViewProps> = (
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
                     className="bg-amber-500 h-2.5 rounded-full"
-                    style={{ width: `${pct(periodProfit)}%` }}
+                    style={{ width: barWidth(dash.profitOfRevenuePercent) }}
                   />
                 </div>
               </div>

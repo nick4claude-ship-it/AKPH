@@ -140,6 +140,7 @@ function akph_portal_render_app() {
     $config = array(
         'displayName' => $user->display_name,
         'userId'      => $user->ID,
+        'siteName'    => get_bloginfo('name'),
     );
     if (akph_portal_mode() === 'paydar') {
         // The app reads everything else (role, projects, currency) from GET /me of the paydar-portal plugin.

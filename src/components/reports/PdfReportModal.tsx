@@ -4,8 +4,10 @@ import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/
 import { toPersianDate, getCurrentFiscalYear } from '../../utils/date';
 import { X, Printer, Download, Building2, CheckCircle2 } from 'lucide-react';
 import { companyLogo } from '../../assets/images';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { moneyUnitLabel } from '../../utils/money';
+import { useCompany } from '../../store/session';
+import { reportProjectTotals } from '../../store/views/reports';
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -26,6 +28,7 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
   statements: _statements,
   targetProject,
 }) => {
+  const company = useCompany();
   if (!isOpen) return null;
 
   const handlePrint = () => {
@@ -33,10 +36,8 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
   };
 
   const selectedProjects = targetProject ? [targetProject] : projects;
-  const totalRevenue = selectedProjects.reduce((sum, p) => sum + p.recordedRevenue, 0);
-  const totalCost = selectedProjects.reduce((sum, p) => sum + p.cost, 0);
-  const totalProfit = selectedProjects.reduce((sum, p) => sum + p.profit, 0);
-  const totalReceivables = selectedProjects.reduce((sum, p) => sum + p.receivables, 0);
+  const totals = reportProjectTotals(selectedProjects);
+  const { revenue: totalRevenue, cost: totalCost, profit: totalProfit, receivables: totalReceivables } = totals;
 
   return (
     <Dialog onClose={onClose} label="خلاصه شاخص‌های کلیدی مالی شرکت (Executive KPIs)" overlayClassName="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl my-auto overflow-hidden animate-in fade-in duration-200">
@@ -80,10 +81,10 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
               </div>
               <div>
                 <h1 className="text-base font-extrabold text-slate-900">
-                  شرکت مهندسی و پیمانکاری سازه گستران پارس
+                  {company.legalName}
                 </h1>
                 <p className="text-xs text-slate-600">
-                  سهامی خاص · شماره ثبت: ۴۹۲۱۸۴ · سامانه یکپارچه مدیریت مالی پروژه‌ها
+                  {company.registrationNumber ? `شماره ثبت: ${company.registrationNumber} · ` : ''}سامانه یکپارچه مدیریت مالی پروژه‌ها
                 </p>
                 <p className="text-[11px] text-amber-700 font-bold mt-0.5">
                   گزارش رسمی پایش عملکرد مالی و سودآوری پروژه‌های EPC
@@ -182,12 +183,12 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
                 {/* Total Summary Row */}
                 <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
                   <td colSpan={2} className="p-2 border-l border-slate-200 font-sans text-right">جمع کل:</td>
-                  <td className="p-2 border-l border-slate-200 text-left">{formatCurrencyCompact(selectedProjects.reduce((a, b) => a + b.contractAmount, 0))}</td>
+                  <td className="p-2 border-l border-slate-200 text-left">{formatCurrencyCompact(totals.contractAmount)}</td>
                   <td className="p-2 border-l border-slate-200 text-left text-emerald-800">{formatCurrencyCompact(totalRevenue)}</td>
                   <td className="p-2 border-l border-slate-200 text-left">{formatCurrencyCompact(totalCost)}</td>
                   <td className="p-2 border-l border-slate-200 text-left text-amber-700">{formatCurrencyCompact(totalProfit)}</td>
                   <td className="p-2 border-l border-slate-200 text-center font-sans">
-                    {formatPercent((totalProfit / totalRevenue) * 100)}
+                    {formatPercent(totals.margin)}
                   </td>
                   <td className="p-2 border-l border-slate-200 text-left text-rose-700">{formatCurrencyCompact(totalReceivables)}</td>
                   <td className="p-2 text-center font-sans">-</td>

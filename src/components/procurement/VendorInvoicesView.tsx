@@ -15,7 +15,7 @@ import {
   Calculator,
 } from 'lucide-react';
 import { VendorInvoice, Project } from '../../types';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 import { formatPercent } from '../../utils/formatters';
 

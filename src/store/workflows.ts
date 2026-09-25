@@ -59,6 +59,7 @@ import {
   vendorInvoiceContext,
 } from './approvalContext';
 import { ACCOUNTS } from './postingRules';
+import { fail, guard, historyEntry, now, ok, today, type WorkflowEnv, type WorkflowResult } from './workflowKit';
 import { dayIndex, getCurrentFiscalYear, jalaliYearEnd, toPersianDate, toPersianTime } from '../utils/date';
 
 /**
@@ -66,33 +67,10 @@ import { dayIndex, getCurrentFiscalYear, jalaliYearEnd, toPersianDate, toPersian
  * ماژول مالک و مرکز تأییدات هر دو همین توابع را صدا می‌زنند تا رکورد در ماژول خودش باقی بماند.
  */
 
-export interface WorkflowEnv {
-  getState: () => AppState;
-  set: <K extends SliceKey>(key: K, updater: SliceUpdater<K>) => void;
-  /** Posts a financial event as env.user (the engine checks that user's permission). */
-  post: (input: FinancialEventInput, options?: { submitter?: string }) => PostingResult;
-  user: UserProfile;
-}
+export type { WorkflowEnv, WorkflowResult } from './workflowKit';
 
-export interface WorkflowResult {
-  ok: boolean;
-  message: string;
-  docNumber?: string;
-  id?: string;
-}
-
-const ok = (message: string, extra: Partial<WorkflowResult> = {}): WorkflowResult => ({ ok: true, message, ...extra });
-const fail = (message: string): WorkflowResult => ({ ok: false, message });
 const fa = (n: number) => formatInt(n);
 const money = (rial: number) => formatMoney(rial);
-const today = () => toPersianDate(new Date());
-const now = () => toPersianTime(new Date());
-
-/** Every state-changing workflow starts here: can(user, action) with separation of duties. */
-function guard(env: WorkflowEnv, action: UserAction, context?: ActionContext): WorkflowResult | null {
-  const check = checkPermission(env.user, action, context);
-  return check.ok ? null : fail(check.reason || 'اجازه این عملیات را ندارید.');
-}
 
 type PettyCashSettingsChain = PettyCashSettings['approvalChains'][PettyCashApprovalLevel];
 
@@ -157,10 +135,6 @@ export const CLIENT_STATEMENT_APPROVAL_STATUSES: StatementWorkflowStatus[] = [
   'approved_by_consultant',
   'submitted_to_employer',
 ];
-
-function historyEntry<S extends string>(env: WorkflowEnv, from: S, to: S, action: string, comment?: string, stepAction?: UserAction) {
-  return { date: today(), time: now(), user: env.user.name, userId: env.user.id, stepAction, role: env.user.role, fromStatus: from, toStatus: to, action, comment };
-}
 
 /** The creator of a statement is the signed-in user, whatever the form put in the first history row. */
 function stampCreator<T extends { workflowHistory: { user: string; userId?: string; role: string }[] }>(env: WorkflowEnv, record: T): T {

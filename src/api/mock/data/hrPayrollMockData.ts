@@ -1,19 +1,10 @@
-const isDev = (): boolean => {
-  try {
-    return typeof import.meta !== 'undefined' && import.meta.env
-      ? Boolean(import.meta.env.DEV)
-      : true;
-  } catch {
-    return true;
-  }
-};
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import type { Employee, MonthlyTimesheet, PayrollSlip } from '../../../types';
+import { demoDataEnabled } from '../demoFlag';
 
 
 
@@ -25,10 +16,10 @@ const rawEmployees: Employee[] = [
     firstName: 'محمدرضا',
     lastName: 'رادمنش',
     fullName: 'مهندس محمدرضا رادمنش',
-    nationalCode: '۰۰۶۲۹۱۸۴۷۱',
+    nationalCode: '۰۰۰۰۰۰۰۰۸۷',
     birthDate: '۱۳۵۲/۰۴/۱۵',
-    phone: '۰۹۱۲۱۱۱۰۰۹۹',
-    email: 'm.radmanesh@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۱۶',
+    email: 'm.radmanesh@example.com',
     role: 'مدیرعامل و عضو هیئت مدیره',
     department: 'مدیریت و کنترل پروژه',
     assignedProjectId: 'all',
@@ -45,10 +36,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'متاهل',
     bankAccount: {
       bankName: 'بانک ملت',
-      shebaNumber: 'IR890120000000003891048102',
-      accountNumber: '3891048102',
+      shebaNumber: 'IR000120000000000000000027',
+      accountNumber: '0000000027',
     },
-    insuranceNumber: '48291039',
+    insuranceNumber: '00000001',
     status: 'فعال',
   },
   {
@@ -57,10 +48,10 @@ const rawEmployees: Employee[] = [
     firstName: 'هادی',
     lastName: 'صمدیان',
     fullName: 'دکتر هادی صمدیان',
-    nationalCode: '۰۰۷۱۸۲۹۳۸۱',
+    nationalCode: '۰۰۰۰۰۰۰۰۹۵',
     birthDate: '۱۳۵۸/۰۸/۲۲',
-    phone: '۰۹۱۲۲۲۲۹۹۳۳',
-    email: 'h.samadian@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۱۷',
+    email: 'h.samadian@example.com',
     role: 'مدیر مالی و اداری',
     department: 'مالی و اداری',
     assignedProjectId: 'all',
@@ -77,10 +68,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'متاهل',
     bankAccount: {
       bankName: 'بانک تجارت',
-      shebaNumber: 'IR450180000000004928103948',
-      accountNumber: '4928103948',
+      shebaNumber: 'IR000180000000000000000028',
+      accountNumber: '0000000028',
     },
-    insuranceNumber: '59281029',
+    insuranceNumber: '00000002',
     status: 'فعال',
   },
   {
@@ -89,10 +80,10 @@ const rawEmployees: Employee[] = [
     firstName: 'کیارش',
     lastName: 'نادری',
     fullName: 'مهندس کیارش نادری',
-    nationalCode: '۰۰۵۳۹۱۸۲۷۳',
+    nationalCode: '۰۰۰۰۰۰۰۱۰۹',
     birthDate: '۱۳۶۳/۱۱/۱۰',
-    phone: '۰۹۱۲۳۳۳۴۴۵۵',
-    email: 'k.naderi@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۱۸',
+    email: 'k.naderi@example.com',
     role: 'مدیر پروژه برج رونیکا',
     department: 'فنی و مهندسی',
     assignedProjectId: 'prj-101',
@@ -109,10 +100,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'متاهل',
     bankAccount: {
       bankName: 'بانک صادرات',
-      shebaNumber: 'IR320190000000001928471029',
-      accountNumber: '1928471029',
+      shebaNumber: 'IR000190000000000000000029',
+      accountNumber: '0000000029',
     },
-    insuranceNumber: '68291034',
+    insuranceNumber: '00000003',
     status: 'فعال',
   },
   {
@@ -121,10 +112,10 @@ const rawEmployees: Employee[] = [
     firstName: 'بهمن',
     lastName: 'کاظمی',
     fullName: 'مهندس بهمن کاظمی',
-    nationalCode: '۰۳۸۱۷۲۹۳۸۱',
+    nationalCode: '۰۰۰۰۰۰۰۱۱۷',
     birthDate: '۱۳۶۵/۰۲/۰۵',
-    phone: '۰۹۱۲۵۵۵۶۶۷۷',
-    email: 'b.kazemi@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۱۹',
+    email: 'b.kazemi@example.com',
     role: 'مدیر پروژه تقاطع بزرگراه فجر',
     department: 'اجرایی کارگاه',
     assignedProjectId: 'prj-102',
@@ -141,10 +132,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'متاهل',
     bankAccount: {
       bankName: 'بانک ملی',
-      shebaNumber: 'IR170170000000004928193847',
-      accountNumber: '4928193847',
+      shebaNumber: 'IR000170000000000000000030',
+      accountNumber: '0000000030',
     },
-    insuranceNumber: '79182930',
+    insuranceNumber: '00000004',
     status: 'فعال',
   },
   {
@@ -153,10 +144,10 @@ const rawEmployees: Employee[] = [
     firstName: 'وحید',
     lastName: 'اکبری',
     fullName: 'مهندس وحید اکبری',
-    nationalCode: '۰۴۵۲۹۱۸۲۷۴',
+    nationalCode: '۰۰۰۰۰۰۰۱۲۵',
     birthDate: '۱۳۶۹/۰۶/۱۸',
-    phone: '۰۹۱۲۷۷۷۸۸۹۹',
-    email: 'v.akbari@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۲۰',
+    email: 'v.akbari@example.com',
     role: 'سرپرست کارگاه و تنخواه‌دار رونیکا',
     department: 'اجرایی کارگاه',
     assignedProjectId: 'prj-101',
@@ -173,10 +164,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'مجرد',
     bankAccount: {
       bankName: 'بانک سپه',
-      shebaNumber: 'IR560150000000009182736451',
-      accountNumber: '9182736451',
+      shebaNumber: 'IR000150000000000000000031',
+      accountNumber: '0000000031',
     },
-    insuranceNumber: '89102834',
+    insuranceNumber: '00000005',
     status: 'فعال',
   },
   {
@@ -185,10 +176,10 @@ const rawEmployees: Employee[] = [
     firstName: 'سعید',
     lastName: 'طاهری',
     fullName: 'مهندس سعید طاهری',
-    nationalCode: '۰۰۳۲۹۱۸۲۷۴',
+    nationalCode: '۰۰۰۰۰۰۰۱۳۳',
     birthDate: '۱۳۷۰/۰۱/۳۰',
-    phone: '۰۹۱۲۸۸۸۹۹۰۰',
-    email: 's.taheri@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۲۱',
+    email: 's.taheri@example.com',
     role: 'سرپرست کارگاه ایستگاه گاز البرز',
     department: 'اجرایی کارگاه',
     assignedProjectId: 'prj-104',
@@ -205,10 +196,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'متاهل',
     bankAccount: {
       bankName: 'بانک ملت',
-      shebaNumber: 'IR890120000000008492019384',
-      accountNumber: '8492019384',
+      shebaNumber: 'IR000120000000000000000032',
+      accountNumber: '0000000032',
     },
-    insuranceNumber: '90192847',
+    insuranceNumber: '00000006',
     status: 'فعال',
   },
   {
@@ -217,10 +208,10 @@ const rawEmployees: Employee[] = [
     firstName: 'مهران',
     lastName: 'پورحسینی',
     fullName: 'مهندس مهران پورحسینی',
-    nationalCode: '۰۳۲۱۹۲۸۴۷۱',
+    nationalCode: '۰۰۰۰۰۰۰۱۴۱',
     birthDate: '۱۳۶۶/۰۹/۱۲',
-    phone: '۰۹۱۲۴۴۴۱۱۲۲',
-    email: 'm.pourhosseini@pars-structures.ir',
+    phone: '۰۹۱۲۰۰۰۰۰۲۲',
+    email: 'm.pourhosseini@example.com',
     role: 'سرپرست کارگاه مجتمع نیلوفر',
     department: 'اجرایی کارگاه',
     assignedProjectId: 'prj-103',
@@ -237,10 +228,10 @@ const rawEmployees: Employee[] = [
     maritalStatus: 'متاهل',
     bankAccount: {
       bankName: 'بانک پاسارگاد',
-      shebaNumber: 'IR720540000000003849102948',
-      accountNumber: '3849102948',
+      shebaNumber: 'IR000540000000000000000033',
+      accountNumber: '0000000033',
     },
-    insuranceNumber: '81920394',
+    insuranceNumber: '00000007',
     status: 'فعال',
   },
 ];
@@ -505,4 +496,4 @@ export const mockPayrollSlips: PayrollSlip[] = [
   },
 ];
 
-export const mockEmployees: Employee[] = isDev() ? rawEmployees : [];
+export const mockEmployees: Employee[] = demoDataEnabled() ? rawEmployees : [];

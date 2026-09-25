@@ -14,12 +14,13 @@ import {
   Project,
   UserProfile,
 } from '../../types';
-import { usePermission } from '../../store/session';
 
 import { InventoryDashboard } from './InventoryDashboard';
-import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { selectMaterials, selectWarehouses, selectStockByWarehouse } from '../../store/domainSelectors';
+import { selectActiveReservationCount, selectMaterials, selectWarehouses, selectStockByWarehouse } from '../../store/domainSelectors';
+import type { StoreIssueFormInput, TransferFormInput } from '../../store/views/inventory';
+import type { NewMaterialInput } from '../../store/recordWorkflows';
 import { MaterialsCatalogView } from './MaterialsCatalogView';
 import { GoodsReceiptsListView } from './GoodsReceiptsListView';
 import { StoreIssuesListView } from './StoreIssuesListView';
@@ -50,6 +51,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { formatMoney } from '../../utils/money';
+import { formatDecimal } from '../../utils/formatters';
 
 interface InventoryModuleProps {
   currentUser: UserProfile;
@@ -66,11 +68,9 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
   // Core State
   // Stock lives only in per-warehouse balances; catalog and warehouse totals are derived from them.
   const appState = useAppState();
-  const { can } = usePermission();
   const wf = useWorkflows();
   const warehouses = useMemo(() => selectWarehouses(appState), [appState]);
   const materials = useMemo(() => selectMaterials(appState), [appState]);
-  const [, setMaterials] = useStoreSlice('materials');
   const receipts = appState.goodsReceipts;
   const issues = appState.storeIssues;
   const [stockWarehouseId, setStockWarehouseId] = useState<string>('');
@@ -107,8 +107,8 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
   };
 
   // Issue request reserves stock; confirming it charges the project at weighted average and writes the kardex.
-  const handleAddIssue = (newIssue: StoreIssueVoucher) => {
-    const result = wf.requestStoreIssue(newIssue);
+  const handleAddIssue = (form: StoreIssueFormInput) => {
+    const result = wf.submitStoreIssueForm(form);
     showToast(result.message);
     return result;
   };
@@ -124,8 +124,8 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
     setActiveIssueDoc(null);
   };
 
-  const handleAddTransfer = (newTrf: InterWarehouseTransfer) => {
-    const result = wf.createTransfer(newTrf);
+  const handleAddTransfer = (form: TransferFormInput) => {
+    const result = wf.submitTransferForm(form);
     showToast(result.message);
     return result;
   };
@@ -135,18 +135,14 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
     showToast(wf.advanceTransfer(transferId, newStatus).message);
   };
 
-  const handleAddMaterial = (newMat: MaterialItem) => {
-    if (!can('inventory.manage_catalog')) return showToast('اجازه تعریف کالا را ندارید.');
-    setMaterials((prev) => [{ ...newMat, currentStock: 0, totalStockValue: 0 }, ...prev]);
-    showToast(`کدینگ متریال جدید "${newMat.name}" در کاتالوگ ثبت شد.`);
+  const handleAddMaterial = (input: NewMaterialInput) => {
+    const result = wf.createMaterial(input);
+    showToast(result.message);
+    return result;
   };
 
   // Stocktake: the workflow recomputes the variance from stored balances, posts it and writes kardex rows.
-  const handleApplyAdjustmentJournal = (stocktakeId: string) => {
-    const audit = stocktakes.find((s) => s.id === stocktakeId);
-    if (!audit || audit.status === 'تأیید نهایی و صدور سند تعدیل') return;
-    showToast(wf.applyStocktake(audit).message);
-  };
+  const handleApplyAdjustmentJournal = (stocktakeId: string) => showToast(wf.applyStocktakeById(stocktakeId).message);
 
   const navTabs: { id: InventorySubTab; label: string; icon: LucideIcon; count?: number }[] = [
     { id: 'dashboard', label: 'پیشخوان انبار و باسکول', icon: WarehouseIcon },
@@ -192,7 +188,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                     isActive ? 'bg-indigo-500/50 text-white' : 'bg-slate-200 text-slate-700'
                   }`}
                 >
-                  {tab.count.toLocaleString('fa-IR')}
+                  {formatDecimal(tab.count)}
                 </span>
               )}
             </button>
@@ -328,21 +324,21 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                 {selectStockByWarehouse(appState, stockWarehouseId || warehouses[0]?.id || '').map((b) => (
                   <tr key={b.materialId}>
                     <td className="py-2">
-                      {b.material!.name} <span className="text-[10px] text-slate-400 font-mono">{b.material!.code}</span>
+                      {b.material.name} <span className="text-[10px] text-slate-400 font-mono">{b.material.code}</span>
                     </td>
                     <td className="py-2 text-left font-mono">
-                      {b.qty.toLocaleString('fa-IR')} {b.material!.unit}
+                      {formatDecimal(b.qty)} {b.material.unit}
                     </td>
-                    <td className="py-2 text-left font-mono text-amber-700">{b.reservedQty.toLocaleString('fa-IR')}</td>
-                    <td className="py-2 text-left font-mono text-emerald-700">{(b.qty - b.reservedQty).toLocaleString('fa-IR')}</td>
-                    <td className="py-2 text-left font-mono">{formatMoney(Math.round(b.qty * b.material!.averageUnitPrice), false)}</td>
+                    <td className="py-2 text-left font-mono text-amber-700">{formatDecimal(b.reservedQty)}</td>
+                    <td className="py-2 text-left font-mono text-emerald-700">{formatDecimal(b.freeQty)}</td>
+                    <td className="py-2 text-left font-mono">{formatMoney(b.value, false)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div className="text-[11px] text-slate-500">
-              رزروهای فعال: {appState.stockReservations.filter((r) => r.status === 'active').length.toLocaleString('fa-IR')} ·
-              برگشت‌ها: {appState.stockReturns.length.toLocaleString('fa-IR')}
+              رزروهای فعال: {formatDecimal(selectActiveReservationCount(appState))} ·
+              برگشت‌ها: {formatDecimal(appState.stockReturns.length)}
             </div>
           </div>
         </div>

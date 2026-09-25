@@ -22,6 +22,7 @@ import {
   Building,
 } from 'lucide-react';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { formatDecimal } from '../../utils/formatters';
 
 interface InterTransfersViewProps {
   transfers: InterWarehouseTransfer[];
@@ -90,7 +91,7 @@ export const InterTransfersView: React.FC<InterTransfersViewProps> = ({
           </div>
 
           <span className="text-xs text-slate-500 font-medium">
-            تعداد حواله‌های ثبت‌شده: {filteredTransfers.length.toLocaleString('fa-IR')} مورد
+            تعداد حواله‌های ثبت‌شده: {formatDecimal(filteredTransfers.length)} مورد
           </span>
         </div>
       </div>
@@ -196,7 +197,7 @@ export const InterTransfersView: React.FC<InterTransfersViewProps> = ({
                         <span className="text-[10px] text-slate-400 font-mono">{item.materialCode}</span>
                       </td>
                       <td className="py-2 font-mono font-bold text-slate-800">
-                        {item.quantity.toLocaleString('fa-IR')} {item.unit}
+                        {formatDecimal(item.quantity)} {item.unit}
                       </td>
                       <td className="py-2 text-left font-mono text-slate-600">
                         {formatMoney(item.unitCost, false)}

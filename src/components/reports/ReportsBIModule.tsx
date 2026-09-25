@@ -23,11 +23,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Project } from '../../types';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatNumber, formatCurrencyCompact, barWidth, formatPercent } from '../../utils/formatters';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { formatPercent } from '../../utils/formatters';
-import { useAppState } from '../../store/AppStore';
-import { selectReceivablesAging } from '../../store/domainSelectors';
+import { useSelector } from '../../store/AppStore';
+import { projectProfitability, projectVariance, selectBiSummary } from '../../store/views/reports';
 
 interface ReportsBIModuleProps {
   projects: Project[];
@@ -37,29 +36,9 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
   const [activeTab, setActiveTab] = useState<'financial_summary' | 'projects_variance' | 'receivables_aging' | 'cost_centers'>('financial_summary');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
-  // Aggregates
-  const totalContractRevenue = projects.reduce((acc, p) => acc + p.contractAmount, 0);
-  const totalApprovedRevenue = projects.reduce((acc, p) => acc + p.recordedRevenue, 0);
-  const totalActualCost = projects.reduce((acc, p) => acc + p.actualCost, 0);
-  const totalGrossProfit = totalApprovedRevenue - totalActualCost;
-  const averageMargin = (totalGrossProfit / (totalApprovedRevenue || 1)) * 100;
-
-  const totalReceivables = projects.reduce((acc, p) => acc + p.receivables, 0);
-  const totalLiabilities = projects.reduce((acc, p) => acc + p.liabilities, 0);
-
-  // Receivables aging from approved, unpaid employer statements and their due dates.
-  const aging = selectReceivablesAging(useAppState());
-  const agingTotal = aging.reduce((a, r) => a + r.remainingClaim, 0);
-  const bucket = (label: string, color: string, test: (days: number) => boolean) => {
-    const amount = aging.filter((r) => test(r.overdueDays)).reduce((a, r) => a + r.remainingClaim, 0);
-    return { label, color, amount, percentage: agingTotal ? Math.round((amount * 1000) / agingTotal) / 10 : 0 };
-  };
-  const agingBuckets = [
-    bucket('کمتر از ۳۰ روز (جاری)', 'bg-emerald-500', (d) => d < 30),
-    bucket('۳۰ تا ۶۰ روز', 'bg-blue-500', (d) => d >= 30 && d < 60),
-    bucket('۶۰ تا ۹۰ روز (نیازمند پیگیری)', 'bg-amber-500', (d) => d >= 60 && d < 90),
-    bucket('بیش از ۹۰ روز (مطالبات معوق/ریسک)', 'bg-rose-500', (d) => d >= 90),
-  ];
+  // Aggregates and receivables aging (store view model).
+  const bi = useSelector((s) => selectBiSummary(s, projects), [projects]);
+  const { totalApprovedRevenue, totalActualCost, totalGrossProfit, averageMargin, agingBuckets } = bi;
 
   return (
     <div className="space-y-6">
@@ -133,7 +112,7 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <span className="text-xs text-slate-500 block mb-1">خالص مطالبات منهای بدهی‌ها</span>
           <div className="text-lg font-bold text-indigo-700 font-mono">
-            {formatMoney(totalReceivables - totalLiabilities, false)}{' '}
+            {formatMoney(bi.netWorkingPosition, false)}{' '}
             <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
           <span className="text-[11px] text-indigo-600 font-medium">شاخص سلامت نقدینگی و جریان وجوه</span>
@@ -205,8 +184,7 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
                 {projects.map((p) => {
-                  const profit = p.recordedRevenue - p.actualCost;
-                  const margin = (profit / (p.recordedRevenue || 1)) * 100;
+                  const { profit, margin } = projectProfitability(p);
                   return (
                     <tr key={p.id} className="hover:bg-slate-50">
                       <td className="py-3 px-3 font-sans">
@@ -233,8 +211,7 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
       {activeTab === 'projects_variance' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {projects.map((p) => {
-            const costVariance = p.budget - p.actualCost;
-            const progressVariance = p.physicalProgress - p.financialProgress;
+            const { costVariance, progressVariance } = projectVariance(p);
             return (
               <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
                 <div className="flex items-start justify-between mb-3">
@@ -312,7 +289,7 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                    <div className={`${bucket.color} h-full rounded-full transition-all`} style={{ width: `${bucket.percentage}%` }} />
+                    <div className={`${bucket.color} h-full rounded-full transition-all`} style={{ width: barWidth(bucket.percentage) }} />
                   </div>
                 </div>
               ))}

@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { CompanyProfile } from '../../types';
 import { seedTomansToRials } from '../moneyFields';
+import { demoDataEnabled } from './demoFlag';
 import { mockProjects, mockUsers } from './data/mockData';
 import {
   mockChartOfAccounts,
@@ -52,18 +54,11 @@ import {
 } from './data/inventoryMockData';
 import { mockPayrollSlips, mockEmployees, mockTimesheets } from './data/hrPayrollMockData';
 
-const isDev = (() => {
-  try {
-    // DEV, or a demo build (VITE_DEMO_DATA=true, used for the WordPress demo plugin).
-    return Boolean(import.meta.env?.DEV) || import.meta.env?.VITE_DEMO_DATA === 'true';
-  } catch {
-    return true;
-  }
-})();
+const isDev = demoDataEnabled();
 
 /**
  * The demo dataset. The seed files are written in Tomans; they are converted to integer Rials
- * here, once, so the store only ever holds Rials. Operational demo records exist only in DEV builds.
+ * here, once, so the store only ever holds Rials. Operational demo records exist only in DEV and demo builds (see demoFlag.ts).
  */
 export function loadMockSeeds() {
   const operational = isDev
@@ -128,3 +123,11 @@ export type MockSeeds = ReturnType<typeof loadMockSeeds>;
 export type OperationalSeeds = NonNullable<MockSeeds['operational']>;
 
 export { mockUsers };
+
+/** The fictional company of the demo dataset. Identifiers fail their check digits, so they match no real company. */
+export const demoCompany: CompanyProfile = {
+  name: 'شرکت پیمانکاری نمونه',
+  legalName: 'شرکت پیمانکاری نمونه (سهامی خاص) — داده ساختگی',
+  nationalId: '۱۰۱۰۰۰۰۰۰۰۱',
+  registrationNumber: '۰۰۰۰۰۱',
+};

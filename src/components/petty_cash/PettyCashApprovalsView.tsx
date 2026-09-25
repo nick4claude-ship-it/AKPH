@@ -18,12 +18,10 @@ import {
 } from 'lucide-react';
 import { PettyCashExpense, PortalRole, User as AppUser } from '../../types';
 import { useAppState } from '../../store/AppStore';
-import { usePermission } from '../../store/session';
-import { PETTY_STEP_ACTION } from '../../utils/permissions';
-import { pettyContext } from '../../store/approvalContext';
-import { Dialog } from '../common/Dialog';
+import { pettyExpenseApproval, pettyExpenseLists } from '../../store/views/pettyCash';
+import { Dialog } from '../../ui/Dialog';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { formatCurrency, formatNumber, toPersianDigits } from '../../utils/formatters';
+import { formatCurrency, formatNumber, toPersianDigits, formatDecimal } from '../../utils/formatters';
 import { formatInt } from '../../utils/money';
 
 interface PettyCashApprovalsViewProps {
@@ -52,15 +50,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
   const [returnComment, setReturnComment] = useState('');
   const [returnError, setReturnError] = useState(false);
 
-  const pendingList = expenses.filter(
-    (e) => e.status === 'pending_approval' || e.status === 'submitted'
-  );
-  const approvedList = expenses.filter(
-    (e) => e.status === 'approved' || e.status === 'accounting_posted'
-  );
-  const rejectedList = expenses.filter(
-    (e) => e.status === 'rejected' || e.status === 'returned_for_correction'
-  );
+  const { pending: pendingList, approved: approvedList, rejected: rejectedList } = pettyExpenseLists(expenses);
 
   const displayedList =
     filterTab === 'pending'
@@ -75,11 +65,10 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
   // Invoice images live in the document center, linked to the expense.
   const appState = useAppState();
   const policy = appState.pettyCashSettings;
-  const { check } = usePermission();
-  const approvePermission = activeExpense
-    ? check(PETTY_STEP_ACTION[activeExpense.currentApprovalStep as PortalRole] ?? 'petty.approve_ceo', pettyContext(activeExpense))
-    : { ok: false };
-  const canReject = activeExpense ? check('petty.reject', { projectId: activeExpense.projectId }).ok : false;
+  // What the signed-in user may do on the active expense (role, project, no self-approval).
+  const activeApproval = activeExpense ? pettyExpenseApproval(currentUser, activeExpense, policy) : null;
+  const approvePermission = { ok: !!activeApproval?.canApprove, reason: activeApproval?.approveReason };
+  const canReject = !!activeApproval?.canReject;
   const activeDocs = activeExpense ? selectDocumentsFor(appState, 'petty_cash_expense', activeExpense.id) : [];
 
   const handleApprove = () => {
@@ -340,7 +329,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       </div>
                       <div className="text-[11px] text-blue-700 mt-0.5">
                         کد کالا: {activeExpense.inventoryItemCode || '-'} | تعداد:{' '}
-                        {activeExpense.inventoryQuantity} {activeExpense.inventoryUnit}
+                        {formatDecimal(activeExpense.inventoryQuantity)} {activeExpense.inventoryUnit}
                       </div>
                     </div>
                     <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded font-medium">
@@ -357,7 +346,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       پیش‌نمایش تصویر فاکتور و مدارک پیوست:
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      {activeDocs.length} پیوست
+                      {formatInt(activeDocs.length)} پیوست
                     </span>
                   </div>
 
@@ -394,27 +383,15 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
                 {/* Multi-Level Approval Stages Stepper: the chain comes from the stored petty cash policy */}
                 {(() => {
-                  const level = activeExpense.approvalLevelRequired;
-                  const chain = policy.approvalChains[level];
-                  const done = activeExpense.status === 'approved' || activeExpense.status === 'accounting_posted';
-                  const current = done ? chain.length : Math.max(0, chain.indexOf(activeExpense.currentApprovalStep as PortalRole));
-                  const range =
-                    level === 'site_manager_and_finance'
-                      ? `تا ${formatCurrency(policy.siteLevelMax)}`
-                      : level === 'project_and_finance'
-                        ? `${formatCurrency(policy.siteLevelMax)} تا ${formatCurrency(policy.projectLevelMax)}`
-                        : `بیش از ${formatCurrency(policy.projectLevelMax)}`;
-                  const steps = ['ثبت تنخواه‌دار', ...chain];
+                  const approval = pettyExpenseApproval(currentUser, activeExpense, policy);
                   return (
                     <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-slate-800">گردش کار تایید چندمرحله‌ای:</span>
-                        <span className="text-[10px] text-slate-500 font-mono">سطح الزامی: {chain.join(' + ')} ({range})</span>
+                        <span className="text-[10px] text-slate-500 font-mono">سطح الزامی: {approval.chainText}</span>
                       </div>
                       <div className="flex items-center justify-between gap-1 pt-2">
-                        {steps.map((label, i) => {
-                          const stepDone = i === 0 || i - 1 < current;
-                          const isCurrent = !done && i - 1 === current;
+                        {approval.steps.map(({ label, done: stepDone, current: isCurrent }, i) => {
                           return (
                             <React.Fragment key={label}>
                               {i > 0 && <div className={`h-0.5 flex-1 ${stepDone ? 'bg-emerald-500' : 'bg-slate-200'}`} />}

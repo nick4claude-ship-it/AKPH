@@ -7,7 +7,8 @@ import React, { useState } from 'react';
 import { Contract, PriceAdjustment, UserProfile } from '../../types';
 import { TrendingUp, Plus, FileSpreadsheet, CheckCircle2, FileText, Download } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel, formatInt } from '../../utils/money';
-import { formatPercent } from '../../utils/formatters';
+import { formatPercent, formatDecimal } from '../../utils/formatters';
+import { summarizePriceAdjustments } from '../../store/views/contracts';
 
 interface AdjustmentsEngineViewProps {
   contracts: Contract[];
@@ -26,11 +27,7 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
     (a) => selectedContractId === 'all' || a.contractId === selectedContractId
   );
 
-  const approvedCount = filteredAdjustments.filter((a) => a.status === 'تأیید کارفرما' || a.status === 'اعمال شده در صورت‌وضعیت').length;
-  const totalAdjustments = filteredAdjustments.reduce(
-    (sum, a) => sum + a.calculatedAdjustmentAmount,
-    0
-  );
+  const summary = summarizePriceAdjustments(filteredAdjustments);
 
   return (
     <div className="space-y-6">
@@ -66,9 +63,9 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <span className="text-xs text-slate-500 block mb-1">مجموع مبالغ تعدیل محاسبه‌شده</span>
           <span className="text-xl font-black text-amber-900 font-mono">
-            {formatMoneyCompact(totalAdjustments)}
+            {formatMoneyCompact(summary.totalAmount)}
           </span>
-          <span className="text-[11px] text-slate-400 block mt-1">تعداد دوره‌ها: {filteredAdjustments.length} فصل</span>
+          <span className="text-[11px] text-slate-400 block mt-1">تعداد دوره‌ها: {formatInt(filteredAdjustments.length)} فصل</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -80,10 +77,10 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <span className="text-xs text-slate-500 block mb-1">وضعیت تاییدات مشاور و کارفرما</span>
           <span className="text-sm font-bold text-emerald-700 block">
-            {formatPercent(filteredAdjustments.length ? (approvedCount * 100) / filteredAdjustments.length : 0)} تأیید کارفرما یا اعمال‌شده
+            {formatPercent(summary.approvedPercent)} تأیید کارفرما یا اعمال‌شده
           </span>
           <span className="text-[11px] text-slate-400 block mt-1">
-            {formatInt(approvedCount)} از {formatInt(filteredAdjustments.length)} تعدیل
+            {formatInt(summary.approvedCount)} از {formatInt(filteredAdjustments.length)} تعدیل
           </span>
         </div>
       </div>
@@ -116,12 +113,12 @@ export const AdjustmentsEngineView: React.FC<AdjustmentsEngineViewProps> = ({
                     <span className="text-[10px] text-slate-400 font-mono">{contract?.code}</span>
                   </td>
                   <td className="p-3 font-medium text-slate-700">{adj.period}</td>
-                  <td className="p-3 text-center font-mono font-medium">{adj.basePeriodIndex.toLocaleString('fa-IR')}</td>
+                  <td className="p-3 text-center font-mono font-medium">{formatDecimal(adj.basePeriodIndex)}</td>
                   <td className="p-3 text-center font-mono font-bold text-blue-700">
-                    {adj.currentPeriodIndex.toLocaleString('fa-IR')}
+                    {formatDecimal(adj.currentPeriodIndex)}
                   </td>
                   <td className="p-3 text-center font-mono font-black text-amber-900">
-                    +{adj.coefficient.toFixed(3)}
+                    +{formatDecimal(adj.coefficient, 3)}
                   </td>
                   <td className="p-3 text-left font-mono text-slate-600">
                     {formatMoney(adj.baseAmount, false)}

@@ -16,6 +16,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../utils/money';
+import { useCompany } from '../../store/session';
+import { formatDecimal } from '../../utils/formatters';
 
 interface WarehousesListViewProps {
   warehouses: Warehouse[];
@@ -28,6 +30,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
   projects,
   currentUser,
 }) => {
+  const company = useCompany();
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
       {/* Header */}
@@ -36,7 +39,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
           <div>
             <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
               <WarehouseIcon className="w-4 h-4 text-indigo-600" />
-              شبکه انبارهای مرکزی و کارگاهی سازه گستران پارس
+              شبکه انبارهای مرکزی و کارگاهی {company.name}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               مدیریت فیزیکی انبارها، باراندازهای تخلیه، سرپرستان انبار و کنترل ظرفیت دپوی مصالح
@@ -44,7 +47,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>تعداد کل انبارها: <strong className="text-slate-800">{warehouses.length.toLocaleString('fa-IR')} انبار</strong></span>
+            <span>تعداد کل انبارها: <strong className="text-slate-800">{formatDecimal(warehouses.length)} انبار</strong></span>
           </div>
         </div>
       </div>
@@ -105,7 +108,7 @@ export const WarehousesListView: React.FC<WarehousesListViewProps> = ({
             <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
               <div className="bg-slate-50 p-2.5 rounded-xl text-center">
                 <span className="text-[10px] text-slate-400 block">مساحت بارانداز</span>
-                <span className="font-bold text-slate-800 font-mono">{wh.areaM2.toLocaleString('fa-IR')} مترمربع</span>
+                <span className="font-bold text-slate-800 font-mono">{formatDecimal(wh.areaM2)} مترمربع</span>
               </div>
 
               <div className="bg-slate-50 p-2.5 rounded-xl text-center">

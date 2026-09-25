@@ -21,11 +21,11 @@ import { PettyCashReportsView } from './PettyCashReportsView';
 import { PettyCashSettingsView } from './PettyCashSettingsView';
 import { NewExpenseModal } from './NewExpenseModal';
 import { useNavigate } from 'react-router-dom';
-import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { selectPettyFunds } from '../../store/domainSelectors';
-import { AppDocument } from '../../types';
-import { usePermission } from '../../store/session';
+import { pettyCashCounts, type PettyExpenseFormInput } from '../../store/views/pettyCash';
+import type { NewPettyFundInput } from '../../store/recordWorkflows';
 
 interface PettyCashModuleProps {
   currentUser: User;
@@ -40,7 +40,6 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
 }) => {
   const navigate = useNavigate();
   const wf = useWorkflows();
-  const { can } = usePermission();
   const appState = useAppState();
   const [activeSubTab, setActiveSubTab] = useState<PettyCashSubTab>('dashboard');
 
@@ -48,12 +47,11 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   const { bankAccounts } = appState;
   // Funds show ceilings from the stored settings; several funds per project (PM, site, procurement).
   const accounts = selectPettyFunds(appState);
-  const [, setAccounts] = useStoreSlice('pettyCashAccounts');
   const expenses = appState.pettyCashExpenses;
   const replenishments = appState.pettyCashReplenishments;
   const requests = appState.pettyCashRequests;
   const reconciliations = appState.pettyCashReconciliations;
-  const [categories, setCategories] = useStoreSlice('pettyCashCategories');
+  const categories = appState.pettyCashCategories;
 
   // UI state
   const [selectedAccount, setSelectedAccount] = useState<PettyCashAccount | null>(null);
@@ -61,20 +59,12 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   const [modalAccountId, setModalAccountId] = useState<string | undefined>(undefined);
 
   // Badge Counters
-  const pendingApprovalsCount = expenses.filter(
-    (e) => e.status === 'pending_approval' || e.status === 'submitted'
-  ).length;
-
-  const lowBalanceCount = accounts.filter(
-    (a) => a.usableBalance <= a.minBalanceWarning && a.status === 'active'
-  ).length;
-
-  const pendingRequestsCount = requests.filter((r) => r.status === 'در انتظار تأیید مالی').length;
+  const { pendingApprovals: pendingApprovalsCount, lowBalance: lowBalanceCount, pendingRequests: pendingRequestsCount } = pettyCashCounts(accounts, expenses, requests);
 
   // ==================== ACTIONS (all run in the store's workflow service) ====================
 
-  const handleSaveExpense = (newExp: PettyCashExpense, attachments: Omit<AppDocument, 'links'>[] = []) => {
-    const result = wf.submitPettyCashExpense(newExp, attachments);
+  const handleSaveExpense = (form: PettyExpenseFormInput) => {
+    const result = wf.submitPettyExpenseForm(form);
     onToast(result.message);
     return result;
   };
@@ -92,14 +82,10 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
 
   // 6. Save New Petty Cash Account
   // A new fund starts empty; money reaches it only through a replenishment paid by treasury.
-  const handleSaveNewAccount = (newAcc: PettyCashAccount) => {
-    if (!can('petty.manage_funds', { projectId: newAcc.projectId || undefined })) {
-      onToast('اجازه تعریف تنخواه را ندارید.');
-      return false;
-    }
-    setAccounts((prev) => [...prev, newAcc]);
-    onToast(`تنخواه ${newAcc.code} تعریف شد.`);
-    return true;
+  const handleSaveNewAccount = (input: NewPettyFundInput) => {
+    const result = wf.createPettyCashFund(input);
+    onToast(result.message);
+    return result;
   };
 
   // Physical count; a difference becomes a pending adjustment voucher.
@@ -110,8 +96,9 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
   };
 
   const handleUpdateCategories = (next: PettyCashCategoryItem[]) => {
-    if (!can('settings.manage')) return onToast('ویرایش سرفصل‌های هزینه فقط با مجوز تنظیمات ممکن است.');
-    setCategories(next);
+    const result = wf.updatePettyCashCategories(next);
+    if (!result.ok) onToast(result.message);
+    return result;
   };
 
   return (
@@ -133,7 +120,7 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
       />
 
       {/* Main Tab Content View */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
         {activeSubTab === 'dashboard' && (
           <PettyCashDashboardView
             accounts={accounts}
@@ -238,7 +225,7 @@ export const PettyCashModule: React.FC<PettyCashModuleProps> = ({
             onOpenPolicySettings={() => navigate('/settings')}
           />
         )}
-      </main>
+      </div>
 
       {/* Floating / Interactive New Expense Modal */}
       {isNewExpenseModalOpen && (

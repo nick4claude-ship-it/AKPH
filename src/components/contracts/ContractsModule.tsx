@@ -7,19 +7,13 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Contract,
-  ContractBOQItem,
   DetailedProgressStatement,
-  ContractAmendment,
-  AdvancePaymentRecord,
-  PriceAdjustment,
-  ContractAuditLog,
   Project,
   UserProfile,
   ContractsMainViewMode,
   SubcontractorContract,
   SubcontractorProgressStatement,
   SubcontractorSubTab,
-  SubcontractorStatementWorkflowStatus,
 } from '../../types';
 import {
   FileText,
@@ -58,13 +52,13 @@ import { AdjustmentsEngineView } from './AdjustmentsEngineView';
 import { PaymentsReceivablesView } from './PaymentsReceivablesView';
 import { ContractReportsView } from './ContractReportsView';
 import { ContractDocumentsView } from './ContractDocumentsView';
-import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useAppState, useSelector } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { usePermission } from '../../store/session';
-import { generateUUID } from '../../utils/ids';
-import { toPersianDate, toPersianTime } from '../../utils/date';
+import { useCompany } from '../../store/session';
+import { formatInt } from '../../utils/money';
 import { selectStatementPayments } from '../../store/domainSelectors';
-import { selectContractFiles } from './contractFiles';
+import { selectContractFiles, subcontractorCounts } from '../../store/views/contracts';
+import type { WorkflowResult } from '../../store/workflowKit';
 import { SubcontractorDashboard } from './subcontractors/SubcontractorDashboard';
 import { SubcontractorStatementsListView } from './subcontractors/SubcontractorStatementsListView';
 import { SubcontractorContractsListView } from './subcontractors/SubcontractorContractsListView';
@@ -102,11 +96,11 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   onPosted,
   onToast,
 }) => {
+  const company = useCompany();
   const appState = useAppState();
   const wf = useWorkflows();
-  const { can } = usePermission();
   const navigate = useNavigate();
-  const toast = (r: { ok: boolean; message: string; docNumber?: string }) => {
+  const toast = (r: WorkflowResult) => {
     onToast?.(r.message);
     if (r.ok && r.docNumber) onPosted?.(r.docNumber);
   };
@@ -116,21 +110,24 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
 
   // Client Section States
   const [activeTab, setActiveTab] = useState<ContractsSubTab>('dashboard');
-  const [contracts, setContracts] = useStoreSlice('contracts');
-  const [boqItems] = useStoreSlice('contractBoq');
-  const [statements, setStatements] = useStoreSlice('clientStatements');
-  const [amendments, setAmendments] = useStoreSlice('contractAmendments');
-  const [advancePayments] = useStoreSlice('advancePayments');
-  const [adjustments] = useStoreSlice('priceAdjustments');
+  const {
+    contracts,
+    contractBoq: boqItems,
+    clientStatements: statements,
+    contractAmendments: amendments,
+    advancePayments,
+    priceAdjustments: adjustments,
+    contractAuditLogs: auditLogs,
+    subcontractorContracts: subContracts,
+    subcontractorStatements: subStatements,
+  } = appState;
   // Receipts and documents are single records in their own layers; contracts only view them.
-  const payments = useMemo(() => selectStatementPayments(appState), [appState]);
-  const documents = useMemo(() => selectContractFiles(appState), [appState]);
-  const [auditLogs, setAuditLogs] = useStoreSlice('contractAuditLogs');
+  const payments = useSelector(selectStatementPayments);
+  const documents = useSelector(selectContractFiles);
+  const subCounts = useMemo(() => subcontractorCounts(subStatements), [subStatements]);
 
   // Subcontractor Section States
   const [subTab, setSubTab] = useState<SubcontractorSubTab>('dashboard');
-  const [subContracts, setSubContracts] = useStoreSlice('subcontractorContracts');
-  const [subStatements, setSubStatements] = useStoreSlice('subcontractorStatements');
   const [selectedSubContract, setSelectedSubContract] = useState<SubcontractorContract | null>(null);
   const [selectedSubStatement, setSelectedSubStatement] = useState<SubcontractorProgressStatement | null>(null);
 
@@ -163,28 +160,14 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     setIsNewSubStatementOpen(true);
   };
 
-  const handleSaveSubContract = (newContract: SubcontractorContract) => {
-    if (!can('contract.manage', { projectId: newContract.projectId })) return onToast?.('اجازه ثبت قرارداد را ندارید.');
-    setSubContracts((prev) => [newContract, ...prev]);
-  };
-
-  const handleSaveSubStatement = (newStatement: SubcontractorProgressStatement) => {
-    const result = wf.createSubcontractorStatement(newStatement);
+  // Saving and approving run in the store's workflow service (same code as the approval center).
+  const reportIfOk = (result: WorkflowResult) => {
     if (result.ok) onToast?.(result.message);
     return result;
   };
 
-  // Workflow steps run in the store's workflow service (same code as the approval center).
-  const handleUpdateSubStatementStatus = (
-    statementId: string,
-    newStatus: SubcontractorStatementWorkflowStatus,
-    comment?: string
-  ) => {
-    const result =
-      newStatus === 'returned_for_revision' || newStatus === 'rejected'
-        ? wf.returnSubcontractorStatement(statementId, comment || 'نیاز به اصلاح متره', newStatus === 'rejected')
-        : wf.advanceSubcontractorStatement(statementId, comment);
-    toast(result);
+  const handleSubStatementDecision = (statementId: string, decision: 'approve' | 'return' | 'reject', comment?: string) => {
+    toast(wf.decideSubcontractorStatement(statementId, decision, comment));
     if (selectedSubStatement?.id === statementId) setSelectedSubStatement(null);
   };
 
@@ -209,49 +192,12 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     setIsNewAmendmentOpen(true);
   };
 
-  const handleSaveContract = (newContract: Contract) => {
-    if (!can('contract.manage', { projectId: newContract.projectId })) return onToast?.('اجازه ثبت قرارداد را ندارید.');
-    setContracts((prev) => [newContract, ...prev]);
-    const now = new Date();
-    const newLog: ContractAuditLog = {
-      id: generateUUID(),
-      contractId: newContract.id,
-      user: currentUser.name,
-      role: currentUser.role,
-      date: toPersianDate(now),
-      time: toPersianTime(now),
-      action: 'تأیید',
-      targetField: 'contract',
-      oldValue: '-',
-      newValue: newContract.code,
-      reason: 'انعقاد قرارداد جدید',
-    };
-    setAuditLogs((prev) => [newLog, ...prev]);
-  };
+  // The open contract follows the store (an approved amendment changes its value).
+  const openContract = selectedContract ? contracts.find((c) => c.id === selectedContract.id) || selectedContract : null;
 
-  const handleSaveStatement = (newStatement: DetailedProgressStatement) => {
-    const result = wf.createClientStatement(newStatement);
-    onToast?.(result.message);
-    return result;
-  };
-
-  const handleSaveAmendment = (newAmendment: ContractAmendment, updatedContract: Contract) => {
-    if (!can('contract.manage', { projectId: updatedContract.projectId })) return onToast?.('اجازه ثبت الحاقیه را ندارید.');
-    setAmendments((prev) => [newAmendment, ...prev]);
-    setContracts((prev) => prev.map((c) => (c.id === updatedContract.id ? updatedContract : c)));
-    if (selectedContract?.id === updatedContract.id) {
-      setSelectedContract(updatedContract);
-    }
-  };
-
-  const handleUpdateStatementStatus = (statementId: string, newStatus: DetailedProgressStatement['status'], reason?: string) => {
-    const result =
-      newStatus === 'returned_for_correction' || newStatus === 'rejected'
-        ? wf.returnClientStatement(statementId, reason || 'نیاز به اصلاح')
-        : wf.advanceClientStatement(statementId, reason);
-    toast(result);
-    const updated = appState.clientStatements.find((s) => s.id === statementId);
-    if (selectedStatement?.id === statementId && updated) setSelectedStatement(null);
+  const handleStatementDecision = (statementId: string, decision: 'approve' | 'return', reason?: string) => {
+    toast(wf.decideClientStatement(statementId, decision, reason));
+    if (selectedStatement?.id === statementId) setSelectedStatement(null);
   };
 
   // Employer approval posts the receivable automatically; this only reports the existing document.
@@ -263,21 +209,12 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
     );
   };
 
-  // Subcontractor Pending Counts
-  const pendingSubcontractorApprovalsCount = subStatements.filter(
-    (s) => s.status === 'submitted' || s.status === 'site_review' || s.status === 'pm_approved'
-  ).length;
-
-  const urgentSubcontractorPaymentCount = subStatements.filter(
-    (s) => s.status === 'management_approved' && s.remainingPayable > 0
-  ).length;
-
   return (
     <div className="space-y-6">
       {/* =========================================================================
           TOP LEVEL PRIMARY DUAL MODE SELECTOR (Requested explicitly by USER):
-          1. صورت‌وضعیت کارفرما (Client Progress Statements - پول ورودی به AKPH)
-          2. صورت‌وضعیت پیمانکاران جزء (Subcontractor Progress Statements - پول خروجی از AKPH)
+          1. صورت‌وضعیت کارفرما (Client Progress Statements - پول ورودی به {company.name})
+          2. صورت‌وضعیت پیمانکاران جزء (Subcontractor Progress Statements - پول خروجی از {company.name})
           ========================================================================= */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-2.5 text-white shadow-md border border-slate-700">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -295,7 +232,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
               <div className="text-right">
                 <span className="block">صورت‌وضعیت و مطالبات کارفرما (Client)</span>
                 <span className={`text-[10px] block font-normal ${mainMode === 'client' ? 'text-slate-900' : 'text-slate-400'}`}>
-                  پولی که AKPH از کارفرما مطالبه می‌کند (درآمد و وصولی)
+                  پولی که {company.name} از کارفرما مطالبه می‌کند (درآمد و وصولی)
                 </span>
               </div>
               <span
@@ -303,7 +240,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                   mainMode === 'client' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300'
                 }`}
               >
-                {contracts.length}
+                {formatInt(contracts.length)}
               </span>
             </button>
 
@@ -320,7 +257,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
               <div className="text-right">
                 <span className="block">صورت‌وضعیت و تعهدات پیمانکاران جزء (Subcontractors)</span>
                 <span className={`text-[10px] block font-normal ${mainMode === 'subcontractor' ? 'text-slate-900' : 'text-slate-400'}`}>
-                  پولی که جوشکار، آرماتوربند، بنّا، تأسیسات و... از AKPH مطالبه می‌کنند
+                  پولی که جوشکار، آرماتوربند، بنّا، تأسیسات و... از {company.name} مطالبه می‌کنند
                 </span>
               </div>
               <div className="flex items-center gap-1 mr-1">
@@ -329,11 +266,11 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                     mainMode === 'subcontractor' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300'
                   }`}
                 >
-                  {subContracts.length}
+                  {formatInt(subContracts.length)}
                 </span>
-                {urgentSubcontractorPaymentCount > 0 && (
+                {subCounts.urgentPayments > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500 text-white animate-pulse">
-                    {urgentSubcontractorPaymentCount} بدهی
+                    {formatInt(subCounts.urgentPayments)} بدهی
                   </span>
                 )}
               </div>
@@ -389,7 +326,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                           isActive ? 'bg-amber-600 text-white font-bold' : 'bg-slate-200 text-slate-700'
                         }`}
                       >
-                        {typeof tab.badge === 'number' ? tab.badge.toLocaleString('fa-IR') : tab.badge}
+                        {typeof tab.badge === 'number' ? formatInt(tab.badge) : tab.badge}
                       </span>
                     )}
                   </button>
@@ -421,15 +358,9 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
             />
           )}
 
-          {activeTab === 'contract_detail' && selectedContract && (
+          {activeTab === 'contract_detail' && openContract && (
             <ContractDetailView
-              contract={selectedContract}
-              boqItems={boqItems}
-              statements={statements}
-              amendments={amendments}
-              payments={payments}
-              documents={documents}
-              auditLogs={auditLogs}
+              contract={openContract}
               currentUser={currentUser}
               onBack={() => setActiveTab('contracts')}
               onOpenNewStatement={(c) => handleOpenNewStatement(c)}
@@ -528,10 +459,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                   id: 'approvals',
                   label: 'کارتابل گردش کار و تاییدات',
                   icon: CheckSquare,
-                  badge:
-                    pendingSubcontractorApprovalsCount > 0
-                      ? pendingSubcontractorApprovalsCount
-                      : undefined,
+                  badge: subCounts.pendingApprovals > 0 ? subCounts.pendingApprovals : undefined,
                 },
                 {
                   id: 'matrix',
@@ -561,9 +489,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                             : 'bg-slate-200 text-slate-700'
                         }`}
                       >
-                        {typeof tab.badge === 'number'
-                          ? tab.badge.toLocaleString('fa-IR')
-                          : tab.badge}
+                        {typeof tab.badge === 'number' ? formatInt(tab.badge) : tab.badge}
                       </span>
                     )}
                   </button>
@@ -624,7 +550,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                 setSelectedSubStatement(stm);
                 setIsSubStatementDetailOpen(true);
               }}
-              onUpdateStatus={handleUpdateSubStatementStatus}
+              onDecide={handleSubStatementDecision}
               onPayStatement={(stm) => openSubPayment(stm)}
             />
           )}
@@ -649,7 +575,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         contracts={subContracts}
         initialContract={contractForNewSubStatement}
         currentUser={currentUser}
-        onSave={handleSaveSubStatement}
+        onSave={(form) => reportIfOk(wf.submitSubcontractorStatementForm(form))}
       />
       )}
 
@@ -659,7 +585,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         onClose={() => setIsNewSubContractOpen(false)}
         projects={projects}
         currentUser={currentUser}
-        onSave={handleSaveSubContract}
+        onSave={(input) => reportIfOk(wf.createSubcontractorContract(input))}
       />
       )}
 
@@ -671,7 +597,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         }}
         statement={selectedSubStatement}
         currentUser={currentUser}
-        onUpdateStatus={handleUpdateSubStatementStatus}
+        onDecide={handleSubStatementDecision}
         onOpenPaymentModal={(stm) => openSubPayment(stm)}
       />
 
@@ -683,7 +609,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
           statement={selectedStatement}
           currentUser={currentUser}
           onClose={() => setSelectedStatement(null)}
-          onUpdateStatus={handleUpdateStatementStatus}
+          onDecide={handleStatementDecision}
           onIssueAccountingEntry={handleIssueAccountingEntryForStatement}
         />
       )}
@@ -691,11 +617,14 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
       {isNewStatementOpen && (
         <NewStatementModal
           contracts={contracts}
-          allBOQItems={boqItems}
           preselectedContract={contractForNewStatement}
           currentUser={currentUser}
           onClose={() => setIsNewStatementOpen(false)}
-          onSaveStatement={handleSaveStatement}
+          onSaveStatement={(form, target) => {
+            const result = wf.submitClientStatementForm(form, target);
+            onToast?.(result.message);
+            return result;
+          }}
         />
       )}
 
@@ -704,7 +633,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
           projects={projects}
           currentUser={currentUser}
           onClose={() => setIsNewContractOpen(false)}
-          onSaveContract={handleSaveContract}
+          onSaveContract={(input) => reportIfOk(wf.createClientContract(input))}
         />
       )}
 
@@ -713,7 +642,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
           contract={contractForNewAmendment}
           currentUser={currentUser}
           onClose={() => setIsNewAmendmentOpen(false)}
-          onSaveAmendment={handleSaveAmendment}
+          onSaveAmendment={(input) => reportIfOk(wf.createContractAmendment(contractForNewAmendment.id, input))}
         />
       )}
 

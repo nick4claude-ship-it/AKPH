@@ -25,14 +25,20 @@ import {
   CostCenter,
   Subledger,
 } from '../../types';
-import { formatMoney, moneyUnitLabel, normalizeDigits } from '../../utils/money';
-import { generateUUID } from '../../utils/ids';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { toPersianDate } from '../../utils/date';
-import { usePermission } from '../../store/session';
-import type { WorkflowResult } from '../../store/workflows';
-import { Dialog } from '../common/Dialog';
-import { MoneyInput } from '../common/NumberInput';
-import { journalContext } from '../../store/approvalContext';
+import { useCurrentUser, usePermission } from '../../store/session';
+import type { WorkflowResult } from '../../store/workflowKit';
+import {
+  blankJournalRow as emptyRow,
+  computeManualEntryDraft,
+  journalDisplayStatus,
+  journalEntryActions,
+  leafAccounts,
+  type ManualEntryFormInput,
+} from '../../store/views/accounting';
+import { Dialog } from '../../ui/Dialog';
+import { MoneyInput } from '../../ui/NumberInput';
 
 interface JournalEntriesViewProps {
   entries: JournalEntry[];
@@ -42,7 +48,8 @@ interface JournalEntriesViewProps {
   projects: Project[];
   costCenters: CostCenter[];
   subledgers: Subledger[];
-  onCreateEntry: (entry: JournalEntry) => WorkflowResult;
+  /** Saves the voucher through the workflow (numbered, pending approval by another user). */
+  onCreateEntry: (form: ManualEntryFormInput) => WorkflowResult;
   onApproveEntry: (id: string) => WorkflowResult;
   onRejectEntry: (id: string, reason: string) => WorkflowResult;
   onReverseEntry: (id: string, reason: string) => WorkflowResult;
@@ -50,30 +57,6 @@ interface JournalEntriesViewProps {
   setIsNewDocModalOpen: (open: boolean) => void;
 }
 
-
-/** Posting accounts (leaves of the chart) for manual vouchers. */
-function leafAccounts(chart: AccountNode[]): { code: string; title: string }[] {
-  const out: { code: string; title: string }[] = [];
-  const walk = (nodes: AccountNode[]) => {
-    for (const n of nodes) {
-      if (n.children?.length) walk(n.children);
-      else out.push({ code: n.code, title: n.title });
-    }
-  };
-  walk(chart);
-  return out;
-}
-
-const emptyRow = (account?: { code: string; title: string }): JournalEntryRow => ({
-  id: generateUUID(),
-  accountCode: account?.code || '',
-  accountName: account?.title || '',
-  subledgerCode: '',
-  subledgerName: '',
-  description: '',
-  debit: 0,
-  credit: 0,
-});
 
 export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   entries,
@@ -89,7 +72,8 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   isNewDocModalOpen,
   setIsNewDocModalOpen,
 }) => {
-  const { can, check } = usePermission();
+  const { can } = usePermission();
+  const currentUser = useCurrentUser();
   const accounts = useMemo(() => leafAccounts(chartOfAccounts), [chartOfAccounts]);
   const unit = moneyUnitLabel();
 
@@ -123,19 +107,23 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
       entry.title.toLowerCase().includes(q) ||
       (entry.projectName || '').toLowerCase().includes(q) ||
       entry.submitter.toLowerCase().includes(q);
-    const status = reversedIds.has(entry.id) ? 'برگشت خورده' : entry.status;
+    const status = journalDisplayStatus(entry, reversedIds);
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
     const matchesProject = projectFilter === 'all' || entry.projectId === projectFilter;
     return matchesSearch && matchesStatus && matchesProject;
   });
 
-  const totalDebitNew = newDocRows.reduce((sum, r) => sum + r.debit, 0);
-  const totalCreditNew = newDocRows.reduce((sum, r) => sum + r.credit, 0);
-  const diffNew = totalDebitNew - totalCreditNew;
-  const areRowsValid =
-    newDocRows.length >= 2 &&
-    newDocRows.every((r) => Boolean(r.accountCode) && ((r.debit > 0 && r.credit === 0) || (r.credit > 0 && r.debit === 0)));
-  const isFormBalanced = totalDebitNew > 0 && totalDebitNew === totalCreditNew && areRowsValid;
+  const newDocForm: ManualEntryFormInput = {
+    date: newDocDate,
+    type: newDocType,
+    title: newDocTitle,
+    projectId: newDocProjectId,
+    costCenterId: newDocCostCenterId,
+    rows: newDocRows,
+  };
+  // Totals, balance and the first problem of the voucher being typed.
+  const newDocDraft = computeManualEntryDraft(newDocForm);
+  const { totalDebit: totalDebitNew, totalCredit: totalCreditNew, isBalanced: isFormBalanced } = newDocDraft;
 
   const updateRow = (id: string, patch: Partial<JournalEntryRow>) =>
     setNewDocRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -149,38 +137,8 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   const handleSubmitNewDoc = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    const date = normalizeDigits(newDocDate.trim());
-    if (!/^1[34]\d{2}\/\d{1,2}\/\d{1,2}$/.test(date)) return setFormError('تاریخ سند را به صورت ۱۴۰۵/۰۷/۰۱ وارد کنید.');
-    for (let i = 0; i < newDocRows.length; i++) {
-      const r = newDocRows[i];
-      if (!r.accountCode) return setFormError(`ردیف ${i + 1} فاقد حساب است.`);
-      if ((r.debit === 0 && r.credit === 0) || (r.debit > 0 && r.credit > 0)) {
-        return setFormError(`در ردیف ${i + 1} دقیقاً یکی از مبالغ بدهکار یا بستانکار باید بیش از صفر باشد.`);
-      }
-    }
-    if (!isFormBalanced) return setFormError('سند تراز نیست: جمع بدهکار و بستانکار باید برابر و بیش از صفر باشد.');
-    if (!newDocTitle.trim()) return setFormError('شرح کلی سند الزامی است.');
-
-    const project = projects.find((p) => p.id === newDocProjectId);
-    const costCenter = costCenters.find((c) => c.id === newDocCostCenterId);
-    const result = onCreateEntry({
-      id: generateUUID(),
-      docNumber: '',
-      date: newDocDate.trim(),
-      title: newDocTitle.trim(),
-      type: newDocType,
-      projectId: project?.id,
-      projectName: project?.name,
-      costCenterId: costCenter?.id,
-      costCenterName: costCenter?.name,
-      submitter: '',
-      status: 'در انتظار تأیید',
-      rows: newDocRows.map((r) => ({ ...r, projectId: project?.id, projectName: project?.name, costCenterId: costCenter?.id, costCenterName: costCenter?.name })),
-      totalDebit: totalDebitNew,
-      totalCredit: totalCreditNew,
-      isBalanced: true,
-      history: [],
-    });
+    if (newDocDraft.error) return setFormError(newDocDraft.error);
+    const result = onCreateEntry(newDocForm);
     if (!result.ok) return setFormError(result.message);
     setIsNewDocModalOpen(false);
     resetForm();
@@ -231,8 +189,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   };
 
   /** A final, non-reversal entry without an existing reversal is the only thing that can be reversed. */
-  const canReverse = (e: JournalEntry) =>
-    (e.status === 'ثبت قطعی' || e.status === 'تأیید شده') && !e.reversedFromDocId && !reversedIds.has(e.id) && can('journal.reverse', { projectId: e.projectId });
+  const canReverse = (e: JournalEntry) => journalEntryActions(currentUser, e, reversedIds).canReverse;
 
   const run = (result: WorkflowResult, onDone: () => void) => {
     if (!result.ok) {
@@ -517,7 +474,8 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
             <div className="flex items-center gap-2">
               {selectedEntry.status === 'در انتظار تأیید' &&
                 (() => {
-                  const permission = check('journal.approve', journalContext(selectedEntry));
+                  const actions = journalEntryActions(currentUser, selectedEntry, reversedIds);
+                  const permission = { ok: actions.canApprove, reason: actions.approveReason };
                   if (!permission.ok) {
                     return <span className="text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg font-medium">{permission.reason}</span>;
                   }
@@ -882,7 +840,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
                 </div>
                 <div>
                   <span>اختلاف: </span>
-                  <strong className="text-sm">{formatMoney(Math.abs(diffNew))}</strong>
+                  <strong className="text-sm">{formatMoney(newDocDraft.difference)}</strong>
                 </div>
               </div>
             </div>

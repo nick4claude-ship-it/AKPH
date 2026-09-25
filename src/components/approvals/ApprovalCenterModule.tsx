@@ -9,9 +9,10 @@ import { ShieldCheck, CheckCircle2, XCircle, Search, ExternalLink, Paperclip, Al
 import { ApprovalItem, ApprovalModule } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { selectApprovals } from '../../store/domainSelectors';
+import { approvalSummary } from '../../store/views/approvals';
 import { useApprovalActions, APPROVAL_MODULE_PATHS } from '../../store/useApprovalActions';
 import { useCurrentUser, usePermission } from '../../store/session';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
 import { formatInt, formatMoney } from '../../utils/money';
 
@@ -37,16 +38,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
   const [rejecting, setRejecting] = useState<ApprovalItem | null>(null);
   const [reason, setReason] = useState('');
 
-  const groups = useMemo(() => {
-    const m = new Map<ApprovalModule, { label: string; count: number; amount: number }>();
-    for (const a of approvals) {
-      const g = m.get(a.module) || { label: a.moduleLabel, count: 0, amount: 0 };
-      g.count++;
-      g.amount += a.amount;
-      m.set(a.module, g);
-    }
-    return [...m.entries()];
-  }, [approvals]);
+  const { groups, totalAmount } = useMemo(() => approvalSummary(approvals), [approvals]);
 
   const q = search.trim().toLowerCase();
   const rows = approvals.filter(
@@ -68,7 +60,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
             <ShieldCheck className="w-5 h-5 text-emerald-600" /> کارتابل تأییدات مرکزی مدیریت
           </h2>
           <p className="text-xs text-slate-500">
-            {formatInt(approvals.length)} مورد در انتظار به ارزش {formatCurrencyCompact(approvals.reduce((s, a) => s + a.amount, 0))} ·{' '}
+            {formatInt(approvals.length)} مورد در انتظار به ارزش {formatCurrencyCompact(totalAmount)} ·{' '}
             {formatInt(mine)} مورد در حیطه نقش شما ({user.role})
           </p>
         </div>

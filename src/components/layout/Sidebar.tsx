@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { matchNav, navTrail, visibleNav, NavNode } from '../../navigation/navConfig';
-import { usePermission } from '../../store/session';
+import { usePermission, useCompany } from '../../store/session';
 import { companyLogo } from '../../assets/images';
 
 interface SidebarProps {
@@ -24,6 +24,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAiAgent,
   counts = {},
 }) => {
+  const company = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
   const activeTrail = navTrail(matchNav(location.pathname)).map((n) => n.id);
@@ -121,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 overflow-hidden">
               <img
                 src={companyLogo}
-                alt="لوگوی شرکت سازه گستران پارس"
+                alt={`لوگوی ${company.name}`}
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -132,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!collapsed && (
               <div className="min-w-0">
                 <h1 className="text-sm font-bold text-white tracking-tight truncate">
-                  سازه گستران پارس
+                  {company.name}
                 </h1>
                 <p className="text-[11px] text-amber-400 font-medium truncate">
                   سامانه جامع پیمانکاری EPC

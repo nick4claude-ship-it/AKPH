@@ -39,11 +39,11 @@ export function formatCurrencyCompact(rial: number): string {
 }
 
 /**
- * Format percentage with Persian digits
+ * Percentage with Persian digits and the ٪ sign, rounded to `digits` decimals (default 1).
  */
-export function formatPercent(value: number): string {
-  if (value === undefined || value === null || Number.isNaN(value)) return '۰٪';
-  const num = Number(value.toFixed(1)).toLocaleString('fa-IR');
+export function formatPercent(value: number, digits = 1): string {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '۰٪';
+  const num = Number(value.toFixed(digits)).toLocaleString('fa-IR');
   return `${num}٪`;
 }
 
@@ -56,4 +56,19 @@ export function toPersianDigits(num: string | number): string {
   return num
     .toString()
     .replace(/[0-9]/g, (w) => persianDigits[+w]);
+}
+
+/** CSS width of a progress bar: the percentage clamped to 0–100 (e.g. style={{ width: barWidth(p) }}). */
+export function barWidth(percent: number): string {
+  const p = Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
+  return `${p}%`;
+}
+
+/**
+ * Any number (counts, quantities, indices, percentages without the sign) with Persian digits and
+ * separators, keeping up to `maxFractionDigits` decimals. Empty for a missing value.
+ */
+export function formatDecimal(value: number | null | undefined, maxFractionDigits = 3): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '';
+  return value.toLocaleString('fa-IR', { maximumFractionDigits: maxFractionDigits });
 }

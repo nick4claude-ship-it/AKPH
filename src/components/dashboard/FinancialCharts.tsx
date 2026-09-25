@@ -4,6 +4,7 @@ import { MonthlyTrendPoint } from '../../store/selectors';
 import { formatCurrencyCompact, formatPercent } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
 import { BarChart3, TrendingUp, Info } from 'lucide-react';
+import { financialChart } from '../../store/views/dashboard';
 
 interface FinancialChartsProps {
   data: MonthlyTrendPoint[];
@@ -20,11 +21,9 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Filter or scale data based on timeframe
-  const displayData = data;
-  const maxVal = Math.max(1, ...displayData.map((d) => Math.max(d.revenue, d.cost)));
-  const best = displayData.reduce<MonthlyTrendPoint | null>((b, d) => (!b || d.profit > b.profit ? d : b), null);
-  const totalRevenue = displayData.reduce((a, d) => a + d.revenue, 0);
-  const totalProfit = displayData.reduce((a, d) => a + d.profit, 0);
+  const chart = financialChart(data);
+  const displayData = chart.points;
+  const best = chart.best;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -111,9 +110,9 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
       <div className="h-64 w-full pt-4 relative select-none">
         <div className="h-full flex items-end justify-between gap-3 px-2 border-b border-slate-200">
           {displayData.map((d, index) => {
-            const revHeight = (d.revenue / maxVal) * 100;
-            const costHeight = (d.cost / maxVal) * 100;
-            const profHeight = (Math.max(0, d.profit) / maxVal) * 100;
+            const revHeight = d.revenuePercent;
+            const costHeight = d.costPercent;
+            const profHeight = d.profitPercent;
             const isHovered = hoveredIndex === index;
 
             return (
@@ -185,12 +184,12 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
       <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
         <span className="flex items-center gap-1">
           <Info className="w-3.5 h-3.5 text-amber-500" />
-          {best && best.profit > 0
+          {best
             ? `بالاترین سود در ماه ${best.month} با ${formatCurrencyCompact(best.profit)} ثبت شده است.`
             : 'در این بازه سود مثبتی در دفاتر ثبت نشده است.'}
         </span>
         <span className="font-mono text-slate-700">
-          حاشیه سود دوره: {formatPercent(totalRevenue ? (totalProfit * 100) / totalRevenue : 0)}
+          حاشیه سود دوره: {formatPercent(chart.margin)}
         </span>
       </div>
     </div>

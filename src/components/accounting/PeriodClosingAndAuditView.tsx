@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarCheck, ShieldCheck, History, Lock, CheckCircle2, AlertTriangle, Users } from 'lucide-react';
 import { AuditLog, JournalEntry } from '../../types';
-import { formatMoney, parseIntegerAmount } from '../../utils/money';
+import { formatMoney } from '../../utils/money';
+import { fiscalYearsOf, selectYearClosing } from '../../store/views/accounting';
 import { toPersianDigits } from '../../utils/formatters';
-import { tryFiscalYearOf } from '../../utils/ids';
-import { getCurrentFiscalYear } from '../../utils/date';
 import { usePermission } from '../../store/session';
-import type { WorkflowResult } from '../../store/workflows';
+import type { WorkflowResult } from '../../store/workflowKit';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 
 interface PeriodClosingAndAuditViewProps {
@@ -27,27 +26,15 @@ const ROLE_SUMMARY = [
 export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps> = ({ auditLogs, journalEntries, closedFiscalYears, onCloseFiscalYear }) => {
   const { can } = usePermission();
   const [activeTab, setActiveTab] = useState<'closing' | 'audit' | 'roles'>('closing');
-  const years = useMemo(() => {
-    const set = new Set(journalEntries.map((j) => tryFiscalYearOf(j.date)).filter((y): y is number => y !== null));
-    set.add(getCurrentFiscalYear());
-    return [...set].sort((a, b) => b - a);
-  }, [journalEntries]);
-  const [year, setYear] = useState<number>(() => years.find((y) => !closedFiscalYears.includes(y)) || getCurrentFiscalYear());
+  const years = useMemo(() => fiscalYearsOf(journalEntries), [journalEntries]);
+  const [year, setYear] = useState<number>(() => years.find((y) => !closedFiscalYears.includes(y)) || years[0]);
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const yearEntries = journalEntries.filter((j) => tryFiscalYearOf(j.date) === year);
-  const pending = yearEntries.filter((j) => j.status === 'در انتظار تأیید' || j.status === 'پیش‌نویس');
-  const final = yearEntries.filter((j) => j.status === 'ثبت قطعی' || j.status === 'تأیید شده' || j.status === 'برگشت خورده');
-  let revenue = 0;
-  let cost = 0;
-  for (const j of final) {
-    for (const r of j.rows) {
-      if (r.accountCode.startsWith('4')) revenue += r.credit - r.debit;
-      else if (/^[56]/.test(r.accountCode)) cost += r.debit - r.credit;
-    }
-  }
-  const isClosed = closedFiscalYears.includes(year);
+  // Figures of the selected year (store view model).
+  const closing = useMemo(() => selectYearClosing(journalEntries, closedFiscalYears, year), [journalEntries, closedFiscalYears, year]);
+  const { yearEntries, pending, final, revenue, cost } = closing;
+  const isClosed = closing.isClosed;
   const allowed = can('fiscal.close');
 
   return (
@@ -86,7 +73,7 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
             </div>
             <label className="text-xs text-slate-700 flex items-center gap-2">
               سال مالی:
-              <select value={year} onChange={(e) => setYear(parseIntegerAmount(e.target.value))} className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                 {years.map((y) => (
                   <option key={y} value={y}>
                     {toPersianDigits(y)} {closedFiscalYears.includes(y) ? '(بسته)' : ''}
@@ -110,8 +97,8 @@ export const PeriodClosingAndAuditView: React.FC<PeriodClosingAndAuditViewProps>
               <p className="font-mono">{formatMoney(cost)}</p>
             </div>
             <div className="p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-900">
-              <div className="font-bold mb-1">{revenue - cost >= 0 ? 'سود' : 'زیان'} قابل انتقال</div>
-              <p className="font-mono">{formatMoney(Math.abs(revenue - cost))}</p>
+              <div className="font-bold mb-1">{closing.isProfit ? 'سود' : 'زیان'} قابل انتقال</div>
+              <p className="font-mono">{formatMoney(closing.result)}</p>
             </div>
           </div>
 

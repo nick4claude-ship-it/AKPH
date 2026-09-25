@@ -7,7 +7,8 @@ import React from 'react';
 import { CalendarClock, AlertTriangle, CheckCircle2, CreditCard } from 'lucide-react';
 import { PaymentRequest } from '../../types';
 import { ScheduledPayment } from '../../store/domainSelectors';
-import { formatNumber } from '../../utils/formatters';
+import { paymentScheduleFigures } from '../../store/views/treasury';
+import { formatNumber, formatDecimal } from '../../utils/formatters';
 import { formatMoney } from '../../utils/money';
 
 interface PaymentScheduleTabProps {
@@ -17,9 +18,8 @@ interface PaymentScheduleTabProps {
 
 /** برنامه پرداخت: تعهدات باز به ترتیب سررسید در برابر نقدینگی موجود بانک‌ها و صندوق‌ها. */
 export const PaymentScheduleTab: React.FC<PaymentScheduleTabProps> = ({ schedule, onPay }) => {
-  const total = schedule.rows.reduce((a, r) => a + r.request.remainingAmount, 0);
-  const overdue = schedule.rows.filter((r) => r.overdue);
-  const gap = total - schedule.availableCash;
+  const figures = paymentScheduleFigures(schedule);
+  const { total, overdue } = figures;
 
   return (
     <div className="space-y-4">
@@ -34,12 +34,12 @@ export const PaymentScheduleTab: React.FC<PaymentScheduleTabProps> = ({ schedule
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">سررسید گذشته</span>
-          <div className="text-lg font-bold text-rose-700 font-mono">{formatMoney(overdue.reduce((a, r) => a + r.request.remainingAmount, 0), false)}</div>
-          <span className="text-[11px] text-slate-400">{overdue.length.toLocaleString('fa-IR')} فقره</span>
+          <div className="text-lg font-bold text-rose-700 font-mono">{formatMoney(figures.overdueAmount, false)}</div>
+          <span className="text-[11px] text-slate-400">{formatDecimal(overdue.length)} فقره</span>
         </div>
-        <div className={`p-4 rounded-xl border ${gap > 0 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
-          <span className="text-xs text-slate-600">{gap > 0 ? 'کسری نقدینگی برای کل تعهدات' : 'مازاد نقدینگی پس از تعهدات'}</span>
-          <div className={`text-lg font-bold font-mono ${gap > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(Math.abs(gap), false)}</div>
+        <div className={`p-4 rounded-xl border ${figures.shortage ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+          <span className="text-xs text-slate-600">{figures.shortage ? 'کسری نقدینگی برای کل تعهدات' : 'مازاد نقدینگی پس از تعهدات'}</span>
+          <div className={`text-lg font-bold font-mono ${figures.shortage ? 'text-rose-700' : 'text-emerald-700'}`}>{formatMoney(figures.gapAmount, false)}</div>
         </div>
       </div>
 

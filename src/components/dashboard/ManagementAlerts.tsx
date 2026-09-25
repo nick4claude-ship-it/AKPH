@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ManagementAlert, AlertPriority } from '../../types';
 import { AlertTriangle, AlertCircle, Info, ChevronLeft, Check, ShieldAlert } from 'lucide-react';
+import { formatInt } from '../../utils/formatters';
 
 interface ManagementAlertsProps {
   alerts: ManagementAlert[];
@@ -71,7 +72,7 @@ export const ManagementAlerts: React.FC<ManagementAlertsProps> = ({
                 : 'text-slate-600'
             }`}
           >
-            همه ({alerts.length})
+            همه ({formatInt(alerts.length)})
           </button>
           <button
             onClick={() => setFilterPriority('critical')}

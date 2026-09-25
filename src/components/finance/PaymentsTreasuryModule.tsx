@@ -30,13 +30,12 @@ import {
   X,
 } from 'lucide-react';
 import { Project, UserProfile, PaymentRequest } from '../../types';
-import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { usePermission } from '../../store/session';
 import { selectPaymentSchedule } from '../../store/domainSelectors';
 import { toPersianDate } from '../../utils/date';
-import { generateUUID } from '../../utils/ids';
-import { MoneyInput } from '../common/NumberInput';
+import { MoneyInput } from '../../ui/NumberInput';
 import { TreasuryReceiptsTab } from './TreasuryReceiptsTab';
 import { PaymentScheduleTab } from './PaymentScheduleTab';
 
@@ -47,10 +46,10 @@ const TAB_PATHS: Partial<Record<TreasuryTab, string>> = {
   bank_accounts: '/finance/banks',
   cash_desks: '/finance/cash',
 };
-import { formatCurrencyCompact } from '../../utils/formatters';
-import { Dialog } from '../common/Dialog';
+import { formatCurrencyCompact, formatInt } from '../../utils/formatters';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { paymentApprovalContext, paymentExecutionContext } from '../../store/approvalContext';
+import { paymentRequestActions, selectTreasuryKpis } from '../../store/views/treasury';
 
 interface PaymentsTreasuryModuleProps {
   /** Initial tab from the route (payments, receipts, banks, cash). */
@@ -78,10 +77,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   // Routed tabs change the URL (so links and Back work); checks and schedule are in-page tabs.
   const setActiveTab = (t: TreasuryTab) => (TAB_PATHS[t] && t !== tab ? navigate(TAB_PATHS[t]!) : setInnerTab(t));
 
-  const [paymentRequests] = useStoreSlice('paymentRequests');
-  const [checks] = useStoreSlice('treasuryChecks');
-  const [cashDesks] = useStoreSlice('cashDesks');
-  const [bankAccounts] = useStoreSlice('bankAccounts');
+  const { paymentRequests, treasuryChecks: checks, cashDesks, bankAccounts } = appState;
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,20 +105,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   const [newRequestProject, setNewRequestProject] = useState(projects[0]?.id || '');
   const [newRequestDueDate, setNewRequestDueDate] = useState(() => toPersianDate(new Date()));
 
-  // KPI Calculations
-  const totalPendingPayments = paymentRequests
-    .filter((p) => p.status !== 'پرداخت شده' && p.status !== 'رد شده')
-    .reduce((acc, p) => acc + p.remainingAmount, 0);
-
-  const totalPaidThisMonth = paymentRequests
-    .filter((p) => p.status === 'پرداخت شده')
-    .reduce((acc, p) => acc + p.paidAmount, 0);
-
-  const totalLiquidCash = bankAccounts.reduce((acc, b) => acc + b.balance, 0) + cashDesks.reduce((acc, c) => acc + c.balance, 0);
-
-  const upcomingChecksDue = checks
-    .filter((c) => c.status === 'در جریان وصول/سررسید' && c.checkType === 'صادره (پرداختی)')
-    .reduce((acc, c) => acc + c.amount, 0);
+  // KPIs (store view model).
+  const { totalPendingPayments, totalPaidThisMonth, totalLiquidCash, upcomingChecksDue } = useMemo(() => selectTreasuryKpis(appState), [appState]);
 
   const handleApproveRequest = (reqId: string) => onToast(wf.approvePaymentRequest(reqId).message);
   const handleRejectRequest = (reqId: string) => onToast(wf.rejectPaymentRequest(reqId, 'رد توسط خزانه‌داری').message);
@@ -138,17 +122,11 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   const handleExecutePayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequestForPay) return;
-    if (paymentAmount <= 0) return setPayError('مبلغ پرداخت باید بیش از صفر باشد.');
-    if (paymentAmount > selectedRequestForPay.remainingAmount) {
-      return setPayError(`مبلغ پرداخت از مانده (${formatMoney(selectedRequestForPay.remainingAmount)}) بیشتر است.`);
-    }
-    if (!paymentSourceId) return setPayError('حساب بانکی یا صندوق پرداخت‌کننده را انتخاب کنید.');
-    const [kind, id] = paymentSourceId.split(':');
-    const result = wf.executePayment(selectedRequestForPay.id, {
-      bankAccountId: kind === 'bank' ? id : undefined,
-      cashDeskId: kind === 'cash' ? id : undefined,
+    const result = wf.payRequestForm({
+      requestId: selectedRequestForPay.id,
+      sourceId: paymentSourceId,
       amount: paymentAmount,
-      trackingNumber: paymentTrackingNo || undefined,
+      trackingNumber: paymentTrackingNo,
     });
     if (!result.ok) return setPayError(result.message);
     onToast(result.message);
@@ -161,27 +139,12 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   // Manual request (no source document): created through the workflow with a sequential number.
   const handleCreateNewRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newRequestAmount <= 0) return setNewRequestError('مبلغ درخواست باید بیش از صفر باشد.');
-    const proj = projects.find((p) => p.id === newRequestProject);
-    if (!proj) return setNewRequestError('پروژه را انتخاب کنید.');
-    const result = wf.createPaymentRequest({
+    const result = wf.createManualPaymentRequest({
       sourceType: newRequestSource,
-      sourceRefId: generateUUID(),
-      sourceRefNumber: 'بدون سند مبدأ',
-      projectId: proj.id,
-      projectName: proj.name,
-      costCenterId: '',
-      beneficiaryName: newRequestBeneficiary.trim(),
-      beneficiaryType:
-        newRequestSource === 'حق بیمه و مالیات'
-          ? newRequestLiability === 'insurance'
-            ? 'سازمان تامین اجتماعی'
-            : 'سازمان امور مالیاتی'
-          : newRequestSource === 'پیش‌پرداخت پیمانکار جزء'
-            ? 'پیمانکار جزء'
-            : 'تأمین‌کننده',
-      taxKind: newRequestSource === 'حق بیمه و مالیات' && newRequestLiability !== 'insurance' ? newRequestLiability : undefined,
-      totalAmount: newRequestAmount,
+      liability: newRequestLiability,
+      projectId: newRequestProject,
+      beneficiaryName: newRequestBeneficiary,
+      amount: newRequestAmount,
       dueDate: newRequestDueDate,
     });
     if (!result.ok) return setNewRequestError(result.message);
@@ -311,7 +274,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <ArrowDownLeft className="w-3.5 h-3.5 text-amber-400" />
           <span>کارتابل درخواست‌های پرداخت (Payables)</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-800 text-amber-300">
-            {paymentRequests.length}
+            {formatInt(paymentRequests.length)}
           </span>
         </button>
 
@@ -326,7 +289,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <Clock className="w-3.5 h-3.5 text-rose-400" />
           <span>برنامه پرداخت</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {schedule.rows.length}
+            {formatInt(schedule.rows.length)}
           </span>
         </button>
 
@@ -341,7 +304,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
           <span>دریافت‌ها</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {appState.receipts.length}
+            {formatInt(appState.receipts.length)}
           </span>
         </button>
 
@@ -356,7 +319,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <Landmark className="w-3.5 h-3.5 text-emerald-400" />
           <span>حساب‌های بانکی و مغایرت</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {bankAccounts.length}
+            {formatInt(bankAccounts.length)}
           </span>
         </button>
 
@@ -371,7 +334,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <CreditCard className="w-3.5 h-3.5 text-blue-400" />
           <span>مدیریت چک‌های صیادی (وارده/صادره)</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {checks.length}
+            {formatInt(checks.length)}
           </span>
         </button>
 
@@ -386,7 +349,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           <Wallet className="w-3.5 h-3.5 text-purple-400" />
           <span>صندوق‌های نقد کارگاهی</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {cashDesks.length}
+            {formatInt(cashDesks.length)}
           </span>
         </button>
       </div>
@@ -436,7 +399,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
             </div>
 
             <span className="text-slate-400 font-mono text-[11px]">
-              تعداد موارد یافته شده: {filteredRequests.length}
+              تعداد موارد یافته شده: {formatInt(filteredRequests.length)}
             </span>
           </div>
 
@@ -514,7 +477,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                         </td>
                         <td className="py-3 px-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            {req.status === 'در انتظار تأیید مالی' && can('payment_request.approve', paymentApprovalContext(req)) && (
+                            {paymentRequestActions(currentUser, req).canApprove && (
                               <>
                                 <button
                                   onClick={() => handleApproveRequest(req.id)}
@@ -531,7 +494,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                               </>
                             )}
 
-                            {(req.status === 'تأیید مدیر ارشد' || req.status === 'در صف پرداخت خزانه') && can('payment.execute', paymentExecutionContext(req)) && (
+                            {paymentRequestActions(currentUser, req).canPay && (
                               <button
                                 onClick={() => openPayment(req)}
                                 className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
@@ -630,7 +593,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               <span>دفتر مدیریت چک‌های صیادی بنفش (سامانه صیاد بانک مرکزی)</span>
             </h3>
             <span className="text-xs text-slate-500 font-mono">
-              تعداد چک‌های ثبتی: {checks.length}
+              تعداد چک‌های ثبتی: {formatInt(checks.length)}
             </span>
           </div>
 
@@ -789,8 +752,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
             <form onSubmit={handleExecutePayment} className="space-y-4 text-xs">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">حساب بانکی یا صندوق پرداخت‌کننده:</label>
-                <select
+                <label htmlFor="payments-treasury-module-1" className="block font-medium text-slate-700 mb-1">حساب بانکی یا صندوق پرداخت‌کننده:</label>
+                <select id="payments-treasury-module-1"
                   value={paymentSourceId}
                   onChange={(e) => setPaymentSourceId(e.target.value)}
                   required
@@ -835,8 +798,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">شماره پیگیری / ارجاع ساتنا / پایا:</label>
-                <input
+                <label htmlFor="payments-treasury-module-2" className="block font-medium text-slate-700 mb-1">شماره پیگیری / ارجاع ساتنا / پایا:</label>
+                <input id="payments-treasury-module-2"
                   type="text"
                   placeholder="مثال: SATNA-9182049182"
                   value={paymentTrackingNo}
@@ -847,8 +810,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">توضیحات واریز:</label>
-                <input
+                <label htmlFor="payments-treasury-module-3" className="block font-medium text-slate-700 mb-1">توضیحات واریز:</label>
+                <input id="payments-treasury-module-3"
                   type="text"
                   placeholder="تسویه قطعی صورت‌وضعیت / پیش‌پرداخت خرید..."
                   value={paymentNotes}
@@ -892,8 +855,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
             <form onSubmit={handleCreateNewRequest} className="space-y-3.5 text-xs">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">منبع ایجاد تعهد:</label>
-                <select
+                <label htmlFor="payments-treasury-module-4" className="block font-medium text-slate-700 mb-1">منبع ایجاد تعهد:</label>
+                <select id="payments-treasury-module-4"
                   value={newRequestSource}
                   onChange={(e) => setNewRequestSource(e.target.value as PaymentRequest['sourceType'])}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -907,8 +870,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
               {newRequestSource === 'حق بیمه و مالیات' && (
                 <div>
-                  <label className="block font-medium text-slate-700 mb-1">نوع بدهی:</label>
-                  <select
+                  <label htmlFor="payments-treasury-module-5" className="block font-medium text-slate-700 mb-1">نوع بدهی:</label>
+                  <select id="payments-treasury-module-5"
                     value={newRequestLiability}
                     onChange={(e) => setNewRequestLiability(e.target.value as typeof newRequestLiability)}
                     className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -922,8 +885,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               )}
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">نام طرف حساب / ذینفع دریافت وجه:</label>
-                <input
+                <label htmlFor="payments-treasury-module-6" className="block font-medium text-slate-700 mb-1">نام طرف حساب / ذینفع دریافت وجه:</label>
+                <input id="payments-treasury-module-6"
                   type="text"
                   placeholder="مثال: شرکت آرمان بتن سازه / مهندس اکبری..."
                   value={newRequestBeneficiary}
@@ -934,8 +897,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">پروژه منتسب:</label>
-                <select
+                <label htmlFor="payments-treasury-module-7" className="block font-medium text-slate-700 mb-1">پروژه منتسب:</label>
+                <select id="payments-treasury-module-7"
                   value={newRequestProject}
                   onChange={(e) => setNewRequestProject(e.target.value)}
                   className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
@@ -968,8 +931,8 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-700 mb-1">تاریخ سررسید موردنظر:</label>
-                <input
+                <label htmlFor="payments-treasury-module-8" className="block font-medium text-slate-700 mb-1">تاریخ سررسید موردنظر:</label>
+                <input id="payments-treasury-module-8"
                   type="text"
                   value={newRequestDueDate}
                   onChange={(e) => setNewRequestDueDate(e.target.value)}

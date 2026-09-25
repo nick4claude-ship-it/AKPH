@@ -17,8 +17,9 @@ import {
   CashDesk,
   BankReconciliationItem,
 } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatInt } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
+import { useCompany } from '../../store/session';
 
 interface BankAndCashViewProps {
   bankAccounts: BankAccount[];
@@ -33,6 +34,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
   reconciliationItems,
   onTriggerReconciliation,
 }) => {
+  const company = useCompany();
   const [activeTab, setActiveTab] = useState<'banks' | 'cash' | 'reconciliation'>('banks');
   const [selectedBankId, setSelectedBankId] = useState<string>(bankAccounts[0]?.id || '');
 
@@ -50,7 +52,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
             }`}
           >
             <Landmark className="w-3.5 h-3.5" />
-            <span>حساب‌های بانکی ({bankAccounts.length})</span>
+            <span>حساب‌های بانکی ({formatInt(bankAccounts.length)})</span>
           </button>
           <button
             onClick={() => setActiveTab('cash')}
@@ -59,7 +61,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
             }`}
           >
             <Wallet className="w-3.5 h-3.5" />
-            <span>صندوق‌های ریالی ({cashDesks.length})</span>
+            <span>صندوق‌های ریالی ({formatInt(cashDesks.length)})</span>
           </button>
           <button
             onClick={() => setActiveTab('reconciliation')}
@@ -73,7 +75,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
         </div>
 
         <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-          خزانه‌داری متمرکز شرکت سازه گستران پارس
+          خزانه‌داری متمرکز {company.name}
         </span>
       </div>
 

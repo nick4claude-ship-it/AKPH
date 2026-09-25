@@ -15,8 +15,10 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { RequestForQuotation, BidSupplierQuote } from '../../types';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
+import { formatDecimal, formatInt } from '../../utils/formatters';
+import { rfqCanIssueOrder } from '../../store/views/procurement';
 
 interface RfqComparisonViewProps {
   rfqs: RequestForQuotation[];
@@ -84,12 +86,12 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                   <div className="flex justify-between text-slate-600">
                     <span>مقدار مورد نیاز:</span>
                     <span className="font-mono font-bold text-indigo-700">
-                      {rfq.requiredQty.toLocaleString('fa-IR')} {rfq.unit}
+                      {formatDecimal(rfq.requiredQty)} {rfq.unit}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>پیشنهادهای دریافتی:</span>
-                    <span className="font-mono font-bold text-slate-800">{rfq.quotes.length} تأمین‌کننده</span>
+                    <span className="font-mono font-bold text-slate-800">{formatInt(rfq.quotes.length)} تأمین‌کننده</span>
                   </div>
                 </div>
 
@@ -120,7 +122,7 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                   <span>جدول مقایسه بها (Matrix)</span>
                 </button>
 
-                {rfq.status !== 'تبدیل به سفارش (PO)' && (
+                {rfqCanIssueOrder(rfq) && (
                   <button
                     onClick={() => onGeneratePoFromRfq(rfq)}
                     className="flex items-center gap-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black transition-colors shadow-2xs cursor-pointer"
@@ -170,7 +172,7 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                 <div>
                   <span className="text-slate-500">حجم خرید:</span>
                   <span className="font-mono font-bold text-slate-900 mr-1.5">
-                    {activeRfqForMatrix.requiredQty.toLocaleString('fa-IR')} {activeRfqForMatrix.unit}
+                    {formatDecimal(activeRfqForMatrix.requiredQty)} {activeRfqForMatrix.unit}
                   </span>
                 </div>
                 {activeRfqForMatrix.savingsVsBudgetAmount && activeRfqForMatrix.savingsVsBudgetAmount > 0 && (

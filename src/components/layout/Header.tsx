@@ -170,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
                 <span className="text-xs font-bold text-slate-800">هشدارهای مدیریتی</span>
                 <span className="text-[11px] text-amber-600 font-medium">
-                  {alerts.length} مورد فعال
+                  {formatInt(alerts.length)} مورد فعال
                 </span>
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">

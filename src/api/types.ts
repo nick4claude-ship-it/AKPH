@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { JournalEntry, UserProfile } from '../types';
+import type { CompanyProfile, JournalEntry, UserProfile } from '../types';
 import type { AppState, SliceKey } from '../store/types';
 import type { CurrencyUnit } from '../utils/money';
 
@@ -13,6 +13,8 @@ export interface PortalSession {
   /** Display currency, chosen once in the paydar-portal plugin. Amounts are always integer Rials, in the store and on the wire. */
   currency: CurrencyUnit;
   fiscalYear: number;
+  /** The company this installation belongs to (WordPress: the site name). */
+  company: CompanyProfile;
 }
 
 /** Records changed in one slice since the last save (demo data source only). */
