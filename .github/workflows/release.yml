@@ -1,22 +1,30 @@
 name: Plugin release
 
-# Runs only when a new tag akph-portal-v<Version> is pushed:
-#   1. the whole CI runs on the tagged commit (lint, npm tests, build, php -l, the WordPress/PHP integration
-#      tests with MySQL, the package check);
-#   2. only when it passes, akph-portal.zip (PHP, the built app and the Vazirmatn font; no node_modules,
-#      TypeScript, sample data or environment files) is built and attached to a new GitHub Release.
+# Publishes akph-portal.zip (PHP, the built app and the Vazirmatn font; no node_modules, TypeScript,
+# sample data or environment files) as a new GitHub Release of the plugin version. Two ways to start it:
+#   - push a new tag akph-portal-v<Version>;
+#   - Actions → Plugin release → Run workflow, on main: the version is read from the Version header of
+#     wordpress-plugin/akph-portal/akph-portal.php and the tag akph-portal-v<Version> is created on the
+#     commit that was tested and built.
+# Either way:
+#   1. the whole CI runs first on that commit (lint, npm tests, build, php -l, the WordPress/PHP integration
+#      tests with MySQL, the package check); nothing is published unless it passes;
+#   2. the run stops if the release of that version already exists, or (Run workflow) if its tag does;
+#   3. the ZIP is built and published with its SHA-256 (in the release notes and as akph-portal.zip.sha256).
 # A release that already exists is never changed: its file is not replaced and the run fails instead.
-# A new version needs a new Version header and a new tag.
+# A new version needs a new Version header (and readme Stable tag).
 on:
   push:
     tags:
       - 'akph-portal-v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# One release at a time, whichever way it was started.
 concurrency:
-  group: plugin-release-${{ github.ref }}
+  group: plugin-release
   cancel-in-progress: false
 
 jobs:
@@ -32,23 +40,36 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v5
-      - name: The tag must match the plugin version
+      - name: Version and tag
+        id: version
         run: |
           version=$(sed -n 's/^ \* Version:[[:space:]]*\([0-9.]*\).*/\1/p' wordpress-plugin/akph-portal/akph-portal.php)
           constant=$(sed -n "s/.*define('AKPH_PORTAL_VERSION', '\([0-9.]*\)').*/\1/p" wordpress-plugin/akph-portal/akph-portal.php)
           stable=$(sed -n 's/^Stable tag:[[:space:]]*\([0-9.]*\).*/\1/p' wordpress-plugin/akph-portal/readme.txt)
-          echo "tag=$TAG header=$version constant=$constant readme=$stable"
-          test -n "$version" || { echo "::error::no Version header"; exit 1; }
-          test "$TAG" = "akph-portal-v${version}" || { echo "::error::tag $TAG does not match the plugin Version $version"; exit 1; }
+          tag="akph-portal-v${version}"
+          echo "event=$GITHUB_EVENT_NAME ref=$GITHUB_REF sha=$GITHUB_SHA header=$version constant=$constant readme=$stable tag=$tag"
+          test -n "$version" || { echo "::error::no Version header in akph-portal.php"; exit 1; }
           test "$constant" = "$version" || { echo "::error::AKPH_PORTAL_VERSION $constant differs from Version $version"; exit 1; }
           test "$stable" = "$version" || { echo "::error::readme.txt Stable tag $stable differs from Version $version"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            test "$GITHUB_REF_NAME" = "$tag" || { echo "::error::tag $GITHUB_REF_NAME does not match the plugin Version $version"; exit 1; }
+          else
+            test "$GITHUB_REF" = "refs/heads/main" || { echo "::error::Run workflow from main only (this run is on $GITHUB_REF)."; exit 1; }
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              echo "::error::tag $tag already exists; a new release needs a new Version header."
+              exit 1
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Never overwrite an existing release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::release $TAG already exists; its file is not replaced. Publish a new version with a new tag."
+            echo "::error::release $TAG already exists; its file is not replaced. Publish a new version with a new Version header."
             exit 1
           fi
       - uses: actions/setup-node@v5
@@ -59,10 +80,28 @@ jobs:
       - name: Build the plugin ZIP (with package check)
         run: npm run plugin:zip
       - name: Create the release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="${TAG#akph-portal-v}"
-          sum=$(sha256sum .plugin-build/akph-portal.zip | cut -d' ' -f1)
-          notes=$(printf 'افزونه وردپرس akph-portal نسخه %s\n\nنصب: پیشخوان ← افزونه‌ها ← افزودن ← بارگذاری افزونه ← akph-portal.zip (راهنما: docs/INSTALL-FA.md)\n\ncommit: %s\nSHA-256: %s\n' "$version" "$GITHUB_SHA" "$sum")
-          # Fails if the release appeared meanwhile: an existing release is never replaced.
-          gh release create "$TAG" .plugin-build/akph-portal.zip --verify-tag --title "akph-portal ${version}" --notes "$notes"
-          echo "release: $(gh release view "$TAG" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"
+          (cd .plugin-build && sha256sum akph-portal.zip > akph-portal.zip.sha256)
+          sum=$(cut -d' ' -f1 .plugin-build/akph-portal.zip.sha256)
+          notes=$(printf 'افزونه وردپرس akph-portal نسخه %s\n\nنصب: پیشخوان ← افزونه‌ها ← افزودن ← بارگذاری افزونه ← akph-portal.zip (راهنما: docs/INSTALL-FA.md)\n\ncommit: %s\nSHA-256: %s\n' "$VERSION" "$GITHUB_SHA" "$sum")
+          assets=(.plugin-build/akph-portal.zip .plugin-build/akph-portal.zip.sha256)
+          # Both fail if the release appeared meanwhile: an existing release is never replaced.
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            gh release create "$TAG" "${assets[@]}" --verify-tag --title "akph-portal ${VERSION}" --notes "$notes"
+          else
+            # Run workflow: the tag is created on the commit that CI tested and this job built.
+            gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "akph-portal ${VERSION}" --notes "$notes"
+          fi
+          git fetch --quiet origin "+refs/tags/$TAG:refs/tags/$TAG"
+          tagged=$(git rev-parse "$TAG^{commit}")
+          test "$tagged" = "$GITHUB_SHA" || { echo "::error::tag $TAG points to $tagged, not $GITHUB_SHA"; exit 1; }
+          {
+            echo "release: $(gh release view "$TAG" --json url -q .url)"
+            echo ""
+            echo "tag: $TAG → $GITHUB_SHA"
+            echo ""
+            echo "SHA-256 (akph-portal.zip): $sum"
+          } >> "$GITHUB_STEP_SUMMARY"

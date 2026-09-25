@@ -181,27 +181,44 @@ class Test_Akph_Schema_Roles extends Akph_Test_Case {
         $this->assertSame('2', Akph_Schema::DB_VERSION);
     }
 
-    public function test_release_runs_only_for_a_new_tag_after_ci_and_never_overwrites() {
+    public function test_release_runs_for_a_new_tag_or_run_workflow_after_ci_and_never_overwrites() {
         $root = dirname(__DIR__, 2) . '/.github/workflows/';
         $release = file_get_contents($root . 'release.yml');
         $ci = file_get_contents($root . 'ci.yml');
-        // Trigger: new tags only (no branch pushes, manual runs or other events).
+        // Triggers: a new tag, or Run workflow (no branch pushes or other events).
         $this->assertSame(1, preg_match('/^on:\n(.*?)^\S/ms', $release, $on));
-        $this->assertSame("  push:\n    tags:\n      - 'akph-portal-v*'", trim($on[1], "\n"));
-        $this->assertStringNotContainsString('workflow_dispatch', $release);
+        $this->assertSame("  push:\n    tags:\n      - 'akph-portal-v*'\n  workflow_dispatch:", trim($on[1], "\n"));
         $this->assertDoesNotMatchRegularExpression('/^\s+branches:/m', $release);
         // The whole CI (npm tests and the WordPress/PHP tests) runs first, and the release job needs it.
         $this->assertMatchesRegularExpression('/uses: \.\/\.github\/workflows\/ci\.yml/', $release);
         $this->assertMatchesRegularExpression('/needs: \[?ci\]?/', $release);
         $this->assertStringContainsString('workflow_call', $ci);
         $this->assertStringContainsString('vendor/bin/phpunit', $ci);
+        // The version comes from the plugin header and must agree with the constant and the readme.
+        $this->assertStringContainsString("sed -n 's/^ \\* Version:", $release);
+        $this->assertStringContainsString('wordpress-plugin/akph-portal/akph-portal.php', $release);
+        $this->assertStringContainsString('tag="akph-portal-v${version}"', $release);
+        $this->assertStringContainsString('AKPH_PORTAL_VERSION', $release);
+        $this->assertStringContainsString('Stable tag', $release);
+        // A pushed tag must match the version; Run workflow runs on main only and stops if the tag exists.
+        $this->assertStringContainsString('test "$GITHUB_REF_NAME" = "$tag"', $release);
+        $this->assertStringContainsString('test "$GITHUB_REF" = "refs/heads/main"', $release);
+        $this->assertStringContainsString('git ls-remote --exit-code --tags origin "refs/tags/$tag"', $release);
         // An existing release is never overwritten.
         $this->assertStringNotContainsString('--clobber', $release);
         $this->assertStringContainsString('gh release view', $release);
         $this->assertStringContainsString('already exists', $release);
-        $this->assertStringContainsString('gh release create', $release);
         $this->assertDoesNotMatchRegularExpression('/gh release (upload|edit|delete)/', $release);
-        // A branch push runs CI; a tag runs it only through the release.
+        // Tag push: the release uses the pushed tag. Run workflow: the tag is created on the tested commit.
+        $this->assertStringContainsString('gh release create "$TAG" "${assets[@]}" --verify-tag', $release);
+        $this->assertStringContainsString('gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA"', $release);
+        $this->assertStringContainsString('test "$tagged" = "$GITHUB_SHA"', $release);
+        // The ZIP is published with its SHA-256.
+        $this->assertStringContainsString('sha256sum akph-portal.zip > akph-portal.zip.sha256', $release);
+        $this->assertStringContainsString('SHA-256: %s', $release);
+        // One release at a time, whichever way it was started.
+        $this->assertMatchesRegularExpression('/concurrency:\n  group: plugin-release\n/', $release);
+        // A branch push runs CI; a release runs it only through the release workflow.
         $this->assertSame(1, preg_match('/^on:\n(.*?)^\S/ms', $ci, $ci_on));
         $this->assertStringContainsString("branches: ['**']", $ci_on[1]);
     }
