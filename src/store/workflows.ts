@@ -46,7 +46,7 @@ import { checkPermission, PETTY_STEP_ACTION, UserAction, ActionContext } from '.
 import { formatMoney, formatInt } from '../utils/money';
 import { toPersianDigits } from '../utils/formatters';
 import { generateUUID, nextDocNumber, tryFiscalYearOf } from '../utils/ids';
-import { finalizeManualEntry, findAccountNode, reversedEntryIds } from './postingEngine';
+import { finalizeManualEntry, findAccountNode, pendingReversalIds, reversedEntryIds } from './postingEngine';
 import {
   journalContext,
   paymentApprovalContext,
@@ -1021,6 +1021,11 @@ export function approveJournalEntry(env: WorkflowEnv, id: string): WorkflowResul
  * Correction of a final entry: a new reversal entry with debit and credit swapped. The original entry
  * is not edited. A reversal cannot itself be reversed, an entry is reversed at most once, and pending
  * or rejected entries have nothing to reverse.
+ *
+ * A manual entry's reversal is a pending entry (DRF number) that becomes final only when another user
+ * approves it (approveJournalEntry issues its ACC number), exactly as on the server; rejecting it leaves
+ * the original free for a new request. An automatic entry is reversed together with its source operation
+ * (reopened for a correct posting) and is final at once; those modules are not on the server yet.
  */
 export function reverseJournalEntry(env: WorkflowEnv, id: string, reason: string): WorkflowResult {
   const state = env.getState();
@@ -1031,18 +1036,17 @@ export function reverseJournalEntry(env: WorkflowEnv, id: string, reason: string
   if (original.status !== 'ثبت قطعی' && original.status !== 'تأیید شده') return fail('فقط سند قطعی قابل معکوس‌کردن است.');
   if (original.reversedFromDocId) return fail('سند معکوس را نمی‌توان دوباره معکوس کرد.');
   if (reversedEntryIds(state).has(original.id)) return fail('این سند قبلاً معکوس شده است.');
+  if (pendingReversalIds(state).has(original.id)) return fail('درخواست معکوس این سند در انتظار تأیید است.');
   if (!reason.trim()) return fail('علت صدور سند معکوس را وارد کنید.');
   if (original.type === 'بستن حساب‌ها') return fail('سند اختتامیه سال قابل معکوس‌کردن نیست.');
 
   // An automatic entry is reversed only together with its source operation, which is reopened so the
   // correct entry can be posted again. Sources that cannot be reopened are corrected in their own module.
   const sourceEvent = state.financialEvents.find((e) => e.journalEntryId === original.id && e.status === 'posted' && e.type !== 'JOURNAL_REVERSAL');
-  let reopen: (() => void) | null = null;
-  if (sourceEvent) {
-    const plan = reopenSourcePlan(env, sourceEvent, original.docNumber, reason);
-    if (typeof plan === 'string') return fail(plan);
-    reopen = plan;
-  }
+  if (!sourceEvent) return requestManualReversal(env, original, reason.trim());
+  const plan = reopenSourcePlan(env, sourceEvent, original.docNumber, reason);
+  if (typeof plan === 'string') return fail(plan);
+  const reopen = plan;
 
   const posting = env.post(
     {
@@ -1078,14 +1082,43 @@ export function reverseJournalEntry(env: WorkflowEnv, id: string, reason: string
   );
   if (!posting.ok) return postingFailure(posting);
   if (posting.duplicate) return fail('این سند قبلاً معکوس شده است.');
-  if (sourceEvent && reopen) {
-    env.set('financialEvents', (prev) => prev.map((e) => (e.id === sourceEvent.id ? { ...e, status: 'reversed' } : e)));
-    reopen();
-  }
-  return ok(
-    `سند معکوس ${posting.event?.docNumber} برای سند ${original.docNumber} صادر شد${sourceEvent ? '؛ عملیات منبع برای ثبت مجدد باز شد' : ''}.`,
-    { docNumber: posting.event?.docNumber }
-  );
+  env.set('financialEvents', (prev) => prev.map((e) => (e.id === sourceEvent.id ? { ...e, status: 'reversed' } : e)));
+  reopen();
+  return ok(`سند معکوس ${posting.event?.docNumber} برای سند ${original.docNumber} صادر شد؛ عملیات منبع برای ثبت مجدد باز شد.`, {
+    docNumber: posting.event?.docNumber,
+  });
+}
+
+/** Pending reversal of a manual entry: lines swapped, waiting for another user's approval. */
+function requestManualReversal(env: WorkflowEnv, original: JournalEntry, reason: string): WorkflowResult {
+  const state = env.getState();
+  const date = today();
+  const reversal: JournalEntry = {
+    id: generateUUID(),
+    docNumber: nextDocNumber(state.journalEntries.map((j) => j.docNumber), 'DRF', date),
+    date,
+    title: `معکوس سند ${original.docNumber} — ${reason}`,
+    type: 'سند اصلاحی و معکوس',
+    projectId: original.projectId,
+    projectName: original.projectName,
+    costCenterId: original.costCenterId,
+    costCenterName: original.costCenterName,
+    rows: original.rows.map((r) => ({ ...r, id: generateUUID(), description: `معکوس: ${r.description}`, debit: r.credit, credit: r.debit })),
+    totalDebit: original.totalCredit,
+    totalCredit: original.totalDebit,
+    isBalanced: true,
+    submitter: env.user.name,
+    submitterId: env.user.id,
+    status: 'در انتظار تأیید',
+    reversedFromDocId: original.id,
+    reversedFromDocNumber: original.docNumber,
+    history: [{ date, time: now(), user: env.user.name, action: 'درخواست سند معکوس و ارسال برای تأیید', note: reason }],
+  };
+  env.set('journalEntries', (prev) => [reversal, ...prev]);
+  return ok(`سند معکوس ${reversal.docNumber} برای سند ${original.docNumber} ثبت شد و در انتظار تأیید کاربر دیگری است.`, {
+    id: reversal.id,
+    docNumber: reversal.docNumber,
+  });
 }
 
 /**

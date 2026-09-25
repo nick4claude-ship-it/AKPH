@@ -9,10 +9,16 @@ if (!defined('ABSPATH')) {
 }
 
 final class Akph_Schema {
-    const DB_VERSION = '1';
+    const DB_VERSION = '2';
     const OPTION_VERSION = 'akph_portal_db_version';
     /** Tables that are not InnoDB (transactions and row locks would silently not work). */
     const OPTION_ENGINE_PROBLEMS = 'akph_portal_engine_problems';
+    /**
+     * Set for an hour after a migration that left tables off InnoDB: the automatic migration on
+     * plugins_loaded is not repeated on every request meanwhile (activation and the settings screen retry).
+     */
+    const TRANSIENT_BACKOFF = 'akph_portal_migrate_backoff';
+    const BACKOFF_SECONDS = 3600;
 
     public static function table($name) {
         global $wpdb;
@@ -117,6 +123,7 @@ final class Akph_Schema {
  project_id bigint(20) unsigned NULL DEFAULT NULL,
  status varchar(12) NOT NULL DEFAULT 'pending',
  reversal_of bigint(20) unsigned NULL DEFAULT NULL,
+ reversal_target bigint(20) unsigned NULL DEFAULT NULL,
  total bigint(20) unsigned NOT NULL DEFAULT 0,
  created_by bigint(20) unsigned NOT NULL,
  created_at datetime NOT NULL,
@@ -130,6 +137,7 @@ final class Akph_Schema {
  PRIMARY KEY  (id),
  UNIQUE KEY doc_number (doc_number),
  UNIQUE KEY reversal_of (reversal_of),
+ KEY reversal_target (reversal_target),
  KEY status_date (status,entry_date),
  KEY fiscal_year (fiscal_year),
  KEY project_id (project_id)",
@@ -187,14 +195,22 @@ final class Akph_Schema {
     }
 
     public static function maybe_migrate() {
-        if (get_option(self::OPTION_VERSION) !== self::DB_VERSION) {
-            self::migrate();
+        if (get_option(self::OPTION_VERSION) === self::DB_VERSION) {
+            return;
         }
+        if (get_transient(self::TRANSIENT_BACKOFF)) {
+            return; // the last attempt left tables off InnoDB: retried after the backoff or from the settings screen
+        }
+        self::migrate();
     }
 
     /**
      * Additive migration. Returns the engine problems found (empty when every table is InnoDB).
-     * The version is stored only when all tables exist on InnoDB; otherwise every command answers 503.
+     * The version is stored only when all tables exist on InnoDB; otherwise every command answers 503 and
+     * the automatic retry waits for the backoff transient to expire.
+     *
+     * Versions: 1 — tables of 0.3.0; 2 — ledger_entries.reversal_target (the entry a reversal reverses, kept
+     * after a rejected reversal releases reversal_of).
      */
     public static function migrate() {
         global $wpdb;
@@ -210,10 +226,22 @@ final class Akph_Schema {
             }
         }
         update_option(self::OPTION_ENGINE_PROBLEMS, $problems, false);
-        if (!$problems) {
-            update_option(self::OPTION_VERSION, self::DB_VERSION, false);
+        if ($problems) {
+            set_transient(self::TRANSIENT_BACKOFF, 1, self::BACKOFF_SECONDS);
+            return $problems;
         }
+        self::backfill();
+        delete_transient(self::TRANSIENT_BACKOFF);
+        update_option(self::OPTION_VERSION, self::DB_VERSION, false);
         return $problems;
+    }
+
+    /** Data steps of the versions above; each is idempotent (runs again harmlessly). */
+    private static function backfill() {
+        global $wpdb;
+        $entries = self::table('ledger_entries');
+        // v2: reversals issued by 0.3.0 get their target.
+        $wpdb->query("UPDATE {$entries} SET reversal_target = reversal_of WHERE reversal_of IS NOT NULL AND reversal_target IS NULL");
     }
 
     private static function engine($table) {

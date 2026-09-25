@@ -57,7 +57,12 @@ final class Akph_Admin {
             return;
         }
         $saved = false;
-        if (isset($_POST['akph_settings_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['akph_settings_nonce'])), 'akph_settings')) {
+        $retried = null;
+        $nonce_ok = isset($_POST['akph_settings_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['akph_settings_nonce'])), 'akph_settings');
+        if ($nonce_ok && isset($_POST['akph_action']) && sanitize_key(wp_unslash($_POST['akph_action'])) === 'migrate_retry') {
+            // The automatic retry waits for the backoff after a failed migration; this runs it now.
+            $retried = Akph_Schema::migrate();
+        } elseif ($nonce_ok) {
             Akph_Settings::update(array(
                 'mode' => isset($_POST['mode']) ? sanitize_key(wp_unslash($_POST['mode'])) : 'live',
                 'currency' => isset($_POST['currency']) ? sanitize_key(wp_unslash($_POST['currency'])) : 'toman',
@@ -68,6 +73,11 @@ final class Akph_Admin {
         echo '<div class="wrap"><h1>تنظیمات پرتال AKPH</h1>';
         if ($saved) {
             echo '<div class="notice notice-success"><p>تنظیمات ذخیره شد.</p></div>';
+        }
+        if ($retried !== null) {
+            echo $retried
+                ? '<div class="notice notice-error"><p>ساخت جدول‌ها دوباره اجرا شد ولی این جدول‌ها هنوز روی InnoDB نیستند: <code>' . esc_html(implode(', ', $retried)) . '</code></p></div>'
+                : '<div class="notice notice-success"><p>جدول‌های پرتال روی InnoDB آماده شدند.</p></div>';
         }
         echo '<form method="post">';
         wp_nonce_field('akph_settings', 'akph_settings_nonce');
@@ -82,7 +92,14 @@ final class Akph_Admin {
         foreach (self::status_rows() as $row) {
             echo '<tr><td>' . esc_html($row[0]) . '</td><td>' . ($row[1] ? '✅' : '⚠️') . '</td><td><code>' . esc_html($row[2]) . '</code></td></tr>';
         }
-        echo '</tbody></table></div>';
+        echo '</tbody></table>';
+        if (!Akph_Schema::ready()) {
+            echo '<form method="post" style="margin-top:12px">';
+            wp_nonce_field('akph_settings', 'akph_settings_nonce');
+            echo '<p class="description">ساخت خودکار جدول‌ها پس از خطا تا یک ساعت تکرار نمی‌شود. پس از رفع مشکل موتور جدول‌ها (InnoDB) این دکمه را بزنید.</p>';
+            echo '<button class="button" name="akph_action" value="migrate_retry">ساخت دوباره جدول‌ها</button></form>';
+        }
+        echo '</div>';
     }
 
     private static function money_cell($rials) {
@@ -116,8 +133,16 @@ final class Akph_Admin {
             }
         }
         $show_plan = $valid && in_array($action, array('migrate_preview', 'migrate_run'), true);
+        $plan = null;
         if ($show_plan) {
-            $plan = Akph_Migration::plan();
+            try {
+                $plan = Akph_Migration::plan();
+            } catch (Akph_Error $e) {
+                echo '<div class="notice notice-error"><p>' . esc_html($e->getMessage()) . '</p></div>';
+                $show_plan = false;
+            }
+        }
+        if ($show_plan) {
             if (!$plan['available']) {
                 echo '<p>جدول پروژه‌های پایدار پورتال پیدا نشد.</p>';
             } else {
@@ -146,8 +171,15 @@ final class Akph_Admin {
         // ---- standard chart
         echo '<h2 style="margin-top:32px">۲. کدینگ استاندارد حساب‌ها</h2>';
         echo '<p>کدهای حسابی که قواعد ثبت پرتال استفاده می‌کنند (فقط کد، عنوان و سطح؛ بدون مانده). حساب‌های موجود تغییر نمی‌کنند و فقط کدهای ناموجود اضافه می‌شوند.</p>';
+        $r = null;
         if ($valid && in_array($action, array('chart_preview', 'chart_install'), true)) {
-            $r = Akph_Accounts::install_standard_chart($action === 'chart_preview');
+            try {
+                $r = Akph_Accounts::install_standard_chart($action === 'chart_preview');
+            } catch (Akph_Error $e) {
+                echo '<div class="notice notice-error"><p>' . esc_html($e->getMessage()) . ' هیچ تغییری ذخیره نشد.</p></div>';
+            }
+        }
+        if ($r !== null) {
             if ($action === 'chart_install') {
                 echo '<div class="notice notice-success"><p>' . esc_html($r['inserted']) . ' حساب اضافه شد.</p></div>';
             } else {

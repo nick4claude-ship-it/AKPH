@@ -11,6 +11,8 @@ import * as recordWorkflows from './recordWorkflows';
 import { WorkflowEnv, WorkflowResult } from './workflowKit';
 import { applyPosting, preparePosting } from './postingEngine';
 import { emitToast } from './toast';
+import { commandKeys } from './commandKeys';
+import { ApiError } from '../api/client';
 import type { AppState } from './types';
 
 /** Workflow functions exposed to the UI (each takes the environment as first argument). */
@@ -150,13 +152,20 @@ export function useWorkflows(): WorkflowApi {
         const state = getState();
         const check = dryRun(state, user, fn, args);
         if (!check.ok) return check;
+        // One Idempotency-Key per form submission: the same submission sent again reuses it.
+        const { key, inFlight } = commandKeys.acquire(name, args);
+        if (inFlight) return { ok: true, message: 'همین درخواست در حال ارسال است…' };
         commands
-          .run(name, args, state)
+          .run(name, args, state, key)
           .then((result) => {
+            commandKeys.settle(key, 'ok');
             dispatch({ type: 'MERGE_SERVER_RECORDS', records: result.records });
             emitToast(result.message);
           })
-          .catch((err: unknown) => emitToast((err as { farsiMessage?: string })?.farsiMessage || 'سرور درخواست را نپذیرفت.'));
+          .catch((err: unknown) => {
+            commandKeys.settle(key, err instanceof ApiError && err.outcomeUnknown ? 'unknown' : 'rejected');
+            emitToast((err as { farsiMessage?: string })?.farsiMessage || 'سرور درخواست را نپذیرفت.');
+          });
         return { ok: true, message: 'درخواست به سرور ارسال شد…' };
       };
     }

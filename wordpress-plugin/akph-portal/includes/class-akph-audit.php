@@ -41,8 +41,8 @@ final class Akph_Audit {
             $where .= $wpdb->prepare(' AND object_id = %d', $object_id);
         }
         $offset = ($page - 1) * $per_page;
-        $rows = $wpdb->get_results("SELECT * FROM {$t} WHERE {$where} ORDER BY id DESC LIMIT {$per_page} OFFSET {$offset}");
-        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$t} WHERE {$where}");
+        $rows = Akph_Db::results("SELECT * FROM {$t} WHERE {$where} ORDER BY id DESC LIMIT {$per_page} OFFSET {$offset}");
+        $total = (int) Akph_Db::value("SELECT COUNT(*) FROM {$t} WHERE {$where}");
         $out = array();
         foreach ((array) $rows as $r) {
             $user = get_userdata((int) $r->user_id);

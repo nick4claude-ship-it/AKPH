@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { buildMockState } from '../src/api/mock/buildState';
-import { postFinancialEventToState, reversedEntryIds } from '../src/store/postingEngine';
+import { pendingReversalIds, postFinancialEventToState, reversedEntryIds } from '../src/store/postingEngine';
 import { selectProjectFinancials } from '../src/store/selectors';
 import { selectApprovals, selectMaterials, availableQtyOf } from './helpers';
 import * as wf from '../src/store/workflows';
@@ -247,10 +247,24 @@ const bankBeforeManual = state.bankAccounts[0].balance;
 ok('تأیید سند توسط مدیر ارشد', wf.approveJournalEntry(env(CEO), manual.id!));
 assert.equal(state.bankAccounts[0].balance, bankBeforeManual - 5_000_000, 'approved voucher moves the bank balance');
 const original = state.journalEntries.find((j) => j.id === manual.id)!;
-ok('صدور سند معکوس', wf.reverseJournalEntry(env(ACC), original.id, 'اشتباه در حساب'));
+// A manual entry's reversal waits for a second person, like any manual entry (server rule since 0.3.1).
+ok('درخواست سند معکوس', wf.reverseJournalEntry(env(ACC), original.id, 'اشتباه در حساب'));
 assert.equal(state.journalEntries.find((j) => j.id === original.id), original, 'the original final entry is not modified');
-assert.equal(state.bankAccounts[0].balance, bankBeforeManual, 'reversal restores the bank balance');
-const reversal = state.journalEntries.find((j) => j.reversedFromDocId === original.id)!;
+const firstRequest = state.journalEntries.find((j) => j.reversedFromDocId === original.id)!;
+assert.equal(firstRequest.status, 'در انتظار تأیید');
+assert.match(firstRequest.docNumber, /^DRF-/);
+assert.equal(state.bankAccounts[0].balance, bankBeforeManual - 5_000_000, 'a pending reversal does not touch the books');
+assert.ok(pendingReversalIds(state).has(original.id));
+assert.ok(!reversedEntryIds(state).has(original.id));
+denied('درخواست دوم معکوس در حالی که اولی در انتظار است', wf.reverseJournalEntry(env(ACC), original.id, 'x'));
+denied('تأیید سند معکوس توسط درخواست‌کننده', wf.approveJournalEntry(env(ACC), firstRequest.id));
+ok('رد درخواست معکوس توسط کاربر دیگر', wf.rejectJournalEntry(env(CEO), firstRequest.id, 'لازم نیست'));
+assert.ok(!pendingReversalIds(state).has(original.id), 'a rejected request frees the original');
+ok('درخواست دوباره سند معکوس', wf.reverseJournalEntry(env(ACC), original.id, 'اشتباه در حساب'));
+const reversal = state.journalEntries.find((j) => j.reversedFromDocId === original.id && j.status === 'در انتظار تأیید')!;
+ok('تأیید سند معکوس توسط کاربر دیگر', wf.approveJournalEntry(env(CEO), reversal.id));
+assert.match(state.journalEntries.find((j) => j.id === reversal.id)!.docNumber, /^ACC-/);
+assert.equal(state.bankAccounts[0].balance, bankBeforeManual, 'the approved reversal restores the bank balance');
 assert.ok(reversedEntryIds(state).has(original.id));
 denied('معکوس دوباره همان سند', wf.reverseJournalEntry(env(ACC), original.id, 'x'));
 denied('معکوس سند معکوس', wf.reverseJournalEntry(env(ACC), reversal.id, 'x'));

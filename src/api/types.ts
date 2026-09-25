@@ -41,7 +41,11 @@ export interface CommandResult {
 export interface CommandGateway {
   /** Workflow actions the installed server can execute. Everything else is read-only in the UI. */
   supports(action: string): boolean;
-  run(action: string, args: unknown[], state: AppState): Promise<CommandResult>;
+  /**
+   * Sends the command. `idempotencyKey` belongs to the form submission (src/store/commandKeys.ts): the same
+   * submission sent again carries the same key.
+   */
+  run(action: string, args: unknown[], state: AppState, idempotencyKey: string): Promise<CommandResult>;
 }
 
 /**

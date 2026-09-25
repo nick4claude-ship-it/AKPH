@@ -76,6 +76,9 @@ final class Akph_Rest {
             return rest_ensure_response($fn());
         } catch (Akph_Error $e) {
             return $e->to_wp_error();
+        } catch (Throwable $e) {
+            error_log('[akph-portal] read failed: ' . $e->getMessage());
+            return new WP_Error('akph_server_error', 'خطای سرور.', array('status' => 500));
         }
     }
 
@@ -93,6 +96,12 @@ final class Akph_Rest {
     // ------------------------------------------------------------------ session
 
     public static function me(WP_REST_Request $request) {
+        return self::read(function () {
+            return self::me_data();
+        });
+    }
+
+    private static function me_data() {
         $user = wp_get_current_user();
         $slug = Akph_Roles::role_of($user);
         $caps = array();
@@ -100,7 +109,7 @@ final class Akph_Rest {
             $caps[$cap] = user_can($user, $cap);
         }
         $today = Akph_Jalali::today_iso();
-        return rest_ensure_response(array(
+        return array(
             'id' => (string) $user->ID,
             'display_name' => $user->display_name,
             'role' => Akph_Roles::label($slug),
@@ -113,7 +122,7 @@ final class Akph_Rest {
             'today' => $today,
             'caps' => $caps,
             'server_version' => AKPH_PORTAL_VERSION,
-        ));
+        );
     }
 
     // ------------------------------------------------------------------ projects
@@ -131,7 +140,9 @@ final class Akph_Rest {
     }
 
     public static function list_managers() {
-        return rest_ensure_response(array('managers' => Akph_Projects::managers()));
+        return self::read(function () {
+            return array('managers' => Akph_Projects::managers());
+        });
     }
 
     public static function create_project(WP_REST_Request $request) {

@@ -365,8 +365,8 @@ export function parseEntry(raw: unknown, lookups: EntryLookups): JournalEntry {
     const day = isoToJalali(iso.slice(0, 10));
     history.push({ date: day, time: iso.slice(11, 16), user, action, ...(note ? { note } : {}) });
   };
-  stamp(createdAt, str(route, o, 'created_by_name', true), sourceType === 'reversal' ? 'صدور سند معکوس' : 'ثبت سند و ارسال برای تأیید');
-  if (rawStatus === 'posted' && sourceType === 'manual') stamp(str(route, o, 'approved_at', true), str(route, o, 'approved_by_name', true), 'تأیید نهایی و درج در دفاتر');
+  stamp(createdAt, str(route, o, 'created_by_name', true), sourceType === 'reversal' ? 'درخواست سند معکوس و ارسال برای تأیید' : 'ثبت سند و ارسال برای تأیید');
+  if (rawStatus === 'posted' && (sourceType === 'manual' || sourceType === 'reversal')) stamp(str(route, o, 'approved_at', true), str(route, o, 'approved_by_name', true), 'تأیید نهایی و درج در دفاتر');
   if (rawStatus === 'rejected') stamp(str(route, o, 'rejected_at', true), '', 'رد سند', str(route, o, 'status_note', true));
   return {
     id,
@@ -419,6 +419,7 @@ const AUDIT_ACTION: Record<string, AuditLog['action']> = {
   entry_updated: 'ویرایش پیش‌نویس',
   entry_posted: 'تأیید سند',
   entry_rejected: 'رد سند',
+  entry_reversal_requested: 'سند معکوس',
   entry_reversed: 'سند معکوس',
 };
 

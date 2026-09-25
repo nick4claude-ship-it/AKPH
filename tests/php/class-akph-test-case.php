@@ -35,6 +35,11 @@ abstract class Akph_Test_Case extends WP_UnitTestCase {
         }
         $wpdb->query("DELETE FROM {$wpdb->prefix}paydar_projects");
         delete_option(Akph_Settings::OPTION);
+        // A test that changes table engines commits its intermediate state (ALTER TABLE commits): start clean.
+        delete_transient(Akph_Schema::TRANSIENT_BACKOFF);
+        if (!Akph_Schema::ready()) {
+            Akph_Schema::migrate();
+        }
         $depth = new ReflectionProperty('Akph_Db', 'depth');
         $depth->setAccessible(true);
         $depth->setValue(null, 0);

@@ -100,9 +100,9 @@ final class Akph_Projects {
         global $wpdb;
         $t = self::table();
         if (Akph_Auth::view_all()) {
-            $rows = $wpdb->get_results("SELECT * FROM {$t} ORDER BY id DESC");
+            $rows = Akph_Db::results("SELECT * FROM {$t} ORDER BY id DESC");
         } else {
-            $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$t} WHERE manager_user_id = %d AND manager_user_id > 0 ORDER BY id DESC", get_current_user_id()));
+            $rows = Akph_Db::results($wpdb->prepare("SELECT * FROM {$t} WHERE manager_user_id = %d AND manager_user_id > 0 ORDER BY id DESC", get_current_user_id()));
         }
         return array_map(array(__CLASS__, 'shape'), (array) $rows);
     }

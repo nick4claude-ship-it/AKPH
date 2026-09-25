@@ -1,7 +1,8 @@
 <?php
 /**
  * Trial balance and account ledger, from posted entries only. Project managers get the lines of their own
- * projects only (lines without a project are headquarters and excluded); their reports are marked partial.
+ * projects only (lines without a project are headquarters and excluded); their reports are marked partial,
+ * and the ledger omits the entry description (entry_description = null) for users without akph_view_all.
  */
 if (!defined('ABSPATH')) {
     exit;
@@ -44,7 +45,7 @@ final class Akph_Reports {
         $where = self::where($f);
         $before = $f['from'] ? $wpdb->prepare('e.entry_date < %s', $f['from']) : '1=0';
         $during = $f['from'] ? $wpdb->prepare('e.entry_date >= %s', $f['from']) : '1=1';
-        $rows = $wpdb->get_results(
+        $rows = Akph_Db::results(
             "SELECT l.account_code, a.title, a.level, a.nature,
                 SUM(CASE WHEN {$before} THEN CAST(l.debit AS SIGNED) - CAST(l.credit AS SIGNED) ELSE 0 END) AS opening,
                 SUM(CASE WHEN {$during} THEN l.debit ELSE 0 END) AS debit,
@@ -97,26 +98,29 @@ final class Akph_Reports {
         $where = self::where($f) . $wpdb->prepare(' AND l.account_code = %s', $account_code);
         $opening = 0;
         if ($f['from']) {
-            $opening = (int) $wpdb->get_var("SELECT COALESCE(SUM(CAST(l.debit AS SIGNED) - CAST(l.credit AS SIGNED)), 0) FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where}" . $wpdb->prepare(' AND e.entry_date < %s', $f['from']));
+            $opening = (int) Akph_Db::value("SELECT COALESCE(SUM(CAST(l.debit AS SIGNED) - CAST(l.credit AS SIGNED)), 0) FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where}" . $wpdb->prepare(' AND e.entry_date < %s', $f['from']));
             $where .= $wpdb->prepare(' AND e.entry_date >= %s', $f['from']);
         }
         $offset = ($page - 1) * $per_page;
         // Balance carried into this page: opening + everything before the page (same order as the rows).
         $carried = $opening;
         if ($offset > 0) {
-            $carried += (int) $wpdb->get_var("SELECT COALESCE(SUM(x.d - x.c), 0) FROM (SELECT CAST(l.debit AS SIGNED) AS d, CAST(l.credit AS SIGNED) AS c FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where} ORDER BY e.entry_date, e.id, l.line_no LIMIT {$offset}) x");
+            $carried += (int) Akph_Db::value("SELECT COALESCE(SUM(x.d - x.c), 0) FROM (SELECT CAST(l.debit AS SIGNED) AS d, CAST(l.credit AS SIGNED) AS c FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where} ORDER BY e.entry_date, e.id, l.line_no LIMIT {$offset}) x");
         }
-        $rows = $wpdb->get_results("SELECT e.id AS entry_id, e.doc_number, e.entry_date, e.description AS entry_description, l.line_no, l.description, l.project_id, l.cost_center_id, l.counterparty_id, l.debit, l.credit FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where} ORDER BY e.entry_date, e.id, l.line_no LIMIT {$per_page} OFFSET {$offset}");
-        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where}");
+        $rows = Akph_Db::results("SELECT e.id AS entry_id, e.doc_number, e.entry_date, e.description AS entry_description, l.line_no, l.description, l.project_id, l.cost_center_id, l.counterparty_id, l.debit, l.credit FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where} ORDER BY e.entry_date, e.id, l.line_no LIMIT {$per_page} OFFSET {$offset}");
+        $total = (int) Akph_Db::value("SELECT COUNT(*) FROM {$l} l JOIN {$e} e ON e.id = l.entry_id WHERE {$where}");
         $balance = $carried;
         $out = array();
+        // The entry description may name other projects or headquarters matters: shown only to users who see
+        // every project. Everyone keeps the description of their own line.
+        $show_entry_description = Akph_Auth::view_all();
         foreach ((array) $rows as $r) {
             $balance += (int) $r->debit - (int) $r->credit;
             $out[] = array(
                 'entry_id' => (string) $r->entry_id,
                 'doc_number' => $r->doc_number,
                 'date' => $r->entry_date,
-                'entry_description' => $r->entry_description,
+                'entry_description' => $show_entry_description ? $r->entry_description : null,
                 'description' => $r->description,
                 'project_id' => $r->project_id ? (string) $r->project_id : null,
                 'cost_center_id' => $r->cost_center_id ? (string) $r->cost_center_id : null,

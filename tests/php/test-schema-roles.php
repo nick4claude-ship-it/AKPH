@@ -93,4 +93,116 @@ class Test_Akph_Schema_Roles extends Akph_Test_Case {
         Akph_Schema::migrate();
         $this->assertSame('0', (string) get_option('users_can_register'));
     }
+
+    public function test_capability_version_is_not_stored_while_a_portal_role_is_missing() {
+        $saved = get_role('paydar_project_manager');
+        $caps = $saved->capabilities;
+        $name = wp_roles()->role_names['paydar_project_manager'];
+        delete_option(Akph_Roles::OPTION_VERSION);
+        remove_role('paydar_project_manager');
+        try {
+            $this->assertSame(array('paydar_project_manager'), Akph_Roles::install());
+            $this->assertFalse(get_option(Akph_Roles::OPTION_VERSION), 'not stored: the missing role would never get its capabilities');
+            $this->assertTrue(get_role('paydar_accountant')->has_cap(Akph_Roles::JOURNAL_CREATE), 'the existing roles are granted anyway');
+            Akph_Roles::maybe_install();
+            $this->assertFalse(get_option(Akph_Roles::OPTION_VERSION));
+        } finally {
+            add_role('paydar_project_manager', $name, array_diff_key($caps, array_flip(Akph_Roles::all_caps())));
+        }
+        // paydar-portal creates the role later: the next request grants it and stores the version.
+        $this->assertFalse(get_role('paydar_project_manager')->has_cap(Akph_Roles::ACCESS));
+        Akph_Roles::maybe_install();
+        $this->assertTrue(get_role('paydar_project_manager')->has_cap(Akph_Roles::ACCESS));
+        $this->assertSame(Akph_Roles::ROLES_VERSION, get_option(Akph_Roles::OPTION_VERSION));
+    }
+
+    public function test_tables_off_innodb_are_not_migrated_again_on_every_request() {
+        global $wpdb;
+        $audit = Akph_Schema::table('audit_log');
+        $queries = array();
+        $count = function ($sql) use (&$queries) {
+            $queries[] = $sql;
+            return $sql;
+        };
+        $wpdb->query("ALTER TABLE {$audit} ENGINE=MyISAM"); // what a host without InnoDB leaves behind
+        try {
+            delete_option(Akph_Schema::OPTION_VERSION);
+            delete_transient(Akph_Schema::TRANSIENT_BACKOFF);
+            $problems = Akph_Schema::migrate();
+            $this->assertSame(array($audit . ':myisam'), $problems);
+            $this->assertFalse(get_option(Akph_Schema::OPTION_VERSION));
+            $this->assertNotEmpty(get_transient(Akph_Schema::TRANSIENT_BACKOFF));
+            $this->assertFalse(Akph_Schema::ready());
+
+            // The next requests do not run dbDelta again while the backoff lasts.
+            add_filter('query', $count);
+            Akph_Schema::maybe_migrate();
+            Akph_Schema::maybe_migrate();
+            remove_filter('query', $count);
+            $this->assertSame(array(), preg_grep('/CREATE TABLE|SHOW TABLE STATUS|DESCRIBE|SHOW (FULL )?COLUMNS/i', $queries));
+
+            // Commands answer 503 meanwhile.
+            $this->login('accountant');
+            $this->assertStatus(503, $this->request('POST', '/journal-entries', $this->entry_body('2026-04-10')));
+
+            // After the backoff (or the retry button) the migration runs again.
+            delete_transient(Akph_Schema::TRANSIENT_BACKOFF);
+            $queries = array();
+            add_filter('query', $count);
+            Akph_Schema::maybe_migrate();
+            remove_filter('query', $count);
+            $this->assertNotEmpty(preg_grep('/SHOW TABLE STATUS/i', $queries));
+            $this->assertNotEmpty(get_transient(Akph_Schema::TRANSIENT_BACKOFF), 'still MyISAM: backoff again');
+        } finally {
+            $wpdb->query("ALTER TABLE {$audit} ENGINE=InnoDB");
+        }
+        // ALTER TABLE committed the failed state above; the repaired state is committed too.
+        $this->assertSame(array(), Akph_Schema::migrate());
+        $this->assertSame(Akph_Schema::DB_VERSION, get_option(Akph_Schema::OPTION_VERSION));
+        $this->assertFalse(get_transient(Akph_Schema::TRANSIENT_BACKOFF));
+        $this->assertTrue(Akph_Schema::ready());
+        $wpdb->query('COMMIT');
+    }
+
+    public function test_version_2_adds_reversal_target_and_fills_it_for_existing_reversals() {
+        global $wpdb;
+        $entries = Akph_Schema::table('ledger_entries');
+        $this->assertSame('reversal_target', $wpdb->get_var("SHOW COLUMNS FROM {$entries} LIKE 'reversal_target'"));
+        $now = gmdate('Y-m-d H:i:s');
+        $row = array('fiscal_year' => 1405, 'entry_date' => '2026-04-10', 'description' => 'x', 'created_by' => 1, 'created_at' => $now, 'updated_at' => $now, 'status' => 'posted');
+        $wpdb->insert($entries, $row + array('doc_number' => 'ACC-1405-00001'));
+        $original = (int) $wpdb->insert_id;
+        $wpdb->insert($entries, $row + array('doc_number' => 'ACC-1405-00002', 'source_type' => 'reversal', 'entry_type' => 'reversal', 'reversal_of' => $original));
+        $reversal = (int) $wpdb->insert_id; // as 0.3.0 wrote it: no reversal_target
+        delete_option(Akph_Schema::OPTION_VERSION);
+        Akph_Schema::maybe_migrate();
+        $this->assertSame((string) $original, $wpdb->get_var("SELECT reversal_target FROM {$entries} WHERE id = {$reversal}"));
+        $this->assertNull($wpdb->get_var("SELECT reversal_target FROM {$entries} WHERE id = {$original}"));
+        $this->assertSame('2', Akph_Schema::DB_VERSION);
+    }
+
+    public function test_release_runs_only_for_a_new_tag_after_ci_and_never_overwrites() {
+        $root = dirname(__DIR__, 2) . '/.github/workflows/';
+        $release = file_get_contents($root . 'release.yml');
+        $ci = file_get_contents($root . 'ci.yml');
+        // Trigger: new tags only (no branch pushes, manual runs or other events).
+        $this->assertSame(1, preg_match('/^on:\n(.*?)^\S/ms', $release, $on));
+        $this->assertSame("  push:\n    tags:\n      - 'akph-portal-v*'", trim($on[1], "\n"));
+        $this->assertStringNotContainsString('workflow_dispatch', $release);
+        $this->assertDoesNotMatchRegularExpression('/^\s+branches:/m', $release);
+        // The whole CI (npm tests and the WordPress/PHP tests) runs first, and the release job needs it.
+        $this->assertMatchesRegularExpression('/uses: \.\/\.github\/workflows\/ci\.yml/', $release);
+        $this->assertMatchesRegularExpression('/needs: \[?ci\]?/', $release);
+        $this->assertStringContainsString('workflow_call', $ci);
+        $this->assertStringContainsString('vendor/bin/phpunit', $ci);
+        // An existing release is never overwritten.
+        $this->assertStringNotContainsString('--clobber', $release);
+        $this->assertStringContainsString('gh release view', $release);
+        $this->assertStringContainsString('already exists', $release);
+        $this->assertStringContainsString('gh release create', $release);
+        $this->assertDoesNotMatchRegularExpression('/gh release (upload|edit|delete)/', $release);
+        // A branch push runs CI; a tag runs it only through the release.
+        $this->assertSame(1, preg_match('/^on:\n(.*?)^\S/ms', $ci, $ci_on));
+        $this->assertStringContainsString("branches: ['**']", $ci_on[1]);
+    }
 }
