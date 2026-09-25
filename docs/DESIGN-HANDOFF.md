@@ -52,9 +52,9 @@
 |---|---|---|
 | `react`، `react-dom`، `react-router-dom`، `lucide-react` | همه | بسته دیگری مجاز نیست |
 | `src/components/**`، `src/pages/**`، `src/assets/**` | همه | |
-| `src/store/views/*` | همه | view modelهای هر ماژول: `contracts`، `procurement`، `inventory`، `pettyCash`، `accounting`، `treasury`، `dashboard`، `reports`، `people`، `approvals`، `exports` |
+| `src/store/views/*` | همه | view modelهای هر ماژول: `contracts`، `procurement`، `inventory`، `pettyCash`، `accounting`، `treasury`، `dashboard`، `reports`، `people`، `approvals`، `exports`، `masterData` |
 | `src/store/AppStore` | `useAppState`، `useSelector` | خواندن وضعیت؛ `useSelector(select, deps)` نتیجه را memo می‌کند |
-| `src/store/session` | همه | `useSession`، `useCurrentUser`، `useCompany`، `usePermission`، `useDemoBanner`، `useReadOnlyNotice` |
+| `src/store/session` | همه | `useSession`، `useCurrentUser`، `useCompany`، `usePermission`، `useDemoBanner`، `useReadOnlyNotice`، `useProjectManagers` |
 | `src/store/useWorkflows` | همه | **تنها راه نوشتن**: `const wf = useWorkflows(); const r = wf.createPurchaseOrder(input); onToast(r.message)` |
 | `src/store/useApprovalActions` | همه | تأیید/رد از کارتابل مرکزی |
 | `src/store/useAssistant` | همه | دستیار هوشمند |
@@ -82,13 +82,13 @@
 | مسیر | کامپوننت | props | hookها و view modelها |
 |---|---|---|---|
 | `/` | `pages/DashboardPage` | `projects`، `selectedProjectId`، `timeRange`، `onChangeTimeRange`، `onOpenProject(p)`، `onOpenReport()`، `onViewApproval(item)`، `onToast` | `useAppState`، `useCurrentUser`، `useApprovalActions`، `useDismissedNotifications`؛ `selectKpiItems`، `selectMonthlyFinancialTrend`، `selectExpenseCategoryTotals`، `selectApprovals`، `selectNotifications`، `selectPettyFunds`؛ `views/dashboard` |
-| `/projects`، `/projects/:projectId` | `project/ProjectsModule` | `projects`، `projectId?`، `onOpenProject(id \| null)`، `onNavigate(path)` | `useAppState`؛ `selectProjectFinancials`، `selectProjectSuppliers`، `selectWarehouses`، `selectPettyFunds`، `selectDocumentsFor`؛ `views/reports.projectBudgetFigures` |
+| `/projects`، `/projects/:projectId` | `project/ProjectsModule` (+ `ProjectFormModal`) | `projects`، `projectId?`، `onOpenProject(id \| null)`، `onNavigate(path)` | `useAppState`، `useCurrentUser`، `useProjectManagers`، `useWorkflows` (`createProject`، `updateProject`)؛ `views/masterData` (`projectEditableGroups`، `projectChanges`، `hasManualSummary`)؛ `selectProjectFinancials`، `views/reports.projectBudgetFigures` |
 | `/contracts/client`، `/contracts/subcontract` | `contracts/ContractsModule` | `mode: 'client' \| 'subcontractor'`، `projects`، `currentUser`، `onPosted?(docNumber)`، `onToast?` | `useAppState`، `useSelector`، `useCompany`، `useWorkflows`؛ `views/contracts` |
 | `/statements/client`، `/statements/subcontractor` | `statements/ProgressStatementsModule` | `projects`، `tab: 'client_statements' \| 'subcontractor_statements'`، `onToast` | `useAppState`، `useCurrentUser`، `useWorkflows`؛ `views/contracts` (`clientStatementActions`، `subcontractorStatementActions`، `statementBalances`، `clientStatementStage`، `CLIENT_FLOW_STEPS`، …) |
 | `/procurement` | `procurement/ProcurementModule` | `projects`، `currentUser`، `onToast` | `useAppState`، `useWorkflows`؛ `views/procurement` |
 | `/inventory` | `inventory/InventoryModule` | `projects`، `currentUser` | `useAppState`، `useWorkflows`؛ `views/inventory`، `selectStockByWarehouse`، … |
 | `/petty-cash` | `petty_cash/PettyCashModule` | `projects`، `currentUser`، `onToast` | `useAppState`، `useWorkflows`؛ `views/pettyCash` |
-| `/finance/accounting` | `accounting/AccountingModule` | `currentUser` | `useAppState`، `useSelector`، `usePermission`، `useWorkflows`؛ `views/accounting` |
+| `/finance/accounting` | `accounting/AccountingModule` (+ `MasterDataForms`) | `currentUser` | `useAppState`، `useSelector`، `usePermission`، `useWorkflows` (سند دستی، `createCostCenter`، `createCounterparty`، `createAccount`)؛ `views/accounting`، `views/masterData` |
 | `/finance/payments`، `/finance/receipts`، `/finance/banks`، `/finance/cash` | `finance/PaymentsTreasuryModule` | `tab`، `projects`، `currentUser`، `onToast` | `useAppState`، `usePermission`، `useWorkflows`؛ `views/treasury` |
 | `/partners/{clients,subcontractors,suppliers}[/:id]` | `partners/PartnersModule` | `projects`، `kind`، `counterpartyId?`، `onOpenProfile(id \| null)`، `onNavigate(path)` | `useAppState`؛ `domainSelectors` |
 | `/payroll` | `hr_payroll/PayrollModule` | `projects`، `currentUser`، `onToast` | `useAppState`، `useCompany`، `usePermission`، `useWorkflows`؛ `views/people` |
@@ -130,7 +130,8 @@
    `window.PaydarPortal`، `localStorage` / `sessionStorage`. عرض نوار پیشرفت: `barWidth(percent)`.
    فیلتر و مرتب‌سازی **نمایشی** (جست‌وجو، انتخاب پروژه، تب) مجاز است.
 7. **حالت فقط‌خواندنی و نمایشی.** نوار `useDemoBanner()` («نسخه نمایشی — داده ساختگی») و پیام
-   `useReadOnlyNotice(pathname)` باید در پوسته دیده شوند؛ حذف یا پنهان نشوند.
+   `useReadOnlyNotice(pathname)` («فقط خواندنی — به‌زودی») باید در پوسته دیده شوند؛ حذف یا پنهان نشوند. «خلاصه دستی» پروژه
+   همیشه با برچسب «سند حسابداری نیست» و جدا از ارقام دفتری نمایش داده شود.
 8. **دسترس‌پذیری.** دکمه‌های فقط-آیکون `aria-label` داشته باشند؛ رنگ تنها نشانه وضعیت نباشد (متن وضعیت
    هم نمایش داده شود)؛ کنتراست متن کوچک کافی باشد.
 9. **چاپ.** کلاس `no-print` برای بخش‌هایی که در چاپ نباید باشند؛ قواعد چاپ در `src/index.css`.

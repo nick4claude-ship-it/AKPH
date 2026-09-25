@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<phpunit
+    bootstrap="bootstrap.php"
+    backupGlobals="false"
+    colors="true"
+    beStrictAboutTestsThatDoNotTestAnything="true"
+    convertErrorsToExceptions="true"
+    convertNoticesToExceptions="true"
+    convertWarningsToExceptions="true"
+    convertDeprecationsToExceptions="false"
+>
+    <testsuites>
+        <testsuite name="akph-portal">
+            <directory prefix="test-" suffix=".php">.</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

@@ -4,34 +4,28 @@
  */
 
 /**
- * Paydar Management Portal REST API client for WordPress integration.
- * Connects to namespace paydar/v1.
- * Handles simple permalinks where restUrl contains '?rest_route='.
+ * REST client of the akph/v1 server (wordpress-plugin/akph-portal). Handles plain permalinks, where
+ * restUrl is "https://site/?rest_route=/akph/v1" and query parameters are joined with "&".
  */
 
-export interface PaydarPortalConfig {
+/** What the app page of the plugin (/?akph_portal=1) defines as window.AkphPortal. */
+export interface AkphPortalConfig {
+  /** 'live': data from akph/v1; 'demo': empty in-browser sandbox (system administrator only). */
+  mode?: 'live' | 'demo';
   restUrl?: string;
   nonce?: string;
   userId?: string | number;
   displayName?: string;
-  role?: string;
   /** WordPress site title (get_bloginfo('name')); shown as the company name. */
   siteName?: string;
-  /** Optional runtime permission hook; it can never allow approving one's own document. */
+  logoutUrl?: string;
+  /** Optional runtime permission hook; it can only restrict, never allow approving one's own document. */
   can?: (action: string, user: unknown, context?: unknown) => boolean;
-  accounting?: {
-    currency?: 'toman' | 'rial';
-    fiscalYear?: number;
-  };
-  petty?: {
-    approvalLimitLevel1?: number;
-    approvalLimitLevel2?: number;
-  };
 }
 
 declare global {
   interface Window {
-    PaydarPortal?: PaydarPortalConfig;
+    AkphPortal?: AkphPortalConfig;
   }
 }
 
@@ -70,15 +64,15 @@ function getFarsiErrorMessage(status: number): string {
  * Build URL taking into account plain permalinks with '?rest_route='
  */
 export function buildApiUrl(endpoint: string, queryParams?: Record<string, string | number | boolean>): string {
-  const config = window.PaydarPortal || {};
-  const baseUrl = config.restUrl || '/wp-json/paydar/v1';
+  const config = window.AkphPortal || {};
+  const baseUrl = config.restUrl || '/wp-json/akph/v1';
 
   // Normalize endpoint to remove leading slash
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
 
   let url: string;
   if (baseUrl.includes('rest_route=')) {
-    // Simple permalink mode: e.g. "https://example.com/?rest_route=/paydar/v1"
+    // Simple permalink mode: e.g. "https://example.com/?rest_route=/akph/v1"
     const separator = baseUrl.endsWith('/') ? '' : '/';
     url = `${baseUrl}${separator}${cleanEndpoint}`;
   } else {
@@ -106,7 +100,7 @@ export async function apiRequest<T>(
   options: RequestInit = {},
   queryParams?: Record<string, string | number | boolean>
 ): Promise<T> {
-  const config = window.PaydarPortal || {};
+  const config = window.AkphPortal || {};
   const url = buildApiUrl(endpoint, queryParams);
 
   const headers: Record<string, string> = {
@@ -173,9 +167,7 @@ export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint
   }
 }
 
-/**
- * JSON REST helpers used by the WordPress data source (src/api/wordpress).
- */
+/** JSON REST helpers used by the akph data source (src/api/akph). */
 export const apiClient = {
   get: <T>(endpoint: string, params?: Record<string, string | number | boolean>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),

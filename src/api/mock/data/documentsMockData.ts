@@ -4,7 +4,7 @@
  */
 
 import type { DocumentCategory } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 /** Seed format of the legacy document register; converted to linked Documents in the store. */
 export interface SeedDocument {
@@ -235,4 +235,4 @@ const rawSystemDocuments: SeedDocument[] = [
   },
 ];
 
-export const mockSystemDocuments: SeedDocument[] = demoDataEnabled() ? rawSystemDocuments : [];
+export const mockSystemDocuments: SeedDocument[] = DEMO_DATA ? rawSystemDocuments : [];

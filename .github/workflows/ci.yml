@@ -44,3 +44,62 @@ jobs:
           status=0
           for f in $files; do php -l "$f" || status=1; done
           exit $status
+
+  wordpress:
+    name: WordPress ${{ matrix.wp }} tests (PHP ${{ matrix.php }}, MySQL 8)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.3']
+        wp: ['7.1.2']
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wp_tests
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v5
+      - name: WordPress test suite (wordpress-develop ${{ matrix.wp }})
+        uses: actions/checkout@v5
+        with:
+          repository: WordPress/wordpress-develop
+          ref: ${{ matrix.wp }}
+          path: wordpress-develop
+          fetch-depth: 1
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring, intl
+          coverage: none
+          tools: composer
+      - name: Install PHPUnit
+        working-directory: tests/php
+        run: composer install --no-interaction --no-progress
+      - name: Configure the test database
+        run: |
+          cp wordpress-develop/wp-tests-config-sample.php wordpress-develop/wp-tests-config.php
+          sed -i "s/youremptytestdbnamehere/wp_tests/; s/yourusernamehere/root/; s/yourpasswordhere/root/; s/'localhost'/'127.0.0.1'/" wordpress-develop/wp-tests-config.php
+      - name: Run the integration tests
+        working-directory: tests/php
+        env:
+          WP_TESTS_DIR: ${{ github.workspace }}/wordpress-develop/tests/phpunit
+          WP_TESTS_PHPUNIT_POLYFILLS_PATH: ${{ github.workspace }}/tests/php/vendor/yoast/phpunit-polyfills
+        run: vendor/bin/phpunit -c phpunit.xml.dist
+
+  plugin:
+    name: plugin ZIP (package check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run plugin:zip

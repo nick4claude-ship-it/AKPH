@@ -11,7 +11,7 @@ import {
   BankReconciliationItem,
   AuditLog,
 } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 // ==================== 1. CHART OF ACCOUNTS (درخت سرفصل‌های کدینگ) ====================
 export const mockChartOfAccounts: AccountNode[] = [
@@ -464,7 +464,7 @@ export const mockChartOfAccounts: AccountNode[] = [
 ];
 
 // ==================== 2. BANK ACCOUNTS & CASH DESKS ====================
-export const mockBankAccounts: BankAccount[] = [
+const rawBankAccounts: BankAccount[] = [
   {
     id: 'bank-1',
     bankName: 'بانک ملت',
@@ -511,7 +511,7 @@ export const mockBankAccounts: BankAccount[] = [
 
 
 // ==================== 3. COST CENTERS & SUBLEDGERS ====================
-export const mockCostCenters: CostCenter[] = [
+const rawCostCenters: CostCenter[] = [
   { id: 'cc-hq', projectId: 'prj-101', code: 'CC-001', name: 'دفتر مرکزی و ستاد راهبری', type: 'دفتر مرکزی', manager: 'مهندس نمونه', allocatedCost: 38_100_000_000, budget: 42_000_000_000 },
   { id: 'cc-prj101-01', projectId: 'prj-101', code: 'CC-101-1', name: 'کارگاه سازه برج رونیکا', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 110_400_000_000, budget: 140_000_000_000 },
   { id: 'cc-prj101-02', projectId: 'prj-101', code: 'CC-101-2', name: 'کارگاه تأسیسات برج رونیکا', type: 'کارگاه پروژه', manager: 'مهندس نمونه', allocatedCost: 40_000_000_000, budget: 50_000_000_000 },
@@ -522,7 +522,7 @@ export const mockCostCenters: CostCenter[] = [
   { id: 'cc-wh', projectId: 'prj-101', code: 'CC-090', name: 'انبار مرکزی مصالح شورآباد', type: 'انبار مرکزی', manager: 'مهندس نمونه', allocatedCost: 8_200_000_000, budget: 10_000_000_000 },
 ];
 
-export const mockSubledgers: Subledger[] = [
+const rawSubledgers: Subledger[] = [
   { id: 'sub-1', code: 'TA-101', name: 'تأمین‌کننده نمونه ۷ (فولاد تخت)', type: 'تأمین‌کننده', phone: '031-00000001', nationalId: '10100000011', balance: 22_500_000_000, nature: 'بستانکار' },
   { id: 'sub-2', code: 'TA-102', name: 'تأمین‌کننده نمونه ۹ (سیمان)', type: 'تأمین‌کننده', phone: '021-00000002', nationalId: '10100000026', balance: 9_200_000_000, nature: 'بستانکار' },
   { id: 'sub-3', code: 'TA-103', name: 'تأمین‌کننده نمونه ۱۰ (قیر و آسفالت)', type: 'تأمین‌کننده', phone: '021-00000003', nationalId: '10100000031', balance: 6_800_000_000, nature: 'بستانکار' },
@@ -535,7 +535,7 @@ export const mockSubledgers: Subledger[] = [
 ];
 
 // ==================== 4. JOURNAL ENTRIES (اسناد حسابداری) ====================
-export const mockJournalEntries: JournalEntry[] = [
+const rawJournalEntries: JournalEntry[] = [
   {
     id: 'doc-824',
     docNumber: 'ACC-1403-0824',
@@ -887,7 +887,7 @@ export const mockJournalEntries: JournalEntry[] = [
 ];
 
 // ==================== 5. RECEIPTS & PAYMENTS ====================
-export const mockReceipts: ReceiptRecord[] = [
+const rawReceipts: ReceiptRecord[] = [
   {
     id: 'rec-1',
     docNumber: 'REC-1403-0194',
@@ -937,7 +937,7 @@ export const mockReceipts: ReceiptRecord[] = [
   },
 ];
 
-export const mockPayments: PaymentRecord[] = [
+const rawPayments: PaymentRecord[] = [
   {
     id: 'pay-1',
     docNumber: 'PAY-1403-0412',
@@ -1010,7 +1010,7 @@ export const mockPayments: PaymentRecord[] = [
 ];
 
 // ==================== 6. ACCOUNTS RECEIVABLE & PAYABLE ====================
-export const mockAccountsReceivable: AccountsReceivableItem[] = [
+const rawAccountsReceivable: AccountsReceivableItem[] = [
   {
     id: 'ar-1',
     debtorName: 'کارفرمای نمونه ۳ (دانشگاه علوم پزشکی)',
@@ -1078,7 +1078,7 @@ export const mockAccountsReceivable: AccountsReceivableItem[] = [
   },
 ];
 
-export const mockAccountsPayable: AccountsPayableItem[] = [
+const rawAccountsPayable: AccountsPayableItem[] = [
   {
     id: 'ap-1',
     creditorName: 'تأمین‌کننده نمونه ۷ (فولاد تخت)',
@@ -1142,7 +1142,7 @@ export const mockAccountsPayable: AccountsPayableItem[] = [
 ];
 
 // ==================== 7. BANK RECONCILIATION ====================
-export const mockBankReconciliationItems: BankReconciliationItem[] = [
+const rawBankReconciliationItems: BankReconciliationItem[] = [
   {
     id: 'recon-1',
     bankAccountId: 'bank-1',
@@ -1199,7 +1199,7 @@ export const mockBankReconciliationItems: BankReconciliationItem[] = [
 ];
 
 // ==================== 8. AUDIT LOGS ====================
-export const mockAuditLogs: AuditLog[] = [
+const rawAuditLogs: AuditLog[] = [
   {
     id: 'log-1',
     date: '۱۴۰۳/۰۷/۰۱',
@@ -1252,3 +1252,15 @@ export const mockAuditLogs: AuditLog[] = [
     description: 'تسویه تنخواه کارگاه رونیکا و کسر از مانده قابل مصرف تنخواه‌دار',
   },
 ];
+
+// Operational demo records only in demo builds (the chart of accounts above is not sample data).
+export const mockBankAccounts: BankAccount[] = DEMO_DATA ? rawBankAccounts : [];
+export const mockCostCenters: CostCenter[] = DEMO_DATA ? rawCostCenters : [];
+export const mockSubledgers: Subledger[] = DEMO_DATA ? rawSubledgers : [];
+export const mockJournalEntries: JournalEntry[] = DEMO_DATA ? rawJournalEntries : [];
+export const mockReceipts: ReceiptRecord[] = DEMO_DATA ? rawReceipts : [];
+export const mockPayments: PaymentRecord[] = DEMO_DATA ? rawPayments : [];
+export const mockAccountsReceivable: AccountsReceivableItem[] = DEMO_DATA ? rawAccountsReceivable : [];
+export const mockAccountsPayable: AccountsPayableItem[] = DEMO_DATA ? rawAccountsPayable : [];
+export const mockBankReconciliationItems: BankReconciliationItem[] = DEMO_DATA ? rawBankReconciliationItems : [];
+export const mockAuditLogs: AuditLog[] = DEMO_DATA ? rawAuditLogs : [];

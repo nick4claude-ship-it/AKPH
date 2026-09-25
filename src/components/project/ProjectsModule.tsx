@@ -21,6 +21,11 @@ import {
 } from 'lucide-react';
 import { Project, PETTY_CASH_FUND_LABELS } from '../../types';
 import { useAppState } from '../../store/AppStore';
+import { useCurrentUser } from '../../store/session';
+import { useWorkflows } from '../../store/useWorkflows';
+import { emitToast } from '../../store/toast';
+import { canCreateProject, hasManualSummary, projectEditableGroups } from '../../store/views/masterData';
+import { ProjectFormModal } from './ProjectFormModal';
 import { selectProjectFinancials } from '../../store/selectors';
 import {
   selectProjectSuppliers,
@@ -30,7 +35,7 @@ import {
   selectWarehouses,
 } from '../../store/domainSelectors';
 import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from '../statements/statementLabels';
-import { barWidth, formatNumber, formatCurrencyCompact, formatDecimal } from '../../utils/formatters';
+import { barWidth, formatNumber, formatCurrencyCompact, formatDecimal, formatPercent } from '../../utils/formatters';
 import { projectBudgetFigures } from '../../store/views/reports';
 import { formatMoney } from '../../utils/money';
 
@@ -68,9 +73,28 @@ const Empty: React.FC<{ text: string }> = ({ text }) => <p className="text-xs te
 /** مرکز اتصال همه اطلاعات پروژه: شرکت ← پروژه ← مرکز هزینه ← قرارداد/تراکنش. */
 export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projectId, onOpenProject, onNavigate }) => {
   const state = useAppState();
+  const user = useCurrentUser();
+  const wf = useWorkflows();
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<ProjectTab>('overview');
+  const [formOpen, setFormOpen] = useState<'new' | 'edit' | null>(null);
   const project = projects.find((p) => p.id === projectId);
+  const form = formOpen && (
+    <ProjectFormModal
+      project={formOpen === 'edit' ? project : undefined}
+      onClose={() => setFormOpen(null)}
+      onCreate={(f) => {
+        const r = wf.createProject(f);
+        if (r.ok) emitToast(r.message);
+        return r;
+      }}
+      onUpdate={(id, changes) => {
+        const r = wf.updateProject(id, changes);
+        if (r.ok) emitToast(r.message);
+        return r;
+      }}
+    />
+  );
 
   if (!project) {
     const q = search.trim().toLowerCase();
@@ -82,16 +106,26 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
             <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded font-mono">Project Management Hub</span>
             <h2 className="text-base font-bold text-slate-900 mt-1">پروژه‌ها — مرکز اتصال قرارداد، هزینه، صورت‌وضعیت، انبار و اسناد</h2>
           </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+          {canCreateProject(user) && (
+            <button onClick={() => setFormOpen('new')} className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold whitespace-nowrap cursor-pointer">
+              پروژه جدید
+            </button>
+          )}
           <div className="relative w-full md:w-72">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
             <input
+              aria-label="جستجوی پروژه"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="جستجوی نام، کد یا کارفرما..."
               className="w-full pl-3 pr-8 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:border-amber-500"
             />
           </div>
+          </div>
         </div>
+        {form}
+        {rows.length === 0 && <Empty text="پروژه‌ای برای نمایش وجود ندارد." />}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {rows.map((p) => (
             <button
@@ -159,8 +193,16 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
               </p>
             </div>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 self-start">{project.status}</span>
+          <div className="flex items-center gap-2 self-start">
+            <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">{project.status}</span>
+            {projectEditableGroups(user, project).length > 0 && (
+              <button onClick={() => setFormOpen('edit')} className="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white font-bold cursor-pointer">
+                ویرایش
+              </button>
+            )}
+          </div>
         </div>
+        {form}
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -190,8 +232,23 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
               <Stat label="مطالبات از کارفرما" value={formatMoney(f.receivables, false)} tone="text-blue-700" />
               <Stat label="بدهی پروژه" value={formatMoney(f.liabilities, false)} tone="text-amber-700" />
               <Stat label="بودجه مصوب" value={formatMoney(project.budget, false)} />
-              <Stat label="حاشیه سود" value={`${formatMoney(f.profitMargin, false)}٪`} />
+              <Stat label="حاشیه سود" value={formatPercent(f.profitMargin)} />
             </div>
+            {project.manualSummary && hasManualSummary(project) && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 space-y-2">
+                <div className="text-[11px] font-bold text-slate-700">
+                  خلاصه دستی <span className="font-normal text-slate-500">— رقم واردشده یا منتقل‌شده از سامانه قبلی؛ سند حسابداری نیست و در دفاتر و گزارش‌ها حساب نمی‌شود.</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <Stat label="درآمد" value={formatMoney(project.manualSummary.revenue, false)} />
+                  <Stat label="هزینه" value={formatMoney(project.manualSummary.cost, false)} />
+                  <Stat label="نقد" value={formatMoney(project.manualSummary.cash, false)} />
+                  <Stat label="مطالبات" value={formatMoney(project.manualSummary.receivable, false)} />
+                  <Stat label="بدهی" value={formatMoney(project.manualSummary.payable, false)} />
+                </div>
+                {project.manualSummary.note && <p className="text-[10px] text-slate-500">{project.manualSummary.note}</p>}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 text-xs">
               {[
                 ['پیشرفت فیزیکی', project.physicalProgress],

@@ -9,15 +9,16 @@ export type { DataSource, PortalSession, StoreChange, CommandGateway, CommandRes
 export { isFinalJournalEntry } from './types';
 
 /**
- * Picks the data source once at startup: inside WordPress (window.PaydarPortal.restUrl is set by the
- * paydar-portal plugin) the REST implementation, otherwise the demo data. Each implementation is a
- * separate chunk, so the production WordPress bundle never downloads the demo dataset.
- * The GitHub Pages build (VITE_PAGES=true) is demo only: it never talks to a server, whatever the page defines.
+ * Picks the data source once at startup:
+ * - the app page of the plugin in live mode (window.AkphPortal.mode === 'live' with restUrl): the akph/v1 server;
+ * - everything else (DEV, the plugin's demo mode, the GitHub Pages site): the in-browser demo source.
+ * Each implementation is a separate chunk. The Pages build (VITE_PAGES=true) never talks to a server.
  */
 export async function createDataSource(): Promise<DataSource> {
-  if (import.meta.env.VITE_PAGES !== 'true' && window.PaydarPortal?.restUrl) {
-    const { createWordPressDataSource } = await import('./wordpress');
-    return createWordPressDataSource();
+  const config = typeof window !== 'undefined' ? window.AkphPortal : undefined;
+  if (import.meta.env.VITE_PAGES !== 'true' && config?.mode === 'live' && config.restUrl) {
+    const { createAkphDataSource } = await import('./akph');
+    return createAkphDataSource();
   }
   const { createMockDataSource } = await import('./mock');
   return createMockDataSource();

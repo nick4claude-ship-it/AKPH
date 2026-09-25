@@ -86,6 +86,12 @@ const WORKFLOW_ACTIONS = [
   'payRequestForm',
   'createManualPaymentRequest',
   'uploadDocument',
+  // Base records (server: akph/v1)
+  'createProject',
+  'updateProject',
+  'createCostCenter',
+  'createCounterparty',
+  'createAccount',
 ] as const;
 
 const wf = { ...workflows, ...recordWorkflows };

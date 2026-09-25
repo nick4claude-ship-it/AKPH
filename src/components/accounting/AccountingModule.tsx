@@ -6,6 +6,7 @@ import { selectProjects, selectLedgerTotals, selectCashFlowByMonth } from '../..
 import { selectReceivablesAging, selectPayablesAging } from '../../store/domainSelectors';
 import { selectAccountingOverview, type ManualEntryFormInput } from '../../store/views/accounting';
 import { useWorkflows } from '../../store/useWorkflows';
+import { MasterDataPanel } from './MasterDataForms';
 import { usePermission } from '../../store/session';
 import type { WorkflowResult } from '../../store/workflowKit';
 import { AccountingNav } from './AccountingNav';
@@ -19,6 +20,7 @@ import { ChartOfAccountsView } from './ChartOfAccountsView';
 import { FinancialReportsView } from './FinancialReportsView';
 import { PeriodClosingAndAuditView } from './PeriodClosingAndAuditView';
 import { emitToast } from '../../store/toast';
+import { formatMoney } from '../../utils/money';
 
 interface AccountingModuleProps {
   currentUser: UserProfile;
@@ -48,6 +50,11 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
 
   const projectName = useCallback((id?: string) => projects.find((p) => p.id === id)?.name, [projects]);
+  /** Toast on success; a failure stays in the form. */
+  const withToast = (result: WorkflowResult) => {
+    if (result.ok) emitToast(result.message);
+    return result;
+  };
 
   // Bank reconciliation: a statement line without a ledger document becomes a pending voucher (second approval).
   const handleReconcile = (itemId: string) => emitToast(wf.reconcileBankItemLogged(itemId).message);
@@ -128,6 +135,20 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
       )}
       {activeSubTab === 'cash_desks' && <BankAndCashView bankAccounts={bankAccounts} cashDesks={cashDesks} reconciliationItems={[]} onTriggerReconciliation={() => undefined} />}
 
+      {(activeSubTab === 'counterparties' || activeSubTab === 'projects_cost_centers' || activeSubTab === 'chart_of_accounts') && (
+        <MasterDataPanel
+          kind={activeSubTab === 'counterparties' ? 'counterparties' : activeSubTab === 'projects_cost_centers' ? 'cost_centers' : 'accounts'}
+          projects={projects}
+          costCenters={costCenters}
+          counterparties={counterparties}
+          chart={chartOfAccounts}
+          canManage={activeSubTab === 'chart_of_accounts' ? can('account.manage') : can('master_data.manage')}
+          onSaveCostCenter={(f) => withToast(wf.createCostCenter(f))}
+          onSaveCounterparty={(f) => withToast(wf.createCounterparty(f))}
+          onSaveAccount={(f) => withToast(wf.createAccount(f))}
+          formatAmount={(r) => formatMoney(r, false)}
+        />
+      )}
       {activeSubTab === 'counterparties' && receivablesView('counterparties')}
       {activeSubTab === 'accounts_receivable' && receivablesView('receivables')}
       {activeSubTab === 'accounts_payable' && receivablesView('payables')}

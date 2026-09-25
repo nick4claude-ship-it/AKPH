@@ -5,7 +5,7 @@ import {
   PurchaseOrder,
   VendorInvoice,
 } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 const rawSuppliers: Supplier[] = [
   {
@@ -1142,8 +1142,8 @@ const rawVendorInvoices: VendorInvoice[] = [
   },
 ];
 
-export const mockSuppliers: Supplier[] = demoDataEnabled() ? rawSuppliers : [];
-export const mockRequisitions: PurchaseRequisition[] = demoDataEnabled() ? rawRequisitions : [];
-export const mockRfqs: RequestForQuotation[] = demoDataEnabled() ? rawRfqs : [];
-export const mockPurchaseOrders: PurchaseOrder[] = demoDataEnabled() ? rawPurchaseOrders : [];
-export const mockVendorInvoices: VendorInvoice[] = demoDataEnabled() ? rawVendorInvoices : [];
+export const mockSuppliers: Supplier[] = DEMO_DATA ? rawSuppliers : [];
+export const mockRequisitions: PurchaseRequisition[] = DEMO_DATA ? rawRequisitions : [];
+export const mockRfqs: RequestForQuotation[] = DEMO_DATA ? rawRfqs : [];
+export const mockPurchaseOrders: PurchaseOrder[] = DEMO_DATA ? rawPurchaseOrders : [];
+export const mockVendorInvoices: VendorInvoice[] = DEMO_DATA ? rawVendorInvoices : [];

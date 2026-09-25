@@ -16,6 +16,10 @@ interface SessionValue {
   /** Label of the data source (demo vs. official books). */
   sourceLabel: string;
   isDemoData: boolean;
+  /** Server mode: sections whose writes the server executes (the others are read-only). */
+  writablePaths?: readonly string[];
+  /** Users who may be assigned as project manager. */
+  listManagers?: () => Promise<{ id: string; name: string }[]>;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -49,18 +53,31 @@ export function useDemoBanner(): string | null {
   if (!isDemoData) return null;
   return import.meta.env.VITE_PAGES === 'true'
     ? 'نسخه نمایشی — داده ساختگی'
-    : 'نسخه نمایشی — اطلاعات با تازه‌کردن صفحه پاک می‌شود';
+    : 'نسخه نمایشی (فقط مدیر سیستم) — هیچ چیز در پایگاه‌داده ذخیره نمی‌شود و با تازه‌کردن صفحه پاک می‌شود';
 }
-
-/** Sections whose writes the installed server already executes; elsewhere the server data is read-only. */
-const SERVER_BACKED_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications'];
 
 /** Notice for a section that is read-only with the current data source (null when writes work there). */
 export function useReadOnlyNotice(pathname: string): string | null {
-  const { isDemoData } = useSession();
-  if (isDemoData) return null;
-  const backed = SERVER_BACKED_PATHS.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
-  return backed ? null : 'این بخش در نسخه وردپرس فعلاً فقط‌خواندنی است — ثبت و تأیید به‌زودی (نیازمند پیاده‌سازی در سرور).';
+  const { writablePaths } = useSession();
+  if (!writablePaths) return null;
+  const backed = writablePaths.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
+  return backed ? null : 'فقط خواندنی — به‌زودی: ثبت و تأیید این بخش هنوز در سرور پیاده نشده است.';
+}
+
+/** Users who may be assigned as project manager (empty while loading or when unavailable). */
+export function useProjectManagers(): { id: string; name: string }[] {
+  const { listManagers } = useSession();
+  const [managers, setManagers] = React.useState<{ id: string; name: string }[]>([]);
+  React.useEffect(() => {
+    let alive = true;
+    listManagers?.()
+      .then((m) => alive && setManagers(m))
+      .catch(() => alive && setManagers([]));
+    return () => {
+      alive = false;
+    };
+  }, [listManagers]);
+  return managers;
 }
 
 /** Permission check bound to the signed-in user, for hiding or disabling actions in the UI. */

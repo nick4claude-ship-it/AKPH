@@ -10,6 +10,10 @@
  */
 
 import type {
+  AccountNode,
+  CostCenter,
+  Counterparty,
+  Project,
   AmendmentType,
   AppDocument,
   DocumentLink,
@@ -74,6 +78,18 @@ import { computeStoreIssueDraft, computeTransferDraft, type StoreIssueFormInput,
 import { generateUUID, nextDocNumber } from '../utils/ids';
 import { getRelativePersianDate } from '../utils/date';
 import { toPersianDigits } from '../utils/formatters';
+import { canAccessProject } from '../utils/permissions';
+import {
+  accountFormError,
+  counterpartyFormError,
+  PROJECT_FIELD_GROUPS,
+  projectEditableGroups,
+  projectFormError,
+  type AccountFormInput,
+  type CostCenterFormInput,
+  type CounterpartyFormInput,
+  type ProjectFormInput,
+} from './views/masterData';
 
 // =============================================================================
 // Client contracts
@@ -1042,4 +1058,163 @@ export function uploadDocument(env: WorkflowEnv, input: NewDocumentInput): Workf
     tags: [project.name],
     description: input.description || 'سند بارگذاری شده در مرکز اسناد.',
   });
+}
+
+// =============================================================================
+// Base records: projects, cost centers, counterparties, accounts (server: akph/v1)
+// =============================================================================
+
+/** A new project. Its ledger figures start at zero and come only from posted entries. */
+export function createProject(env: WorkflowEnv, form: ProjectFormInput): WorkflowResult {
+  const deny = guard(env, 'project.create');
+  if (deny) return fail('اجازه ثبت پروژه جدید را ندارید.');
+  const error = projectFormError(form, true);
+  if (error) return fail(error);
+  const state = env.getState();
+  const project: Project = {
+    id: generateUUID(),
+    code: nextDocNumber(state.projects.map((p) => p.code), 'PRJ'),
+    name: form.name.trim(),
+    clientId: '',
+    consultantId: '',
+    managerUserId: form.managerUserId,
+    siteSupervisor: form.siteSupervisor,
+    costCenterIds: [],
+    contractIds: [],
+    client: form.clientName.trim(),
+    contractAmount: form.contractAmount,
+    recordedRevenue: 0,
+    cost: 0,
+    profit: 0,
+    profitMargin: 0,
+    physicalProgress: form.physicalProgress,
+    financialProgress: 0,
+    receivables: 0,
+    liabilities: 0,
+    budget: form.budget,
+    actualCost: 0,
+    forecastFinalCost: form.budget,
+    status: form.status,
+    manager: form.managerName || '',
+    startDate: form.startDate,
+    expectedEndDate: form.endDate,
+    directCost: 0,
+    indirectCost: 0,
+    cashInflow: 0,
+    cashOutflow: 0,
+    expenseBreakdown: { materials: 0, labor: 0, machinery: 0, transport: 0, subcontractors: 0, procurement: 0, office: 0, insurance: 0, tax: 0, other: 0 },
+    location: form.location,
+    contractRef: form.contractRef,
+    description: form.description,
+    consultantName: form.consultantName,
+    manualSummary: { revenue: form.manualRevenue, cost: form.manualCost, cash: form.manualCash, receivable: form.manualReceivable, payable: form.manualPayable, note: '' },
+    version: 1,
+  };
+  env.set('projects', (prev) => [project, ...prev]);
+  return ok(`پروژه ${project.code} ثبت شد.`, { id: project.id });
+}
+
+/** Changes of a project, limited to the field groups the user may write (server: Akph_Projects::update). */
+export function updateProject(env: WorkflowEnv, id: string, changes: Partial<ProjectFormInput>): WorkflowResult {
+  const state = env.getState();
+  const project = state.projects.find((p) => p.id === id);
+  if (!project || !canAccessProject(env.user, id)) return fail('پروژه پیدا نشد.');
+  const groups = projectEditableGroups(env.user, project);
+  const denied = (Object.keys(changes) as (keyof ProjectFormInput)[]).filter((k) => k !== 'managerName' && !groups.includes(PROJECT_FIELD_GROUPS[k]));
+  if (denied.length) return fail('اجازه تغییر این فیلدها را ندارید.');
+  if (!Object.keys(changes).length) return fail('تغییری وارد نشده است.');
+  const error = projectFormError(changes, false);
+  if (error) return fail(error);
+  const ms = project.manualSummary || { revenue: 0, cost: 0, cash: 0, receivable: 0, payable: 0, note: '' };
+  const c = changes;
+  const next: Project = {
+    ...project,
+    name: c.name ?? project.name,
+    client: c.clientName ?? project.client,
+    location: c.location ?? project.location,
+    contractRef: c.contractRef ?? project.contractRef,
+    description: c.description ?? project.description,
+    budget: c.budget ?? project.budget,
+    contractAmount: c.contractAmount ?? project.contractAmount,
+    managerUserId: c.managerUserId ?? project.managerUserId,
+    manager: c.managerUserId !== undefined ? c.managerName || '' : project.manager,
+    status: c.status ?? project.status,
+    physicalProgress: c.physicalProgress ?? project.physicalProgress,
+    siteSupervisor: c.siteSupervisor ?? project.siteSupervisor,
+    consultantName: c.consultantName ?? project.consultantName,
+    startDate: c.startDate ?? project.startDate,
+    expectedEndDate: c.endDate ?? project.expectedEndDate,
+    manualSummary: {
+      ...ms,
+      revenue: c.manualRevenue ?? ms.revenue,
+      cost: c.manualCost ?? ms.cost,
+      cash: c.manualCash ?? ms.cash,
+      receivable: c.manualReceivable ?? ms.receivable,
+      payable: c.manualPayable ?? ms.payable,
+    },
+    version: (project.version || 1) + 1,
+  };
+  env.set('projects', (prev) => prev.map((p) => (p.id === id ? next : p)));
+  return ok(`پروژه ${project.code} به‌روز شد.`, { id });
+}
+
+export function createCostCenter(env: WorkflowEnv, form: CostCenterFormInput): WorkflowResult {
+  const deny = guard(env, 'master_data.manage', { projectId: form.projectId || null });
+  if (deny) return deny;
+  if (!form.name.trim()) return fail('نام مرکز هزینه الزامی است.');
+  const state = env.getState();
+  if (form.code && state.costCenters.some((c) => c.code === form.code)) return fail('این کد قبلاً استفاده شده است.');
+  const center: CostCenter = {
+    id: generateUUID(),
+    code: form.code.trim() || nextDocNumber(state.costCenters.map((c) => c.code), 'CC'),
+    name: form.name.trim(),
+    projectId: form.projectId || undefined,
+    type: form.type,
+    manager: form.manager,
+    budget: form.budget,
+    version: 1,
+  };
+  env.set('costCenters', (prev) => [...prev, center]);
+  if (center.projectId) env.set('projects', (prev) => prev.map((p) => (p.id === center.projectId ? { ...p, costCenterIds: [...p.costCenterIds, center.id] } : p)));
+  return ok(`مرکز هزینه ${center.code} ثبت شد.`, { id: center.id });
+}
+
+export function createCounterparty(env: WorkflowEnv, form: CounterpartyFormInput): WorkflowResult {
+  const deny = guard(env, 'master_data.manage');
+  if (deny) return deny;
+  const error = counterpartyFormError(form);
+  if (error) return fail(error);
+  const party: Counterparty = {
+    id: generateUUID(),
+    kind: form.kind,
+    name: form.name.trim(),
+    nationalId: form.nationalId,
+    economicCode: form.economicCode,
+    phone: form.phone,
+    email: form.email,
+    address: form.address,
+    shebaNumber: form.shebaNumber.replace(/\s/g, '').toUpperCase(),
+    bankName: form.bankName,
+    tradeType: form.tradeType,
+    status: 'active',
+    version: 1,
+  };
+  env.set('counterparties', (prev) => [...prev, party]);
+  return ok(`طرف حساب «${party.name}» ثبت شد.`, { id: party.id });
+}
+
+/** A new account in the chart; group and general accounts never receive entry lines. */
+export function createAccount(env: WorkflowEnv, form: AccountFormInput): WorkflowResult {
+  const deny = guard(env, 'account.manage');
+  if (deny) return deny;
+  const chart = env.getState().chartOfAccounts;
+  const error = accountFormError(chart, form);
+  if (error) return fail(error);
+  const exists = (list: readonly AccountNode[]): boolean => list.some((n) => n.code === form.code || (n.children ? exists(n.children) : false));
+  if (exists(chart)) return fail('کد حساب تکراری است.');
+  const node: AccountNode = { code: form.code, title: form.title.trim(), level: form.level, nature: form.nature, parentCode: form.parentCode || undefined, balance: 0, turnoverDebit: 0, turnoverCredit: 0 };
+  const insert = (list: AccountNode[]): AccountNode[] =>
+    list.map((n) => (n.code === form.parentCode ? { ...n, children: [...(n.children || []), node].sort((a, b) => a.code.localeCompare(b.code)) } : n.children ? { ...n, children: insert(n.children) } : n));
+  env.set('chartOfAccounts', (prev) => (form.level === 'گروه' ? [...prev, node].sort((a, b) => a.code.localeCompare(b.code)) : insert(prev)));
+  return ok(`حساب ${form.code} ثبت شد.`);
 }

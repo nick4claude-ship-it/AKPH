@@ -4,7 +4,7 @@
  */
 
 import type { Employee, MonthlyTimesheet, PayrollSlip } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 
 
@@ -496,4 +496,4 @@ export const mockPayrollSlips: PayrollSlip[] = [
   },
 ];
 
-export const mockEmployees: Employee[] = demoDataEnabled() ? rawEmployees : [];
+export const mockEmployees: Employee[] = DEMO_DATA ? rawEmployees : [];

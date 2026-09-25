@@ -12,7 +12,7 @@ import {
   StocktakeAudit,
   KardexEntry,
 } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 const rawWarehouses: Warehouse[] = [
   {
@@ -848,8 +848,8 @@ const rawKardexRecords: KardexEntry[] = [
   },
 ];
 
-export const mockWarehouses: Warehouse[] = demoDataEnabled() ? rawWarehouses : [];
-export const mockGoodsReceipts: GoodsReceiptNote[] = demoDataEnabled() ? rawGoodsReceipts : [];
-export const mockStoreIssues: StoreIssueVoucher[] = demoDataEnabled() ? rawStoreIssues : [];
-export const mockInterTransfers: InterWarehouseTransfer[] = demoDataEnabled() ? rawInterTransfers : [];
-export const mockKardexRecords: KardexEntry[] = demoDataEnabled() ? rawKardexRecords : [];
+export const mockWarehouses: Warehouse[] = DEMO_DATA ? rawWarehouses : [];
+export const mockGoodsReceipts: GoodsReceiptNote[] = DEMO_DATA ? rawGoodsReceipts : [];
+export const mockStoreIssues: StoreIssueVoucher[] = DEMO_DATA ? rawStoreIssues : [];
+export const mockInterTransfers: InterWarehouseTransfer[] = DEMO_DATA ? rawInterTransfers : [];
+export const mockKardexRecords: KardexEntry[] = DEMO_DATA ? rawKardexRecords : [];

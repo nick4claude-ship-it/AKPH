@@ -24,7 +24,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return action.state;
     case 'MERGE_SERVER_RECORDS': {
       let next = state;
-      for (const { slice, upserted } of action.records) {
+      for (const { slice, upserted = [], replace } of action.records) {
+        if (replace !== undefined) {
+          next = { ...next, [slice]: replace };
+          continue;
+        }
         const rows = [...((next[slice] as unknown as { id: string }[]) || [])];
         const index = new Map(rows.map((r, i) => [r.id, i]));
         for (const r of upserted as unknown as { id: string }[]) {
@@ -64,7 +68,7 @@ export { diffStates } from './saveQueue';
 /** Slices that only hold per-browser UI state; they may change locally even when the server owns the data. */
 const LOCAL_ONLY_SLICES: ReadonlySet<SliceKey> = new Set<SliceKey>(['dismissedNotificationIds']);
 
-export const SERVER_REQUIRED_MESSAGE = 'این عملیات در نسخه وردپرس به‌زودی فعال می‌شود (نیازمند پیاده‌سازی در سرور).';
+export const SERVER_REQUIRED_MESSAGE = 'فقط خواندنی — این عملیات به‌زودی در سرور فعال می‌شود.';
 
 export const AppStoreProvider: React.FC<{
   children: React.ReactNode;

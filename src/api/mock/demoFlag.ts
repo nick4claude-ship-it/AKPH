@@ -4,13 +4,12 @@
  */
 
 /**
- * Operational demo records ship only in DEV and in demo builds (VITE_DEMO_DATA=true: the WordPress
- * demo plugin and the GitHub Pages site). A plain production build carries none of them.
+ * Operational demo records ship only in DEV and in demo builds (VITE_DEMO_DATA=true: the GitHub Pages
+ * site). The value is a build-time constant, so a plain production build (the WordPress plugin) drops
+ * the sample records from the bundle entirely instead of carrying them unused.
  */
+export const DEMO_DATA: boolean = import.meta.env.DEV === true || import.meta.env.VITE_DEMO_DATA === 'true';
+
 export function demoDataEnabled(): boolean {
-  try {
-    return Boolean(import.meta.env?.DEV) || import.meta.env?.VITE_DEMO_DATA === 'true';
-  } catch {
-    return true;
-  }
+  return DEMO_DATA;
 }
