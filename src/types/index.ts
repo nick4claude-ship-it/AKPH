@@ -1,6 +1,6 @@
 export type ProjectStatus = 'در حال اجرا' | 'تجهیز کارگاه' | 'تحویل موقت' | 'تعلیق' | 'اختتام';
 
-export type CounterpartyKind = 'client' | 'supplier' | 'subcontractor' | 'employee' | 'bank' | 'other';
+export type CounterpartyKind = 'client' | 'supplier' | 'subcontractor' | 'consultant' | 'employee' | 'bank' | 'other';
 
 export interface Counterparty {
   id: string;
@@ -16,6 +16,8 @@ export interface Counterparty {
   bankName?: string;
   tradeType?: string;
   status?: 'active' | 'inactive';
+  /** Server concurrency token (akph/v1); sent back with every command on this record. */
+  version?: number;
 }
 
 export interface Project {
@@ -62,6 +64,20 @@ export interface Project {
     tax: number;
     other: number;
   };
+  location?: string;
+  /** Contract number or reference of the project. */
+  contractRef?: string;
+  description?: string;
+  consultantName?: string;
+  /**
+   * Figures typed by hand (or copied from the previous system). Shown as «خلاصه دستی»; they never enter
+   * the ledger, which is the only source of the project's financial figures.
+   */
+  manualSummary?: { revenue: number; cost: number; cash: number; receivable: number; payable: number; note: string };
+  /** Server concurrency token (akph/v1). */
+  version?: number;
+  /** Field groups the signed-in user may edit (server: base, budget, assign, exec, financial). */
+  editableGroups?: string[];
 }
 
 export interface KpiItem {
@@ -317,6 +333,8 @@ export interface CostCenter {
   manager?: string;
   allocatedCost?: number;
   budget?: number;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface BankAccount {

@@ -1,0 +1,167 @@
+<?php
+/**
+ * Dashboard screens: a link to the app, the settings (mode and display currency, with a health check) and
+ * the one-time tools (project migration from paydar-portal, standard chart of accounts). Settings and tools
+ * need manage_options.
+ */
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+final class Akph_Admin {
+    public static function boot() {
+        add_action('admin_menu', array(__CLASS__, 'menu'));
+        add_action('admin_notices', array(__CLASS__, 'notices'));
+    }
+
+    public static function menu() {
+        add_menu_page('پرتال AKPH', 'پرتال AKPH', Akph_Roles::ACCESS, 'akph-portal', array(__CLASS__, 'home_page'), 'dashicons-building', 3);
+        add_submenu_page('akph-portal', 'تنظیمات پرتال AKPH', 'تنظیمات', 'manage_options', 'akph-portal-settings', array(__CLASS__, 'settings_page'));
+        add_submenu_page('akph-portal', 'ابزارهای انتقال', 'انتقال و کدینگ', 'manage_options', 'akph-portal-tools', array(__CLASS__, 'tools_page'));
+    }
+
+    public static function notices() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        $problems = get_option(Akph_Schema::OPTION_ENGINE_PROBLEMS);
+        if ($problems) {
+            echo '<div class="notice notice-error"><p>پرتال AKPH: جدول‌های زیر روی موتور InnoDB ساخته نشدند و فرمان‌های پرتال غیرفعال‌اند: <code>' . esc_html(implode(', ', (array) $problems)) . '</code></p></div>';
+        }
+    }
+
+    public static function home_page() {
+        $url = esc_url(Akph_App::url());
+        echo '<div class="wrap"><h1>پرتال AKPH</h1>';
+        echo '<p><a class="button button-primary" href="' . $url . '" target="_blank" rel="noopener">باز کردن پرتال</a></p>';
+        echo '<p>حالت فعلی: <strong>' . (Akph_Settings::get('mode') === 'demo' ? 'نمایشی (فقط مدیر سیستم؛ داده نمونه در مرورگر)' : 'واقعی (سرور akph/v1)') . '</strong></p></div>';
+    }
+
+    private static function status_rows() {
+        global $wpdb;
+        $problems = (array) get_option(Akph_Schema::OPTION_ENGINE_PROBLEMS, array());
+        $missing = Akph_Roles::missing_roles();
+        return array(
+            array('PHP ۶۴ بیتی', PHP_INT_SIZE >= 8, 'PHP ' . PHP_VERSION . ' (' . (PHP_INT_SIZE * 8) . ' بیت)'),
+            array('جدول‌های akph روی InnoDB', Akph_Schema::ready(), $problems ? implode(', ', $problems) : 'نسخه ' . get_option(Akph_Schema::OPTION_VERSION, '—')),
+            array('نقش‌های پرتال', !$missing, $missing ? 'پیدا نشد: ' . implode(', ', $missing) . ' (افزونه پایدار پورتال این نقش‌ها را می‌سازد)' : 'مدیر سیستم، مدیر ارشد، حسابدار، مدیر پروژه'),
+            array('قابلیت‌های akph_*', get_option(Akph_Roles::OPTION_VERSION) === Akph_Roles::ROLES_VERSION, 'نسخه ' . get_option(Akph_Roles::OPTION_VERSION, '—')),
+            array('ثبت‌نام عمومی', !get_option('users_can_register'), get_option('users_can_register') ? 'فعال است؛ آن را در «تنظیمات › عمومی» غیرفعال کنید.' : 'غیرفعال'),
+            array('آدرس REST', true, rest_url(Akph_Rest::NS)),
+            array('موتور پایگاه‌داده', true, $wpdb->db_server_info()),
+        );
+    }
+
+    public static function settings_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        $saved = false;
+        if (isset($_POST['akph_settings_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['akph_settings_nonce'])), 'akph_settings')) {
+            Akph_Settings::update(array(
+                'mode' => isset($_POST['mode']) ? sanitize_key(wp_unslash($_POST['mode'])) : 'live',
+                'currency' => isset($_POST['currency']) ? sanitize_key(wp_unslash($_POST['currency'])) : 'toman',
+            ));
+            $saved = true;
+        }
+        $s = Akph_Settings::all();
+        echo '<div class="wrap"><h1>تنظیمات پرتال AKPH</h1>';
+        if ($saved) {
+            echo '<div class="notice notice-success"><p>تنظیمات ذخیره شد.</p></div>';
+        }
+        echo '<form method="post">';
+        wp_nonce_field('akph_settings', 'akph_settings_nonce');
+        echo '<table class="form-table" role="presentation"><tr><th scope="row">حالت پرتال</th><td>';
+        echo '<p><label><input type="radio" name="mode" value="live" ' . checked($s['mode'], 'live', false) . '> واقعی — داده از سرور (akph/v1). بخش‌هایی که هنوز فرمان سرور ندارند «فقط خواندنی — به‌زودی» هستند.</label></p>';
+        echo '<p><label><input type="radio" name="mode" value="demo" ' . checked($s['mode'], 'demo', false) . '> نمایشی — داده نمونه فقط در مرورگر، فقط برای مدیر سیستم؛ چیزی در پایگاه‌داده ذخیره نمی‌شود.</label></p>';
+        echo '</td></tr><tr><th scope="row"><label for="akph-currency">واحد نمایش مبالغ</label></th><td>';
+        echo '<select id="akph-currency" name="currency"><option value="toman" ' . selected($s['currency'], 'toman', false) . '>تومان</option><option value="rial" ' . selected($s['currency'], 'rial', false) . '>ریال</option></select>';
+        echo '<p class="description">مبالغ همیشه به ریال صحیح ذخیره می‌شوند؛ این فقط واحد نمایش است.</p></td></tr></table>';
+        submit_button('ذخیره');
+        echo '</form><h2>وضعیت</h2><table class="widefat striped" style="max-width:900px"><tbody>';
+        foreach (self::status_rows() as $row) {
+            echo '<tr><td>' . esc_html($row[0]) . '</td><td>' . ($row[1] ? '✅' : '⚠️') . '</td><td><code>' . esc_html($row[2]) . '</code></td></tr>';
+        }
+        echo '</tbody></table></div>';
+    }
+
+    private static function money_cell($rials) {
+        return esc_html(number_format((int) $rials)) . ' ریال';
+    }
+
+    public static function tools_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        echo '<div class="wrap"><h1>انتقال پروژه‌ها و کدینگ استاندارد</h1>';
+        if (!Akph_Schema::ready()) {
+            echo '<div class="notice notice-error"><p>جدول‌های پرتال آماده نیست؛ صفحه تنظیمات را ببینید.</p></div></div>';
+            return;
+        }
+        $action = isset($_POST['akph_action']) ? sanitize_key(wp_unslash($_POST['akph_action'])) : '';
+        $valid = $action && isset($_POST['akph_tools_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['akph_tools_nonce'])), 'akph_tools');
+        if ($action && !$valid) {
+            echo '<div class="notice notice-error"><p>مهلت فرم تمام شده است؛ دوباره تلاش کنید.</p></div>';
+        }
+
+        // ---- project migration
+        echo '<h2>۱. انتقال پروژه‌ها از پایدار پورتال</h2>';
+        echo '<p>جدول <code>' . esc_html(Akph_Migration::legacy_table()) . '</code> فقط خوانده می‌شود و تغییر نمی‌کند. اجرای دوباره پروژه تکراری نمی‌سازد. مبالغ خلاصه دستی (میلیارد تومان) به ریال تبدیل و فقط به‌صورت «خلاصه دستی» ثبت می‌شوند؛ هیچ سند حسابداری ساخته نمی‌شود و اسناد حسابداری افزونه قبلی منتقل نمی‌شوند.</p>';
+        if ($valid && $action === 'migrate_run') {
+            try {
+                $r = Akph_Migration::run();
+                echo '<div class="notice notice-success"><p>' . esc_html($r['created']) . ' پروژه منتقل شد؛ ' . esc_html($r['skipped']) . ' پروژه قبلاً منتقل شده بود.</p></div>';
+            } catch (Akph_Error $e) {
+                echo '<div class="notice notice-error"><p>' . esc_html($e->getMessage()) . ' هیچ تغییری ذخیره نشد.</p></div>';
+            }
+        }
+        $show_plan = $valid && in_array($action, array('migrate_preview', 'migrate_run'), true);
+        if ($show_plan) {
+            $plan = Akph_Migration::plan();
+            if (!$plan['available']) {
+                echo '<p>جدول پروژه‌های پایدار پورتال پیدا نشد.</p>';
+            } else {
+                echo '<p>پیش‌نمایش: <strong>' . esc_html($plan['create']) . '</strong> پروژه جدید، <strong>' . esc_html($plan['skip']) . '</strong> تکراری (رد می‌شود)، <strong>' . esc_html($plan['errors']) . '</strong> خطا.</p>';
+                echo '<table class="widefat striped"><thead><tr><th>شناسه قبلی</th><th>نام</th><th>اقدام</th><th>بودجه</th><th>مبلغ قرارداد</th><th>خلاصه دستی (درآمد / هزینه)</th><th>هشدار و خطا</th></tr></thead><tbody>';
+                $labels = array('create' => 'ایجاد', 'skip' => 'رد (قبلاً منتقل شده)', 'error' => 'خطا');
+                foreach ($plan['items'] as $item) {
+                    $f = $item['fields'];
+                    $notes = array_merge($item['errors'], $item['warnings']);
+                    echo '<tr><td><code>' . esc_html($item['legacy_id']) . '</code></td><td>' . esc_html($item['name']) . '</td><td>' . esc_html($labels[$item['action']]) . '</td>';
+                    echo '<td>' . self::money_cell($f['budget']) . '</td><td>' . self::money_cell($f['contract_amount']) . '</td>';
+                    echo '<td>' . self::money_cell($f['manual_revenue']) . ' / ' . self::money_cell($f['manual_cost']) . '</td>';
+                    echo '<td>' . esc_html(implode(' ', $notes)) . '</td></tr>';
+                }
+                echo '</tbody></table>';
+            }
+        }
+        echo '<form method="post" style="margin-top:12px">';
+        wp_nonce_field('akph_tools', 'akph_tools_nonce');
+        echo '<button class="button" name="akph_action" value="migrate_preview">پیش‌نمایش (بدون تغییر)</button> ';
+        if ($show_plan && !empty($plan['available']) && $plan['create'] > 0 && !$plan['errors']) {
+            echo '<button class="button button-primary" name="akph_action" value="migrate_run" onclick="return confirm(\'پروژه‌ها منتقل شوند؟\')">انتقال ' . esc_html($plan['create']) . ' پروژه</button>';
+        }
+        echo '</form>';
+
+        // ---- standard chart
+        echo '<h2 style="margin-top:32px">۲. کدینگ استاندارد حساب‌ها</h2>';
+        echo '<p>کدهای حسابی که قواعد ثبت پرتال استفاده می‌کنند (فقط کد، عنوان و سطح؛ بدون مانده). حساب‌های موجود تغییر نمی‌کنند و فقط کدهای ناموجود اضافه می‌شوند.</p>';
+        if ($valid && in_array($action, array('chart_preview', 'chart_install'), true)) {
+            $r = Akph_Accounts::install_standard_chart($action === 'chart_preview');
+            if ($action === 'chart_install') {
+                echo '<div class="notice notice-success"><p>' . esc_html($r['inserted']) . ' حساب اضافه شد.</p></div>';
+            } else {
+                echo '<p>' . esc_html(count($r['missing'])) . ' حساب در کدینگ شما نیست:</p><ul style="columns:2">';
+                foreach ($r['missing'] as $a) {
+                    echo '<li><code>' . esc_html($a[0]) . '</code> ' . esc_html($a[1]) . '</li>';
+                }
+                echo '</ul>';
+            }
+        }
+        echo '<form method="post">';
+        wp_nonce_field('akph_tools', 'akph_tools_nonce');
+        echo '<button class="button" name="akph_action" value="chart_preview">پیش‌نمایش کدهای ناموجود</button> ';
+        echo '<button class="button button-primary" name="akph_action" value="chart_install" onclick="return confirm(\'کدهای ناموجود اضافه شوند؟\')">افزودن کدهای ناموجود</button>';
+        echo '</form></div>';
+    }
+}

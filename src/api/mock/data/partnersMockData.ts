@@ -1,4 +1,4 @@
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 /**
  * @license
@@ -187,4 +187,4 @@ const rawClients: ClientPartner[] = [
   },
 ];
 
-export const mockClients: ClientPartner[] = demoDataEnabled() ? rawClients : [];
+export const mockClients: ClientPartner[] = DEMO_DATA ? rawClients : [];

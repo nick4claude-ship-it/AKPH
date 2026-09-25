@@ -44,7 +44,7 @@ const FORBIDDEN_CODE = [
   [/\.toLocaleString\(/, 'formats numbers by hand; use formatInt / formatDecimal / formatPercent / formatMoney'],
   [/\.toFixed\(/, 'formats numbers by hand; use formatPercent / formatDecimal'],
   [/\bgenerateUUID\b|\bnextDocNumber\b/, 'creates ids or document numbers; the workflow issues them'],
-  [/\bwindow\.PaydarPortal\b|\bfetch\(|\bXMLHttpRequest\b/, 'talks to the server; only src/api does'],
+  [/\bwindow\.AkphPortal\b|\bfetch\(|\bXMLHttpRequest\b/, 'talks to the server; only src/api does'],
   [/\blocalStorage\b|\bsessionStorage\b/, 'stores data in the browser; keep state in the store'],
   [/role=["']dialog["']/, 'hand-made dialog; use <Dialog> from src/ui/Dialog (role="dialog", Esc, focus trap)'],
   [

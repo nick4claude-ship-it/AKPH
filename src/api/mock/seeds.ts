@@ -5,7 +5,7 @@
 
 import type { CompanyProfile } from '../../types';
 import { seedTomansToRials } from '../moneyFields';
-import { demoDataEnabled } from './demoFlag';
+import { DEMO_DATA } from './demoFlag';
 import { mockProjects, mockUsers } from './data/mockData';
 import {
   mockChartOfAccounts,
@@ -54,7 +54,7 @@ import {
 } from './data/inventoryMockData';
 import { mockPayrollSlips, mockEmployees, mockTimesheets } from './data/hrPayrollMockData';
 
-const isDev = demoDataEnabled();
+const isDev = DEMO_DATA;
 
 /**
  * The demo dataset. The seed files are written in Tomans; they are converted to integer Rials

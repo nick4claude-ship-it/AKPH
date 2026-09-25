@@ -15,6 +15,8 @@ export interface PortalSession {
   fiscalYear: number;
   /** The company this installation belongs to (WordPress: the site name). */
   company: CompanyProfile;
+  /** Jalali fiscal years closed on the server (akph/v1 GET /me). */
+  closedFiscalYears?: number[];
 }
 
 /** Records changed in one slice since the last save (demo data source only). */
@@ -25,7 +27,8 @@ export type StoreChange =
 /** Records the server returns after a command; they replace the local copies by id. */
 export interface CommandResult {
   message: string;
-  records: { slice: SliceKey; upserted: Record<string, unknown>[] }[];
+  /** Changed records by slice: `upserted` replaces local copies by id; `replace` swaps a whole slice (e.g. the chart tree). */
+  records: { slice: SliceKey; upserted?: Record<string, unknown>[]; replace?: unknown }[];
   id?: string;
   docNumber?: string;
 }
@@ -47,21 +50,26 @@ export interface CommandGateway {
  *
  * - mock: the demo computes everything in the browser (reference rules in src/store) and keeps the
  *   result in memory through `saveChanges`.
- * - wordpress: the browser never sends computed records, balances, statuses or final entries. It sends
- *   commands through `commands`; the server's answer is merged into the store.
+ * - akph: the akph/v1 server of the WordPress plugin. The browser never sends computed records, balances,
+ *   statuses or final entries. It sends commands through `commands`; the server's answer is merged into
+ *   the store.
  */
 export interface DataSource {
-  readonly kind: 'mock' | 'wordpress';
+  readonly kind: 'mock' | 'akph';
   /** Shown in the footer so nobody mistakes demo data for real books. */
   readonly label: string;
   /** `userId` is honoured only by the mock source (DEV role switcher). */
   loadSession(userId?: string): Promise<PortalSession>;
   /** Everything the session's user may see (project managers: own projects only). */
   loadState(session: PortalSession): Promise<AppState>;
-  /** Demo only: keeps locally computed changes. Absent for the WordPress source. */
+  /** Demo only: keeps locally computed changes. Absent for the akph source. */
   saveChanges?(changes: StoreChange[]): Promise<void>;
-  /** WordPress only: server-side commands. */
+  /** akph only: server-side commands. */
   commands?: CommandGateway;
+  /** akph only: sections whose writes the server executes; the others are read-only («به‌زودی»). */
+  writablePaths?: readonly string[];
+  /** Users who may be assigned as project manager. */
+  listManagers?(): Promise<{ id: string; name: string }[]>;
   /** DEV only: users the role switcher can sign in as. */
   devUsers?(): UserProfile[];
 }

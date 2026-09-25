@@ -9,11 +9,11 @@ import {
 } from '../../../types';
 import { getRelativePersianDate } from '../../../utils/date';
 import { defaultAvatar, projectFajrInterchange, projectRonikaTower } from '../../../assets/images';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 
 /** Demo users, one per paydar-portal role (used only by the DEV role switcher). */
-export const mockUsers: UserProfile[] = [
+const rawUsers: UserProfile[] = [
   {
     id: 'usr-001',
     name: 'کاربر مدیر ارشد نمونه',
@@ -276,4 +276,7 @@ const rawProjects: Project[] = [
   },
 ];
 
-export const mockProjects: Project[] = demoDataEnabled() ? rawProjects : [];
+export const mockProjects: Project[] = DEMO_DATA ? rawProjects : [];
+
+/** Demo users of the role switcher (demo builds only); a plain build signs in as one neutral administrator. */
+export const mockUsers: UserProfile[] = DEMO_DATA ? rawUsers : [{ id: 'sandbox-admin', name: 'مدیر سیستم', role: 'مدیر سیستم', email: '', avatar: '' }];

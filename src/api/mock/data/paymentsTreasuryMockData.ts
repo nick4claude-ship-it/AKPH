@@ -4,7 +4,7 @@
  */
 
 import type { PaymentRequest, TreasuryCheck, ProjectCashDesk as CashDesk } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 
 
@@ -280,6 +280,6 @@ const rawCashDesks: CashDesk[] = [
   },
 ];
 
-export const mockPaymentRequests: PaymentRequest[] = demoDataEnabled() ? rawPaymentRequests : [];
-export const mockTreasuryChecks: TreasuryCheck[] = demoDataEnabled() ? rawTreasuryChecks : [];
-export const mockCashDesks: CashDesk[] = demoDataEnabled() ? rawCashDesks : [];
+export const mockPaymentRequests: PaymentRequest[] = DEMO_DATA ? rawPaymentRequests : [];
+export const mockTreasuryChecks: TreasuryCheck[] = DEMO_DATA ? rawTreasuryChecks : [];
+export const mockCashDesks: CashDesk[] = DEMO_DATA ? rawCashDesks : [];

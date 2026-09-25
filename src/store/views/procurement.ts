@@ -36,10 +36,13 @@ export function selectProcurementDashboard(
     spend.set(category, (spend.get(category) ?? 0) + o.totalOrderAmount);
   }
   const categoryTotal = sumBy(Array.from(spend.values()), (v) => v);
+  const urgent = requisitions.filter((r) => r.priority === 'فوری کارگاهی (حیاتی)' && r.status !== 'سفارش صادر شده (PO)' && r.status !== 'لغو شده');
   return {
     totalOrdersAmount: sumBy(orders, (o) => o.totalOrderAmount),
     activeOrdersCount: orders.filter((o) => !CLOSED_ORDER_STATUSES.includes(o.status)).length,
-    urgentRequisitions: requisitions.filter((r) => r.priority === 'فوری کارگاهی (حیاتی)' && r.status !== 'سفارش صادر شده (PO)' && r.status !== 'لغو شده'),
+    urgentRequisitions: urgent,
+    /** Projects the urgent requisitions belong to («—» when none). */
+    urgentProjects: Array.from(new Set(urgent.map((r) => r.projectName).filter(Boolean))).join('، ') || '—',
     pendingApprovalsCount: requisitions.filter((r) => r.status.includes('تأیید') || r.status.includes('پیش‌نویس')).length,
     activeRfqsCount: rfqs.filter((r) => r.status === 'در حال استعلام' || r.status === 'کمیسیون معاملات و ارزیابی').length,
     totalSavings: sumBy(rfqs, (r) => r.savingsVsBudgetAmount || 0),

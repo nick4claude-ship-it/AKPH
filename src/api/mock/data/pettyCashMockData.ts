@@ -8,7 +8,7 @@ import {
   PettyCashAttachment,
   PettyCashSettings,
 } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 // ==================== 1. PETTY CASH ACCOUNTS (تنخواه‌گردان‌ها) ====================
 export const initialPettyCashAccounts: PettyCashAccount[] = [
@@ -846,7 +846,7 @@ export const initialPettyCashCategories: PettyCashCategoryItem[] = [
   },
 ];
 
-export const mockPettyCashAccounts: PettyCashAccount[] = demoDataEnabled() ? initialPettyCashAccounts : [];
+export const mockPettyCashAccounts: PettyCashAccount[] = DEMO_DATA ? initialPettyCashAccounts : [];
 /** Stored petty cash policy (editable in Settings). */
 export const initialPettyCashSettings: PettyCashSettings = {
   fundLimits: {
@@ -865,4 +865,4 @@ export const initialPettyCashSettings: PettyCashSettings = {
   lowBalancePercent: 25,
 };
 
-export const mockPettyCashExpenses: SeedPettyCashExpense[] = demoDataEnabled() ? initialPettyCashExpenses : [];
+export const mockPettyCashExpenses: SeedPettyCashExpense[] = DEMO_DATA ? initialPettyCashExpenses : [];

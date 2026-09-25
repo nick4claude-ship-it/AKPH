@@ -4,7 +4,7 @@
  */
 
 import { Counterparty } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 
 const rawCounterparties: Counterparty[] = [
@@ -454,7 +454,7 @@ const rawCounterparties: Counterparty[] = [
   },
 ];
 
-export const mockCounterparties: Counterparty[] = demoDataEnabled() ? rawCounterparties : [];
+export const mockCounterparties: Counterparty[] = DEMO_DATA ? rawCounterparties : [];
 
 export function getCounterparty(id?: string): Counterparty | undefined {
   if (!id) return undefined;

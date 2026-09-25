@@ -18,6 +18,7 @@ import {
   getCurrentPersianMonthName,
 } from '../../utils/date';
 import { formatInt } from '../../utils/money';
+import { toPersianDigits } from '../../utils/formatters';
 
 interface HeaderProps {
   title: string;
@@ -62,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
     this_month: `این ماه (${currentMonthName})`,
     last_3_months: '۳ ماه اخیر',
     last_6_months: '۶ ماه اخیر',
-    current_year: `سال جاری (${currentFiscalYear})`,
+    current_year: `سال جاری (${toPersianDigits(currentFiscalYear)})`,
     custom: 'بازه سفارشی',
   };
 

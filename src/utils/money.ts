@@ -4,10 +4,10 @@
  */
 
 /**
- * Money rules (aligned with the paydar-portal ledger):
+ * Money rules (aligned with the akph-portal ledger):
  * - Every stored amount is an integer number of Rials. No floats, no Tomans in state.
  * - The display currency (ریال or تومان) is chosen once, at bootstrap, by the data source
- *   (WordPress: PaydarPortal.accounting.currency). The UI never offers a switch.
+ *   (WordPress: the currency setting of the akph-portal plugin, from GET /me). The UI never offers a switch.
  * - Amounts are shown only through formatRial / formatToman (via formatMoney).
  * - Typed amounts are read with parseIntegerAmount (Persian/Arabic digits, positive integers)
  *   in the display currency and converted to Rials with parseMoneyInput.

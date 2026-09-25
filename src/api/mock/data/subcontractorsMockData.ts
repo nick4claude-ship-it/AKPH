@@ -7,7 +7,7 @@ import {
   SubcontractorContract,
   SubcontractorProgressStatement,
 } from '../../../types';
-import { demoDataEnabled } from '../demoFlag';
+import { DEMO_DATA } from '../demoFlag';
 
 const rawSubcontractorContracts: SubcontractorContract[] = [
   {
@@ -782,5 +782,5 @@ const rawSubcontractorStatements: SubcontractorProgressStatement[] = [
   },
 ];
 
-export const mockSubcontractorContracts: SubcontractorContract[] = demoDataEnabled() ? rawSubcontractorContracts : [];
-export const mockSubcontractorStatements: SubcontractorProgressStatement[] = demoDataEnabled() ? rawSubcontractorStatements : [];
+export const mockSubcontractorContracts: SubcontractorContract[] = DEMO_DATA ? rawSubcontractorContracts : [];
+export const mockSubcontractorStatements: SubcontractorProgressStatement[] = DEMO_DATA ? rawSubcontractorStatements : [];

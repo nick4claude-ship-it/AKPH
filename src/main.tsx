@@ -8,6 +8,8 @@ import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import App from './App.tsx';
+// Vazirmatn ships inside the bundle (app/assets in the plugin); no external font service is used.
+import '@fontsource-variable/vazirmatn';
 import './index.css';
 import { createDataSource, DataSource, PortalSession } from './api';
 import { AppStoreProvider } from './store/AppStore';
@@ -77,7 +79,7 @@ function Root() {
     );
   }
 
-  // The role switcher exists only with demo data (DEV, or a demo build); the WordPress source never offers it.
+  // The role switcher exists only with demo data (DEV, or a demo build); the server source never offers it.
   const demoBuild = import.meta.env.DEV || import.meta.env.VITE_DEMO_DATA === 'true';
   const devUsers = demoBuild && boot.source.kind === 'mock' ? boot.source.devUsers?.() : undefined;
   return (
@@ -86,6 +88,8 @@ function Root() {
         session={boot.session}
         sourceLabel={boot.source.label}
         isDemoData={boot.source.kind === 'mock'}
+        writablePaths={boot.source.writablePaths}
+        listManagers={boot.source.listManagers}
         devUsers={devUsers}
         switchUser={devUsers ? (userId) => load(userId, { source: boot.source, epoch: boot.epoch }) : undefined}
       >

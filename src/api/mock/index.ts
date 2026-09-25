@@ -55,16 +55,19 @@ export function createMockDataSource(): DataSource {
 
   return {
     kind: 'mock',
-    label: 'داده نمایشی (محیط توسعه)',
+    label: 'داده نمایشی (بدون ذخیره در سرور)',
 
     async loadSession(userId?: string): Promise<PortalSession> {
       const state = ensure();
-      const base = mockUsers.find((u) => u.id === userId) || mockUsers[0];
+      // The plugin's demo mode (system administrator only) runs as the signed-in WordPress user.
+      const page = typeof window !== 'undefined' ? window.AkphPortal : undefined;
+      const sandboxUser = page?.mode === 'demo' ? { id: String(page.userId || 'admin'), name: page.displayName || 'مدیر سیستم', role: 'مدیر سیستم' as const, email: '', avatar: '' } : null;
+      const base = sandboxUser || mockUsers.find((u) => u.id === userId) || mockUsers[0];
       return {
         user: { ...base, projectIds: projectScope(base, state) },
         currency: 'toman',
         fiscalYear: getCurrentFiscalYear(),
-        company: demoCompany,
+        company: page?.siteName ? { name: page.siteName, legalName: page.siteName } : demoCompany,
       };
     },
 
@@ -81,5 +84,9 @@ export function createMockDataSource(): DataSource {
     },
 
     devUsers: () => mockUsers,
+
+    async listManagers() {
+      return mockUsers.filter((u) => u.role === 'مدیر پروژه').map((u) => ({ id: u.id, name: u.name }));
+    },
   };
 }

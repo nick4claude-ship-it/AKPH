@@ -58,7 +58,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
     () => selectProcurementDashboard(orders, requisitions, rfqs, invoices, suppliers),
     [orders, requisitions, rfqs, invoices, suppliers]
   );
-  const { totalOrdersAmount, activeOrdersCount, urgentRequisitions, pendingApprovalsCount, activeRfqsCount, totalSavings, pendingInvoices, totalAccountsPayable } = dash;
+  const { totalOrdersAmount, activeOrdersCount, urgentRequisitions, urgentProjects, pendingApprovalsCount, activeRfqsCount, totalSavings, pendingInvoices, totalAccountsPayable } = dash;
 
   return (
     <div className="space-y-6">
@@ -155,7 +155,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">پروژه‌های درگیر:</span>
-            <span className="font-bold text-rose-700">رونیکا و فجر</span>
+            <span className="font-bold text-rose-700">{urgentProjects}</span>
           </div>
         </div>
 

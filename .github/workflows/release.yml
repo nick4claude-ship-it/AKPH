@@ -1,0 +1,46 @@
+name: Plugin release
+
+# Builds the installable plugin (akph-portal.zip: PHP, the built app and the Vazirmatn font; no
+# node_modules, TypeScript, sample data or environment files) and attaches it to the GitHub Release of
+# the plugin version (tag akph-portal-v<Version>). A later build of the same version replaces the asset.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plugin-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build the plugin ZIP (with package check)
+        run: npm run plugin:zip
+      - name: Publish the release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^ \* Version:[[:space:]]*\([0-9.]*\).*/\1/p' wordpress-plugin/akph-portal/akph-portal.php)
+          test -n "$version"
+          tag="akph-portal-v${version}"
+          sum=$(sha256sum .plugin-build/akph-portal.zip | cut -d' ' -f1)
+          notes=$(printf 'افزونه وردپرس akph-portal نسخه %s\n\nنصب: پیشخوان ← افزونه‌ها ← افزودن ← بارگذاری افزونه ← akph-portal.zip (راهنما: docs/INSTALL-FA.md)\n\ncommit: %s\nSHA-256: %s\n' "$version" "$GITHUB_SHA" "$sum")
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" .plugin-build/akph-portal.zip --clobber
+            gh release edit "$tag" --notes "$notes"
+          else
+            gh release create "$tag" .plugin-build/akph-portal.zip --target "$GITHUB_SHA" --title "akph-portal ${version}" --notes "$notes"
+          fi
+          echo "release: $(gh release view "$tag" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"

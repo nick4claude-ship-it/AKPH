@@ -87,6 +87,10 @@ export type UserAction =
   | 'inventory.transfer'
   | 'inventory.stocktake'
   | 'inventory.manage_catalog'
+  // اطلاعات پایه (سرور akph/v1)
+  | 'project.create'
+  | 'master_data.manage'
+  | 'account.manage'
   // سایر
   | 'document.manage'
   | 'settings.manage'
@@ -150,6 +154,8 @@ const ROLE_PERMISSIONS: Record<PortalRole, typeof ALL | ReadonlySet<UserAction>>
     'inventory.receive',
     'inventory.stocktake',
     'inventory.manage_catalog',
+    'master_data.manage',
+    'account.manage',
     'document.manage',
     'reports.financial',
   ]),
@@ -230,8 +236,8 @@ export function canAccessProject(user: UserProfile | null | undefined, projectId
  * 1. Separation of duties (cannot be overridden): nobody approves a record they created, nobody approves
  *    two consecutive steps of one document, the payer is not the approver.
  * 2. Project scope — a project manager acts only inside own projects (records without a project excluded).
- * 3. The role matrix, mirrored from the paydar-portal plugin.
- * 4. window.PaydarPortal.can may only restrict further; it never grants what the matrix denies.
+ * 3. The role matrix, mirrored by the akph-portal server (capabilities akph_*).
+ * 4. window.AkphPortal.can may only restrict further; it never grants what the matrix denies.
  */
 export function checkPermission(user: UserProfile | undefined | null, action: UserAction, context: ActionContext = {}): PermissionCheck {
   if (!user) return { ok: false, reason: 'کاربر وارد سامانه نشده است.' };
@@ -258,7 +264,7 @@ export function checkPermission(user: UserProfile | undefined | null, action: Us
     return { ok: false, reason: `نقش «${user.role}» مجاز به این عملیات نیست.` };
   }
 
-  const portal = typeof window !== 'undefined' ? window.PaydarPortal : undefined;
+  const portal = typeof window !== 'undefined' ? window.AkphPortal : undefined;
   if (portal && typeof portal.can === 'function' && portal.can(action, user, context) === false) {
     return { ok: false, reason: 'سامانه وردپرس اجازه این عملیات را به شما نمی‌دهد.' };
   }
