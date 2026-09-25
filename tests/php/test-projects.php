@@ -88,6 +88,29 @@ class Test_Akph_Projects extends Akph_Test_Case {
         $this->assertSame(array($client['id']), array_column($this->request('GET', '/counterparties')->get_data()['counterparties'], 'id'));
     }
 
+    public function test_manual_cost_center_code_may_not_look_like_an_issued_number() {
+        $this->login('accountant');
+        foreach (array('CC-1405-00001', 'CC-1405-7', 'PRJ-1404-12', 'cc-1405-00002', 'ABC-2026-1') as $code) {
+            $response = $this->request('POST', '/cost-centers', array('name' => 'کد دستی', 'code' => $code));
+            $this->assertStatus(400, $response, $code);
+            $this->assertSame('code', $response->get_data()['data']['field'], $code);
+        }
+        $this->assertSame(0, $this->count_rows('cost_centers'));
+        foreach (array('SITE-01', 'CC-1405', 'CC1405-1', 'HQ-2026-A', '1405-0001') as $code) {
+            $this->assertStatus(201, $this->request('POST', '/cost-centers', array('name' => 'کد دستی ' . $code, 'code' => $code)), $code);
+        }
+        // The issued number itself is kept on edits; another record cannot take that shape.
+        $auto = $this->request('POST', '/cost-centers', array('name' => 'شماره خودکار'))->get_data()['records']['cost_centers'][0];
+        $this->assertMatchesRegularExpression('/^CC-\d{4}-\d{5}$/', $auto['code']);
+        $kept = $this->request('POST', "/cost-centers/{$auto['id']}", array('version' => $auto['version'], 'code' => $auto['code'], 'name' => 'نام تازه'));
+        $this->assertStatus(200, $kept);
+        $manual = $this->request('GET', '/cost-centers')->get_data()['cost_centers'][0];
+        $renamed = $this->request('POST', "/cost-centers/{$manual['id']}", array('version' => $manual['version'], 'code' => 'CC-1405-00099'));
+        $this->assertStatus(400, $renamed);
+        $this->assertTrue(Akph_Master_Data::looks_auto_numbered('CC-1405-00001'));
+        $this->assertFalse(Akph_Master_Data::looks_auto_numbered("CC-1405-1\n"));
+    }
+
     public function test_chart_of_accounts_rules() {
         $this->login('accountant');
         $group = $this->request('POST', '/accounts', array('code' => '7', 'title' => 'گروه آزمایشی', 'level' => 'group', 'nature' => 'debit'));

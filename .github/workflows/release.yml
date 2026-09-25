@@ -1,46 +1,68 @@
 name: Plugin release
 
-# Builds the installable plugin (akph-portal.zip: PHP, the built app and the Vazirmatn font; no
-# node_modules, TypeScript, sample data or environment files) and attaches it to the GitHub Release of
-# the plugin version (tag akph-portal-v<Version>). A later build of the same version replaces the asset.
+# Runs only when a new tag akph-portal-v<Version> is pushed:
+#   1. the whole CI runs on the tagged commit (lint, npm tests, build, php -l, the WordPress/PHP integration
+#      tests with MySQL, the package check);
+#   2. only when it passes, akph-portal.zip (PHP, the built app and the Vazirmatn font; no node_modules,
+#      TypeScript, sample data or environment files) is built and attached to a new GitHub Release.
+# A release that already exists is never changed: its file is not replaced and the run fails instead.
+# A new version needs a new Version header and a new tag.
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags:
+      - 'akph-portal-v*'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: plugin-release
+  group: plugin-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
   release:
+    name: GitHub Release
+    needs: [ci]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v5
+      - name: The tag must match the plugin version
+        run: |
+          version=$(sed -n 's/^ \* Version:[[:space:]]*\([0-9.]*\).*/\1/p' wordpress-plugin/akph-portal/akph-portal.php)
+          constant=$(sed -n "s/.*define('AKPH_PORTAL_VERSION', '\([0-9.]*\)').*/\1/p" wordpress-plugin/akph-portal/akph-portal.php)
+          stable=$(sed -n 's/^Stable tag:[[:space:]]*\([0-9.]*\).*/\1/p' wordpress-plugin/akph-portal/readme.txt)
+          echo "tag=$TAG header=$version constant=$constant readme=$stable"
+          test -n "$version" || { echo "::error::no Version header"; exit 1; }
+          test "$TAG" = "akph-portal-v${version}" || { echo "::error::tag $TAG does not match the plugin Version $version"; exit 1; }
+          test "$constant" = "$version" || { echo "::error::AKPH_PORTAL_VERSION $constant differs from Version $version"; exit 1; }
+          test "$stable" = "$version" || { echo "::error::readme.txt Stable tag $stable differs from Version $version"; exit 1; }
+      - name: Never overwrite an existing release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::release $TAG already exists; its file is not replaced. Publish a new version with a new tag."
+            exit 1
+          fi
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
       - name: Build the plugin ZIP (with package check)
         run: npm run plugin:zip
-      - name: Publish the release asset
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Create the release
         run: |
-          version=$(sed -n 's/^ \* Version:[[:space:]]*\([0-9.]*\).*/\1/p' wordpress-plugin/akph-portal/akph-portal.php)
-          test -n "$version"
-          tag="akph-portal-v${version}"
+          version="${TAG#akph-portal-v}"
           sum=$(sha256sum .plugin-build/akph-portal.zip | cut -d' ' -f1)
           notes=$(printf 'افزونه وردپرس akph-portal نسخه %s\n\nنصب: پیشخوان ← افزونه‌ها ← افزودن ← بارگذاری افزونه ← akph-portal.zip (راهنما: docs/INSTALL-FA.md)\n\ncommit: %s\nSHA-256: %s\n' "$version" "$GITHUB_SHA" "$sum")
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" .plugin-build/akph-portal.zip --clobber
-            gh release edit "$tag" --notes "$notes"
-          else
-            gh release create "$tag" .plugin-build/akph-portal.zip --target "$GITHUB_SHA" --title "akph-portal ${version}" --notes "$notes"
-          fi
-          echo "release: $(gh release view "$tag" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"
+          # Fails if the release appeared meanwhile: an existing release is never replaced.
+          gh release create "$TAG" .plugin-build/akph-portal.zip --verify-tag --title "akph-portal ${version}" --notes "$notes"
+          echo "release: $(gh release view "$TAG" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"

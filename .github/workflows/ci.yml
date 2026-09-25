@@ -1,8 +1,12 @@
 name: CI
 
+# Branch pushes and pull requests; the release workflow calls it (workflow_call) for a new tag, so a tag
+# runs it once, as a precondition of the release.
 on:
   push:
+    branches: ['**']
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read

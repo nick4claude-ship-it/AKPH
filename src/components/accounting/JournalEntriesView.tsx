@@ -44,6 +44,8 @@ interface JournalEntriesViewProps {
   entries: JournalEntry[];
   /** Ids of final entries that already have a reversal entry. */
   reversedIds: Set<string>;
+  /** Final entries whose reversal waits for another user's approval. */
+  pendingReversalIds: Set<string>;
   chartOfAccounts: AccountNode[];
   projects: Project[];
   costCenters: CostCenter[];
@@ -61,6 +63,7 @@ interface JournalEntriesViewProps {
 export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   entries,
   reversedIds,
+  pendingReversalIds,
   chartOfAccounts,
   projects,
   costCenters,
@@ -98,7 +101,8 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   const [newDocRows, setNewDocRows] = useState<JournalEntryRow[]>(() => [emptyRow(), emptyRow()]);
 
   const entryByNumber = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
-  const reversalOf = (id: string) => entries.find((e) => e.reversedFromDocId === id);
+  // The live reversal of an entry (a rejected request is history only).
+  const reversalOf = (id: string) => entries.find((e) => e.reversedFromDocId === id && e.status !== 'رد شده');
 
   const filteredEntries = entries.filter((entry) => {
     const q = searchTerm.toLowerCase();
@@ -189,7 +193,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   };
 
   /** A final, non-reversal entry without an existing reversal is the only thing that can be reversed. */
-  const canReverse = (e: JournalEntry) => journalEntryActions(currentUser, e, reversedIds).canReverse;
+  const canReverse = (e: JournalEntry) => journalEntryActions(currentUser, e, reversedIds, pendingReversalIds).canReverse;
 
   const run = (result: WorkflowResult, onDone: () => void) => {
     if (!result.ok) {
@@ -354,6 +358,11 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
                 اثر این سند با سند معکوس {reversalOf(selectedEntry.id)?.docNumber} خنثی شده است.
               </div>
             )}
+            {pendingReversalIds.has(selectedEntry.id) && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                سند معکوس {reversalOf(selectedEntry.id)?.docNumber} برای این سند ثبت شده و در انتظار تأیید کاربر دیگری است؛ تا تأیید آن، اثر این سند در دفاتر باقی است.
+              </div>
+            )}
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
                 <span className="text-slate-500 text-[11px] block">عنوان سند:</span>
@@ -474,7 +483,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
             <div className="flex items-center gap-2">
               {selectedEntry.status === 'در انتظار تأیید' &&
                 (() => {
-                  const actions = journalEntryActions(currentUser, selectedEntry, reversedIds);
+                  const actions = journalEntryActions(currentUser, selectedEntry, reversedIds, pendingReversalIds);
                   const permission = { ok: actions.canApprove, reason: actions.approveReason };
                   if (!permission.ok) {
                     return <span className="text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg font-medium">{permission.reason}</span>;
@@ -520,7 +529,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
             <h3 className="text-sm font-bold">صدور سند معکوس</h3>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            سند قطعی ویرایش یا حذف نمی‌شود؛ یک سند معکوس با جابه‌جایی بدهکار و بستانکار صادر می‌گردد و سند اصلی بدون تغییر باقی می‌ماند.
+            سند قطعی ویرایش یا حذف نمی‌شود؛ یک سند معکوس با جابه‌جایی بدهکار و بستانکار ثبت می‌شود و سند اصلی بدون تغییر باقی می‌ماند. سند معکوس سند دستی مانند هر سند دیگر با تأیید کاربر دیگری قطعی می‌شود.
           </p>
           <label className="block text-xs font-semibold text-slate-700">
             علت و مستندات اصلاح:

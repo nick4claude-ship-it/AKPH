@@ -8,7 +8,6 @@ import type { AppState, SliceKey } from '../../store/types';
 import { emptyState } from '../../store/state';
 import { buildManualEntry, type ManualEntryFormInput } from '../../store/views/accounting';
 import type { AccountFormInput, CostCenterFormInput, CounterpartyFormInput, ProjectFormInput } from '../../store/views/masterData';
-import { generateUUID } from '../../utils/ids';
 import { apiClient, ApiError } from '../client';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
@@ -99,8 +98,9 @@ function result(raw: unknown, state: AppState, extra: Records = []): CommandResu
   };
 }
 
-const post = (path: string, body: unknown, version?: number) =>
-  apiClient.command<unknown>('POST', path, version === undefined ? body : { ...(body as object), version }, { idempotencyKey: generateUUID(), version });
+/** Sends one command with the Idempotency-Key of the form submission it belongs to. */
+const post = (key: string, path: string, body: unknown, version?: number) =>
+  apiClient.command<unknown>('POST', path, version === undefined ? body : { ...(body as object), version }, { idempotencyKey: key, version });
 
 const findEntry = (state: AppState, id: string): JournalEntry => {
   const entry = state.journalEntries.find((j) => j.id === id);
@@ -138,33 +138,35 @@ function projectBody(f: Partial<ProjectFormInput>) {
   return body;
 }
 
-const createEntry = async (entry: JournalEntry, state: AppState) => result(await post('journal-entries', toEntryBody(entry, counterpartyIds(state))), state);
-const approve = async (id: string, state: AppState) => result(await post(`journal-entries/${id}/post`, {}, findEntry(state, id).version), state);
-const reject = async (id: string, reason: string, state: AppState) => result(await post(`journal-entries/${id}/reject`, { reason }, findEntry(state, id).version), state);
-const reverse = async (id: string, reason: string, state: AppState) => result(await post(`journal-entries/${id}/reverse`, { reason }, findEntry(state, id).version), state);
+const createEntry = async (key: string, entry: JournalEntry, state: AppState) => result(await post(key, 'journal-entries', toEntryBody(entry, counterpartyIds(state))), state);
+const approve = async (key: string, id: string, state: AppState) => result(await post(key, `journal-entries/${id}/post`, {}, findEntry(state, id).version), state);
+const reject = async (key: string, id: string, reason: string, state: AppState) => result(await post(key, `journal-entries/${id}/reject`, { reason }, findEntry(state, id).version), state);
+const reverse = async (key: string, id: string, reason: string, state: AppState) => result(await post(key, `journal-entries/${id}/reverse`, { reason }, findEntry(state, id).version), state);
+
+type Command = (args: unknown[], state: AppState, key: string) => Promise<CommandResult>;
 
 /** Commands; each key is the reference workflow (src/store) whose effect the server now performs. */
-const COMMANDS: Record<string, (args: unknown[], state: AppState) => Promise<CommandResult>> = {
-  createManualJournalEntry: ([entry], state) => createEntry(entry as JournalEntry, state),
-  submitManualJournalEntryForm: ([form], state) => createEntry(buildManualEntry(state, form as ManualEntryFormInput), state),
-  approveJournalEntry: ([id], state) => approve(id as string, state),
-  approveJournalEntryLogged: ([id], state) => approve(id as string, state),
-  rejectJournalEntry: ([id, reason], state) => reject(id as string, reason as string, state),
-  rejectJournalEntryLogged: ([id, reason], state) => reject(id as string, reason as string, state),
-  reverseJournalEntry: ([id, reason], state) => reverse(id as string, reason as string, state),
-  reverseJournalEntryLogged: ([id, reason], state) => reverse(id as string, reason as string, state),
+const COMMANDS: Record<string, Command> = {
+  createManualJournalEntry: ([entry], state, key) => createEntry(key, entry as JournalEntry, state),
+  submitManualJournalEntryForm: ([form], state, key) => createEntry(key, buildManualEntry(state, form as ManualEntryFormInput), state),
+  approveJournalEntry: ([id], state, key) => approve(key, id as string, state),
+  approveJournalEntryLogged: ([id], state, key) => approve(key, id as string, state),
+  rejectJournalEntry: ([id, reason], state, key) => reject(key, id as string, reason as string, state),
+  rejectJournalEntryLogged: ([id, reason], state, key) => reject(key, id as string, reason as string, state),
+  reverseJournalEntry: ([id, reason], state, key) => reverse(key, id as string, reason as string, state),
+  reverseJournalEntryLogged: ([id, reason], state, key) => reverse(key, id as string, reason as string, state),
 
-  async createProject([form], state) {
-    return result(await post('projects', projectBody(form as ProjectFormInput)), state);
+  async createProject([form], state, key) {
+    return result(await post(key, 'projects', projectBody(form as ProjectFormInput)), state);
   },
-  async updateProject([id, changes], state) {
+  async updateProject([id, changes], state, key) {
     const project = state.projects.find((p) => p.id === id);
-    return result(await post(`projects/${id}`, projectBody(changes as Partial<ProjectFormInput>), project?.version), state);
+    return result(await post(key, `projects/${id}`, projectBody(changes as Partial<ProjectFormInput>), project?.version), state);
   },
-  async createCostCenter([form], state) {
+  async createCostCenter([form], state, key) {
     const f = form as CostCenterFormInput;
     const body = { code: f.code.trim() || undefined, name: f.name.trim(), project_id: f.projectId || null, type: COST_CENTER_TYPE_KEYS[f.type] || 'other', manager_name: f.manager, budget: f.budget };
-    const raw = await post('cost-centers', body);
+    const raw = await post(key, 'cost-centers', body);
     // The project lists its cost centers: refresh it from the stored copy with the new id added.
     const res = result(raw, state);
     const created = res.records.find((r) => r.slice === 'costCenters')?.upserted?.[0] as { id?: string } | undefined;
@@ -172,7 +174,7 @@ const COMMANDS: Record<string, (args: unknown[], state: AppState) => Promise<Com
     if (project && created?.id) res.records.push({ slice: 'projects', upserted: [{ ...project, costCenterIds: [...project.costCenterIds, created.id] } as unknown as Record<string, unknown>] });
     return res;
   },
-  async createCounterparty([form], state) {
+  async createCounterparty([form], state, key) {
     const f = form as CounterpartyFormInput;
     const body = {
       kind: f.kind,
@@ -186,14 +188,14 @@ const COMMANDS: Record<string, (args: unknown[], state: AppState) => Promise<Com
       bank_name: f.bankName,
       trade_type: f.tradeType,
     };
-    const res = result(await post('counterparties', body), state);
+    const res = result(await post(key, 'counterparties', body), state);
     const party = res.records.find((r) => r.slice === 'counterparties')?.upserted || [];
     res.records.push({ slice: 'subledgers', upserted: subledgersOf({ counterparties: party as never }) as unknown as Record<string, unknown>[] });
     return res;
   },
-  async createAccount([form], state) {
+  async createAccount([form], state, key) {
     const f = form as AccountFormInput;
-    const raw = await post('accounts', { code: f.code, title: f.title.trim(), level: LEVEL_KEYS[f.level], nature: NATURE_KEYS[f.nature], parent_code: f.parentCode || '' });
+    const raw = await post(key, 'accounts', { code: f.code, title: f.title.trim(), level: LEVEL_KEYS[f.level], nature: NATURE_KEYS[f.nature], parent_code: f.parentCode || '' });
     // The chart is a tree: reload it whole instead of merging one node.
     const chart = parseAccounts(await apiClient.get<unknown>('accounts'));
     return { ...result(raw, state), records: [{ slice: 'chartOfAccounts', replace: chart }] };
@@ -203,10 +205,10 @@ const COMMANDS: Record<string, (args: unknown[], state: AppState) => Promise<Com
 export function createAkphDataSource(): DataSource {
   const commands: CommandGateway = {
     supports: (action) => action in COMMANDS,
-    run: (action, args, state) => {
+    run: (action, args, state, idempotencyKey) => {
       const cmd = COMMANDS[action];
       if (!cmd) return Promise.reject(new ApiError(501, `Unsupported command ${action}`, 'فقط خواندنی — این عملیات به‌زودی در سرور فعال می‌شود.'));
-      return cmd(args, state);
+      return cmd(args, state, idempotencyKey);
     },
   };
 

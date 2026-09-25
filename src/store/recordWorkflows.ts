@@ -1158,12 +1158,20 @@ export function updateProject(env: WorkflowEnv, id: string, changes: Partial<Pro
   return ok(`پروژه ${project.code} به‌روز شد.`, { id });
 }
 
+/**
+ * Shape of the numbers the server issues (CC-1405-00001, ^[A-Z]+-\d{4}-\d+$): a manual code may not take it,
+ * or it could collide with a number issued later. Case-insensitive, as the server's codes are compared.
+ */
+export const looksAutoNumbered = (code: string): boolean => /^[A-Z]+-\d{4}-\d+$/i.test(code);
+
 export function createCostCenter(env: WorkflowEnv, form: CostCenterFormInput): WorkflowResult {
   const deny = guard(env, 'master_data.manage', { projectId: form.projectId || null });
   if (deny) return deny;
   if (!form.name.trim()) return fail('نام مرکز هزینه الزامی است.');
   const state = env.getState();
-  if (form.code && state.costCenters.some((c) => c.code === form.code)) return fail('این کد قبلاً استفاده شده است.');
+  const code = form.code.trim();
+  if (code && looksAutoNumbered(code)) return fail('کدی به شکل شماره خودکار (مانند CC-1405-00001) را سرور صادر می‌کند؛ کد دیگری وارد کنید یا کد را خالی بگذارید.');
+  if (code && state.costCenters.some((c) => c.code.toLowerCase() === code.toLowerCase())) return fail('این کد قبلاً استفاده شده است.');
   const center: CostCenter = {
     id: generateUUID(),
     code: form.code.trim() || nextDocNumber(state.costCenters.map((c) => c.code), 'CC'),

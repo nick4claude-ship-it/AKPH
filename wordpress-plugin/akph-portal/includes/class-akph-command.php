@@ -8,6 +8,8 @@
  * - All writes of a command (records, numbers, audit rows, the key itself) are one InnoDB transaction;
  *   any error rolls everything back.
  * - A command on an existing mutable record must send the version it read (409 when stale).
+ * - A deadlock or lock wait timeout aborts the whole command with 409 `akph_retry` (data.retryable = true);
+ *   the key is not stored either, so the same command may be sent again with the same key.
  * - The response lists the changed records: { message, records: { slice: [record, ...] }, id?, doc_number? }.
  */
 if (!defined('ABSPATH')) {
@@ -44,17 +46,16 @@ final class Akph_Command {
         $route = substr($request->get_method() . ' ' . $request->get_route(), 0, 191);
         $hash = hash('sha256', $route . "\n" . wp_json_encode(self::canonical($body)));
 
-        $stored = self::find_key($user_id, $key);
-        if ($stored) {
-            return self::replay($stored, $hash, $route);
-        }
-
         $keys = Akph_Schema::table('idempotency_keys');
         $suppress = $wpdb->suppress_errors(true);
         try {
+            $stored = self::find_key($user_id, $key);
+            if ($stored) {
+                return self::replay($stored, $hash, $route);
+            }
             Akph_Db::begin();
             // Claim the key first: a concurrent request with the same key waits on this row, then replays.
-            $claimed = $wpdb->insert($keys, array(
+            $key_id = Akph_Db::try_insert($keys, array(
                 'user_id' => $user_id,
                 'idem_key' => $key,
                 'route' => $route,
@@ -63,14 +64,11 @@ final class Akph_Command {
                 'response' => null,
                 'created_at' => Akph_Db::now_utc(),
             ));
-            if ($claimed === false) {
-                $duplicate = Akph_Db::is_duplicate_error();
+            if ($key_id === false) {
                 Akph_Db::rollback();
-                $wpdb->suppress_errors($suppress);
-                $stored = $duplicate ? self::find_key($user_id, $key) : null;
-                return $stored ? self::replay($stored, $hash, $route) : new WP_Error('akph_db_error', 'خطای پایگاه‌داده؛ هیچ تغییری ذخیره نشد.', array('status' => 500));
+                $stored = self::find_key($user_id, $key);
+                return $stored ? self::replay($stored, $hash, $route) : Akph_Error::retry()->to_wp_error();
             }
-            $key_id = (int) $wpdb->insert_id;
             Akph_Audit::set_request_key($key);
             $result = $handler($body, $request);
             $status = isset($result['status']) ? (int) $result['status'] : 200;
@@ -78,28 +76,28 @@ final class Akph_Command {
             $response = self::shape($result);
             Akph_Db::update($keys, array('status_code' => $status, 'response' => wp_json_encode($response)), array('id' => $key_id));
             Akph_Db::commit();
-            $wpdb->suppress_errors($suppress);
             Akph_Auth::flush();
             return new WP_REST_Response($response, $status);
         } catch (Akph_Error $e) {
+            // Includes 409 akph_retry (deadlock, lock wait timeout): nothing is kept, not even the key, so the
+            // client may send the same command again with the same Idempotency-Key.
             Akph_Db::rollback();
-            $wpdb->suppress_errors($suppress);
             Akph_Auth::flush();
             return $e->to_wp_error();
         } catch (Throwable $e) {
             Akph_Db::rollback();
-            $wpdb->suppress_errors($suppress);
             Akph_Auth::flush();
             error_log('[akph-portal] command failed: ' . $e->getMessage());
             return new WP_Error('akph_server_error', 'خطای سرور؛ هیچ تغییری ذخیره نشد.', array('status' => 500));
         } finally {
+            $wpdb->suppress_errors($suppress);
             Akph_Audit::set_request_key('');
         }
     }
 
     private static function find_key($user_id, $key) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . Akph_Schema::table('idempotency_keys') . ' WHERE user_id = %d AND idem_key = %s', $user_id, $key));
+        return Akph_Db::row($wpdb->prepare('SELECT * FROM ' . Akph_Schema::table('idempotency_keys') . ' WHERE user_id = %d AND idem_key = %s', $user_id, $key));
     }
 
     private static function replay($stored, $hash, $route) {
@@ -151,6 +149,6 @@ final class Akph_Command {
     public static function purge_old_keys() {
         global $wpdb;
         $cutoff = gmdate('Y-m-d H:i:s', time() - self::KEY_TTL_DAYS * DAY_IN_SECONDS);
-        $wpdb->query($wpdb->prepare('DELETE FROM ' . Akph_Schema::table('idempotency_keys') . ' WHERE created_at < %s', $cutoff));
+        Akph_Db::exec($wpdb->prepare('DELETE FROM ' . Akph_Schema::table('idempotency_keys') . ' WHERE created_at < %s', $cutoff));
     }
 }

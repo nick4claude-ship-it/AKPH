@@ -39,18 +39,18 @@ final class Akph_Accounts {
 
     public static function has_children($code) {
         global $wpdb;
-        return (bool) $wpdb->get_var($wpdb->prepare('SELECT id FROM ' . self::table() . ' WHERE parent_code = %s AND active = 1 LIMIT 1', $code));
+        return (bool) Akph_Db::value($wpdb->prepare('SELECT id FROM ' . self::table() . ' WHERE parent_code = %s AND active = 1 LIMIT 1', $code));
     }
 
     public static function by_code($code) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . self::table() . ' WHERE code = %s', $code));
+        return Akph_Db::row($wpdb->prepare('SELECT * FROM ' . self::table() . ' WHERE code = %s', $code));
     }
 
     public static function list_all() {
         global $wpdb;
         $t = self::table();
-        $rows = (array) $wpdb->get_results("SELECT * FROM {$t} ORDER BY code");
+        $rows = (array) Akph_Db::results("SELECT * FROM {$t} ORDER BY code");
         $parents = array();
         foreach ($rows as $r) {
             if ((int) $r->active === 1 && $r->parent_code !== '') {
@@ -104,7 +104,7 @@ final class Akph_Accounts {
 
     public static function used($code) {
         global $wpdb;
-        return (bool) $wpdb->get_var($wpdb->prepare('SELECT id FROM ' . Akph_Schema::table('ledger_lines') . ' WHERE account_code = %s LIMIT 1', $code));
+        return (bool) Akph_Db::value($wpdb->prepare('SELECT id FROM ' . Akph_Schema::table('ledger_lines') . ' WHERE account_code = %s LIMIT 1', $code));
     }
 
     private static function columns(array $body, $existing = null) {

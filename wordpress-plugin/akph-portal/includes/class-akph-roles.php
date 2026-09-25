@@ -67,11 +67,17 @@ final class Akph_Roles {
         }
     }
 
-    /** Additive: add_cap only, on roles that exist. Missing roles are reported in the settings screen. */
+    /**
+     * Additive: add_cap only, on roles that exist. The version is stored only when all four roles exist, so a
+     * role created later (paydar-portal activated after this plugin) still gets its capabilities on a later
+     * request. Missing roles are reported in the settings screen. Returns the missing role slugs.
+     */
     public static function install() {
+        $missing = array();
         foreach (self::grants() as $slug => $caps) {
             $role = get_role($slug);
             if (!$role) {
+                $missing[] = $slug;
                 continue;
             }
             foreach ($caps as $cap) {
@@ -80,7 +86,10 @@ final class Akph_Roles {
                 }
             }
         }
-        update_option(self::OPTION_VERSION, self::ROLES_VERSION, false);
+        if (!$missing) {
+            update_option(self::OPTION_VERSION, self::ROLES_VERSION, false);
+        }
+        return $missing;
     }
 
     /** Roles of the list above that do not exist on this site (paydar-portal creates them). */

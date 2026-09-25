@@ -51,6 +51,14 @@ final class Akph_Error extends Exception {
         return new self('akph_conflict', $message, 409, $data);
     }
 
+    /**
+     * The command met another command on the same records (deadlock, lock wait timeout, or a record that
+     * changed between two locks). Nothing was saved; the client may send it again with the same key.
+     */
+    public static function retry() {
+        return new self('akph_retry', 'هم‌زمان با کاربر دیگری روی همین رکورد کار شد و هیچ تغییری ذخیره نشد؛ دوباره تلاش کنید.', 409, array('retryable' => true));
+    }
+
     /** A rule of accounting is violated (unbalanced entry, group account, closed year, ...). */
     public static function rule($message, array $data = array()) {
         return new self('akph_rule', $message, 422, $data);

@@ -32,14 +32,25 @@ declare global {
 export class ApiError extends Error {
   status: number;
   farsiMessage: string;
+  /** WordPress REST error code (e.g. akph_retry, akph_conflict); '' when the server sent none. */
+  code: string;
 
-  constructor(status: number, message: string, farsiMessage: string) {
+  constructor(status: number, message: string, farsiMessage: string, code = '') {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.farsiMessage = farsiMessage;
+    this.code = code;
+  }
+
+  /** No answer reached the browser: the command may or may not have run on the server. */
+  get outcomeUnknown(): boolean {
+    return this.status === 0;
   }
 }
+
+/** 409 akph_retry: a deadlock or lock wait timeout on the server; nothing was saved and the same command may run again. */
+export const isRetryableConflict = (err: unknown): boolean => err instanceof ApiError && err.status === 409 && err.code === 'akph_retry';
 
 function getFarsiErrorMessage(status: number): string {
   switch (status) {
@@ -123,14 +134,16 @@ export async function apiRequest<T>(
     if (!response.ok) {
       // WordPress REST errors carry { code, message }; a Persian message from the server wins.
       let serverMessage = '';
+      let code = '';
       try {
-        const body = (await response.json()) as { message?: unknown };
+        const body = (await response.json()) as { message?: unknown; code?: unknown };
         if (typeof body?.message === 'string') serverMessage = body.message;
+        if (typeof body?.code === 'string') code = body.code;
       } catch {
         /* not JSON */
       }
       const farsiMsg = /[\u0600-\u06FF]/.test(serverMessage) ? serverMessage : getFarsiErrorMessage(response.status);
-      throw new ApiError(response.status, serverMessage || `HTTP error ${response.status}`, farsiMsg);
+      throw new ApiError(response.status, serverMessage || `HTTP error ${response.status}`, farsiMsg, code);
     }
 
     return (await response.json()) as T;
@@ -145,15 +158,23 @@ export async function apiRequest<T>(
 
 /** Options of a state-changing command (docs/API-CONTRACT.md). */
 export interface CommandOptions {
-  /** Same key for every retry of one user action; the server answers a repeated key with the first result. */
+  /**
+   * One key per form submission (src/store/commandKeys.ts), the same for every retry of it; the server
+   * answers a repeated key with the first result.
+   */
   idempotencyKey: string;
   /** Version of the record the command acts on (optimistic concurrency, answered with 409 when stale). */
   version?: number;
+  /** Pause before sending again after 409 akph_retry (ms). */
+  retryDelayMs?: number;
 }
 
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Sends a command. A network failure (no response) is retried once with the same Idempotency-Key,
- * so a command is never applied twice.
+ * Sends a command. Sent again once, with the same Idempotency-Key, when no response arrived (network
+ * failure: the server replays the result if the first attempt did run) or when the server answered 409
+ * akph_retry (deadlock or lock wait timeout: nothing was saved). A command is never applied twice.
  */
 export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint: string, body: unknown, options: CommandOptions): Promise<T> {
   const headers: Record<string, string> = { 'Idempotency-Key': options.idempotencyKey };
@@ -162,7 +183,11 @@ export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint
   try {
     return await apiRequest<T>(endpoint, init);
   } catch (err) {
-    if (err instanceof ApiError && err.status === 0) return apiRequest<T>(endpoint, init);
+    if (err instanceof ApiError && err.outcomeUnknown) return apiRequest<T>(endpoint, init);
+    if (isRetryableConflict(err)) {
+      await pause(options.retryDelayMs ?? 400 + Math.floor(Math.random() * 400));
+      return apiRequest<T>(endpoint, init);
+    }
     throw err;
   }
 }

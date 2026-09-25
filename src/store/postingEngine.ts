@@ -378,9 +378,20 @@ export function finalizeManualEntry(
   return { ok: true, state: syncCashBalances(next, approved.rows), entry: approved };
 }
 
-/** Final entries that already have a reversal (derived; the original entry is never edited). */
+/** Final entries whose reversal is final too (derived; the original entry is never edited). */
 export function reversedEntryIds(state: Pick<AppState, 'journalEntries'>): Set<string> {
-  return new Set(state.journalEntries.map((j) => j.reversedFromDocId).filter((id): id is string => !!id));
+  return new Set(
+    state.journalEntries
+      .filter((j) => j.reversedFromDocId && (j.status === 'ثبت قطعی' || j.status === 'تأیید شده'))
+      .map((j) => j.reversedFromDocId as string)
+  );
+}
+
+/** Final entries with a reversal waiting for another user's approval (a rejected request frees the entry). */
+export function pendingReversalIds(state: Pick<AppState, 'journalEntries'>): Set<string> {
+  return new Set(
+    state.journalEntries.filter((j) => j.reversedFromDocId && j.status === 'در انتظار تأیید').map((j) => j.reversedFromDocId as string)
+  );
 }
 
 /** Posts an event against a plain state object (used for seeding and tests). */

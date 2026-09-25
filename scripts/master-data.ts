@@ -64,6 +64,14 @@ console.log('  ✔ پروژه: ایجاد فقط مدیر ارشد/سیستم؛ 
 // ---- cost centers, counterparties
 assert.ok(rw.createCostCenter(env(ACC), { code: '', name: 'کارگاه آزمون', projectId: project.id, type: 'کارگاه پروژه', manager: '', budget: 0 }).ok);
 assert.equal(rw.createCostCenter(env(PM), { code: '', name: 'x', projectId: project.id, type: 'کارگاه پروژه', manager: '', budget: 0 }).ok, false);
+// A manual code may not look like a number the server issues (^[A-Z]+-\d{4}-\d+$), in any letter case.
+for (const code of ['CC-1405-00009', 'PRJ-1404-3', 'cc-1405-7']) {
+  const r = rw.createCostCenter(env(ACC), { code, name: 'کد دستی', projectId: '', type: 'دفتر مرکزی', manager: '', budget: 0 });
+  assert.equal(r.ok, false, code);
+  assert.match(r.message, /شماره خودکار/);
+}
+for (const code of ['SITE-01', 'CC-1405', 'HQ-2026-A']) assert.ok(rw.createCostCenter(env(ACC), { code, name: `کد ${code}`, projectId: '', type: 'دفتر مرکزی', manager: '', budget: 0 }).ok, code);
+console.log('  ✔ کد دستی مرکز هزینه به شکل شماره خودکار پذیرفته نمی‌شود');
 assert.ok(state.projects.find((p) => p.id === project.id)!.costCenterIds.length === 1);
 // Valid IBAN: check digits computed for this test only (the number belongs to nobody).
 const bban = '0170000000000000000001'; // 22 digits: IR + 2 check digits + 22 = 26 characters

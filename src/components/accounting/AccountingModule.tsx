@@ -46,6 +46,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   const cashFlow = useMemo(() => selectCashFlowByMonth(appState), [appState]);
   const overview = useSelector(selectAccountingOverview);
   const reversedIds = overview.reversedIds;
+  const pendingReversalIds = overview.pendingReversalIds;
   const { bankReconciliations: reconciliationItems, auditLogs } = appState;
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
 
@@ -103,6 +104,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
         <JournalEntriesView
           entries={journalEntries}
           reversedIds={reversedIds}
+          pendingReversalIds={pendingReversalIds}
           chartOfAccounts={chartOfAccounts}
           projects={projects}
           costCenters={costCenters}

@@ -106,18 +106,81 @@ class Test_Akph_Ledger extends Akph_Test_Case {
         $this->assertStatus(201, $response);
         list($original, $reversal) = $response->get_data()['records']['journal_entries'];
         $this->assertSame($posted['doc_number'], $original['doc_number']);
+        $this->assertSame('posted', $original['status'], 'the original is never edited');
         $this->assertSame($reversal['id'], $original['reversed_by']['id']);
-        $this->assertSame('posted', $reversal['status']);
-        $this->assertSame('ACC-1405-00002', $reversal['doc_number']);
+        $this->assertSame('pending', $original['reversed_by']['status']);
+        $this->assertSame($posted['id'], $reversal['reversal_of']['id']);
+        $this->assertSame('reversal', $reversal['entry_type']);
         $this->assertSame(700, $reversal['lines'][0]['credit']);
         $this->assertSame(700, $reversal['lines'][1]['debit']);
+        $this->assertSame(1, $this->count_rows('doc_sequences', "prefix = 'ACC' AND seq > 0"), 'no final number yet');
+        // A second request while one is pending, and reversing a reversal, are refused.
         $this->assertStatus(409, $this->request('POST', "/journal-entries/{$posted['id']}/reverse", array('version' => $posted['version'], 'reason' => 'دوباره')));
         $this->assertStatus(409, $this->request('POST', "/journal-entries/{$reversal['id']}/reverse", array('version' => $reversal['version'], 'reason' => 'معکوسِ معکوس')));
+        $this->assertStatus(409, $this->request('POST', "/journal-entries/{$reversal['id']}", $this->entry_body('2026-04-10', 5) + array('version' => $reversal['version'])), 'a reversal is not edited');
+        $tb = $this->request('GET', '/reports/trial-balance')->get_data();
+        $this->assertSame(700, $tb['totals']['debit'], 'the pending reversal is not in the books');
+        // Separation of duties: the user who asked for the reversal cannot post it.
+        $this->assertSame('akph_segregation_of_duties', $this->errorCode($this->post_entry($reversal, 'accountant')));
+        $final = $this->post_entry($reversal, 'accountant2');
+        $this->assertStatus(200, $final);
+        $this->assertSame('ACC-1405-00002', $final->get_data()['doc_number']);
+        list($original, $reversal) = $final->get_data()['records']['journal_entries'];
+        $this->assertSame('posted', $reversal['status']);
+        $this->assertSame('posted', $original['reversed_by']['status']);
+        $this->assertSame('ACC-1405-00002', $original['reversed_by']['doc_number']);
+        $this->assertSame((string) self::$users['accountant2'], $reversal['approved_by']);
+        $this->assertStatus(409, $this->request('POST', "/journal-entries/{$posted['id']}/reverse", array('version' => $posted['version'], 'reason' => 'دوباره')));
         $tb = $this->request('GET', '/reports/trial-balance')->get_data();
         $this->assertTrue($tb['balanced']);
         foreach ($tb['rows'] as $row) {
             $this->assertSame(0, $row['closing'], $row['account_code']);
         }
+        global $wpdb;
+        $actions = $wpdb->get_col('SELECT action FROM ' . Akph_Schema::table('audit_log') . " WHERE object_type = 'entry' ORDER BY id");
+        $this->assertSame(array('entry_created', 'entry_posted', 'entry_reversal_requested', 'entry_reversed'), $actions);
+    }
+
+    public function test_rejected_reversal_frees_the_original_for_a_new_request() {
+        $entry = $this->make_entry('accountant', '2026-04-10', 700);
+        $posted = $this->post_entry($entry, 'accountant2')->get_data()['records']['journal_entries'][0];
+        $this->login('accountant');
+        $reversal = $this->request('POST', "/journal-entries/{$posted['id']}/reverse", array('version' => $posted['version'], 'reason' => 'اشتباه'))->get_data()['records']['journal_entries'][1];
+        $this->login('accountant2');
+        $rejected = $this->request('POST', "/journal-entries/{$reversal['id']}/reject", array('version' => $reversal['version'], 'reason' => 'لازم نیست'));
+        $this->assertStatus(200, $rejected);
+        list($original, $reversal) = $rejected->get_data()['records']['journal_entries'];
+        $this->assertNull($original['reversed_by']);
+        $this->assertSame('rejected', $reversal['status']);
+        $this->assertSame($posted['id'], $reversal['reversal_of']['id'], 'the rejected reversal still names its original');
+        $this->assertStatus(409, $this->post_entry($reversal, 'senior'), 'a rejected reversal is never posted');
+        $this->login('accountant');
+        $again = $this->request('POST', "/journal-entries/{$posted['id']}/reverse", array('version' => $posted['version'], 'reason' => 'این بار درست'));
+        $this->assertStatus(201, $again);
+        $this->assertSame('pending', $again->get_data()['records']['journal_entries'][0]['reversed_by']['status']);
+    }
+
+    public function test_ledger_hides_entry_description_from_users_without_view_all() {
+        $project = $this->make_project(array('manager_user_id' => self::$users['pm']));
+        $this->login('accountant');
+        $body = $this->entry_body('2026-04-10', 500, array('description' => 'شرح محرمانه دفتر مرکزی'));
+        $body['lines'][0]['project_id'] = $project['id'];
+        $body['lines'][1]['project_id'] = $project['id'];
+        $entry = $this->request('POST', '/journal-entries', $body)->get_data()['records']['journal_entries'][0];
+        $this->assertStatus(200, $this->post_entry($entry, 'accountant2'));
+
+        $this->login('pm');
+        $ledger = $this->request('GET', '/reports/ledger', null, array(), array('account_code' => '11101'));
+        $this->assertStatus(200, $ledger);
+        $rows = $ledger->get_data()['rows'];
+        $this->assertCount(1, $rows);
+        $this->assertNull($rows[0]['entry_description']);
+        $this->assertSame('بانک', $rows[0]['description'], 'the line description stays');
+        $this->assertStringNotContainsString('محرمانه', wp_json_encode($ledger->get_data()));
+
+        $this->login('accountant');
+        $rows = $this->request('GET', '/reports/ledger', null, array(), array('account_code' => '11101'))->get_data()['rows'];
+        $this->assertSame('شرح محرمانه دفتر مرکزی', $rows[0]['entry_description']);
     }
 
     public function test_idempotency_key_returns_the_same_response_and_creates_one_entry() {

@@ -21,7 +21,7 @@ import type {
 import type { AppState } from '../types';
 import type { Balances, CashFlowPoint } from '../selectors';
 import { postedEntries, selectProjectCostBreakdown, selectProjectFinancials } from '../selectors';
-import { reversedEntryIds } from '../postingEngine';
+import { pendingReversalIds, reversedEntryIds } from '../postingEngine';
 import { journalContext } from '../approvalContext';
 import { isFinalJournalEntry } from '../../api/types';
 import { checkPermission } from '../../utils/permissions';
@@ -39,6 +39,8 @@ export function selectAccountingOverview(state: AppState) {
     pendingApprovalsCount: state.journalEntries.filter((e) => e.status === 'در انتظار تأیید').length,
     pettyCashTotal: sumBy(state.pettyCashAccounts, (p) => p.actualBalance),
     reversedIds: reversedEntryIds(state),
+    /** Final entries with a reversal waiting for approval: not reversible again until it is decided. */
+    pendingReversalIds: pendingReversalIds(state),
   };
 }
 
@@ -197,14 +199,20 @@ export function journalDisplayStatus(entry: JournalEntry, reversedIds: ReadonlyS
 }
 
 /** What the signed-in user may do with a voucher. */
-export function journalEntryActions(user: UserProfile, entry: JournalEntry, reversedIds: ReadonlySet<string>) {
+export function journalEntryActions(
+  user: UserProfile,
+  entry: JournalEntry,
+  reversedIds: ReadonlySet<string>,
+  pendingReversals: ReadonlySet<string> = new Set()
+) {
   const approve = checkPermission(user, 'journal.approve', journalContext(entry));
   return {
-    /** Final, not itself a reversal, not yet reversed, and the user may reverse in its project. */
+    /** Final, not itself a reversal, not reversed or waiting for a reversal, and the user may reverse in its project. */
     canReverse:
       (entry.status === 'ثبت قطعی' || entry.status === 'تأیید شده') &&
       !entry.reversedFromDocId &&
       !reversedIds.has(entry.id) &&
+      !pendingReversals.has(entry.id) &&
       checkPermission(user, 'journal.reverse', { projectId: entry.projectId }).ok,
     canApprove: approve.ok,
     approveReason: approve.reason,

@@ -49,6 +49,8 @@ const responses: Record<string, unknown> = {
 const g = globalThis as unknown as Record<string, unknown>;
 // Plain permalinks, as on the live site: the REST base is a query string.
 g.window = { AkphPortal: { mode: 'live', restUrl: 'https://site.test/?rest_route=/akph/v1', nonce: 'nonce-1', siteName: 'شرکت آزمون' } };
+/** One-off answers, used before `responses`: a status and body, or a network failure ('network'). */
+const queued: Record<string, ({ status: number; body: unknown } | 'network')[]> = {};
 g.fetch = async (url: string, init: RequestInit) => {
   const prefix = 'https://site.test/?rest_route=/akph/v1/';
   assert.ok(url.startsWith(prefix), `REST URL keeps rest_route: ${url}`);
@@ -56,11 +58,16 @@ g.fetch = async (url: string, init: RequestInit) => {
   const method = init.method || 'GET';
   calls.push({ method, url: path, query, headers: init.headers as Record<string, string>, body: init.body ? JSON.parse(String(init.body)) : undefined });
   const key = `${method} ${path}`;
+  const next = queued[key]?.shift();
+  if (next === 'network') throw new TypeError('Failed to fetch');
+  if (next) return new Response(JSON.stringify(next.body), { status: next.status });
   if (!(key in responses)) return new Response(JSON.stringify({ code: 'rest_no_route', message: 'No route' }), { status: 404 });
   return new Response(JSON.stringify(responses[key]), { status: 200 });
 };
 
 const { createAkphDataSource } = await import('../src/api/akph');
+const { sendCommand, ApiError } = await import('../src/api/client');
+const { createCommandKeys, stableStringify } = await import('../src/store/commandKeys');
 const { parseEntry, parseAccounts } = await import('../src/api/akph/mapping');
 const { appReducer } = await import('../src/store/AppStore');
 const { isoToJalali, jalaliToIso } = await import('../src/utils/jalali');
@@ -121,6 +128,7 @@ for (const a of ['createManualJournalEntry', 'submitManualJournalEntryForm', 'ap
 for (const a of ['approveVendorInvoice', 'executePayment', 'closeFiscalYearLogged', 'createClientContract']) assert.equal(commands.supports(a), false, a);
 console.log('  ✔ فرمان‌های این مرحله پشتیبانی می‌شوند؛ بقیه «فقط خواندنی — به‌زودی»');
 
+const draftKey = 'submission-key-0001';
 const draft = await commands.run('createManualJournalEntry', [{
   id: 'local', docNumber: 'LOCAL-1', date: '۱۴۰۵/۰۲/۰۱', title: 'دستی', type: 'پرداخت', submitter: 'x', status: 'تأیید شده',
   rows: [
@@ -129,9 +137,9 @@ const draft = await commands.run('createManualJournalEntry', [{
     { id: 'r3', accountCode: '11101', accountName: '', description: '', debit: 0, credit: 30, subledgerCode: '3' },
   ],
   totalDebit: 30, totalCredit: 30, isBalanced: true, history: [],
-}], state);
+}], state, draftKey);
 const create = calls.find((c) => c.method === 'POST' && c.url === 'journal-entries')!;
-assert.match(create.headers['Idempotency-Key'], /^[0-9a-f-]{36}$/, 'Idempotency-Key header');
+assert.equal(create.headers['Idempotency-Key'], draftKey, 'the key of the form submission is sent as given');
 const body = create.body as Record<string, unknown>;
 for (const k of ['id', 'status', 'doc_number', 'docNumber', 'draft_number', 'total', 'totalDebit', 'submitter', 'version']) assert.ok(!(k in body), `draft body must not carry ${k}`);
 assert.equal(body.date, '2026-04-21', 'Jalali form date → ISO');
@@ -146,19 +154,94 @@ console.log('  ✔ سند دستی فقط به‌صورت ورودی کاربر 
 
 const merged = appReducer(state, { type: 'MERGE_SERVER_RECORDS', records: draft.records });
 assert.equal(merged.journalEntries[0].id, '13');
-await commands.run('approveJournalEntryLogged', ['12'], merged);
+await commands.run('approveJournalEntryLogged', ['12'], merged, 'submission-key-0002');
 const postCall = calls.find((c) => c.url === 'journal-entries/12/post')!;
 assert.equal(postCall.headers['If-Match'], '"1"', 'If-Match carries the record version');
 assert.deepEqual(postCall.body, { version: 1 });
 console.log('  ✔ قطعی‌کردن با version و If-Match نسخه رکورد');
 
-await commands.run('updateProject', ['5', { physicalProgress: 40, startDate: '۱۴۰۵/۰۲/۰۱', manualRevenue: 7 }], state);
+await commands.run('updateProject', ['5', { physicalProgress: 40, startDate: '۱۴۰۵/۰۲/۰۱', manualRevenue: 7 }], state, 'submission-key-0003');
 const upd = calls.find((c) => c.url === 'projects/5')!;
 assert.deepEqual(upd.body, { physical_progress: 40, start_date: '2026-04-21', manual_revenue: 7, version: 3 }, 'only the changed fields, with the version');
 console.log('  ✔ ویرایش پروژه فقط فیلدهای تغییرکرده را با نسخه رکورد می‌فرستد');
 
+// A reversal waits for a second person: pending on the wire, pending in the app, the original not yet reversed.
+{
+  const { pendingReversalIds, reversedEntryIds } = await import('../src/store/postingEngine');
+  const lk = { chart: state.chartOfAccounts, projects: state.projects, costCenters: state.costCenters, counterparties: state.counterparties };
+  const request = parseEntry(entry({ id: '14', doc_number: null, draft_number: 'DRF-1405-00004', status: 'pending', entry_type: 'reversal', source_type: 'reversal', approved_by: null, approved_at: null, version: 1, reversal_of: { id: '11', doc_number: 'ACC-1405-00001' } }), lk);
+  assert.equal(request.status, 'در انتظار تأیید');
+  assert.equal(request.docNumber, 'DRF-1405-00004');
+  assert.equal(request.reversedFromDocId, '11');
+  const withRequest = appReducer(state, { type: 'MERGE_SERVER_RECORDS', records: [{ slice: 'journalEntries', upserted: [request as unknown as Record<string, unknown>] }] });
+  assert.ok(pendingReversalIds(withRequest).has('11'));
+  assert.ok(!reversedEntryIds(withRequest).has('11'), 'not reversed until another user posts it');
+  const posted = parseEntry(entry({ id: '14', doc_number: 'ACC-1405-00003', draft_number: 'DRF-1405-00004', entry_type: 'reversal', source_type: 'reversal', version: 2, reversal_of: { id: '11', doc_number: 'ACC-1405-00001' } }), lk);
+  const final = appReducer(withRequest, { type: 'MERGE_SERVER_RECORDS', records: [{ slice: 'journalEntries', upserted: [posted as unknown as Record<string, unknown>] }] });
+  assert.ok(reversedEntryIds(final).has('11'));
+  assert.ok(!pendingReversalIds(final).has('11'));
+  console.log('  ✔ سند معکوس تا تأیید کاربر دوم «در انتظار تأیید» است و سند اصلی تا آن زمان معکوس‌شده حساب نمی‌شود');
+}
+
 const replaced = appReducer(state, { type: 'MERGE_SERVER_RECORDS', records: [{ slice: 'chartOfAccounts', replace: parseAccounts(responses['GET accounts']) }] });
 assert.equal(replaced.chartOfAccounts[0].code, '1');
+
+// ---------------------------------------------------------------- one Idempotency-Key per form submission
+{
+  let clock = 1_000;
+  let n = 0;
+  const keys = createCommandKeys({ now: () => clock, newKey: () => `key-${++n}`, successGraceMs: 15_000, unknownKeepMs: 600_000 });
+  const form = { date: '۱۴۰۵/۰۲/۰۱', title: 'سند', rows: [{ accountCode: '11101', debit: 5 }] };
+  const first = keys.acquire('submitManualJournalEntryForm', [form]);
+  assert.deepEqual(first, { key: 'key-1', inFlight: false });
+  // Pressing submit again while the first send is on its way: same key, and not sent again.
+  assert.deepEqual(keys.acquire('submitManualJournalEntryForm', [{ rows: [{ debit: 5, accountCode: '11101' }], title: 'سند', date: '۱۴۰۵/۰۲/۰۱' }]), { key: 'key-1', inFlight: true }, 'key order does not matter');
+  keys.settle('key-1', 'ok');
+  clock += 5_000;
+  assert.equal(keys.acquire('submitManualJournalEntryForm', [form]).key, 'key-1', 'a late double click gets the stored answer');
+  keys.settle('key-1', 'ok');
+  clock += 20_000;
+  assert.equal(keys.acquire('submitManualJournalEntryForm', [form]).key, 'key-2', 'a later submission is a new command');
+  // No answer (network): submitting again by hand reuses the key, so a command that did run is not run twice.
+  keys.settle('key-2', 'unknown');
+  clock += 300_000;
+  assert.equal(keys.acquire('submitManualJournalEntryForm', [form]).key, 'key-2');
+  // A refusal leaves nothing on the server: the corrected (or same) form is a new submission.
+  keys.settle('key-2', 'rejected');
+  assert.equal(keys.acquire('submitManualJournalEntryForm', [form]).key, 'key-3');
+  assert.notEqual(keys.acquire('approveJournalEntryLogged', ['12']).key, keys.acquire('approveJournalEntryLogged', ['13']).key, 'another record, another key');
+  assert.notEqual(keys.acquire('rejectJournalEntryLogged', ['12', 'x']).key, keys.acquire('approveJournalEntryLogged', ['12']).key, 'another action, another key');
+  assert.equal(stableStringify({ b: 1, a: [1, { d: undefined, c: 2 }] }), '{"a":[1,{"c":2}],"b":1}');
+  console.log('  ✔ Idempotency-Key یک بار برای هر ارسال فرم ساخته می‌شود و در تکرار همان ارسال تغییر نمی‌کند');
+}
+
+// ---------------------------------------------------------------- 409 akph_retry and lost answers
+{
+  const retryBody = { code: 'akph_retry', message: 'هم‌زمان با کاربر دیگری روی همین رکورد کار شد و هیچ تغییری ذخیره نشد؛ دوباره تلاش کنید.', data: { status: 409, retryable: true } };
+  const sends = () => calls.filter((c) => c.url === 'journal-entries/12/post');
+  calls.length = 0;
+  queued['POST journal-entries/12/post'] = [{ status: 409, body: retryBody }];
+  const answer = await sendCommand<{ doc_number: string }>('POST', 'journal-entries/12/post', { version: 1 }, { idempotencyKey: 'retry-key-1', version: 1, retryDelayMs: 1 });
+  assert.equal(answer.doc_number, 'ACC-1405-00002');
+  assert.equal(sends().length, 2, 'sent again once after 409 akph_retry');
+  assert.deepEqual(sends().map((c) => c.headers['Idempotency-Key']), ['retry-key-1', 'retry-key-1'], 'with the same key');
+
+  calls.length = 0;
+  queued['POST journal-entries/12/post'] = [{ status: 409, body: retryBody }, { status: 409, body: retryBody }];
+  await assert.rejects(sendCommand('POST', 'journal-entries/12/post', {}, { idempotencyKey: 'retry-key-2', retryDelayMs: 1 }), (e: unknown) => e instanceof ApiError && e.code === 'akph_retry' && !e.outcomeUnknown);
+  assert.equal(sends().length, 2, 'only once');
+
+  calls.length = 0;
+  queued['POST journal-entries/12/post'] = [{ status: 409, body: { code: 'akph_conflict', message: 'نسخه رکورد تغییر کرده است.', data: { status: 409 } } }];
+  await assert.rejects(sendCommand('POST', 'journal-entries/12/post', {}, { idempotencyKey: 'retry-key-3', retryDelayMs: 1 }), (e: unknown) => e instanceof ApiError && e.code === 'akph_conflict');
+  assert.equal(sends().length, 1, 'a stale version is not sent again');
+
+  calls.length = 0;
+  queued['POST journal-entries/12/post'] = ['network'];
+  await sendCommand('POST', 'journal-entries/12/post', {}, { idempotencyKey: 'retry-key-4' });
+  assert.deepEqual(sends().map((c) => c.headers['Idempotency-Key']), ['retry-key-4', 'retry-key-4'], 'a lost answer is asked again with the same key');
+  console.log('  ✔ خطای 409 akph_retry (بن‌بست/پایان مهلت قفل) و پاسخ گم‌شده یک بار با همان کلید تکرار می‌شوند؛ تعارض نسخه تکرار نمی‌شود');
+}
 
 // ---------------------------------------------------------------- strict parsing
 const look = { chart: [], projects: [], costCenters: [], counterparties: [] };

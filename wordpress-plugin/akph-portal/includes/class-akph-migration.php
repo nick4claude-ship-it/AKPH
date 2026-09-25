@@ -26,7 +26,7 @@ final class Akph_Migration {
     public static function legacy_exists() {
         global $wpdb;
         $t = self::legacy_table();
-        return $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($t))) === $t;
+        return Akph_Db::value($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($t))) === $t;
     }
 
     /**
@@ -75,8 +75,8 @@ final class Akph_Migration {
         if (!self::legacy_exists()) {
             return array('available' => false, 'items' => array(), 'create' => 0, 'skip' => 0, 'errors' => 0);
         }
-        $rows = $wpdb->get_results('SELECT * FROM ' . self::legacy_table() . ' ORDER BY id');
-        $existing = $wpdb->get_col('SELECT legacy_id FROM ' . Akph_Schema::table('projects') . ' WHERE legacy_id IS NOT NULL');
+        $rows = Akph_Db::results('SELECT * FROM ' . self::legacy_table() . ' ORDER BY id');
+        $existing = Akph_Db::col('SELECT legacy_id FROM ' . Akph_Schema::table('projects') . ' WHERE legacy_id IS NOT NULL');
         $existing = array_flip((array) $existing);
         $items = array();
         $counts = array('create' => 0, 'skip' => 0, 'errors' => 0);
@@ -182,11 +182,11 @@ final class Akph_Migration {
                     continue;
                 }
                 // Re-check inside the transaction: two administrators may run the tool at once.
-                if ($wpdb->get_var($wpdb->prepare("SELECT id FROM {$t} WHERE legacy_id = %s FOR UPDATE", $item['legacy_id']))) {
+                if (Akph_Db::value($wpdb->prepare("SELECT id FROM {$t} WHERE legacy_id = %s FOR UPDATE", $item['legacy_id']))) {
                     continue;
                 }
                 $data = $item['fields'];
-                if ($wpdb->get_var($wpdb->prepare("SELECT id FROM {$t} WHERE code = %s", $data['code']))) {
+                if (Akph_Db::value($wpdb->prepare("SELECT id FROM {$t} WHERE code = %s", $data['code']))) {
                     $data['code'] = mb_substr('LEG-' . $data['code'], 0, 32);
                 }
                 $now = Akph_Db::now_utc();

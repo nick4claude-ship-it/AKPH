@@ -56,7 +56,7 @@ final class Akph_Auth {
         global $wpdb;
         $uid = get_current_user_id();
         if (!isset(self::$own_projects[$uid])) {
-            $ids = $uid > 0 ? $wpdb->get_col($wpdb->prepare('SELECT id FROM ' . Akph_Schema::table('projects') . ' WHERE manager_user_id = %d', $uid)) : array();
+            $ids = $uid > 0 ? Akph_Db::col($wpdb->prepare('SELECT id FROM ' . Akph_Schema::table('projects') . ' WHERE manager_user_id = %d', $uid)) : array();
             self::$own_projects[$uid] = array_map('intval', (array) $ids);
         }
         return self::$own_projects[$uid];

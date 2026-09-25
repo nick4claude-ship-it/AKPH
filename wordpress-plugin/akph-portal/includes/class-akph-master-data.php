@@ -34,7 +34,7 @@ final class Akph_Master_Data {
         global $wpdb;
         $t = Akph_Schema::table('cost_centers');
         $scope = Akph_Auth::project_scope_sql('project_id');
-        $rows = $wpdb->get_results("SELECT * FROM {$t} WHERE {$scope} ORDER BY code");
+        $rows = Akph_Db::results("SELECT * FROM {$t} WHERE {$scope} ORDER BY code");
         return array_map(array(__CLASS__, 'cost_center_shape'), (array) $rows);
     }
 
@@ -67,14 +67,27 @@ final class Akph_Master_Data {
             if (!preg_match('/^[A-Za-z0-9.\-]{1,32}$/D', $code)) {
                 throw Akph_Error::invalid('کد مرکز هزینه فقط حروف لاتین، رقم، نقطه و خط تیره است.', array('field' => 'code'));
             }
+            // PREFIX-YYYY-N is the shape of the numbers the server issues (CC-1405-00001): a manual code of that
+            // shape could take a number the counter will issue later. An existing record keeps its own code.
+            if (self::looks_auto_numbered($code) && (!$existing || $code !== $existing->code)) {
+                throw Akph_Error::invalid('کدی به شکل شماره خودکار (مانند CC-1405-00001) را سرور صادر می‌کند؛ کد دیگری وارد کنید یا کد را خالی بگذارید.', array('field' => 'code'));
+            }
             $data['code'] = $code;
         }
         return $data;
     }
 
+    /**
+     * Pattern of server-issued numbers, ^[A-Z]+-\d{4}-\d+$. Checked case-insensitively: codes are compared
+     * with the table's case-insensitive collation, so cc-1405-1 would collide with CC-1405-1 as well.
+     */
+    public static function looks_auto_numbered($code) {
+        return (bool) preg_match('/^[A-Z]+-\d{4}-\d+$/iD', (string) $code);
+    }
+
     private static function assert_unique_code($table, $code, $id = 0) {
         global $wpdb;
-        if ($wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE code = %s AND id <> %d", $code, $id))) {
+        if (Akph_Db::value($wpdb->prepare("SELECT id FROM {$table} WHERE code = %s AND id <> %d", $code, $id))) {
             throw Akph_Error::conflict('این کد قبلاً استفاده شده است.', array('field' => 'code'));
         }
     }
@@ -126,7 +139,7 @@ final class Akph_Master_Data {
 
     private static function used_in_lines($column, $id) {
         global $wpdb;
-        return (bool) $wpdb->get_var($wpdb->prepare('SELECT id FROM ' . Akph_Schema::table('ledger_lines') . " WHERE {$column} = %d LIMIT 1", $id));
+        return (bool) Akph_Db::value($wpdb->prepare('SELECT id FROM ' . Akph_Schema::table('ledger_lines') . " WHERE {$column} = %d LIMIT 1", $id));
     }
 
     // ------------------------------------------------------------------ counterparties
@@ -154,12 +167,12 @@ final class Akph_Master_Data {
         global $wpdb;
         $t = Akph_Schema::table('counterparties');
         if (Akph_Auth::view_all()) {
-            $rows = $wpdb->get_results("SELECT * FROM {$t} ORDER BY name");
+            $rows = Akph_Db::results("SELECT * FROM {$t} ORDER BY name");
         } else {
             // Project managers: only the clients their own projects refer to.
             $scope = Akph_Auth::project_scope_sql('p.id');
             $p = Akph_Schema::table('projects');
-            $rows = $wpdb->get_results("SELECT DISTINCT c.* FROM {$t} c JOIN {$p} p ON p.client_id = c.id WHERE {$scope} ORDER BY c.name");
+            $rows = Akph_Db::results("SELECT DISTINCT c.* FROM {$t} c JOIN {$p} p ON p.client_id = c.id WHERE {$scope} ORDER BY c.name");
         }
         return array_map(array(__CLASS__, 'counterparty_shape'), (array) $rows);
     }
@@ -244,9 +257,9 @@ final class Akph_Master_Data {
         if ($after->name !== $row->name && $after->kind === 'client') {
             global $wpdb;
             $p = Akph_Schema::table('projects');
-            $ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$p} WHERE client_id = %d", $id));
+            $ids = Akph_Db::col($wpdb->prepare("SELECT id FROM {$p} WHERE client_id = %d", $id));
             if ($ids) {
-                Akph_Db::must($wpdb->query($wpdb->prepare("UPDATE {$p} SET client_name = %s, version = version + 1, updated_by = %d, updated_at = %s WHERE client_id = %d", $after->name, get_current_user_id(), Akph_Db::now_utc(), $id)));
+                Akph_Db::exec($wpdb->prepare("UPDATE {$p} SET client_name = %s, version = version + 1, updated_by = %d, updated_at = %s WHERE client_id = %d", $after->name, get_current_user_id(), Akph_Db::now_utc(), $id));
                 $records['projects'] = array();
                 foreach ($ids as $pid) {
                     $records['projects'][] = Akph_Projects::shape(Akph_Db::find($p, (int) $pid));
