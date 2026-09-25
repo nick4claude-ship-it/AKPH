@@ -4,26 +4,23 @@
  */
 
 import React, { useState } from 'react';
-import {
-  SubcontractorContract,
-  SubcontractorTradeType,
-  Project,
-  UserProfile,
-} from '../../../types';
+import { SubcontractorTradeType, Project, UserProfile } from '../../../types';
 import { X, Building, Hammer, Plus, DollarSign, Calendar } from 'lucide-react';
-import { Dialog } from '../../common/Dialog';
+import { Dialog } from '../../../ui/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
-import { IntegerInput, MoneyInput } from '../../common/NumberInput';
-import { generateUUID, nextDocNumber } from '../../../utils/ids';
+import { IntegerInput, MoneyInput } from '../../../ui/NumberInput';
 import { getRelativePersianDate } from '../../../utils/date';
-import { useAppState } from '../../../store/AppStore';
+import { useSelector } from '../../../store/AppStore';
+import { suggestSubcontractNumber } from '../../../store/views/contracts';
+import type { NewSubcontractInput } from '../../../store/recordWorkflows';
 
 interface NewSubcontractorContractModalProps {
   isOpen: boolean;
   onClose: () => void;
   projects: Project[];
   currentUser: UserProfile;
-  onSave: (contract: SubcontractorContract) => void;
+  /** Creates the subcontract through the workflow (cost center, ledger account and retention come from the store). */
+  onSave: (input: NewSubcontractInput) => { ok: boolean; message: string };
 }
 
 export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractModalProps> = ({
@@ -33,13 +30,13 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
   currentUser,
   onSave,
 }) => {
-  const existingNumbers = useAppState().subcontractorContracts.map((c) => c.contractNumber);
+  const suggestedNumber = useSelector(suggestSubcontractNumber);
   const [projectId, setProjectId] = useState<string>(projects[0]?.id || '');
   const [formError, setFormError] = useState<string | null>(null);
   const [subcontractorName, setSubcontractorName] = useState('');
   const [subcontractorPhone, setSubcontractorPhone] = useState('');
   const [tradeType, setTradeType] = useState<SubcontractorTradeType>('جوشکاری و اسکلت فلزی');
-  const [contractNumber, setContractNumber] = useState(() => nextDocNumber(existingNumbers, 'SUB'));
+  const [contractNumber, setContractNumber] = useState(suggestedNumber);
   const [title, setTitle] = useState('');
   const [contractValue, setContractValue] = useState<number>(0);
   const [unitRateDescription, setUnitRateDescription] = useState('نرخ واحد توافقی بر اساس فهرست مقادیر');
@@ -51,45 +48,24 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
   if (!isOpen) return null;
 
-  const selectedProject = projects.find((p) => p.id === projectId) || projects[0];
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProject) return setFormError('پروژه را انتخاب کنید.');
-    if (!subcontractorName.trim()) return setFormError('نام پیمانکار را وارد کنید.');
-    if (contractValue <= 0) return setFormError('مبلغ قرارداد باید بیش از صفر باشد.');
-    if (advancePaid > contractValue) return setFormError('پیش‌پرداخت از مبلغ قرارداد بیشتر است.');
-    if (retentionDepositRate > 100) return setFormError('درصد سپرده نمی‌تواند بیش از ۱۰۰ باشد.');
-    if (!selectedProject.costCenterIds?.[0]) return setFormError('برای این پروژه مرکز هزینه تعریف نشده است.');
-
-    const newContract: SubcontractorContract = {
-      id: generateUUID(),
-      contractNumber,
-      title: title || `عملیات ${tradeType} پروژه ${selectedProject.name}`,
-      projectId: selectedProject.id,
-      projectName: selectedProject.name,
-      costCenterId: selectedProject.costCenterIds[0],
-      counterpartyId: 'cp-sub-01',
+    const result = onSave({
+      projectId: projectId || projects[0]?.id || '',
       subcontractorName,
       subcontractorPhone,
       tradeType,
+      contractNumber,
+      title,
       contractValue,
-      executedValue: 0,
-      approvedStatementsValue: 0,
-      paidValue: 0,
-      remainingPayableValue: 0,
-      remainingContractValue: contractValue,
+      unitRateDescription,
       startDate,
       endDate,
-      status: 'فعال',
-      unitRateDescription,
       advancePaid,
-      retentionDeposit: Math.round(contractValue * (retentionDepositRate / 100)),
-      penaltyOrDeductions: 0,
+      retentionDepositRate,
       notes,
-    };
-
-    onSave(newContract);
+    });
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
@@ -119,8 +95,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">انتخاب کارگاه / پروژه:</label>
-              <select
+              <label htmlFor="new-subcontractor-contract-modal-1" className="text-xs font-bold text-slate-700 block mb-1.5">انتخاب کارگاه / پروژه:</label>
+              <select id="new-subcontractor-contract-modal-1"
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium cursor-pointer"
@@ -134,8 +110,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">رشته تخصصی پیمانکاری:</label>
-              <select
+              <label htmlFor="new-subcontractor-contract-modal-2" className="text-xs font-bold text-slate-700 block mb-1.5">رشته تخصصی پیمانکاری:</label>
+              <select id="new-subcontractor-contract-modal-2"
                 value={tradeType}
                 onChange={(e) => setTradeType(e.target.value as SubcontractorTradeType)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold cursor-pointer"
@@ -159,8 +135,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">نام پیمانکار / سرپرست اکیپ:</label>
-              <input
+              <label htmlFor="new-subcontractor-contract-modal-3" className="text-xs font-bold text-slate-700 block mb-1.5">نام پیمانکار / سرپرست اکیپ:</label>
+              <input id="new-subcontractor-contract-modal-3"
                 type="text"
                 required
                 placeholder="مثال: صنایع جوش پیشگام (قادری)"
@@ -171,8 +147,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">شماره تماس / همراه:</label>
-              <input
+              <label htmlFor="new-subcontractor-contract-modal-4" className="text-xs font-bold text-slate-700 block mb-1.5">شماره تماس / همراه:</label>
+              <input id="new-subcontractor-contract-modal-4"
                 type="text"
                 placeholder="۰۹۱۲۰۰۰۰۰۰۰"
                 value={subcontractorPhone}
@@ -184,8 +160,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">شماره قرارداد سیستمی:</label>
-              <input
+              <label htmlFor="new-subcontractor-contract-modal-5" className="text-xs font-bold text-slate-700 block mb-1.5">شماره قرارداد سیستمی:</label>
+              <input id="new-subcontractor-contract-modal-5"
                 type="text"
                 required
                 value={contractNumber}
@@ -195,8 +171,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">سقف مبلغ کل قرارداد ({moneyUnitLabel()}):</label>
-              <MoneyInput
+              <label htmlFor="new-subcontractor-contract-modal-6" className="text-xs font-bold text-slate-700 block mb-1.5">سقف مبلغ کل قرارداد ({moneyUnitLabel()}):</label>
+              <MoneyInput id="new-subcontractor-contract-modal-6"
                 required
                 value={contractValue}
                 onValueChange={(v) => setContractValue(v)}
@@ -209,8 +185,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1.5">موضوع و شرح عملیات پیمان:</label>
-            <input
+            <label htmlFor="new-subcontractor-contract-modal-7" className="text-xs font-bold text-slate-700 block mb-1.5">موضوع و شرح عملیات پیمان:</label>
+            <input id="new-subcontractor-contract-modal-7"
               type="text"
               placeholder="مثال: عملیات جوشکاری و مونتاژ تیر و ستون‌های فلزی طبقات ۱ تا ۱۰"
               value={title}
@@ -220,8 +196,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1.5">شرح نرخ پایه و بهای واحد توافقی:</label>
-            <input
+            <label htmlFor="new-subcontractor-contract-modal-8" className="text-xs font-bold text-slate-700 block mb-1.5">شرح نرخ پایه و بهای واحد توافقی:</label>
+            <input id="new-subcontractor-contract-modal-8"
               type="text"
               placeholder="مثال: نرخ هر کیلو جوشکاری نفوذی یا هر متر قالب‌بندی طبق فهرست‌بها"
               value={unitRateDescription}
@@ -232,8 +208,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">تاریخ شروع کار:</label>
-              <input
+              <label htmlFor="new-subcontractor-contract-modal-9" className="text-xs font-bold text-slate-700 block mb-1.5">تاریخ شروع کار:</label>
+              <input id="new-subcontractor-contract-modal-9"
                 type="text"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -241,8 +217,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">تاریخ پایان کار:</label>
-              <input
+              <label htmlFor="new-subcontractor-contract-modal-10" className="text-xs font-bold text-slate-700 block mb-1.5">تاریخ پایان کار:</label>
+              <input id="new-subcontractor-contract-modal-10"
                 type="text"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -253,8 +229,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">پیش‌پرداخت اولیه ({moneyUnitLabel()}):</label>
-              <MoneyInput
+              <label htmlFor="new-subcontractor-contract-modal-11" className="text-xs font-bold text-slate-700 block mb-1.5">پیش‌پرداخت اولیه ({moneyUnitLabel()}):</label>
+              <MoneyInput id="new-subcontractor-contract-modal-11"
                 value={advancePaid}
                 onValueChange={(v) => setAdvancePaid(v)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
@@ -262,9 +238,9 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">درصد سپرده حسن انجام کار:</label>
+              <label htmlFor="new-subcontractor-contract-modal-12" className="text-xs font-bold text-slate-700 block mb-1.5">درصد سپرده حسن انجام کار:</label>
               <div className="flex items-center gap-1">
-                <MoneyInput
+                <MoneyInput id="new-subcontractor-contract-modal-12"
                   value={retentionDepositRate}
                   onValueChange={(v) => setRetentionDepositRate(v)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
@@ -275,8 +251,8 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1.5">توضیحات و شرایط ویژه کارگاهی:</label>
-            <textarea
+            <label htmlFor="new-subcontractor-contract-modal-13" className="text-xs font-bold text-slate-700 block mb-1.5">توضیحات و شرایط ویژه کارگاهی:</label>
+            <textarea id="new-subcontractor-contract-modal-13"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

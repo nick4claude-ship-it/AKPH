@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Contract, UserProfile } from '../../types';
-import { ContractFile } from './contractFiles';
+import type { ContractFile } from '../../store/views/contracts';
 import { FileText, Download, Plus, Search, Paperclip, Eye } from 'lucide-react';
 
 interface ContractDocumentsViewProps {

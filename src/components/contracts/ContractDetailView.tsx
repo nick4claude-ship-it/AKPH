@@ -4,16 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import {
-  Contract,
-  ContractBOQItem,
-  DetailedProgressStatement,
-  ContractAmendment,
-  StatementPayment,
-  ContractAuditLog,
-  UserProfile,
-} from '../../types';
-import { ContractFile } from './contractFiles';
+import { Contract, DetailedProgressStatement, UserProfile } from '../../types';
+import { useSelector } from '../../store/AppStore';
+import { selectContractDetail } from '../../store/views/contracts';
 import {
   Building2,
   Calendar,
@@ -38,15 +31,10 @@ import {
   Settings,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { barWidth, formatDecimal, formatPercent, formatInt } from '../../utils/formatters';
 
 interface ContractDetailViewProps {
   contract: Contract;
-  boqItems: ContractBOQItem[];
-  statements: DetailedProgressStatement[];
-  amendments: ContractAmendment[];
-  payments: StatementPayment[];
-  documents: ContractFile[];
-  auditLogs: ContractAuditLog[];
   currentUser: UserProfile;
   onBack: () => void;
   onOpenNewStatement: (contract: Contract) => void;
@@ -68,12 +56,6 @@ type DetailTab =
 
 export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
   contract,
-  boqItems,
-  statements,
-  amendments,
-  payments,
-  documents,
-  auditLogs,
   currentUser,
   onBack,
   onOpenNewStatement,
@@ -82,18 +64,16 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
 
-  // Filter items for this contract
-  const contractBOQ = boqItems.filter((b) => b.contractId === contract.id);
-  const contractStatements = statements.filter((s) => s.contractId === contract.id);
-  const contractAmendments = amendments.filter((a) => a.contractId === contract.id);
-  const contractPayments = payments.filter((p) => p.contractId === contract.id);
-  const contractDocs = documents.filter((d) => d.contractId === contract.id);
-  const contractLogs = auditLogs.filter((l) => l.contractId === contract.id);
-
-  // Financial calculations
-  const execPct = (contract.executedValue / contract.currentValue) * 100;
-  const billedPct = (contract.billedValue / contract.currentValue) * 100;
-  const receivedPct = (contract.receivedValue / contract.currentValue) * 100;
+  const detail = useSelector((s) => selectContractDetail(s, contract), [contract]);
+  const {
+    progress,
+    boq: contractBOQ,
+    statements: contractStatements,
+    amendments: contractAmendments,
+    payments: contractPayments,
+    documents: contractDocs,
+    auditLogs: contractLogs,
+  } = detail;
 
   return (
     <div className="space-y-6">
@@ -163,7 +143,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
               {formatMoneyCompact(contract.executedValue)}
             </span>
             <span className="text-[10px] text-indigo-400 block mt-0.5 font-bold">
-              {Number(execPct.toFixed(1)).toLocaleString('fa-IR')}٪ پیشرفت فیزیکی
+              {formatPercent(progress.executedPercent)} پیشرفت فیزیکی
             </span>
           </div>
 
@@ -173,7 +153,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
               {formatMoneyCompact(contract.billedValue)}
             </span>
             <span className="text-[10px] text-purple-400 block mt-0.5">
-              {Number(billedPct.toFixed(1)).toLocaleString('fa-IR')}٪ از کل پیمان
+              {formatPercent(progress.billedPercent)} از کل پیمان
             </span>
           </div>
 
@@ -183,7 +163,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
               {formatMoneyCompact(contract.receivedValue)}
             </span>
             <span className="text-[10px] text-emerald-400 block mt-0.5 font-bold">
-              {Number(receivedPct.toFixed(1)).toLocaleString('fa-IR')}٪ وصولی
+              {formatPercent(progress.receivedPercent)} وصولی
             </span>
           </div>
 
@@ -203,7 +183,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
               {formatMoneyCompact(contract.remainingValue)}
             </span>
             <span className="text-[10px] text-teal-400 block mt-0.5 font-bold">
-              {Number((100 - execPct).toFixed(1)).toLocaleString('fa-IR')}٪ حجم مانده
+              {formatPercent(progress.remainingPercent)} حجم مانده
             </span>
           </div>
         </div>
@@ -211,14 +191,14 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
         {/* Integrated Progress Visualizer */}
         <div className="mt-4 pt-3 border-t border-slate-800">
           <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden flex">
-            <div className="bg-emerald-500 h-full" style={{ width: `${Math.min(100, receivedPct)}%` }}></div>
-            <div className="bg-purple-500 h-full" style={{ width: `${Math.max(0, Math.min(100, billedPct - receivedPct))}%` }}></div>
-            <div className="bg-indigo-400 h-full" style={{ width: `${Math.max(0, Math.min(100, execPct - billedPct))}%` }}></div>
+            <div className="bg-emerald-500 h-full" style={{ width: barWidth(progress.receivedPercent) }}></div>
+            <div className="bg-purple-500 h-full" style={{ width: barWidth(progress.billedNotReceivedPercent) }}></div>
+            <div className="bg-indigo-400 h-full" style={{ width: barWidth(progress.executedNotBilledPercent) }}></div>
           </div>
           <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
-            <span>دریافت: {receivedPct.toFixed(1)}٪</span>
-            <span>ارسال صورت‌وضعیت: {billedPct.toFixed(1)}٪</span>
-            <span>کارکرد واقعی: {execPct.toFixed(1)}٪</span>
+            <span>دریافت: {formatPercent(progress.receivedPercent)}</span>
+            <span>ارسال صورت‌وضعیت: {formatPercent(progress.billedPercent)}</span>
+            <span>کارکرد واقعی: {formatPercent(progress.executedPercent)}</span>
             <span>سقف پیمان: ۱۰۰٪</span>
           </div>
         </div>
@@ -255,7 +235,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                     activeTab === tab.id ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-slate-200 text-slate-700'
                   }`}
                 >
-                  {tab.count.toLocaleString('fa-IR')}
+                  {formatDecimal(tab.count)}
                 </span>
               )}
             </button>
@@ -369,7 +349,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                   </p>
                 </div>
                 <div className="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
-                  مجموع اقلام: <strong>{contractBOQ.length} ردیف</strong>
+                  مجموع اقلام: <strong>{formatInt(contractBOQ.length)} ردیف</strong>
                 </div>
               </div>
 
@@ -400,18 +380,18 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                           <span className="text-[10px] text-slate-400 block mt-0.5">{item.chapter}</span>
                         </td>
                         <td className="p-3 text-center font-bold text-slate-600">{item.unit}</td>
-                        <td className="p-3 text-left font-mono font-medium">{item.initialQuantity.toLocaleString('fa-IR')}</td>
+                        <td className="p-3 text-left font-mono font-medium">{formatDecimal(item.initialQuantity)}</td>
                         <td className="p-3 text-left font-mono">{formatMoney(item.unitRate, false)}</td>
                         <td className="p-3 text-left font-mono font-bold text-slate-800">
                           {formatMoney(item.initialAmount, false)}
                         </td>
                         <td className="p-3 text-left font-mono">
                           <span className="font-bold text-indigo-700">
-                            {item.cumulativeExecutedQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(item.cumulativeExecutedQuantity)}
                           </span>
                           {item.isSurplusQuantity && (
                             <span className="block text-[10px] font-bold text-rose-600">
-                              مازاد: +{item.surplusQuantity?.toLocaleString('fa-IR')}
+                              مازاد: +{formatDecimal(item.surplusQuantity)}
                             </span>
                           )}
                         </td>
@@ -428,7 +408,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}
                           >
-                            {Number(item.progressPercentage.toFixed(1)).toLocaleString('fa-IR')}٪
+                            {formatDecimal(item.progressPercentage, 1)}٪
                           </span>
                         </td>
                         <td className="p-3 text-center">
@@ -438,7 +418,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                                 {item.inventoryMaterialCode}
                               </span>
                               <span className="text-[9px] text-slate-400 block mt-0.5">
-                                مصرف: {item.inventoryConsumedQty?.toLocaleString('fa-IR')}
+                                مصرف: {formatDecimal(item.inventoryConsumedQty)}
                               </span>
                             </div>
                           ) : (
@@ -836,13 +816,13 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                         <div className="flex justify-between mb-1">
                           <span className="text-slate-500">نرخ تحقق وصولی از صورت‌وضعیت:</span>
                           <span className="font-bold text-slate-900">
-                            {((contract.receivedValue / contract.billedValue) * 100).toFixed(1)}٪
+                            {formatPercent(progress.collectedOfBilledPercent)}
                           </span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-2">
                           <div
                             className="bg-emerald-500 h-2 rounded-full"
-                            style={{ width: `${(contract.receivedValue / contract.billedValue) * 100}%` }}
+                            style={{ width: barWidth(progress.collectedOfBilledPercent) }}
                           ></div>
                         </div>
                       </div>
@@ -851,13 +831,13 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                         <div className="flex justify-between mb-1">
                           <span className="text-slate-500">پیشرفت ریالی کارکرد پیمان:</span>
                           <span className="font-bold text-indigo-700">
-                            {((contract.executedValue / contract.currentValue) * 100).toFixed(1)}٪
+                            {formatPercent(progress.executedPercent)}
                           </span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-2">
                           <div
                             className="bg-indigo-600 h-2 rounded-full"
-                            style={{ width: `${(contract.executedValue / contract.currentValue) * 100}%` }}
+                            style={{ width: barWidth(progress.executedPercent) }}
                           ></div>
                         </div>
                       </div>

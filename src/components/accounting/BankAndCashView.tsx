@@ -17,7 +17,7 @@ import {
   CashDesk,
   BankReconciliationItem,
 } from '../../types';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatInt } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
 import { useCompany } from '../../store/session';
 
@@ -52,7 +52,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
             }`}
           >
             <Landmark className="w-3.5 h-3.5" />
-            <span>حساب‌های بانکی ({bankAccounts.length})</span>
+            <span>حساب‌های بانکی ({formatInt(bankAccounts.length)})</span>
           </button>
           <button
             onClick={() => setActiveTab('cash')}
@@ -61,7 +61,7 @@ export const BankAndCashView: React.FC<BankAndCashViewProps> = ({
             }`}
           >
             <Wallet className="w-3.5 h-3.5" />
-            <span>صندوق‌های ریالی ({cashDesks.length})</span>
+            <span>صندوق‌های ریالی ({formatInt(cashDesks.length)})</span>
           </button>
           <button
             onClick={() => setActiveTab('reconciliation')}

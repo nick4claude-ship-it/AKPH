@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { formatDecimal, formatInt } from '../../utils/formatters';
 
 interface BOQManagementViewProps {
   contracts: Contract[];
@@ -64,7 +65,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
         {surplusCount > 0 && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
             <AlertTriangle className="w-4 h-4 text-rose-600" />
-            <span>{surplusCount.toLocaleString('fa-IR')} ردیف مازاد بر سقف پیمان نیازمند الحاقیه</span>
+            <span>{formatDecimal(surplusCount)} ردیف مازاد بر سقف پیمان نیازمند الحاقیه</span>
           </div>
         )}
       </div>
@@ -107,7 +108,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>فقط اقلام مازاد بر پیمان ({surplusCount})</span>
+            <span>فقط اقلام مازاد بر پیمان ({formatInt(surplusCount)})</span>
           </button>
         </div>
       </div>
@@ -153,7 +154,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                   </td>
                   <td className="p-3 text-center font-bold text-slate-600">{item.unit}</td>
                   <td className="p-3 text-left font-mono font-medium">
-                    {item.initialQuantity.toLocaleString('fa-IR')}
+                    {formatDecimal(item.initialQuantity)}
                   </td>
                   <td className="p-3 text-left font-mono text-slate-600">
                     {formatMoney(item.unitRate, false)}
@@ -164,11 +165,11 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                         item.isSurplusQuantity ? 'text-rose-700 font-black' : 'text-indigo-900'
                       }`}
                     >
-                      {item.cumulativeExecutedQuantity.toLocaleString('fa-IR')}
+                      {formatDecimal(item.cumulativeExecutedQuantity)}
                     </span>
                     {item.isSurplusQuantity && (
                       <span className="block text-[10px] font-bold text-rose-600">
-                        مازاد: +{item.surplusQuantity?.toLocaleString('fa-IR')}
+                        مازاد: +{formatDecimal(item.surplusQuantity)}
                       </span>
                     )}
                   </td>
@@ -185,7 +186,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {Number(item.progressPercentage.toFixed(1)).toLocaleString('fa-IR')}٪
+                      {formatDecimal(item.progressPercentage, 1)}٪
                     </span>
                   </td>
                   <td className="p-3 text-center">
@@ -198,7 +199,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                           </span>
                         </div>
                         <span className="text-[9px] text-slate-500 block">
-                          مصرف انبار: {item.inventoryConsumedQty?.toLocaleString('fa-IR')} {item.unit}
+                          مصرف انبار: {formatDecimal(item.inventoryConsumedQty)} {item.unit}
                         </span>
                       </div>
                     ) : (

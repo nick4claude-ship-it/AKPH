@@ -1,9 +1,9 @@
 import React from 'react';
 import { X, Printer, CheckCircle2, ShieldCheck, Building, Truck, FileText } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { formatPercent } from '../../utils/formatters';
+import { formatPercent, formatDecimal } from '../../utils/formatters';
 import { useCompany } from '../../store/session';
 
 interface PurchaseOrderPrintModalProps {
@@ -145,7 +145,7 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
                         <div className="text-[10px] text-slate-500 mt-0.5">{item.specifications}</div>
                       </td>
                       <td className="py-3 px-3 text-center font-bold font-mono text-slate-800">
-                        {item.orderedQty.toLocaleString('fa-IR')}
+                        {formatDecimal(item.orderedQty)}
                       </td>
                       <td className="py-3 px-3 text-center text-slate-500">{item.unit}</td>
                       <td className="py-3 px-3 text-left font-mono font-medium text-slate-700">

@@ -22,10 +22,11 @@ import {
   AppDocument,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { generateUUID, nextDocNumber } from '../../utils/ids';
-import { toPersianDate, toPersianTime } from '../../utils/date';
-import { Dialog } from '../common/Dialog';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { toPersianDate } from '../../utils/date';
+import { useSelector } from '../../store/AppStore';
+import { attachmentFromFile, checkPettyExpenseForm, type PettyExpenseFormInput } from '../../store/views/pettyCash';
+import { Dialog } from '../../ui/Dialog';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { moneyUnitLabel } from '../../utils/money';
 
 interface NewExpenseModalProps {
@@ -38,7 +39,8 @@ interface NewExpenseModalProps {
   currentUser: User;
   preselectedAccountId?: string;
   /** Validation (fund limits, balance) and approval level are decided by the workflow service. */
-  onSaveExpense: (expense: PettyCashExpense, attachments: Omit<AppDocument, 'links'>[]) => { ok: boolean; message: string };
+  /** Records the expense through the workflow (number, approval chain and attachments are handled there). */
+  onSaveExpense: (form: PettyExpenseFormInput) => { ok: boolean; message: string };
 }
 
 export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
@@ -89,18 +91,29 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   const [previewAttachment, setPreviewAttachment] = useState<PettyCashAttachment | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Validation & Duplicate Checking
-  const isOverUsable = targetAccount ? amount > targetAccount.usableBalance : false;
-
-  // Check duplicate: Same Vendor + Same Invoice Number + Same Date + Same Amount
-  const duplicateExpense = existingExpenses.find(
-    (e) =>
-      vendor.trim() !== '' &&
-      invoiceNumber.trim() !== '' &&
-      (e.vendor || '').toLowerCase().trim() === vendor.toLowerCase().trim() &&
-      e.invoiceNumber.toLowerCase().trim() === invoiceNumber.toLowerCase().trim() &&
-      e.amount === amount
-  );
+  const form: PettyExpenseFormInput = {
+    accountId: targetAccount?.id || '',
+    date,
+    category: selectedCategory,
+    subCategory: selectedSubCategory,
+    amount,
+    vendor,
+    vendorNationalId,
+    invoiceNumber,
+    invoiceDate,
+    description,
+    paymentMethod,
+    inventoryTarget,
+    inventoryItemCode,
+    inventoryItemName,
+    inventoryQuantity,
+    inventoryUnit,
+    attachments,
+  };
+  // Over the usable balance, possible duplicate invoice (same vendor, number and amount), first problem.
+  const check = useSelector((s) => checkPettyExpenseForm(s, accounts, form), [accounts, JSON.stringify(form)]);
+  const isOverUsable = check.isOverUsable;
+  const duplicateExpense = check.duplicate;
 
   const handleCategoryChange = (catName: string) => {
     setSelectedCategory(catName);
@@ -111,17 +124,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   };
 
   const handleAddSimulatedFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const newAtt: PettyCashAttachment = {
-        id: generateUUID(),
-        name: file.name,
-        type: file.type.includes('pdf') ? 'pdf' : 'image',
-        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        url: URL.createObjectURL(file),
-      };
-      setAttachments((prev) => [...prev, newAtt]);
-    }
+    const file = e.target.files?.[0];
+    if (file) setAttachments((prev) => [...prev, attachmentFromFile(file)]);
   };
 
   const handleRemoveAttachment = (id: string) => {
@@ -130,96 +134,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!amount || amount <= 0) {
-      setFormError('مبلغ هزینه باید بیشتر از صفر باشد.');
-      return;
-    }
-
-    if (isOverUsable) {
-      setFormError('خطا: مبلغ هزینه از مانده قابل مصرف این تنخواه بیشتر است.');
-      return;
-    }
-
+    if (check.error) return setFormError(check.error);
     setFormError(null);
-
-    if (!targetAccount) return;
-
-
-    const expNumber = nextDocNumber(
-      existingExpenses.map((e) => e.expenseNumber),
-      'EXP',
-      date
-    );
-
-    const newExpense: PettyCashExpense = {
-      id: generateUUID(),
-      expenseNumber: expNumber,
-      pettyCashId: targetAccount.id,
-      pettyCashTitle: targetAccount.title,
-      projectId: targetAccount.projectId,
-      projectName: targetAccount.projectName,
-      costCenter: targetAccount.costCenterName,
-      date,
-      category: selectedCategory,
-      subCategory: selectedSubCategory,
-      amount,
-      vendor,
-      vendorNationalId,
-      invoiceNumber,
-      invoiceDate,
-      description,
-      paymentMethod,
-      costCenterId: targetAccount.costCenterId,
-      status: 'pending_approval',
-      // Set from the stored thresholds and approval chains when the workflow accepts the expense.
-      approvalLevelRequired: 'site_manager_and_finance',
-      currentApprovalStep: 'مدیر پروژه',
-      approvalHistory: [
-        {
-          level: 'ثبت اولیه',
-          approverName: currentUser.name,
-          approverRole: currentUser.role,
-          date,
-          time: toPersianTime(new Date()),
-          action: 'approved',
-          comment: 'ثبت هزینه و ارسال به کارتابل تأییدات',
-        },
-      ],
-      submitterName: currentUser.name,
-      submitterRole: currentUser.role,
-      inventoryTarget,
-      inventoryItemCode: inventoryTarget === 'send_to_warehouse' ? inventoryItemCode : undefined,
-      inventoryItemName: inventoryTarget === 'send_to_warehouse' ? inventoryItemName : undefined,
-      inventoryQuantity: inventoryTarget === 'send_to_warehouse' ? inventoryQuantity : undefined,
-      inventoryUnit: inventoryTarget === 'send_to_warehouse' ? inventoryUnit : undefined,
-      accountingAccountCode: '511',
-      accountingAccountName: `هزینه ${selectedCategory} کارگاهی`,
-    };
-
-    // Attachments are archived in the document center and linked to the expense.
-    const docs: Omit<AppDocument, 'links'>[] = attachments.map((a) => ({
-      id: generateUUID(),
-      title: `فاکتور ${invoiceNumber || expNumber} - ${description}`,
-      type: 'فاکتور هزینه تنخواه',
-      fileName: a.name,
-      docNumber: invoiceNumber || expNumber,
-      date: invoiceDate || date,
-      fileFormat: a.type === 'image' ? 'JPG' : 'PDF',
-      fileSize: a.size || '-',
-      version: '1.0',
-      status: 'معتبر و جاری',
-      confidentiality: 'عادی',
-      registeredBy: currentUser.name,
-      tags: ['تنخواه', selectedCategory],
-      description,
-      url: a.url,
-    }));
-    const result = onSaveExpense(newExpense, docs);
-    if (!result.ok) {
-      setFormError(result.message);
-      return;
-    }
+    // Number, approval level and first approver come from the stored policy in the workflow.
+    const result = onSaveExpense(form);
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
@@ -269,10 +188,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label htmlFor="new-expense-modal-1" className="block text-xs font-bold text-slate-700 mb-1">
                   انتخاب حساب تنخواه‌گردان پرداختی <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <select id="new-expense-modal-1"
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
@@ -286,9 +205,9 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <span className="block text-xs font-bold text-slate-700 mb-1">
                   پروژه و مرکز هزینه منظورشده
-                </label>
+                </span>
                 <div className="w-full text-xs px-3 py-2 bg-slate-200/70 border border-slate-300 rounded-lg text-slate-700 font-medium">
                   {targetAccount?.projectName} ({targetAccount?.costCenterName})
                 </div>
@@ -323,10 +242,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           {/* Amount & Date */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-2" className="block text-xs font-bold text-slate-700 mb-1">
                 مبلغ فاکتور / هزینه ({moneyUnitLabel()}) <span className="text-rose-500">*</span>
               </label>
-              <MoneyInput
+              <MoneyInput id="new-expense-modal-2"
                 required
                 value={amount}
                 onValueChange={(v) => setAmount(v)}
@@ -343,10 +262,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-3" className="block text-xs font-bold text-slate-700 mb-1">
                 تاریخ هزینه <span className="text-rose-500">*</span>
               </label>
-              <input
+              <input id="new-expense-modal-3"
                 type="text"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -356,10 +275,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-4" className="block text-xs font-bold text-slate-700 mb-1">
                 روش پرداخت از تنخواه <span className="text-rose-500">*</span>
               </label>
-              <select
+              <select id="new-expense-modal-4"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
@@ -396,10 +315,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           {/* Category & Subcategory */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-5" className="block text-xs font-bold text-slate-700 mb-1">
                 دسته‌بندی اصلی هزینه <span className="text-rose-500">*</span>
               </label>
-              <select
+              <select id="new-expense-modal-5"
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
@@ -413,10 +332,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-6" className="block text-xs font-bold text-slate-700 mb-1">
                 زیردسته تفکیکی <span className="text-rose-500">*</span>
               </label>
-              <select
+              <select id="new-expense-modal-6"
                 value={selectedSubCategory}
                 onChange={(e) => setSelectedSubCategory(e.target.value)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
@@ -433,10 +352,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           {/* Vendor & Invoice Information */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-7" className="block text-xs font-bold text-slate-700 mb-1">
                 فروشنده / طرف‌حساب <span className="text-rose-500">*</span>
               </label>
-              <input
+              <input id="new-expense-modal-7"
                 type="text"
                 required
                 placeholder="نام فروشگاه، راننده، یا شخص"
@@ -447,10 +366,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-8" className="block text-xs font-bold text-slate-700 mb-1">
                 شماره فاکتور / رسید <span className="text-rose-500">*</span>
               </label>
-              <input
+              <input id="new-expense-modal-8"
                 type="text"
                 required
                 placeholder="INV-..."
@@ -461,10 +380,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="new-expense-modal-9" className="block text-xs font-bold text-slate-700 mb-1">
                 تاریخ صدور فاکتور
               </label>
-              <input
+              <input id="new-expense-modal-9"
                 type="text"
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
@@ -475,10 +394,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label htmlFor="new-expense-modal-10" className="block text-xs font-bold text-slate-700 mb-1">
               شرح دقیق هزینه و محل مصرف <span className="text-rose-500">*</span>
             </label>
-            <textarea
+            <textarea id="new-expense-modal-10"
               rows={2}
               required
               placeholder="شرح دقیق اقلام خریداری شده و دلیل خرید اضطراری از محل تنخواه..."
@@ -547,10 +466,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             {inventoryTarget === 'send_to_warehouse' && (
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <label htmlFor="new-expense-modal-11" className="block text-[11px] font-medium text-slate-600 mb-1">
                     کد کالا در انبار
                   </label>
-                  <input
+                  <input id="new-expense-modal-11"
                     type="text"
                     placeholder="TOOL-..."
                     value={inventoryItemCode}
@@ -559,10 +478,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <label htmlFor="new-expense-modal-12" className="block text-[11px] font-medium text-slate-600 mb-1">
                     نام قلم در انبار
                   </label>
-                  <input
+                  <input id="new-expense-modal-12"
                     type="text"
                     placeholder="عنوان دقیق کالا"
                     value={inventoryItemName}
@@ -571,10 +490,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <label htmlFor="new-expense-modal-13" className="block text-[11px] font-medium text-slate-600 mb-1">
                     مقدار / تعداد
                   </label>
-                  <IntegerInput
+                  <IntegerInput id="new-expense-modal-13"
                     value={inventoryQuantity}
                     onValueChange={(v) => setInventoryQuantity(v)}
                     className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded font-mono"
@@ -587,7 +506,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           {/* Invoice Upload & Attachments (بخش ۲۵ پرامپت: آپلود فاکتور، Drag & Drop، پیش‌نمایش و زوم) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700">
+              <label htmlFor="new-expense-modal-14" className="block text-xs font-bold text-slate-700">
                 پیوست تصویر فاکتور یا رسید رسمی <span className="text-rose-500">*</span>
               </label>
               <span className="text-[11px] text-slate-500">
@@ -597,7 +516,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
             {/* Drag & drop upload area */}
             <div className="border-2 border-dashed border-slate-300 hover:border-amber-400 rounded-xl p-4 text-center transition-colors bg-slate-50/60 relative">
-              <input
+              <input id="new-expense-modal-14"
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={handleAddSimulatedFile}

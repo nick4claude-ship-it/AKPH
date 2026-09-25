@@ -23,7 +23,6 @@ import { Project, PETTY_CASH_FUND_LABELS } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { selectProjectFinancials } from '../../store/selectors';
 import {
-  selectBudgetVsActual,
   selectProjectSuppliers,
   selectDocumentsFor,
   selectPettyFunds,
@@ -31,7 +30,8 @@ import {
   selectWarehouses,
 } from '../../store/domainSelectors';
 import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from '../statements/statementLabels';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { barWidth, formatNumber, formatCurrencyCompact, formatDecimal } from '../../utils/formatters';
+import { projectBudgetFigures } from '../../store/views/reports';
 import { formatMoney } from '../../utils/money';
 
 type ProjectTab = 'overview' | 'contract' | 'cost_centers' | 'statements' | 'suppliers' | 'inventory' | 'petty_cash' | 'documents' | 'budget';
@@ -114,11 +114,11 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] text-slate-500">
-                  <span>پیشرفت فیزیکی {p.physicalProgress.toLocaleString('fa-IR')}٪</span>
-                  <span>پیشرفت مالی {p.financialProgress.toLocaleString('fa-IR')}٪</span>
+                  <span>پیشرفت فیزیکی {formatDecimal(p.physicalProgress)}٪</span>
+                  <span>پیشرفت مالی {formatDecimal(p.financialProgress)}٪</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, p.physicalProgress)}%` }} />
+                  <div className="h-full bg-amber-500" style={{ width: barWidth(p.physicalProgress) }} />
                 </div>
               </div>
             </button>
@@ -134,14 +134,12 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
   const clientStatements = state.clientStatements.filter((s) => s.projectId === project.id);
   const subStatements = state.subcontractorStatements.filter((s) => s.projectId === project.id);
   const costCenters = state.costCenters.filter((c) => c.projectId === project.id);
-  const budget = selectBudgetVsActual(state, project.id);
+  const { rows: budget, budgetTotal, actualTotal } = projectBudgetFigures(state, project.id);
   const suppliers = selectProjectSuppliers(state, project.id);
   const warehouses = selectWarehouses(state).filter((w) => w.projectId === project.id);
   const funds = selectPettyFunds(state).filter((a) => a.projectId === project.id);
   const documents = selectDocumentsFor(state, 'project', project.id);
   const consultant = state.counterparties.find((c) => c.id === project.consultantId)?.name;
-  const budgetTotal = budget.reduce((a, r) => a + r.budget, 0);
-  const actualTotal = budget.reduce((a, r) => a + r.actual, 0);
 
   return (
     <div className="space-y-5">
@@ -202,19 +200,19 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                 <div key={label as string} className="space-y-1">
                   <div className="flex justify-between text-slate-600">
                     <span>{label}</span>
-                    <span className="font-mono">{(v as number).toLocaleString('fa-IR')}٪</span>
+                    <span className="font-mono">{formatDecimal(v as number)}٪</span>
                   </div>
                   <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, v as number)}%` }} />
+                    <div className="h-full bg-amber-500" style={{ width: barWidth(v as number) }} />
                   </div>
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-              <Stat label="قراردادها (کارفرما / جزء)" value={`${contracts.length.toLocaleString('fa-IR')} / ${subcontracts.length.toLocaleString('fa-IR')}`} />
-              <Stat label="صورت‌وضعیت‌ها (کارفرما / جزء)" value={`${clientStatements.length.toLocaleString('fa-IR')} / ${subStatements.length.toLocaleString('fa-IR')}`} />
-              <Stat label="تأمین‌کنندگان" value={suppliers.length.toLocaleString('fa-IR')} />
-              <Stat label="اسناد" value={documents.length.toLocaleString('fa-IR')} />
+              <Stat label="قراردادها (کارفرما / جزء)" value={`${formatDecimal(contracts.length)} / ${formatDecimal(subcontracts.length)}`} />
+              <Stat label="صورت‌وضعیت‌ها (کارفرما / جزء)" value={`${formatDecimal(clientStatements.length)} / ${formatDecimal(subStatements.length)}`} />
+              <Stat label="تأمین‌کنندگان" value={formatDecimal(suppliers.length)} />
+              <Stat label="اسناد" value={formatDecimal(documents.length)} />
             </div>
           </div>
         )}
@@ -337,7 +335,7 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                       {s.name}
                     </button>
                   </td>
-                  <td className="py-2 text-left font-mono">{s.orders.toLocaleString('fa-IR')}</td>
+                  <td className="py-2 text-left font-mono">{formatDecimal(s.orders)}</td>
                   <td className="py-2 text-left font-mono">{formatCurrencyCompact(s.ordered)}</td>
                   <td className="py-2 text-left font-mono">{formatCurrencyCompact(s.invoiced)}</td>
                   <td className="py-2 text-left font-mono text-emerald-700">{formatCurrencyCompact(s.paid)}</td>
@@ -370,7 +368,7 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                   <div key={b.materialId} className="flex justify-between text-[11px] text-slate-600">
                     <span>{b.material!.name}</span>
                     <span className="font-mono">
-                      {b.qty.toLocaleString('fa-IR')} {b.material!.unit} (رزرو {b.reservedQty.toLocaleString('fa-IR')})
+                      {formatDecimal(b.qty)} {b.material!.unit} (رزرو {formatDecimal(b.reservedQty)})
                     </span>
                   </div>
                 ))}
@@ -461,10 +459,10 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${r.usedPercent > 100 ? 'bg-rose-500' : 'bg-amber-500'}`}
-                          style={{ width: `${Math.min(100, r.budget > 0 ? r.usedPercent : 100)}%` }}
+                          style={{ width: barWidth(r.budget > 0 ? r.usedPercent : 100) }}
                         />
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">{r.budget > 0 ? `${r.usedPercent.toLocaleString('fa-IR')}٪` : 'بدون بودجه'}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{r.budget > 0 ? `${formatDecimal(r.usedPercent)}٪` : 'بدون بودجه'}</div>
                     </td>
                   </tr>
                 ))}

@@ -18,6 +18,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
+import { contractProgress } from '../../store/views/contracts';
 
 interface ContractsListViewProps {
   contracts: Contract[];
@@ -131,7 +133,7 @@ export const ContractsListView: React.FC<ContractsListViewProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredContracts.map((c) => {
-              const execPct = (c.executedValue / c.currentValue) * 100;
+              const execPct = contractProgress(c).executedPercent;
               return (
                 <tr
                   key={c.id}
@@ -167,7 +169,7 @@ export const ContractsListView: React.FC<ContractsListViewProps> = ({
                       {formatMoneyCompact(c.executedValue)}
                     </span>
                     <span className="block text-[10px] text-indigo-500 font-bold">
-                      {execPct.toFixed(1)}٪
+                      {formatPercent(execPct)}
                     </span>
                   </td>
                   <td className="p-3 text-left font-mono font-bold text-emerald-700">

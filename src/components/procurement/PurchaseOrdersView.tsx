@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { PurchaseOrder, Project, POStatus } from '../../types';
 import { formatMoney } from '../../utils/money';
+import { formatDecimal, formatInt } from '../../utils/formatters';
 
 interface PurchaseOrdersViewProps {
   orders: PurchaseOrder[];
@@ -64,7 +65,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
             <div>
               <h3 className="text-base font-bold text-slate-800">سفارشات رسمی خرید و قراردادهای تأمین (PO)</h3>
               <p className="text-xs text-slate-500">
-                {filteredOrders.length} سفارش رسمی صادرشده با قابلیت رهگیری تحویل بار، باسکول پای کار و چاپ سربرگ‌دار
+                {formatInt(filteredOrders.length)} سفارش رسمی صادرشده با قابلیت رهگیری تحویل بار، باسکول پای کار و چاپ سربرگ‌دار
               </p>
             </div>
           </div>
@@ -159,7 +160,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                   <td className="py-3.5 px-4 max-w-xs">
                     <div className="font-bold text-slate-800 truncate">{order.items[0]?.materialName}</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      {order.items[0]?.orderedQty.toLocaleString('fa-IR')} {order.items[0]?.unit}
+                      {formatDecimal(order.items[0]?.orderedQty)} {order.items[0]?.unit}
                     </div>
                   </td>
 

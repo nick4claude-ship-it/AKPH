@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Project, ApprovalItem, DetailedProgressStatement, PettyCashAccount } from '../../types';
-import { formatCurrencyCompact } from '../../utils/formatters';
+import { formatCurrencyCompact, formatInt } from '../../utils/formatters';
 import { Search, Building2, FileText, UserCheck, Coins, Receipt, X, ArrowLeft, ArrowUpRight } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -138,7 +138,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            پروژه‌ها ({matchedProjects.length})
+            پروژه‌ها ({formatInt(matchedProjects.length)})
           </button>
           <button
             onClick={() => setActiveCategory('approvals')}
@@ -148,7 +148,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            فاکتورها و اسناد ({matchedApprovals.length})
+            فاکتورها و اسناد ({formatInt(matchedApprovals.length)})
           </button>
           <button
             onClick={() => setActiveCategory('statements')}
@@ -158,7 +158,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            صورت‌وضعیت‌ها ({matchedStatements.length})
+            صورت‌وضعیت‌ها ({formatInt(matchedStatements.length)})
           </button>
           <button
             onClick={() => setActiveCategory('petty')}
@@ -168,7 +168,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            تنخواه‌ها ({matchedPettyCash.length})
+            تنخواه‌ها ({formatInt(matchedPettyCash.length)})
           </button>
         </div>
 

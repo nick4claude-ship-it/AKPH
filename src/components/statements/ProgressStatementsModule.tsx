@@ -21,21 +21,22 @@ import {
 import { Project, DetailedProgressStatement, SubcontractorProgressStatement } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { useCurrentUser, usePermission } from '../../store/session';
-import { Dialog } from '../common/Dialog';
-import { CLIENT_STATEMENT_FLOW, SUBCONTRACTOR_STATEMENT_FLOW } from '../../store/workflows';
-import { statementContext } from '../../store/approvalContext';
+import { useCurrentUser } from '../../store/session';
+import { Dialog } from '../../ui/Dialog';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { CLIENT_APPROVED_STATUSES } from '../../store/state';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
 import {
-  CLIENT_STATUS_LABELS,
-  SUB_STATUS_LABELS,
   CLIENT_FLOW_STEPS,
   SUB_FLOW_STEPS,
   clientFlowIndex,
+  clientStatementActions,
+  statementBalances,
+  clientStatementStage,
+  subcontractorStatementStage,
   subFlowIndex,
-} from './statementLabels';
+  subcontractorStatementActions,
+} from '../../store/views/contracts';
+import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from './statementLabels';
 import { formatInt, formatMoney } from '../../utils/money';
 
 type StatementsTab = 'client_statements' | 'subcontractor_statements';
@@ -72,7 +73,6 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
   const state = useAppState();
   const wf = useWorkflows();
   const user = useCurrentUser();
-  const { check } = usePermission();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
@@ -100,10 +100,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
     [state.subcontractorStatements, selectedProjectId, q]
   );
 
-  const approvedClient = state.clientStatements.filter((s) => CLIENT_APPROVED_STATUSES.includes(s.status));
-  const receivable = approvedClient.reduce((a, s) => a + s.remainingPayable, 0);
-  const approvedSub = state.subcontractorStatements.filter((s) => s.status === 'management_approved' || s.status === 'paid');
-  const payable = approvedSub.reduce((a, s) => a + s.remainingPayable, 0);
+  const { receivable, payable, approvedClientCount, approvedSubCount } = statementBalances(state);
 
   const run = (r: { ok: boolean; message: string }) => onToast(r.message);
 
@@ -116,10 +113,11 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
       : [];
 
   const clientAction = (s: DetailedProgressStatement) => {
-    const step = CLIENT_STATEMENT_FLOW[s.status];
+    const actions = clientStatementActions(user, s);
+    const step = actions.advance;
     if (step) {
-      const permission = check(step.action, statementContext(s));
-      const canReturn = check('client_statement.return', { projectId: s.projectId }).ok;
+      const permission = { ok: step.allowed, reason: step.reason };
+      const canReturn = actions.canReturn;
       return (
         <div className="flex items-center gap-1 justify-end">
           <button
@@ -136,7 +134,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
         </div>
       );
     }
-    if (CLIENT_APPROVED_STATUSES.includes(s.status) && s.remainingPayable > 0) {
+    if (actions.canCollect) {
       return (
         <button
           onClick={() => navigate(`/finance/receipts?statement=${s.id}`)}
@@ -150,10 +148,11 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
   };
 
   const subAction = (s: SubcontractorProgressStatement) => {
-    const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
+    const actions = subcontractorStatementActions(user, s);
+    const step = actions.advance;
     if (step) {
-      const permission = check(step.action, statementContext(s));
-      const canReturn = check('sub_statement.return', { projectId: s.projectId }).ok;
+      const permission = { ok: step.allowed, reason: step.reason };
+      const canReturn = actions.canReturn;
       return (
         <div className="flex items-center gap-1 justify-end">
           <button
@@ -170,7 +169,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
         </div>
       );
     }
-    if (s.status === 'management_approved' && s.remainingPayable > 0) {
+    if (actions.awaitingPayment) {
       return (
         <button
           onClick={() => navigate(`/finance/payments?source=${s.id}`)}
@@ -231,7 +230,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
             <span className="text-xs text-slate-500 block mb-1">مانده مطالبات صورت‌وضعیت‌های مصوب کارفرما</span>
             <div className="text-lg font-bold text-blue-700 font-mono">{formatMoney(receivable)}</div>
             <span className="text-[11px] text-slate-400 font-medium">
-              {formatInt(approvedClient.length)} صورت‌وضعیت مصوب · وصول در لایه دریافت‌ها
+              {formatInt(approvedClientCount)} صورت‌وضعیت مصوب · وصول در لایه دریافت‌ها
             </span>
           </div>
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
@@ -243,7 +242,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
             <span className="text-xs text-slate-500 block mb-1">مانده بدهی صورت‌وضعیت‌های مصوب پیمانکاران جزء</span>
             <div className="text-lg font-bold text-amber-700 font-mono">{formatMoney(payable)}</div>
             <span className="text-[11px] text-slate-400 font-medium">
-              {formatInt(approvedSub.length)} صورت‌وضعیت با تأیید مدیر ارشد · پرداخت فقط در خزانه
+              {formatInt(approvedSubCount)} صورت‌وضعیت با تأیید مدیر ارشد · پرداخت فقط در خزانه
             </span>
           </div>
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
@@ -314,12 +313,12 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                     <td className="py-2.5 px-3 text-left font-mono font-bold">{formatCurrencyCompact(s.netPayable)}</td>
                     <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatCurrencyCompact(s.receivedAmount)}</td>
                     <td className="py-2.5 px-3 text-left font-mono text-blue-700">
-                      {CLIENT_APPROVED_STATUSES.includes(s.status) ? formatCurrencyCompact(s.remainingPayable) : '—'}
+                      {clientStatementStage(s).approved ? formatCurrencyCompact(s.remainingPayable) : '—'}
                     </td>
                     <td className="py-2.5 px-3 min-w-[140px]">
                       <span className="text-[11px] font-bold text-slate-700">{CLIENT_STATUS_LABELS[s.status]}</span>
-                      {CLIENT_STATEMENT_FLOW[s.status] && (
-                        <div className="text-[10px] text-slate-400">بعدی: {CLIENT_STATEMENT_FLOW[s.status]!.label}</div>
+                      {clientStatementStage(s).nextLabel && (
+                        <div className="text-[10px] text-slate-400">بعدی: {clientStatementStage(s).nextLabel}</div>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-left">{clientAction(s)}</td>
@@ -344,13 +343,13 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                     <td className="py-2.5 px-3 text-left font-mono font-bold">{formatCurrencyCompact(s.netPayable)}</td>
                     <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatCurrencyCompact(s.paidAmount)}</td>
                     <td className="py-2.5 px-3 text-left font-mono text-amber-700">
-                      {s.status === 'management_approved' || s.status === 'paid' ? formatCurrencyCompact(s.remainingPayable) : '—'}
+                      {subcontractorStatementStage(s).approved ? formatCurrencyCompact(s.remainingPayable) : '—'}
                     </td>
                     <td className="py-2.5 px-3 min-w-[140px]">
                       <span className="text-[11px] font-bold text-slate-700">{SUB_STATUS_LABELS[s.status]}</span>
-                      {SUBCONTRACTOR_STATEMENT_FLOW[s.status] && (
+                      {subcontractorStatementStage(s).nextLabel && (
                         <div className="text-[10px] text-slate-400">
-                          بعدی: {SUBCONTRACTOR_STATEMENT_FLOW[s.status]!.label} ({SUBCONTRACTOR_STATEMENT_FLOW[s.status]!.role})
+                          بعدی: {subcontractorStatementStage(s).nextLabel} ({subcontractorStatementStage(s).nextRole})
                         </div>
                       )}
                     </td>

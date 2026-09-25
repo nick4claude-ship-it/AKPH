@@ -20,9 +20,10 @@ import {
   User,
 } from '../../types';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { dayIndex, toPersianDate } from '../../utils/date';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { toPersianDate } from '../../utils/date';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { moneyUnitLabel } from '../../utils/money';
+import { countDifference, pettyReconciliationFigures } from '../../store/views/pettyCash';
 
 interface PettyCashReconciliationViewProps {
   accounts: PettyCashAccount[];
@@ -55,24 +56,11 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
   // The count is made today; the period starts on the chosen date.
   const [periodStartDate, setPeriodStartDate] = useState(monthStart);
   const periodEndDate = toPersianDate(new Date());
-  const start = dayIndex(periodStartDate) || 0;
-  const inPeriod = (d: string) => (dayIndex(d) || 0) >= start;
-
-  // Expected balance is the fund's book balance; the period's movements explain how it was reached.
-  // Cash that should be in hand: book balance minus expenses paid out but still awaiting approval.
-  const expectedBalance = (selectedAccount?.actualBalance ?? 0) - (selectedAccount?.pendingExpenses ?? 0);
-  const accountReplenishmentsSum = replenishments
-    .filter((r) => r.pettyCashId === selectedAccount?.id && inPeriod(r.date))
-    .reduce((sum, r) => sum + r.amount, 0);
-  const accountApprovedExpensesSum = expenses
-    .filter(
-      (e) =>
-        e.pettyCashId === selectedAccount?.id &&
-        (e.status === 'approved' || e.status === 'accounting_posted') &&
-        inPeriod(e.date)
-    )
-    .reduce((sum, e) => sum + e.amount, 0);
-  const openingBalance = (selectedAccount?.actualBalance ?? 0) - accountReplenishmentsSum + accountApprovedExpensesSum;
+  // Book figures of the fund for the count (store view model).
+  const figures = pettyReconciliationFigures(selectedAccount, replenishments, expenses, periodStartDate);
+  const { expectedBalance, openingBalance } = figures;
+  const accountReplenishmentsSum = figures.replenishmentsSum;
+  const accountApprovedExpensesSum = figures.approvedExpensesSum;
 
   // Actual physical counted cash input
   const [actualCountedCash, setActualCountedCash] = useState<number>(expectedBalance);
@@ -81,7 +69,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
   const [notification, setNotification] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const discrepancy = actualCountedCash - expectedBalance; // 0 = balanced, < 0 = deficit, > 0 = surplus
+  const discrepancy = countDifference(actualCountedCash, expectedBalance); // 0 = balanced, < 0 = deficit, > 0 = surplus
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,10 +125,10 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           {/* Account & Date Range selector */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="petty-cash-reconciliation-view-1" className="block text-xs font-bold text-slate-700 mb-1">
                 انتخاب حساب تنخواه‌گردان جهت تسویه
               </label>
-              <select
+              <select id="petty-cash-reconciliation-view-1"
                 value={selectedAccountId}
                 onChange={(e) => {
                   setSelectedAccountId(e.target.value);
@@ -158,8 +146,8 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">از تاریخ</label>
-              <input
+              <label htmlFor="petty-cash-reconciliation-view-2" className="block text-xs font-bold text-slate-700 mb-1">از تاریخ</label>
+              <input id="petty-cash-reconciliation-view-2"
                 type="text"
                 value={periodStartDate}
                 onChange={(e) => setPeriodStartDate(e.target.value)}
@@ -168,8 +156,8 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">تا تاریخ</label>
-              <input
+              <label htmlFor="petty-cash-reconciliation-view-3" className="block text-xs font-bold text-slate-700 mb-1">تا تاریخ</label>
+              <input id="petty-cash-reconciliation-view-3"
                 type="text"
                 value={periodEndDate}
                 readOnly
@@ -220,10 +208,10 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           {/* Actual Counted Cash & Discrepancy comparison */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
             <div className="space-y-3">
-              <label className="block text-xs font-bold text-slate-800">
+              <label htmlFor="petty-cash-reconciliation-view-4" className="block text-xs font-bold text-slate-800">
                 موجودی واقعی شمارش‌شده کارگاه / پرینت بانکی ({moneyUnitLabel()}) <span className="text-rose-500">*</span>
               </label>
-              <MoneyInput
+              <MoneyInput id="petty-cash-reconciliation-view-4"
                 required
                 value={actualCountedCash}
                 onValueChange={(v) => setActualCountedCash(v)}
@@ -273,10 +261,10 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           {/* If Discrepancy != 0, require reason and note */}
           {discrepancy !== 0 && (
             <div className="space-y-3 p-4 bg-amber-50/70 border border-amber-300 rounded-xl">
-              <label className="block text-xs font-bold text-amber-950">
+              <label htmlFor="petty-cash-reconciliation-view-5" className="block text-xs font-bold text-amber-950">
                 علت مغایرت و انحراف مانده <span className="text-rose-500">*</span>
               </label>
-              <input
+              <input id="petty-cash-reconciliation-view-5"
                 type="text"
                 required
                 placeholder="مثال: کارمزد بانکی حواله‌ها، خطای شمارش دستی، گرد کردن ارقام ریز خریدهای مصالح..."
@@ -288,10 +276,10 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label htmlFor="petty-cash-reconciliation-view-6" className="block text-xs font-bold text-slate-700 mb-1">
               توضیحات و مصوبات صورتجلسه تسویه
             </label>
-            <textarea
+            <textarea id="petty-cash-reconciliation-view-6"
               rows={2}
               placeholder="نکات مطابقت مدارک، بررسی رسیدهای بانکی و تاییدات مدیر پروژه..."
               value={notes}

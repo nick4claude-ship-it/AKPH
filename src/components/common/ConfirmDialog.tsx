@@ -5,7 +5,7 @@
 
 import React, { useId, useRef } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
-import { Dialog } from './Dialog';
+import { Dialog } from '../../ui/Dialog';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;

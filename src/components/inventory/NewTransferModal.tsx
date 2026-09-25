@@ -18,11 +18,11 @@ import {
   Trash2,
   AlertTriangle,
 } from 'lucide-react';
-import { generateUUID } from '../../utils/ids';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { IntegerInput } from '../common/NumberInput';
-import { toPersianDate } from '../../utils/date';
+import { IntegerInput } from '../../ui/NumberInput';
+import { useSelector } from '../../store/AppStore';
+import { computeTransferDraft, newTransferLine, type TransferFormInput, type TransferLineInput } from '../../store/views/inventory';
 
 interface NewTransferModalProps {
   isOpen: boolean;
@@ -30,7 +30,8 @@ interface NewTransferModalProps {
   warehouses: Warehouse[];
   materials: MaterialItem[];
   currentUser: UserProfile;
-  onSubmitTransfer: (transfer: InterWarehouseTransfer) => { ok: boolean; message: string };
+  /** Issues the transfer through the workflow (valued at the weighted average there). */
+  onSubmitTransfer: (form: TransferFormInput) => { ok: boolean; message: string };
 }
 
 export const NewTransferModal: React.FC<NewTransferModalProps> = ({
@@ -47,88 +48,27 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
   const [driverName, setDriverName] = useState('');
   const [truckPlate, setTruckPlate] = useState('');
 
-  const [items, setItems] = useState(() => [
-    {
-      rowKey: generateUUID(),
-      materialId: materials[0]?.id || '',
-      materialCode: materials[0]?.code || '',
-      materialName: materials[0]?.name || '',
-      unit: materials[0]?.unit || 'کیلوگرم',
-      quantity: 0,
-      unitCost: materials[0]?.averageUnitPrice || 0,
-      totalCost: 0,
-    },
-  ]);
-
-  const sourceWh = warehouses.find((w) => w.id === sourceWarehouseId);
-  const targetWh = warehouses.find((w) => w.id === targetWarehouseId);
-
-  const totalCost = items.reduce((s, i) => s + i.totalCost, 0);
-
-  const handleMaterialChange = (index: number, matId: string) => {
-    const mat = materials.find((m) => m.id === matId);
-    if (!mat) return;
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              materialId: mat.id,
-              materialCode: mat.code,
-              materialName: mat.name,
-              unit: mat.unit,
-              unitCost: mat.averageUnitPrice,
-              totalCost: mat.averageUnitPrice * item.quantity,
-            }
-          : item
-      )
-    );
-  };
-
-  const handleQtyChange = (index: number, qty: number) => {
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              quantity: qty,
-              totalCost: qty * item.unitCost,
-            }
-          : item
-      )
-    );
-  };
-
+  const [rows, setRows] = useState<TransferLineInput[]>(() => [newTransferLine(materials)]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const form: TransferFormInput = { sourceWarehouseId, targetWarehouseId, waybillNumber, driverName, truckPlate, lines: rows };
+  // Lines valued at the weighted average cost, plus the first problem of the form.
+  const draft = useSelector((s) => computeTransferDraft(s, form), [JSON.stringify(form)]);
+  const items = draft.lines;
+  const totalCost = draft.totalCost;
+  const sourceWh = draft.source;
+  const targetWh = draft.target;
+
+  const updateRow = (index: number, patch: Partial<TransferLineInput>) =>
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  const handleMaterialChange = (index: number, matId: string) => updateRow(index, { materialId: matId });
+  const handleQtyChange = (index: number, qty: number) => updateRow(index, { quantity: qty });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sourceWh || !targetWh) return setFormError('انبار مبدأ و مقصد را انتخاب کنید.');
-    if (sourceWarehouseId === targetWarehouseId) return setFormError('انبار مبدأ و مقصد نمی‌توانند یکسان باشند.');
-    if (items.some((i) => i.quantity <= 0)) return setFormError('مقدار هر ردیف باید بیش از صفر باشد.');
-    if (!waybillNumber.trim()) return setFormError('شماره بارنامه را وارد کنید.');
+    if (draft.error) return setFormError(draft.error);
     setFormError(null);
-
-    const newTrf: InterWarehouseTransfer = {
-      id: generateUUID(),
-      transferNumber: '',
-      date: toPersianDate(new Date()),
-      sourceWarehouseId,
-      sourceWarehouseName: sourceWh.name,
-      sourceProjectId: sourceWh.projectId || '',
-      targetWarehouseId,
-      targetWarehouseName: targetWh.name,
-      targetProjectId: targetWh.projectId || '',
-      waybillNumber: waybillNumber.trim(),
-      driverName: driverName.trim(),
-      truckPlate: truckPlate.trim(),
-      items: items.map(({ rowKey: _k, ...i }) => i),
-      totalCost,
-      status: 'در مسیر حمل',
-      authorizedBy: `${currentUser.name} (${currentUser.role})`,
-    };
-
-    const result = onSubmitTransfer(newTrf);
+    const result = onSubmitTransfer(form);
     if (!result.ok) return setFormError(result.message);
     onClose();
   };
@@ -171,8 +111,8 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
           {/* Source and Target Warehouses */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">انبار کارگاه مبدأ *</label>
-              <select
+              <label htmlFor="new-transfer-modal-1" className="font-bold text-slate-700 block mb-1">انبار کارگاه مبدأ *</label>
+              <select id="new-transfer-modal-1"
                 value={sourceWarehouseId}
                 onChange={(e) => setSourceWarehouseId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer font-medium"
@@ -186,8 +126,8 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">انبار کارگاه مقصد *</label>
-              <select
+              <label htmlFor="new-transfer-modal-2" className="font-bold text-slate-700 block mb-1">انبار کارگاه مقصد *</label>
+              <select id="new-transfer-modal-2"
                 value={targetWarehouseId}
                 onChange={(e) => setTargetWarehouseId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white cursor-pointer font-medium"
@@ -204,8 +144,8 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
           {/* Transport & Driver Info */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">شماره بارنامه داخلی</label>
-              <input
+              <label htmlFor="new-transfer-modal-3" className="font-bold text-slate-700 block mb-1">شماره بارنامه داخلی</label>
+              <input id="new-transfer-modal-3"
                 type="text"
                 value={waybillNumber}
                 onChange={(e) => setWaybillNumber(e.target.value)}
@@ -215,8 +155,8 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">نام راننده</label>
-              <input
+              <label htmlFor="new-transfer-modal-4" className="font-bold text-slate-700 block mb-1">نام راننده</label>
+              <input id="new-transfer-modal-4"
                 type="text"
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
@@ -226,8 +166,8 @@ export const NewTransferModal: React.FC<NewTransferModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">شماره پلاک خودرو</label>
-              <input
+              <label htmlFor="new-transfer-modal-5" className="font-bold text-slate-700 block mb-1">شماره پلاک خودرو</label>
+              <input id="new-transfer-modal-5"
                 type="text"
                 value={truckPlate}
                 onChange={(e) => setTruckPlate(e.target.value)}

@@ -21,7 +21,8 @@ import {
   ArrowUpRight,
   FileText,
 } from 'lucide-react';
-import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel, formatInt } from '../../utils/money';
+import { selectClientReceivables } from '../../store/views/contracts';
 
 interface PaymentsReceivablesViewProps {
   contracts: Contract[];
@@ -42,16 +43,9 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'receivables' | 'payments_history'>('receivables');
 
-  // Statements with remaining receivables
-  const unpaidStatements = statements.filter((s) => s.remainingPayable > 0);
-  const totalReceivables = unpaidStatements.reduce((sum, s) => sum + s.remainingPayable, 0);
-
-  // Aging categories
-  const currentReceivables = unpaidStatements.filter((s) => (s.overdueDays || 0) <= 0);
-  const overdue30 = unpaidStatements.filter((s) => (s.overdueDays || 0) > 0 && (s.overdueDays || 0) <= 30);
-  const overdueCritical = unpaidStatements.filter((s) => (s.overdueDays || 0) > 30);
-
-  const totalReceivedPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+  // Statements with remaining receivables, by age
+  const receivables = selectClientReceivables(statements, payments);
+  const unpaidStatements = receivables.unpaid;
 
   return (
     <div className="space-y-6">
@@ -83,10 +77,10 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <DollarSign className="w-4 h-4 text-slate-600" />
           </div>
           <span className="text-xl font-black text-slate-900 font-mono">
-            {formatMoneyCompact(totalReceivables)}
+            {formatMoneyCompact(receivables.totalReceivable)}
           </span>
           <span className="text-[10px] text-slate-400 block mt-1">
-            از {unpaidStatements.length} فقره صورت‌وضعیت
+            از {formatInt(unpaidStatements.length)} فقره صورت‌وضعیت
           </span>
         </div>
 
@@ -96,7 +90,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <Clock className="w-4 h-4 text-emerald-600" />
           </div>
           <span className="text-xl font-black text-emerald-700 font-mono">
-            {formatMoneyCompact(currentReceivables.reduce((sum, s) => sum + s.remainingPayable, 0))}
+            {formatMoneyCompact(receivables.current.amount)}
           </span>
           <span className="text-[10px] text-emerald-600 block mt-1">کمتر از ۳۰ روز تا سررسید</span>
         </div>
@@ -107,7 +101,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <AlertTriangle className="w-4 h-4 text-amber-600" />
           </div>
           <span className="text-xl font-black text-amber-800 font-mono">
-            {formatMoneyCompact(overdue30.reduce((sum, s) => sum + s.remainingPayable, 0))}
+            {formatMoneyCompact(receivables.overdue30.amount)}
           </span>
           <span className="text-[10px] text-amber-700 block mt-1">نیاز به پیگیری امور مالی</span>
         </div>
@@ -118,7 +112,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
           <span className="text-xl font-black text-rose-700 font-mono">
-            {formatMoneyCompact(overdueCritical.reduce((sum, s) => sum + s.remainingPayable, 0))}
+            {formatMoneyCompact(receivables.overdueCritical.amount)}
           </span>
           <span className="text-[10px] text-rose-700 block mt-1">مشمول خسارت تأخیر تادیه</span>
         </div>
@@ -135,7 +129,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            لیست مطالبات معوق به تفکیک کارفرما ({unpaidStatements.length})
+            لیست مطالبات معوق به تفکیک کارفرما ({formatInt(unpaidStatements.length)})
           </button>
           <button
             onClick={() => setActiveSubTab('payments_history')}
@@ -145,7 +139,7 @@ export const PaymentsReceivablesView: React.FC<PaymentsReceivablesViewProps> = (
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            سوابق وصولی‌ها و واریزی‌های بانکی ({payments.length})
+            سوابق وصولی‌ها و واریزی‌های بانکی ({formatInt(payments.length)})
           </button>
         </div>
 

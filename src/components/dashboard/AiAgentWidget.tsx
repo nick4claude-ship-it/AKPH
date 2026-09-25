@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { Sparkles, Send, Bot, User, CornerDownLeft, RefreshCw, X, MessageSquare, ArrowRight } from 'lucide-react';
 import { formatCurrencyCompact } from '../../utils/formatters';
-import { useAppState } from '../../store/AppStore';
 import { useCurrentUser } from '../../store/session';
-import { answerManagementQuery, AssistantAnswer } from '../../store/assistant';
-import { generateUUID } from '../../utils/ids';
-import { toPersianTime } from '../../utils/date';
+import { useAssistant, type AssistantMessage } from '../../store/useAssistant';
 
 interface AiAgentWidgetProps {
   isOpen?: boolean;
@@ -13,13 +10,7 @@ interface AiAgentWidgetProps {
   isFloating?: boolean;
 }
 
-interface Message {
-  id: string;
-  sender: 'ai' | 'user';
-  text: string;
-  dataPoints?: { label: string; value: string }[];
-  time: string;
-}
+type Message = AssistantMessage;
 
 export const samplePrompts = [
   'وضعیت پروژه رونیکا را بگو.',
@@ -35,8 +26,8 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
   onClose,
   isFloating = false,
 }) => {
-  const appState = useAppState();
   const user = useCurrentUser();
+  const assistant = useAssistant();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'm1',
@@ -48,32 +39,19 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
-  const generateAnswer = (query: string): AssistantAnswer => answerManagementQuery(appState, query);
 
   const handleSend = (textToSend?: string) => {
     const text = textToSend || inputValue;
     if (!text.trim()) return;
 
-    const userMsg: Message = {
-      id: generateUUID(),
-      sender: 'user',
-      text,
-      time: toPersianTime(new Date()),
-    };
+    const userMsg = assistant.userMessage(text);
 
     setMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setInputValue('');
     setIsTyping(true);
 
     setTimeout(() => {
-      const response = generateAnswer(text);
-      const aiMsg: Message = {
-        id: generateUUID(),
-        sender: 'ai',
-        text: response.text,
-        dataPoints: response.dataPoints,
-        time: toPersianTime(new Date()),
-      };
+      const aiMsg = assistant.reply(text);
       setMessages((prev) => [...prev, aiMsg]);
       setIsTyping(false);
     }, 600);

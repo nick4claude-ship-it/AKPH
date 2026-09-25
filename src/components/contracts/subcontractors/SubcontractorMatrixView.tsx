@@ -18,6 +18,8 @@ import {
   Download,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../../utils/money';
+import { formatDecimal, formatPercent, formatInt } from '../../../utils/formatters';
+import { subcontractMatrix } from '../../../store/views/contracts';
 
 interface SubcontractorMatrixViewProps {
   contracts: SubcontractorContract[];
@@ -56,19 +58,8 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
     });
   }, [contracts, searchTerm, selectedProjectId, selectedTrade]);
 
-  // Group by project
-  const groupedByProject = useMemo(() => {
-    const groups: { [projectId: string]: { projectId: string; projectName: string; contracts: SubcontractorContract[] } } = {};
-
-    filteredContracts.forEach((c) => {
-      if (!groups[c.projectId]) {
-        groups[c.projectId] = { projectId: c.projectId, projectName: c.projectName, contracts: [] };
-      }
-      groups[c.projectId].contracts.push(c);
-    });
-
-    return Object.values(groups);
-  }, [filteredContracts]);
+  // Group by project, with per-project totals (store view model).
+  const groupedByProject = useMemo(() => subcontractMatrix(filteredContracts), [filteredContracts]);
 
   return (
     <div className="space-y-6">
@@ -86,7 +77,7 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-              {filteredContracts.length} پیمانکار در ماتریس
+              {formatInt(filteredContracts.length)} پیمانکار در ماتریس
             </span>
           </div>
         </div>
@@ -138,12 +129,10 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
 
       {/* Project Grouped Cards */}
       <div className="space-y-6">
-        {groupedByProject.map(({ projectId, projectName, contracts: projectContracts }) => {
-          const prjContractTotal = projectContracts.reduce((s, c) => s + c.contractValue, 0);
-          const prjExecutedTotal = projectContracts.reduce((s, c) => s + c.executedValue, 0);
-          const prjApprovedTotal = projectContracts.reduce((s, c) => s + c.approvedStatementsValue, 0);
-          const prjPaidTotal = projectContracts.reduce((s, c) => s + c.paidValue, 0);
-          const prjDebtTotal = projectContracts.reduce((s, c) => s + c.remainingPayableValue, 0);
+        {groupedByProject.map(({ projectId, projectName, contracts: projectRows, totals }) => {
+          const projectContracts = projectRows.map((r) => r.contract);
+          const progressOf = new Map(projectRows.map((r) => [r.contract.id, r.progress]));
+          const { contractValue: prjContractTotal, executed: prjExecutedTotal, paid: prjPaidTotal, debt: prjDebtTotal } = totals;
 
           return (
             <div
@@ -159,7 +148,7 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
                   <div>
                     <h4 className="font-bold text-sm">{projectName}</h4>
                     <span className="text-[11px] text-slate-300">
-                      تعداد پیمانکاران جزء: {projectContracts.length.toLocaleString('fa-IR')} اکیپ
+                      تعداد پیمانکاران جزء: {formatDecimal(projectContracts.length)} اکیپ
                     </span>
                   </div>
                 </div>
@@ -227,24 +216,21 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
                           <td className="p-3 text-left font-bold text-blue-700">
                             {formatMoneyCompact(c.executedValue)}
                             <span className="text-[10px] text-blue-500 block font-normal">
-                              {Math.round((c.executedValue / c.contractValue) * 100).toLocaleString('fa-IR')}٪ پیشرفت
+                              {formatPercent(progressOf.get(c.id)!.executedPercent, 0)} پیشرفت
                             </span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-purple-700">
                             {formatMoneyCompact(c.approvedStatementsValue)}
                             <span className="text-[10px] text-purple-500 block font-normal">
-                              {Math.round((c.approvedStatementsValue / c.contractValue) * 100).toLocaleString('fa-IR')}٪ پیمان
+                              {formatPercent(progressOf.get(c.id)!.approvedPercent, 0)} پیمان
                             </span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-emerald-700">
                             {formatMoneyCompact(c.paidValue)}
                             <span className="text-[10px] text-emerald-600 block font-normal">
-                              {c.approvedStatementsValue > 0
-                                ? Math.round((c.paidValue / c.approvedStatementsValue) * 100).toLocaleString('fa-IR')
-                                : '۰'}
-                              ٪ تسویه
+                              {formatPercent(progressOf.get(c.id)!.settledPercent, 0)} تسویه
                             </span>
                           </td>
 

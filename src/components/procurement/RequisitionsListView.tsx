@@ -17,8 +17,10 @@ import {
   FileText,
 } from 'lucide-react';
 import { PurchaseRequisition, Project, RequisitionPriority, RequisitionStatus } from '../../types';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
+import { formatDecimal, formatInt } from '../../utils/formatters';
+import { requisitionConvertible } from '../../store/views/procurement';
 
 interface RequisitionsListViewProps {
   requisitions: PurchaseRequisition[];
@@ -72,7 +74,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
             <div>
               <h3 className="text-base font-bold text-slate-800">درخواست‌های خرید و تقاضای کالا از کارگاه‌ها (PR)</h3>
               <p className="text-xs text-slate-500">
-                مجموع {filteredReqs.length} تقاضای خرید فعال در فرآیند بررسی، استعلام و تأمین
+                مجموع {formatInt(filteredReqs.length)} تقاضای خرید فعال در فرآیند بررسی، استعلام و تأمین
               </p>
             </div>
           </div>
@@ -180,7 +182,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                     <div className="text-[11px] text-slate-500 mt-0.5">
                       {req.items.length > 1
                         ? `و ${req.items.length - 1} ردیف دیگر...`
-                        : `${req.items[0]?.requestedQty.toLocaleString('fa-IR')} ${req.items[0]?.unit}`}
+                        : `${formatDecimal(req.items[0]?.requestedQty)} ${req.items[0]?.unit}`}
                     </div>
                   </td>
 
@@ -228,7 +230,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                         <Eye className="w-4 h-4" />
                       </button>
 
-                      {req.status !== 'سفارش صادر شده (PO)' && (
+                      {requisitionConvertible(req) && (
                         <>
                           <button
                             onClick={() => onConvertToRfq(req)}
@@ -321,7 +323,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                             <div className="text-[10px] text-slate-500">{it.specification}</div>
                           </td>
                           <td className="p-2.5 text-center font-mono font-bold">
-                            {it.requestedQty.toLocaleString('fa-IR')} {it.unit}
+                            {formatDecimal(it.requestedQty)} {it.unit}
                           </td>
                           <td className="p-2.5 text-left font-mono">
                             {formatMoney(it.estimatedUnitPrice, false)}

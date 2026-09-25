@@ -20,11 +20,11 @@ import {
   PettyCashReconciliation,
   Project,
 } from '../../types';
-import { useAppState } from '../../store/AppStore';
-import { documentCount } from '../../store/domainSelectors';
-import { formatCurrency, formatNumber, formatPercent } from '../../utils/formatters';
+import { useSelector } from '../../store/AppStore';
+import { pettyReportFigures } from '../../store/views/pettyCash';
+import { formatCurrency, formatNumber, formatPercent, formatDecimal } from '../../utils/formatters';
 import { toPersianDate } from '../../utils/date';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatInt, moneyUnitLabel } from '../../utils/money';
 
 interface PettyCashReportsViewProps {
@@ -42,7 +42,6 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
   reconciliations,
   projects,
 }) => {
-  const appState = useAppState();
   const [selectedReportType, setSelectedReportType] = useState<
     'statement' | 'project_category' | 'missing_docs' | 'rejected' | 'reconciliation_sheet'
   >('statement');
@@ -58,28 +57,9 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
     (r) => r.pettyCashId === selectedAccount?.id
   );
 
-  const missingDocsExpenses = expenses.filter(
-    (e) => !e.invoiceNumber || !documentCount(appState, 'petty_cash_expense', e.id)
-  );
-
-  const rejectedExpenses = expenses.filter((e) => e.status === 'rejected');
-
-  // Spend per category from approved expenses.
-  const approvedExpenses = expenses.filter((e) => e.status === 'approved' || e.status === 'accounting_posted');
-  const approvedTotal = approvedExpenses.reduce((a, e) => a + e.amount, 0);
-  const categoryRows = [...new Set(approvedExpenses.map((e) => e.category))]
-    .map((cat) => {
-      const rows = approvedExpenses.filter((e) => e.category === cat);
-      const total = rows.reduce((a, e) => a + e.amount, 0);
-      return {
-        cat,
-        count: rows.length,
-        total,
-        projects: [...new Set(rows.map((e) => e.projectName))].join('، '),
-        pct: approvedTotal ? (total * 100) / approvedTotal : 0,
-      };
-    })
-    .sort((a, b) => b.total - a.total);
+  // Report figures (store view model).
+  const report = useSelector((s) => pettyReportFigures(s, expenses), [expenses]);
+  const { missingDocsExpenses, rejectedExpenses, categoryRows } = report;
   const lastReconciliation = reconciliations.find((r) => r.pettyCashId === selectedAccount?.id);
 
   // Trigger print
@@ -143,7 +123,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          اسناد ناقص / بدون مدارک ({missingDocsExpenses.length.toLocaleString('fa-IR')})
+          اسناد ناقص / بدون مدارک ({formatDecimal(missingDocsExpenses.length)})
         </button>
 
         <button
@@ -154,7 +134,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          فاکتورهای ردشده و دلایل آن ({rejectedExpenses.length.toLocaleString('fa-IR')})
+          فاکتورهای ردشده و دلایل آن ({formatDecimal(rejectedExpenses.length)})
         </button>
 
         <button
@@ -172,8 +152,8 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
       {/* Account Selector filter */}
       {(selectedReportType === 'statement' || selectedReportType === 'reconciliation_sheet') && (
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-700">انتخاب تنخواه‌گردان مورد گزارش:</label>
-          <select
+          <label htmlFor="petty-cash-reports-view-1" className="text-xs font-bold text-slate-700">انتخاب تنخواه‌گردان مورد گزارش:</label>
+          <select id="petty-cash-reports-view-1"
             value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
             className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium w-80"
@@ -311,7 +291,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                       </td>
                       <td className="py-3 px-4 text-slate-600">{row.projects}</td>
                       <td className="py-3 px-4 text-left font-mono font-semibold text-amber-700">
-                        {formatPercent(row.pct)}
+                        {formatPercent(row.share)}
                       </td>
                     </tr>
                   ))}
@@ -568,7 +548,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                     {accountExpenses.slice(0, 6).map((exp, idx) => (
                       <tr key={exp.id}>
                         <td className="p-2 border-l border-slate-200 text-center font-mono">
-                          {(idx + 1).toLocaleString('fa-IR')}
+                          {formatDecimal(idx + 1)}
                         </td>
                         <td className="p-2 border-l border-slate-200 font-mono text-[11px]">
                           {exp.expenseNumber}

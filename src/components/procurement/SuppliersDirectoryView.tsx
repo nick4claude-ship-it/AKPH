@@ -17,7 +17,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Supplier, ProcurementCategory, VendorGrade } from '../../types';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, formatMoneyCompact } from '../../utils/money';
 
 interface SuppliersDirectoryViewProps {

@@ -9,7 +9,7 @@ import { Project, CounterpartyKind } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { selectCounterpartyProfile, CounterpartyProfile } from '../../store/domainSelectors';
 import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from '../statements/statementLabels';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatNumber, formatCurrencyCompact, formatDecimal } from '../../utils/formatters';
 import { formatMoney, formatInt } from '../../utils/money';
 
 type PartnerKind = 'clients' | 'subcontractors' | 'suppliers';
@@ -63,7 +63,7 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({ kind, counterpar
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Icon className="w-5 h-5 text-amber-600" /> {meta.title}
-            <span className="text-xs font-normal text-slate-500">({rows.length.toLocaleString('fa-IR')})</span>
+            <span className="text-xs font-normal text-slate-500">({formatDecimal(rows.length)})</span>
           </h2>
           <div className="relative w-full md:w-72">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
@@ -95,8 +95,8 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({ kind, counterpar
                     <div className="font-bold text-slate-900">{p.counterparty.name}</div>
                     <div className="text-[10px] text-slate-400">{p.counterparty.tradeType || p.counterparty.nationalId || ''}</div>
                   </td>
-                  <td className="py-2.5 px-3 text-left font-mono">{p.contracts.length.toLocaleString('fa-IR')}</td>
-                  <td className="py-2.5 px-3 text-left font-mono">{p.projects.length.toLocaleString('fa-IR')}</td>
+                  <td className="py-2.5 px-3 text-left font-mono">{formatDecimal(p.contracts.length)}</td>
+                  <td className="py-2.5 px-3 text-left font-mono">{formatDecimal(p.projects.length)}</td>
                   <td className="py-2.5 px-3 text-left font-mono">{formatCurrencyCompact(p.executed)}</td>
                   <td className="py-2.5 px-3 text-left font-mono">{formatCurrencyCompact(p.approvedStatements)}</td>
                   <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatCurrencyCompact(p.paidOrReceived)}</td>
@@ -146,15 +146,15 @@ export const PartnersModule: React.FC<PartnersModuleProps> = ({ kind, counterpar
         </div>
         <div className="text-left">
           <div className="text-[10px] text-slate-500">سابقه عملکرد (بدون برگشت/مغایرت)</div>
-          <div className={`text-lg font-bold ${profile.performance.score >= 80 ? 'text-emerald-700' : 'text-amber-700'}`}>{profile.performance.score.toLocaleString('fa-IR')}٪</div>
+          <div className={`text-lg font-bold ${profile.performance.score >= 80 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatDecimal(profile.performance.score)}٪</div>
           <div className="text-[10px] text-slate-400">
-            {profile.performance.returned.toLocaleString('fa-IR')} مورد برگشتی از {formatInt(profile.performance.total)}
+            {formatDecimal(profile.performance.returned)} مورد برگشتی از {formatInt(profile.performance.total)}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <Stat label={meta.contracts} value={profile.contracts.length.toLocaleString('fa-IR')} />
+        <Stat label={meta.contracts} value={formatDecimal(profile.contracts.length)} />
         <Stat label={meta.executed} value={formatMoney(profile.executed)} />
         <Stat label={meta.approved} value={formatMoney(profile.approvedStatements)} />
         <Stat label={meta.settled} value={formatMoney(profile.paidOrReceived, false)} tone="text-emerald-700" />

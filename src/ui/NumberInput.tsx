@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { fromDisplayAmount, moneyUnitLabel, toDisplayAmount, tryParseIntegerAmount, maxMoneyInput } from '../../utils/money';
+import { fromDisplayAmount, moneyUnitLabel, toDisplayAmount, tryParseIntegerAmount, maxMoneyInput } from '../utils/money';
 
 type BaseProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'defaultValue'> & {
   value: number;
@@ -87,3 +87,8 @@ export const MoneyInput: React.FC<BaseProps & { showUnit?: boolean }> = ({ value
     </div>
   );
 };
+
+/** Whole-number percentage (0–100). Anything above 100 is read as 100. */
+export const PercentInput: React.FC<Omit<BaseProps, 'max'>> = ({ onValueChange, ...rest }) => (
+  <IntegerInput {...rest} onValueChange={(v) => onValueChange(Math.min(100, v))} />
+);

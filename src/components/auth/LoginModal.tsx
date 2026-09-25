@@ -6,7 +6,7 @@
 import React, { useId } from 'react';
 import { X, ShieldCheck, Check } from 'lucide-react';
 import { UserProfile } from '../../types';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 
 interface LoginModalProps {
   onClose: () => void;

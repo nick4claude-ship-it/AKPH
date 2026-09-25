@@ -1,8 +1,9 @@
 import React from 'react';
 import { DetailedProgressStatement } from '../../types';
-import { clientStatementPhase, clientStatementReceivable, ClientStatementPhase } from '../../store/statementPhase';
-import { formatCurrencyCompact, formatNumber } from '../../utils/formatters';
+import type { ClientStatementPhase } from '../../store/statementPhase';
+import { formatCurrencyCompact, formatNumber, formatInt } from '../../utils/formatters';
 import { FileText, Clock, AlertTriangle, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { statementsSummary } from '../../store/views/dashboard';
 
 interface ProgressStatementsSummaryProps {
   statements: DetailedProgressStatement[];
@@ -15,15 +16,8 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
   onOpenStatementsModule,
   onSelectStatement,
 }) => {
-  const inReview = statements.filter((s) => clientStatementPhase(s) === 'in_review');
-  const pendingCount = inReview.length;
-  const unapprovedAmount = inReview.reduce((sum, s) => sum + s.netPayable, 0);
-
-  const totalReceivables = statements.reduce((sum, s) => sum + clientStatementReceivable(s), 0);
-  const totalReceived = statements.reduce((sum, s) => sum + s.receivedAmount, 0);
-  const totalOverdue = statements
-    .filter((s) => clientStatementPhase(s) === 'overdue')
-    .reduce((sum, s) => sum + clientStatementReceivable(s), 0);
+  const summary = statementsSummary(statements);
+  const { pendingCount, unapprovedAmount, totalReceivables, totalReceived, totalOverdue } = summary;
 
   const getStatusBadge = (status: ClientStatementPhase) => {
     switch (status) {
@@ -85,7 +79,7 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
         <div>
           <span className="text-[10px] text-slate-500 block mb-0.5">در انتظار تأیید</span>
           <span className="text-base font-extrabold text-amber-700 tabular-nums">
-            {pendingCount} مورد
+            {formatInt(pendingCount)} مورد
           </span>
         </div>
         <div>
@@ -129,7 +123,7 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {statements.map((st) => (
+            {summary.rows.map(({ statement: st, phase, approvedAmount, receivable }) => (
               <tr
                 key={st.id}
                 onClick={() => onSelectStatement(st)}
@@ -146,16 +140,16 @@ export const ProgressStatementsSummary: React.FC<ProgressStatementsSummaryProps>
                   {formatCurrencyCompact(st.netPayable)}
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-emerald-700 font-bold">
-                  {formatCurrencyCompact(clientStatementPhase(st) === 'in_review' ? 0 : st.approvedNetPayable ?? st.netPayable)}
+                  {formatCurrencyCompact(approvedAmount)}
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-slate-600">
                   {formatCurrencyCompact(st.receivedAmount)}
                 </td>
                 <td className="py-2.5 px-3 font-mono tabular-nums text-left text-rose-600 font-semibold">
-                  {formatCurrencyCompact(clientStatementReceivable(st))}
+                  {formatCurrencyCompact(receivable)}
                 </td>
                 <td className="py-2.5 px-3 text-center">
-                  {getStatusBadge(clientStatementPhase(st))}
+                  {getStatusBadge(phase)}
                 </td>
               </tr>
             ))}

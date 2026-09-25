@@ -5,7 +5,7 @@ import { usePermission } from '../store/session';
 import { useWorkflows } from '../store/useWorkflows';
 import { PETTY_CASH_FUND_LABELS, PettyCashFundType, PettyCashSettings, PettyCashApprovalLevel } from '../types';
 import { moneyUnitLabel } from '../utils/money';
-import { IntegerInput, MoneyInput } from '../components/common/NumberInput';
+import { MoneyInput, PercentInput } from '../ui/NumberInput';
 
 const LEVEL_LABELS: Record<PettyCashApprovalLevel, string> = {
   site_manager_and_finance: 'سطح ۱',
@@ -64,7 +64,7 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <label className="space-y-1">
             <span className="text-slate-600">نرخ مالیات بر ارزش افزوده (درصد)</span>
-            <IntegerInput disabled={!canEdit} value={vatRate} onValueChange={(v) => setVatRate(Math.min(100, v))} className={INPUT_CLASS} />
+            <PercentInput disabled={!canEdit} value={vatRate} onValueChange={setVatRate} className={INPUT_CLASS} />
           </label>
           <div className="space-y-1">
             <span className="text-slate-600">واحد پول نمایش</span>
@@ -118,7 +118,7 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
           </label>
           <label className="space-y-1">
             <span className="text-slate-600">هشدار موجودی کم (درصد از سقف)</span>
-            <IntegerInput disabled={!canEdit} value={draft.lowBalancePercent} onValueChange={(v) => setDraft((d) => ({ ...d, lowBalancePercent: Math.min(100, v) }))} className={INPUT_CLASS} />
+            <PercentInput disabled={!canEdit} value={draft.lowBalancePercent} onValueChange={(v) => setDraft((d) => ({ ...d, lowBalancePercent: v }))} className={INPUT_CLASS} />
           </label>
         </div>
         <div className="space-y-1.5 text-xs">

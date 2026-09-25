@@ -52,6 +52,17 @@ export function useDemoBanner(): string | null {
     : 'نسخه نمایشی — اطلاعات با تازه‌کردن صفحه پاک می‌شود';
 }
 
+/** Sections whose writes the installed server already executes; elsewhere the server data is read-only. */
+const SERVER_BACKED_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications'];
+
+/** Notice for a section that is read-only with the current data source (null when writes work there). */
+export function useReadOnlyNotice(pathname: string): string | null {
+  const { isDemoData } = useSession();
+  if (isDemoData) return null;
+  const backed = SERVER_BACKED_PATHS.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
+  return backed ? null : 'این بخش در نسخه وردپرس فعلاً فقط‌خواندنی است — ثبت و تأیید به‌زودی (نیازمند پیاده‌سازی در سرور).';
+}
+
 /** Permission check bound to the signed-in user, for hiding or disabling actions in the UI. */
 export function usePermission(): {
   can: (action: UserAction, context?: ActionContext) => boolean;

@@ -15,7 +15,7 @@ import { ProgressStatementsSummary } from '../components/dashboard/ProgressState
 import { ManagementAlerts } from '../components/dashboard/ManagementAlerts';
 import { QuickActions } from '../components/dashboard/QuickActions';
 import { AiAgentWidget } from '../components/dashboard/AiAgentWidget';
-import { useAppState, useStoreSlice } from '../store/AppStore';
+import { useAppState } from '../store/AppStore';
 import { selectKpiItems, selectMonthlyFinancialTrend, selectExpenseCategoryTotals } from '../store/selectors';
 import { selectApprovals, selectNotifications, selectPettyFunds } from '../store/domainSelectors';
 import { useApprovalActions } from '../store/useApprovalActions';

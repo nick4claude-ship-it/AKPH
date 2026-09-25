@@ -24,20 +24,24 @@ import {
   Building,
   Hammer,
 } from 'lucide-react';
-import { Dialog } from '../../common/Dialog';
+import { Dialog } from '../../../ui/Dialog';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
 import { useCompany } from '../../../store/session';
+import {
+  SUBCONTRACTOR_STATEMENT_STEPS,
+  subcontractorActiveStepTitle,
+  subcontractorStatementActions,
+  subcontractorStatementStep,
+} from '../../../store/views/contracts';
+import { formatDecimal } from '../../../utils/formatters';
 
 interface SubcontractorStatementDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   statement: SubcontractorProgressStatement | null;
   currentUser: UserProfile;
-  onUpdateStatus?: (
-    statementId: string,
-    newStatus: SubcontractorStatementWorkflowStatus,
-    comment?: string
-  ) => void;
+  /** Next approval step, or return for revision (runs the store workflow). */
+  onDecide?: (statementId: string, decision: 'approve' | 'return' | 'reject', comment?: string) => void;
   onOpenPaymentModal?: (statement: SubcontractorProgressStatement) => void;
 }
 
@@ -46,7 +50,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
   onClose,
   statement,
   currentUser,
-  onUpdateStatus,
+  onDecide,
   onOpenPaymentModal,
 }) => {
   const company = useCompany();
@@ -54,39 +58,11 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
 
   if (!isOpen || !statement) return null;
 
-  // Step indices
-  const getWorkflowStepIndex = (status: SubcontractorStatementWorkflowStatus) => {
-    switch (status) {
-      case 'submitted':
-        return 0;
-      case 'measured':
-        return 1;
-      case 'site_review':
-        return 2;
-      case 'pm_approved':
-        return 3;
-      case 'finance_approved':
-        return 4;
-      case 'management_approved':
-        return 5;
-      case 'paid':
-        return 7;
-      default:
-        return 0;
-    }
-  };
-
-  const currentStep = getWorkflowStepIndex(statement.status);
-
-  const steps = [
-    { title: '۱. کارکرد', desc: 'پیمانکار جزء' },
-    { title: '۲. اندازه‌گیری', desc: 'مدیر پروژه' },
-    { title: '۳. تأیید کارگاه', desc: 'مدیر پروژه' },
-    { title: '۴. تأیید مدیر پروژه', desc: 'مدیر پروژه' },
-    { title: '۵. تأیید مالی', desc: 'حسابدار' },
-    { title: '۶. تأیید مدیر ارشد', desc: 'ثبت بدهی و درخواست پرداخت' },
-    { title: '۷. پرداخت', desc: 'فقط در خزانه' },
-  ];
+  // Position on the 7-step approval bar.
+  const currentStep = subcontractorStatementStep(statement.status);
+  const steps = SUBCONTRACTOR_STATEMENT_STEPS;
+  const activeStepTitle = subcontractorActiveStepTitle(statement.status);
+  const actions = subcontractorStatementActions(currentUser, statement);
 
   return (
     <Dialog onClose={onClose} label="جزئیات صورت‌وضعیت پیمانکار جزء" overlayClassName="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto" className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
@@ -133,7 +109,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
           <div className="flex items-center justify-between text-xs mb-2">
             <span className="font-bold text-slate-700">گردش کار ۶ مرحله‌ای صورت‌وضعیت پیمانکار جزء:</span>
             <span className="text-[11px] text-amber-800 font-bold">
-              مرحله فعال: {steps[Math.min(currentStep, steps.length - 1)].title}
+              مرحله فعال: {activeStepTitle}
             </span>
           </div>
 
@@ -262,16 +238,16 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                           </td>
                           <td className="p-2.5 text-center text-slate-600">{item.unit}</td>
                           <td className="p-2.5 text-center text-slate-600">
-                            {item.contractQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(item.contractQuantity)}
                           </td>
                           <td className="p-2.5 text-center text-slate-600">
-                            {item.previousQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(item.previousQuantity)}
                           </td>
                           <td className="p-2.5 text-center font-black text-slate-900">
-                            {item.currentQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(item.currentQuantity)}
                           </td>
                           <td className="p-2.5 text-center font-bold text-blue-700">
-                            {item.cumulativeQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(item.cumulativeQuantity)}
                           </td>
                           <td className="p-2.5 text-left text-slate-600">
                             {formatMoney(item.unitRate, false)}
@@ -433,7 +409,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                       <td className="p-2 border-l border-slate-200">{item.description}</td>
                       <td className="p-2 border-l border-slate-200 text-center">{item.unit}</td>
                       <td className="p-2 border-l border-slate-200 text-center font-bold">
-                        {item.currentQuantity.toLocaleString('fa-IR')}
+                        {formatDecimal(item.currentQuantity)}
                       </td>
                       <td className="p-2 border-l border-slate-200 text-left">
                         {formatMoney(item.unitRate, false)}
@@ -492,7 +468,7 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
           </div>
 
           <div className="flex items-center gap-2">
-            {statement.status === 'management_approved' && onOpenPaymentModal && (
+            {actions.awaitingPayment && onOpenPaymentModal && (
               <button
                 onClick={() => {
                   onClose();

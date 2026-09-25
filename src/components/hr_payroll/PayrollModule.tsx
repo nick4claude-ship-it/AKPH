@@ -29,10 +29,11 @@ import {
 import { Project, UserProfile, PayrollSlip } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { usePermission, useCompany } from '../../store/session';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { useWorkflows } from '../../store/useWorkflows';
+import { payrollTotals } from '../../store/views/people';
 import { useNavigate } from 'react-router-dom';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatNumber, formatCurrencyCompact, formatInt } from '../../utils/formatters';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface PayrollModuleProps {
@@ -74,12 +75,15 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   };
 
   // Totals for active month
-  const totalGrossSalaries = slips.reduce((acc, s) => acc + s.grossTotalSalary, 0);
-  const totalNetPayable = slips.reduce((acc, s) => acc + s.netPayableSalary, 0);
-  const totalWorkerInsurance = slips.reduce((acc, s) => acc + s.workerInsuranceDeduction, 0);
-  const totalEmployerInsurance = slips.reduce((acc, s) => acc + s.employerInsuranceContribution, 0);
-  const totalIncomeTax = slips.reduce((acc, s) => acc + s.incomeTaxDeduction, 0);
-  const totalCompanyLaborCost = slips.reduce((acc, s) => acc + s.totalCostForCompany, 0);
+  const totals = payrollTotals(slips);
+  const {
+    gross: totalGrossSalaries,
+    net: totalNetPayable,
+    workerInsurance: totalWorkerInsurance,
+    employerInsurance: totalEmployerInsurance,
+    incomeTax: totalIncomeTax,
+    companyLaborCost: totalCompanyLaborCost,
+  } = totals;
 
   // Financial approval of the month's calculated slips posts one payroll entry
   // (Dr salary cost per cost center / Cr salaries, insurance, tax, loans) and queues the net pay in treasury.
@@ -234,7 +238,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
           <CreditCard className="w-3.5 h-3.5 text-amber-400" />
           <span>لیست و فیش‌های حقوق ({selectedMonth})</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-800 text-amber-300">
-            {slips.length}
+            {formatInt(slips.length)}
           </span>
         </button>
 
@@ -249,7 +253,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
           <Users className="w-3.5 h-3.5 text-emerald-400" />
           <span>شناسنامه پرسنل و قراردادها</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {employees.length}
+            {formatInt(employees.length)}
           </span>
         </button>
 
@@ -264,7 +268,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
           <Clock className="w-3.5 h-3.5 text-blue-400" />
           <span>کارکرد و تایم‌شیت کارگاه‌ها</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
-            {timesheets.length}
+            {formatInt(timesheets.length)}
           </span>
         </button>
       </div>
@@ -301,7 +305,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
             </div>
 
             <span className="text-slate-400 font-mono text-[11px]">
-              تعداد فیش‌های محاسبه شده: {filteredSlips.length}
+              تعداد فیش‌های محاسبه شده: {formatInt(filteredSlips.length)}
             </span>
           </div>
 
@@ -433,7 +437,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
               <span>کارکرد ماهانه پرسنل کارگاه‌ها و تایید سرپرستان ({selectedMonth})</span>
             </h3>
             <span className="text-xs text-slate-500 font-mono">
-              تعداد تایم‌شیت‌ها: {timesheets.length}
+              تعداد تایم‌شیت‌ها: {formatInt(timesheets.length)}
             </span>
           </div>
 

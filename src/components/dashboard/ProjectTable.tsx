@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Project } from '../../types';
 import { formatNumber, formatCurrencyCompact, formatPercent } from '../../utils/formatters';
 import { ArrowUpRight, Search, Building2, ChevronLeft } from 'lucide-react';
+import { sumProjects } from '../../store/views/dashboard';
+import { formatInt } from '../../utils/money';
 
 interface ProjectTableProps {
   projects: Project[];
@@ -227,15 +229,15 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
       {/* Table Footer Totals */}
       <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600">
         <div>
-          مجموع پروژه‌های نمایش داده شده: <span className="font-bold text-slate-900">{filteredProjects.length}</span> مورد
+          مجموع پروژه‌های نمایش داده شده: <span className="font-bold text-slate-900">{formatInt(filteredProjects.length)}</span> مورد
         </div>
         <div className="flex items-center gap-4 text-[11px] font-mono">
           <span>
-            مجموع کارکرد: <strong className="text-emerald-700">{formatCurrencyCompact(projects.reduce((a, b) => a + b.recordedRevenue, 0))}</strong>
+            مجموع کارکرد: <strong className="text-emerald-700">{formatCurrencyCompact(sumProjects(projects).recordedRevenue)}</strong>
           </span>
           <span>·</span>
           <span>
-            مجموع مطالبات: <strong className="text-rose-600">{formatCurrencyCompact(projects.reduce((a, b) => a + b.receivables, 0))}</strong>
+            مجموع مطالبات: <strong className="text-rose-600">{formatCurrencyCompact(sumProjects(projects).receivables)}</strong>
           </span>
         </div>
       </div>

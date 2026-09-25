@@ -26,6 +26,8 @@ import {
   Truck,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { formatDecimal } from '../../utils/formatters';
+import { sumGoodsReceipts } from '../../store/views/inventory';
 
 interface GoodsReceiptsListViewProps {
   receipts: GoodsReceiptNote[];
@@ -64,7 +66,7 @@ export const GoodsReceiptsListView: React.FC<GoodsReceiptsListViewProps> = ({
     });
   }, [receipts, searchQuery, selectedWarehouseId, statusFilter]);
 
-  const totalValue = filteredReceipts.reduce((s, r) => s + r.totalAmount, 0);
+  const totalValue = sumGoodsReceipts(filteredReceipts).totalValue;
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
@@ -196,7 +198,7 @@ export const GoodsReceiptsListView: React.FC<GoodsReceiptsListViewProps> = ({
                       <div>
                         <span className="font-bold text-slate-900 font-mono flex items-center gap-1">
                           <Scale className="w-3.5 h-3.5 text-slate-400" />
-                          {receipt.netWeightKg.toLocaleString('fa-IR')} kg
+                          {formatDecimal(receipt.netWeightKg)} kg
                         </span>
                         <span className="text-[10px] text-slate-400 block">قبض: {receipt.weighbridgeSlipNumber}</span>
                       </div>

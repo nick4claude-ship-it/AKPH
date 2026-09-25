@@ -14,7 +14,7 @@ import {
 import { PettyCashAccount, PettyCashExpense, User } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { documentCount } from '../../store/domainSelectors';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { formatCurrency, formatNumber, formatDecimal } from '../../utils/formatters';
 
 interface PettyCashPeriodClosingViewProps {
   accounts: PettyCashAccount[];
@@ -73,8 +73,8 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
       {/* Account Selector */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-700">انتخاب تنخواه جهت بستن دوره:</label>
-          <select
+          <label htmlFor="petty-cash-period-closing-view-1" className="text-xs font-bold text-slate-700">انتخاب تنخواه جهت بستن دوره:</label>
+          <select id="petty-cash-period-closing-view-1"
             value={selectedAccountId}
             onChange={(e) => {
               setSelectedAccountId(e.target.value);
@@ -119,7 +119,7 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
           <p className="text-[11px] text-slate-600 mt-2">
             {accountPendingExpenses.length === 0
               ? 'تمام هزینه‌ها تعیین تکلیف و تایید شده‌اند.'
-              : `${accountPendingExpenses.length.toLocaleString('fa-IR')} فاکتور بلاتکلیف در کارتابل وجود دارد.`}
+              : `${formatDecimal(accountPendingExpenses.length)} فاکتور بلاتکلیف در کارتابل وجود دارد.`}
           </p>
           <div className="mt-3 text-[10px] font-bold">
             {accountPendingExpenses.length === 0 ? (
@@ -149,7 +149,7 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
           <p className="text-[11px] text-slate-600 mt-2">
             {missingDocsExpenses.length === 0
               ? 'تمام فاکتورها دارای شماره رسمی و تصویر پیوست هستند.'
-              : `${missingDocsExpenses.length.toLocaleString('fa-IR')} سند فاقد شماره فاکتور یا پیوست است.`}
+              : `${formatDecimal(missingDocsExpenses.length)} سند فاقد شماره فاکتور یا پیوست است.`}
           </p>
           <div className="mt-3 text-[10px] font-bold">
             {missingDocsExpenses.length === 0 ? (

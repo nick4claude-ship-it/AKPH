@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { PettyCashSubTab } from '../../types';
+import { formatDecimal } from '../../utils/formatters';
 
 interface PettyCashNavProps {
   activeSubTab: PettyCashSubTab;
@@ -119,7 +120,7 @@ export const PettyCashNav: React.FC<PettyCashNavProps> = ({
                       isActive ? 'bg-slate-950 text-white' : item.badgeColor
                     }`}
                   >
-                    {item.badge.toLocaleString('fa-IR')}
+                    {formatDecimal(item.badge)}
                   </span>
                 )}
               </button>

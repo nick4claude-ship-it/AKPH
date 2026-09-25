@@ -9,10 +9,11 @@ import { ArrowDownLeft, Plus, X } from 'lucide-react';
 import { ReceiptRecord } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
-import { Dialog } from '../common/Dialog';
+import { selectReceiptsFigures } from '../../store/views/treasury';
+import { formatNumber, formatCurrencyCompact, formatDecimal } from '../../utils/formatters';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { MoneyInput } from '../common/NumberInput';
+import { MoneyInput } from '../../ui/NumberInput';
 
 type ReceiptSource = NonNullable<ReceiptRecord['sourceType']>;
 
@@ -25,10 +26,9 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
   const [params] = useSearchParams();
   const preselected = params.get('statement') || '';
 
-  const collectible = useMemo(
-    () => state.clientStatements.filter((s) => ['approved_by_employer', 'claimed', 'partially_paid'].includes(s.status) && s.remainingPayable > 0),
-    [state.clientStatements]
-  );
+  // Collectible statements and receipts figures (store view model).
+  const figures = useMemo(() => selectReceiptsFigures(state), [state]);
+  const collectible = figures.collectible;
 
   const [open, setOpen] = useState(Boolean(preselected));
   const [sourceType, setSourceType] = useState<ReceiptSource>('صورت‌وضعیت کارفرما');
@@ -42,15 +42,11 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
   const [tracking, setTracking] = useState('');
 
   const statement = state.clientStatements.find((s) => s.id === statementId);
-  const clients = state.counterparties.filter((c) => c.kind === 'client');
+  const clients = figures.clients;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (amount <= 0) return setError('مبلغ دریافت باید بیش از صفر باشد.');
-    if (sourceType === 'صورت‌وضعیت کارفرما' && statement && amount > statement.remainingPayable) {
-      return setError(`مبلغ از مانده مطالبات این صورت‌وضعیت (${formatMoney(statement.remainingPayable)}) بیشتر است.`);
-    }
-    if (!bankAccountId) return setError('حساب بانکی مقصد را انتخاب کنید.');
+    // Amount, remaining claim and bank account are checked by the workflow.
     const result = wf.recordReceipt({
       sourceType,
       statementId: sourceType === 'صورت‌وضعیت کارفرما' ? statementId : undefined,
@@ -69,8 +65,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
     setTracking('');
   };
 
-  const totalReceived = state.receipts.reduce((a, r) => a + r.amount, 0);
-  const receivable = collectible.reduce((a, s) => a + s.remainingPayable, 0);
+  const { totalReceived, receivable } = figures;
 
   return (
     <div className="space-y-4">
@@ -78,12 +73,12 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">مانده مطالبات قابل وصول</span>
           <div className="text-lg font-bold text-blue-700 font-mono">{formatMoney(receivable, false)}</div>
-          <span className="text-[11px] text-slate-400">{collectible.length.toLocaleString('fa-IR')} صورت‌وضعیت مصوب</span>
+          <span className="text-[11px] text-slate-400">{formatDecimal(collectible.length)} صورت‌وضعیت مصوب</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">جمع دریافت‌های ثبت‌شده</span>
           <div className="text-lg font-bold text-emerald-700 font-mono">{formatMoney(totalReceived, false)}</div>
-          <span className="text-[11px] text-slate-400">{state.receipts.length.toLocaleString('fa-IR')} فقره</span>
+          <span className="text-[11px] text-slate-400">{formatDecimal(state.receipts.length)} فقره</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-center">
           <button

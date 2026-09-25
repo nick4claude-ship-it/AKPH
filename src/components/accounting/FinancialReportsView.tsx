@@ -2,10 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { BarChart3, Printer, Download, Layers, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Project, CostCenter, JournalEntry } from '../../types';
 import { formatPercent } from '../../utils/formatters';
-import { formatMoney, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
-import { downloadCsv } from '../../utils/export';
-import { useAppState } from '../../store/AppStore';
-import { selectProjectCostBreakdown, selectProjectFinancials } from '../../store/selectors';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { downloadTable } from '../../utils/export';
+import { useSelector } from '../../store/AppStore';
+import { selectFinancialReports } from '../../store/views/accounting';
+import { financialReportCsv } from '../../store/views/exports';
 
 interface FinancialReportsViewProps {
   projects: Project[];
@@ -23,87 +24,26 @@ const REPORTS: [ReportType, string][] = [
   ['general_ledger', 'دفتر روزنامه'],
 ];
 
-const isFinal = (j: JournalEntry) => j.status === 'ثبت قطعی' || j.status === 'تأیید شده' || j.status === 'برگشت خورده';
-
 /**
  * All reports are computed from final journal entries of this system. Manual project summaries
  * (budget, forecast) are never added to these figures and are not shown as accounting reports.
  */
 export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ projects, journalEntries }) => {
-  const state = useAppState();
   const unit = moneyUnitLabel();
   const [reportType, setReportType] = useState<ReportType>('project_pnl');
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
   const targetProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
 
-  const finals = useMemo(() => journalEntries.filter(isFinal), [journalEntries]);
+  // Every report is computed in the store from final entries.
+  const reports = useSelector((s) => selectFinancialReports(s, journalEntries, targetProject?.id), [journalEntries, targetProject?.id]);
+  const { finals, trial, trialTotals, incomeStatement, balanceSheet, projectFinancials, breakdown } = reports;
+  const { revenue, directCost, overhead, financialCost } = incomeStatement;
+  const incomeStatementProfit = incomeStatement.profit;
+  const { assets, netProfit } = balanceSheet;
+  const totalDebit = trialTotals.debit;
+  const totalCredit = trialTotals.credit;
 
-  const trial = useMemo(() => {
-    const map = new Map<string, { name: string; debit: number; credit: number }>();
-    for (const j of finals) {
-      for (const r of j.rows) {
-        const cur = map.get(r.accountCode) || { name: r.accountName, debit: 0, credit: 0 };
-        map.set(r.accountCode, { name: cur.name, debit: cur.debit + r.debit, credit: cur.credit + r.credit });
-      }
-    }
-    return [...map]
-      .map(([code, v]) => ({ code, ...v, balance: v.debit - v.credit }))
-      .sort((a, b) => a.code.localeCompare(b.code));
-  }, [finals]);
-
-  const sumBy = (prefix: RegExp, rows: { code: string; balance: number }[] = trial) => rows.filter((t) => prefix.test(t.code)).reduce((a, t) => a + t.balance, 0);
-  // Income statement: the year-end closing entry moves results to retained earnings and is not a result itself.
-  const pnlTrial = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const j of finals) {
-      if (j.type === 'بستن حساب‌ها') continue;
-      for (const r of j.rows) map.set(r.accountCode, (map.get(r.accountCode) || 0) + r.debit - r.credit);
-    }
-    return [...map].map(([code, balance]) => ({ code, balance }));
-  }, [finals]);
-  const revenue = -sumBy(/^4/, pnlTrial);
-  const directCost = sumBy(/^5/, pnlTrial);
-  const financialCost = sumBy(/^62/, pnlTrial);
-  const overhead = sumBy(/^6/, pnlTrial) - financialCost;
-  const incomeStatementProfit = revenue - directCost - overhead - financialCost;
-  // Balance sheet: profit of years not yet closed (closed years are already in retained earnings).
-  const netProfit = -sumBy(/^[456]/);
-  const assets = sumBy(/^1/);
-  const liabilities = -sumBy(/^2/);
-  const equity = -sumBy(/^3/);
-  const totalDebit = trial.reduce((a, t) => a + t.debit, 0);
-  const totalCredit = trial.reduce((a, t) => a + t.credit, 0);
-
-  const projectFinancials = targetProject ? selectProjectFinancials(state, targetProject.id) : null;
-  const breakdown = useMemo(() => (targetProject ? selectProjectCostBreakdown(state, targetProject.id) : []), [state, targetProject]);
-  const breakdownTotal = breakdown.reduce((a, b) => a + b.amount, 0);
-
-  const exportCsv = () => {
-    const d = (n: number) => toDisplayAmount(n);
-    switch (reportType) {
-      case 'project_pnl':
-        return downloadCsv(`project-pnl-${targetProject?.code || ''}`, ['کد حساب', 'حساب', `مبلغ (${unit})`], breakdown.map((b) => [b.accountCode, b.accountName, d(b.amount)]));
-      case 'trial_balance':
-        return downloadCsv('trial-balance', ['کد حساب', 'حساب', `گردش بدهکار (${unit})`, `گردش بستانکار (${unit})`, `مانده بدهکار (${unit})`, `مانده بستانکار (${unit})`], trial.map((t) => [t.code, t.name, d(t.debit), d(t.credit), d(Math.max(0, t.balance)), d(Math.max(0, -t.balance))]));
-      case 'income_statement':
-        return downloadCsv('income-statement', ['شرح', `مبلغ (${unit})`], [
-          ['درآمدهای عملیاتی', d(revenue)],
-          ['بهای تمام‌شده مستقیم', d(-directCost)],
-          ['هزینه‌های عمومی و اداری', d(-overhead)],
-          ['هزینه‌های مالی', d(-financialCost)],
-          ['سود (زیان) خالص', d(incomeStatementProfit)],
-        ]);
-      case 'balance_sheet':
-        return downloadCsv('balance-sheet', ['شرح', `مبلغ (${unit})`], [
-          ['جمع دارایی‌ها', d(assets)],
-          ['جمع بدهی‌ها', d(liabilities)],
-          ['حقوق صاحبان سهام', d(equity)],
-          ['سود (زیان) دوره بسته‌نشده', d(netProfit)],
-        ]);
-      case 'general_ledger':
-        return downloadCsv('journal', ['شماره سند', 'تاریخ', 'نوع', 'شرح', 'کد حساب', 'حساب', `بدهکار (${unit})`, `بستانکار (${unit})`], finals.flatMap((j) => j.rows.map((r) => [j.docNumber, j.date, j.type, j.title, r.accountCode, r.accountName, d(r.debit), d(r.credit)])));
-    }
-  };
+  const exportCsv = () => downloadTable(financialReportCsv(reportType, reports, targetProject));
 
   const row = (label: string, amount: number, className = '') => (
     <div className={`flex justify-between py-1.5 border-b border-slate-100 font-sans ${className}`}>
@@ -206,7 +146,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
                         {b.accountName}
                       </td>
                       <td className="py-2.5 px-3 text-left tabular-nums font-bold text-slate-800">{formatMoney(b.amount, false)}</td>
-                      <td className="py-2.5 px-3 text-left tabular-nums text-slate-500">{formatPercent(breakdownTotal ? (b.amount / breakdownTotal) * 100 : 0)}</td>
+                      <td className="py-2.5 px-3 text-left tabular-nums text-slate-500">{formatPercent(b.share)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -250,8 +190,8 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
                     <td className="py-2 px-4 font-sans text-slate-900">{t.name}</td>
                     <td className="py-2 px-3 text-left">{formatMoney(t.debit, false)}</td>
                     <td className="py-2 px-3 text-left">{formatMoney(t.credit, false)}</td>
-                    <td className="py-2 px-3 text-left font-bold text-blue-700">{t.balance > 0 ? formatMoney(t.balance, false) : '-'}</td>
-                    <td className="py-2 px-3 text-left font-bold text-amber-800">{t.balance < 0 ? formatMoney(-t.balance, false) : '-'}</td>
+                    <td className="py-2 px-3 text-left font-bold text-blue-700">{t.debitBalance > 0 ? formatMoney(t.debitBalance, false) : '-'}</td>
+                    <td className="py-2 px-3 text-left font-bold text-amber-800">{t.creditBalance > 0 ? formatMoney(t.creditBalance, false) : '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -262,8 +202,8 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
                   </td>
                   <td className="py-3 px-3 text-left">{formatMoney(totalDebit, false)}</td>
                   <td className="py-3 px-3 text-left">{formatMoney(totalCredit, false)}</td>
-                  <td className="py-3 px-3 text-left text-emerald-700">{formatMoney(trial.reduce((a, t) => a + Math.max(0, t.balance), 0), false)}</td>
-                  <td className="py-3 px-3 text-left text-emerald-700">{formatMoney(trial.reduce((a, t) => a + Math.max(0, -t.balance), 0), false)}</td>
+                  <td className="py-3 px-3 text-left text-emerald-700">{formatMoney(trialTotals.debitBalance, false)}</td>
+                  <td className="py-3 px-3 text-left text-emerald-700">{formatMoney(trialTotals.creditBalance, false)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -280,7 +220,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
           <div className="space-y-1 text-xs text-slate-800">
             {row('درآمدهای عملیاتی', revenue, 'font-bold text-emerald-700')}
             {row('کسر می‌شود: بهای تمام‌شده مستقیم پیمان‌ها', -directCost, 'text-slate-600 pr-4')}
-            {row('سود ناخالص', revenue - directCost, 'bg-slate-50 px-2 rounded-lg font-bold')}
+            {row('سود ناخالص', incomeStatement.grossProfit, 'bg-slate-50 px-2 rounded-lg font-bold')}
             {row('کسر می‌شود: هزینه‌های عمومی و اداری', -overhead, 'text-slate-600 pr-4')}
             {row('کسر می‌شود: هزینه‌های مالی', -financialCost, 'text-slate-600 pr-4')}
             {row('سود (زیان) خالص دوره', incomeStatementProfit, 'bg-amber-50 px-3 rounded-xl border border-amber-200 font-extrabold text-sm text-amber-950')}
@@ -298,8 +238,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
               <h4 className="font-bold text-slate-900 mb-3 pb-2 border-b border-slate-200">دارایی‌ها</h4>
               <div className="space-y-1 font-mono">
-                {trial
-                  .filter((t) => t.code.startsWith('1') && t.balance !== 0)
+                {balanceSheet.assetRows
                   .map((t) => (
                     <div key={t.code} className="flex justify-between">
                       <span className="font-sans">{t.name}</span>
@@ -315,12 +254,11 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
               <h4 className="font-bold text-slate-900 mb-3 pb-2 border-b border-slate-200">بدهی‌ها و حقوق صاحبان سهام</h4>
               <div className="space-y-1 font-mono">
-                {trial
-                  .filter((t) => /^[23]/.test(t.code) && t.balance !== 0)
+                {balanceSheet.claimRows
                   .map((t) => (
                     <div key={t.code} className="flex justify-between">
                       <span className="font-sans">{t.name}</span>
-                      <strong>{formatMoney(-t.balance, false)}</strong>
+                      <strong>{formatMoney(t.amount, false)}</strong>
                     </div>
                   ))}
                 <div className="flex justify-between">
@@ -329,7 +267,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
                 </div>
                 <div className="flex justify-between pt-3 border-t-2 border-slate-300 font-bold text-sm text-emerald-900">
                   <span className="font-sans">جمع بدهی و حقوق صاحبان سهام</span>
-                  <span>{formatMoney(liabilities + equity + netProfit, false)}</span>
+                  <span>{formatMoney(balanceSheet.totalClaims, false)}</span>
                 </div>
               </div>
             </div>

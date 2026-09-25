@@ -27,10 +27,10 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { formatInt, formatMoney, formatMoneyCompact } from '../../utils/money';
-import { formatPercent } from '../../utils/formatters';
-import { useAppState } from '../../store/AppStore';
+import { barWidth, formatPercent } from '../../utils/formatters';
+import { useSelector } from '../../store/AppStore';
+import { selectClientContractsDashboard, type AlertSeverity } from '../../store/views/contracts';
 import type { ContractsSubTab } from './ContractsModule';
-import { dayIndex, todayIndex } from '../../store/domainSelectors';
 
 interface ContractsDashboardProps {
   contracts: Contract[];
@@ -55,48 +55,14 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<'all' | '1403' | '1402'>('all');
 
-  // Aggregated KPIs
-  const activeContractsCount = contracts.filter((c) => c.status === 'فعال' || c.status === 'تحویل موقت').length;
-  const totalContractsValue = contracts.reduce((sum, c) => sum + c.currentValue, 0);
-  const totalExecutedValue = contracts.reduce((sum, c) => sum + c.executedValue, 0);
-  const totalBilledValue = contracts.reduce((sum, c) => sum + c.billedValue, 0);
-  const totalApprovedBilledValue = contracts.reduce((sum, c) => sum + c.approvedBilledValue, 0);
-  const totalReceivedValue = contracts.reduce((sum, c) => sum + c.receivedValue, 0);
-  const totalReceivableValue = contracts.reduce((sum, c) => sum + c.receivableValue, 0);
-  
-  // Pending statements under review (consultant or employer)
-  const pendingStatements = statements.filter(
-    (s) => s.status === 'submitted_to_consultant' || s.status === 'under_consultant_review' || s.status === 'submitted_to_employer'
-  );
-  const totalPendingStatementsAmount = pendingStatements.reduce((sum, s) => sum + s.grossAmount, 0);
-
-  // Alerts and secondary figures computed from the store (no fixed samples).
-  const store = useAppState();
-  const today = todayIndex();
-  const totalApprovedChanges = contracts.reduce((sum, c) => sum + c.approvedChangesValue, 0);
-  const totalInitial = contracts.reduce((sum, c) => sum + c.initialValue, 0);
-  const changesPercent = totalInitial > 0 ? (totalApprovedChanges / totalInitial) * 100 : 0;
-  const overdue = statements.filter((s) => s.remainingPayable > 0 && ['approved_by_employer', 'claimed', 'partially_paid'].includes(s.status) && dayIndex(s.dueDate) < today);
-  const overdueAmount = overdue.reduce((sum, s) => sum + s.remainingPayable, 0);
-  const contractIds = new Set(contracts.map((c) => c.id));
-  const exceeded = store.contractBoq.filter((b) => contractIds.has(b.contractId) && b.cumulativeExecutedQuantity > b.initialQuantity);
-  const endingSoon = contracts.filter((c) => c.status === 'فعال' && dayIndex(c.endDate) - today >= 0 && dayIndex(c.endDate) - today <= 60);
-  type Alert = { id: string; title: string; value: string; description: string; tone: string; tab?: ContractsSubTab; action?: string };
-  const alerts: Alert[] = [
-    ...(overdue.length
-      ? [{ id: 'overdue', title: `مطالبات سررسیدگذشته (${formatInt(overdue.length)} صورت‌وضعیت)`, value: formatMoney(overdueAmount), description: overdue.slice(0, 3).map((s) => `${s.statementNumber} — ${s.projectName}`).join('، '), tone: 'bg-rose-50/70 border-rose-200/80 text-rose-900', tab: 'payments' as const, action: 'پیگیری وصول' }]
-      : []),
-    ...exceeded.slice(0, 3).map((b) => ({ id: `boq-${b.id}`, title: 'عبور کارکرد از مقدار پیمان', value: `+${formatInt(b.cumulativeExecutedQuantity - b.initialQuantity)} ${b.unit}`, description: `ردیف ${b.code} (${b.description}) نیاز به الحاقیه یا دستورکار دارد.`, tone: 'bg-amber-50/70 border-amber-200/80 text-amber-900', tab: 'boq' as const, action: 'بررسی فهرست‌بها' })),
-    ...(pendingStatements.length
-      ? [{ id: 'pending', title: `صورت‌وضعیت در انتظار مشاور/کارفرما (${formatInt(pendingStatements.length)})`, value: formatMoney(totalPendingStatementsAmount), description: pendingStatements.slice(0, 3).map((s) => s.statementNumber).join('، '), tone: 'bg-blue-50/70 border-blue-200/80 text-blue-900', tab: 'statements' as const, action: 'مشاهده صورت‌وضعیت‌ها' }]
-      : []),
-    ...endingSoon.map((c) => ({ id: `end-${c.id}`, title: 'نزدیک شدن به تاریخ خاتمه قرارداد', value: c.endDate, description: `${c.code} — ${c.projectTitle}`, tone: 'bg-slate-50 border-slate-200 text-slate-800' })),
-  ];
-
-  // Overall financial execution ratios
-  const executionRatio = totalContractsValue > 0 ? (totalExecutedValue / totalContractsValue) * 100 : 0;
-  const billingRatio = totalContractsValue > 0 ? (totalBilledValue / totalContractsValue) * 100 : 0;
-  const collectionRatio = totalBilledValue > 0 ? (totalReceivedValue / totalBilledValue) * 100 : 0;
+  const dash = useSelector((s) => selectClientContractsDashboard(s, contracts, statements), [contracts, statements]);
+  const { totals, percents, alerts } = dash;
+  const alertTone: Record<AlertSeverity, string> = {
+    critical: 'bg-rose-50/70 border-rose-200/80 text-rose-900',
+    warning: 'bg-amber-50/70 border-amber-200/80 text-amber-900',
+    info: 'bg-blue-50/70 border-blue-200/80 text-blue-900',
+    neutral: 'bg-slate-50 border-slate-200 text-slate-800',
+  };
 
   return (
     <div className="space-y-6">
@@ -155,12 +121,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {activeContractsCount.toLocaleString('fa-IR')}
+              {formatInt(dash.activeCount)}
             </span>
-            <span className="text-xs text-slate-500">از مجموع {contracts.length.toLocaleString('fa-IR')} پیمان</span>
+            <span className="text-xs text-slate-500">از مجموع {formatInt(dash.contractCount)} پیمان</span>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تحویل موقت: ۱ پروژه</span>
+            <span>تحویل موقت: {formatInt(dash.provisionalHandoverCount)} پروژه</span>
             <button
               onClick={() => onNavigateTab('contracts')}
               className="text-blue-600 hover:underline font-medium flex items-center gap-0.5 cursor-pointer"
@@ -181,12 +147,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatMoneyCompact(totalContractsValue)}
+              {formatMoneyCompact(totals.contractValue)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>الحاقیه‌های مصوب: {formatMoneyCompact(totalApprovedChanges)}</span>
-            <span className="text-emerald-600 font-medium">+{formatPercent(changesPercent)} افزایش سقف</span>
+            <span>الحاقیه‌های مصوب: {formatMoneyCompact(totals.approvedChanges)}</span>
+            <span className="text-emerald-600 font-medium">+{formatPercent(percents.changes)} افزایش سقف</span>
           </div>
         </div>
 
@@ -200,12 +166,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-indigo-950 tracking-tight">
-              {formatMoneyCompact(totalExecutedValue)}
+              {formatMoneyCompact(totals.executedValue)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">پیشرفت ریالی کارکرد:</span>
-            <span className="font-bold text-indigo-700">{Number(executionRatio.toFixed(1)).toLocaleString('fa-IR')}٪</span>
+            <span className="font-bold text-indigo-700">{formatPercent(percents.execution)}</span>
           </div>
         </div>
 
@@ -219,12 +185,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-purple-950 tracking-tight">
-              {formatMoneyCompact(totalBilledValue)}
+              {formatMoneyCompact(totals.billedValue)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تأییدشده: {formatMoneyCompact(totalApprovedBilledValue)}</span>
-            <span className="text-purple-600 font-medium">{Number(billingRatio.toFixed(1)).toLocaleString('fa-IR')}٪ از پیمان</span>
+            <span>تأییدشده: {formatMoneyCompact(totals.approvedBilledValue)}</span>
+            <span className="text-purple-600 font-medium">{formatPercent(percents.billing)} از پیمان</span>
           </div>
         </div>
 
@@ -238,12 +204,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-emerald-700 tracking-tight">
-              {formatMoneyCompact(totalReceivedValue)}
+              {formatMoneyCompact(totals.receivedValue)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">نسبت وصولی از صورت‌وضعیت:</span>
-            <span className="font-bold text-emerald-600">{Number(collectionRatio.toFixed(1)).toLocaleString('fa-IR')}٪</span>
+            <span className="font-bold text-emerald-600">{formatPercent(percents.collection)}</span>
           </div>
         </div>
 
@@ -257,11 +223,11 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-rose-700 tracking-tight">
-              {formatMoneyCompact(totalReceivableValue)}
+              {formatMoneyCompact(totals.receivableValue)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="text-rose-600 font-medium">{formatMoneyCompact(overdueAmount)} سررسید گذشته</span>
+            <span className="text-rose-600 font-medium">{formatMoneyCompact(totals.overdueAmount)} سررسید گذشته</span>
             <button
               onClick={() => onNavigateTab('payments')}
               className="text-rose-700 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
@@ -282,11 +248,11 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-800 tracking-tight">
-              {formatMoneyCompact(totalPendingStatementsAmount)}
+              {formatMoneyCompact(totals.pendingAmount)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>{pendingStatements.length.toLocaleString('fa-IR')} فقره صورت‌وضعیت</span>
+            <span>{formatInt(dash.pendingStatements.length)} فقره صورت‌وضعیت</span>
             <span className="text-amber-700 font-medium">مشاور و کارفرما</span>
           </div>
         </div>
@@ -301,12 +267,12 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-teal-900 tracking-tight">
-              {formatMoneyCompact((totalContractsValue - totalExecutedValue))}
+              {formatMoneyCompact(totals.remainingWork)}
             </span>
                       </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>ظرفیت جذب کارگاه‌ها</span>
-            <span className="text-teal-700 font-medium">{Number((100 - executionRatio).toFixed(1)).toLocaleString('fa-IR')}٪ مانده</span>
+            <span className="text-teal-700 font-medium">{formatPercent(percents.remaining)} مانده</span>
           </div>
         </div>
       </div>
@@ -329,26 +295,22 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-indigo-600"></span>
-              <span className="text-slate-600">کارکرد اجراشده ({executionRatio.toFixed(0)}٪)</span>
+              <span className="text-slate-600">کارکرد اجراشده ({formatPercent(percents.execution, 0)})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-purple-600"></span>
-              <span className="text-slate-600">ارسال‌شده ({billingRatio.toFixed(0)}٪)</span>
+              <span className="text-slate-600">ارسال‌شده ({formatPercent(percents.billing, 0)})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-emerald-600"></span>
-              <span className="text-slate-600">وصول‌شده ({(totalReceivedValue / totalContractsValue * 100).toFixed(0)}٪)</span>
+              <span className="text-slate-600">وصول‌شده ({formatPercent(percents.received, 0)})</span>
             </div>
           </div>
         </div>
 
         {/* Progress Bars for each active contract */}
         <div className="space-y-5">
-          {contracts.map((contract) => {
-            const cExecRatio = (contract.executedValue / contract.currentValue) * 100;
-            const cBilledRatio = (contract.billedValue / contract.currentValue) * 100;
-            const cRecRatio = (contract.receivedValue / contract.currentValue) * 100;
-
+          {dash.rows.map(({ contract, progress }) => {
             return (
               <div
                 key={contract.id}
@@ -378,30 +340,30 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                   <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden flex">
                     <div
                       className="bg-emerald-500 h-full transition-all"
-                      style={{ width: `${Math.min(100, cRecRatio)}%` }}
-                      title={`دریافتی: ${cRecRatio.toFixed(1)}%`}
+                      style={{ width: barWidth(progress.receivedPercent) }}
+                      title={`دریافتی: ${formatPercent(progress.receivedPercent)}`}
                     ></div>
                     <div
                       className="bg-purple-500 h-full transition-all"
-                      style={{ width: `${Math.max(0, Math.min(100, cBilledRatio - cRecRatio))}%` }}
-                      title={`صورت‌وضعیت بدون وصول: ${(cBilledRatio - cRecRatio).toFixed(1)}%`}
+                      style={{ width: barWidth(progress.billedNotReceivedPercent) }}
+                      title={`صورت‌وضعیت بدون وصول: ${formatPercent(progress.billedNotReceivedPercent)}`}
                     ></div>
                     <div
                       className="bg-indigo-400 h-full transition-all"
-                      style={{ width: `${Math.max(0, Math.min(100, cExecRatio - cBilledRatio))}%` }}
-                      title={`کارکرد صورت‌وضعیت‌نشده: ${(cExecRatio - cBilledRatio).toFixed(1)}%`}
+                      style={{ width: barWidth(progress.executedNotBilledPercent) }}
+                      title={`کارکرد صورت‌وضعیت‌نشده: ${formatPercent(progress.executedNotBilledPercent)}`}
                     ></div>
                   </div>
 
                   <div className="flex items-center justify-between text-[10px] text-slate-500">
                     <span className="text-emerald-700 font-medium">
-                      دریافتی نقدی: {Number(cRecRatio.toFixed(1)).toLocaleString('fa-IR')}٪
+                      دریافتی نقدی: {formatPercent(progress.receivedPercent)}
                     </span>
                     <span className="text-purple-700 font-medium">
-                      صورت‌وضعیت ارسالی: {Number(cBilledRatio.toFixed(1)).toLocaleString('fa-IR')}٪
+                      صورت‌وضعیت ارسالی: {formatPercent(progress.billedPercent)}
                     </span>
                     <span className="text-indigo-700 font-bold">
-                      پیشرفت فیزیکی کارکرد: {Number(cExecRatio.toFixed(1)).toLocaleString('fa-IR')}٪
+                      پیشرفت فیزیکی کارکرد: {formatPercent(progress.executedPercent)}
                     </span>
                     <span className="text-slate-400">سقف کل پیمان: ۱۰۰٪</span>
                   </div>
@@ -430,7 +392,7 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
             <div className="space-y-2.5">
               {alerts.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">هشدار فعالی برای قراردادها وجود ندارد.</p>}
               {alerts.map((a) => (
-                <div key={a.id} className={`p-3 rounded-xl border flex items-start gap-3 ${a.tone}`}>
+                <div key={a.id} className={`p-3 rounded-xl border flex items-start gap-3 ${alertTone[a.severity]}`}>
                   <span className="w-2 h-2 rounded-full bg-current mt-1.5 shrink-0 opacity-70"></span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between gap-2">
@@ -440,7 +402,7 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                     <p className="text-[11px] text-slate-600 mt-0.5">{a.description}</p>
                     {a.tab && (
                       <button onClick={() => onNavigateTab(a.tab!)} className="mt-1.5 text-[11px] font-bold hover:underline cursor-pointer">
-                        {a.action} ➔
+                        {a.actionLabel} ➔
                       </button>
                     )}
                   </div>
@@ -477,7 +439,7 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
             </div>
 
             <div className="space-y-3">
-              {statements.slice(0, 4).map((stm) => {
+              {dash.recentStatements.map((stm) => {
                 const statusStyles: Record<string, { label: string; bg: string; text: string }> = {
                   draft: { label: 'پیش‌نویس کارگاه', bg: 'bg-slate-100', text: 'text-slate-700' },
                   prepared: { label: 'تهیه شده', bg: 'bg-blue-50', text: 'text-blue-700' },

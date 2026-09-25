@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { formatMoneyCompact, moneyUnitLabel, formatInt } from '../../../utils/money';
 import { useCompany } from '../../../store/session';
+import { selectSubcontractorDashboard, subcontractProgress } from '../../../store/views/contracts';
+import { formatDecimal, barWidth, formatPercent } from '../../../utils/formatters';
 
 interface SubcontractorDashboardProps {
   contracts: SubcontractorContract[];
@@ -61,7 +63,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
   // Interactive Filter state
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedTrade, setSelectedTrade] = useState<string>('all');
-  const [drilldownContractId, setDrilldownContractId] = useState<string>('sub-cnt-01');
+  const [drilldownContractId, setDrilldownContractId] = useState<string>(contracts[0]?.id || '');
 
   // Filtered dataset
   const filteredContracts = useMemo(() => {
@@ -80,45 +82,9 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
     });
   }, [statements, selectedProjectId, selectedTrade]);
 
-  // Aggregate KPI metrics requested by user:
-  // 1. کل صورت‌وضعیت‌های پیمانکاران جزء
-  const totalStatementsCount = filteredStatements.length;
-  const totalStatementsGross = filteredStatements.reduce((sum, s) => sum + s.grossAmount, 0);
-
-  // 2. در انتظار بررسی (کارگاه)
-  const pendingSiteReview = filteredStatements.filter((s) => s.status === 'submitted' || s.status === 'measured' || s.status === 'site_review');
-  const pendingSiteReviewCount = pendingSiteReview.length;
-  const pendingSiteReviewAmount = pendingSiteReview.reduce((sum, s) => sum + s.netPayable, 0);
-
-  // 3. در انتظار تأیید مدیریت (و مدیر پروژه)
-  const pendingManagementReview = filteredStatements.filter((s) => s.status === 'pm_approved' || s.status === 'finance_approved');
-  const pendingManagementReviewCount = pendingManagementReview.length;
-  const pendingManagementReviewAmount = pendingManagementReview.reduce((sum, s) => sum + s.netPayable, 0);
-
-  // 4. تأییدشده و پرداخت‌نشده (تعهدات فوری پرداختنی)
-  const approvedUnpaidStatements = filteredStatements.filter((s) => s.status === 'management_approved' && s.remainingPayable > 0);
-  const approvedUnpaidCount = approvedUnpaidStatements.length;
-  const approvedUnpaidAmount = approvedUnpaidStatements.reduce((sum, s) => sum + s.remainingPayable, 0);
-
-  // 5. پرداخت‌شده
-  const paidStatements = filteredStatements.filter((s) => s.status === 'paid' || s.paidAmount > 0);
-  const paidCount = paidStatements.length;
-  const paidAmount = filteredStatements.reduce((sum, s) => sum + s.paidAmount, 0);
-
-  // 6. مبلغ کل تعهدات به پیمانکاران جزء (ارزش کل قراردادها)
-  const totalContractCommitments = filteredContracts.reduce((sum, c) => sum + c.contractValue, 0);
-
-  // 7. مبلغ کارکرد اجراشده متره
-  const totalExecutedValue = filteredContracts.reduce((sum, c) => sum + c.executedValue, 0);
-
-  // 8. صورت‌وضعیت‌های تأییدشده کل
-  const totalApprovedStatements = filteredContracts.reduce((sum, c) => sum + c.approvedStatementsValue, 0);
-
-  // 9. مبلغ باقیمانده (تعهدات مانده پرداخت نشده: تأییدشده منهای پرداختی)
-  const totalRemainingPayableDebt = filteredContracts.reduce((sum, c) => sum + c.remainingPayableValue, 0);
-
-  // 10. مانده ظرفیت قراردادها (سقف قرارداد - کارکرد)
-  const totalRemainingWorkCapacity = totalContractCommitments - totalExecutedValue;
+  // KPIs of the filtered contracts and statements (store view model).
+  const dash = useMemo(() => selectSubcontractorDashboard(filteredContracts, filteredStatements), [filteredContracts, filteredStatements]);
+  const { totals } = dash;
 
   // Selected Drilldown Contract (for "پروژه X ← پیمانکار جوشکاری ← قرارداد ۲ میلیارد ← کارکرد ۸۰۰ میلیون...")
   const drilldownContract = useMemo(() => {
@@ -126,11 +92,8 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
   }, [contracts, drilldownContractId]);
 
   // Unique trade types for filter
-  const tradeTypes = useMemo(() => {
-    const set = new Set<string>();
-    contracts.forEach((c) => set.add(c.tradeType));
-    return Array.from(set);
-  }, [contracts]);
+  const tradeTypes = useMemo(() => selectSubcontractorDashboard(contracts, []).tradeTypes, [contracts]);
+  const drill = drilldownContract ? subcontractProgress(drilldownContract) : null;
 
   return (
     <div className="space-y-6">
@@ -223,7 +186,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
             onChange={(e) => setSelectedProjectId(e.target.value)}
             className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:ring-1 focus:ring-amber-500 cursor-pointer"
           >
-            <option value="all">همه پروژه‌ها ({projects.length})</option>
+            <option value="all">همه پروژه‌ها ({formatInt(projects.length)})</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -236,7 +199,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
             onChange={(e) => setSelectedTrade(e.target.value)}
             className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:ring-1 focus:ring-amber-500 cursor-pointer"
           >
-            <option value="all">همه رشته‌های کاری ({tradeTypes.length})</option>
+            <option value="all">همه رشته‌های کاری ({formatInt(tradeTypes.length)})</option>
             {tradeTypes.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -258,7 +221,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
         </div>
 
         <div className="text-xs text-slate-500 font-medium">
-          نمایش {filteredContracts.length} قرارداد پیمانکار جزء | {filteredStatements.length} صورت‌وضعیت
+          نمایش {formatInt(filteredContracts.length)} قرارداد پیمانکار جزء | {formatInt(filteredStatements.length)} صورت‌وضعیت
         </div>
       </div>
 
@@ -274,13 +237,13 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatMoneyCompact(totalContractCommitments)}
+              {formatMoneyCompact(totals.contractValue)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تعداد قراردادها: {filteredContracts.length.toLocaleString('fa-IR')}</span>
+            <span>تعداد قراردادها: {formatDecimal(filteredContracts.length)}</span>
             <span className="text-slate-700 font-bold">
-              کارکرد: {formatMoneyCompact(totalExecutedValue)}
+              کارکرد: {formatMoneyCompact(totals.executed)}
             </span>
           </div>
         </div>
@@ -295,11 +258,11 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-950 tracking-tight">
-              {formatMoneyCompact(pendingSiteReviewAmount)}
+              {formatMoneyCompact(dash.pendingSite.amount)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-amber-200/50 flex items-center justify-between text-[11px]">
-            <span className="text-amber-800 font-bold">{pendingSiteReviewCount.toLocaleString('fa-IR')} صورت‌وضعیت</span>
+            <span className="text-amber-800 font-bold">{formatDecimal(dash.pendingSite.count)} صورت‌وضعیت</span>
             <span className="text-amber-700">کنترل احجام و متره میدانی</span>
           </div>
         </div>
@@ -314,11 +277,11 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-indigo-950 tracking-tight">
-              {formatMoneyCompact(pendingManagementReviewAmount)}
+              {formatMoneyCompact(dash.pendingManagement.amount)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-indigo-200/50 flex items-center justify-between text-[11px]">
-            <span className="text-indigo-800 font-bold">{pendingManagementReviewCount.toLocaleString('fa-IR')} صورت‌وضعیت</span>
+            <span className="text-indigo-800 font-bold">{formatDecimal(dash.pendingManagement.count)} صورت‌وضعیت</span>
             <span className="text-indigo-700">تأیید مدیر پروژه شده</span>
           </div>
         </div>
@@ -333,11 +296,11 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-rose-950 tracking-tight">
-              {formatMoneyCompact(approvedUnpaidAmount)}
+              {formatMoneyCompact(dash.approvedUnpaid.amount)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-rose-200/50 flex items-center justify-between text-[11px]">
-            <span className="text-rose-800 font-bold">{approvedUnpaidCount.toLocaleString('fa-IR')} مورد پرداختنی فوری</span>
+            <span className="text-rose-800 font-bold">{formatDecimal(dash.approvedUnpaid.count)} مورد پرداختنی فوری</span>
             <span className="text-rose-600 font-medium">دستور پرداخت صادرشده</span>
           </div>
         </div>
@@ -352,11 +315,11 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-emerald-900 tracking-tight">
-              {formatMoneyCompact(paidAmount)}
+              {formatMoneyCompact(dash.paid.amount)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-emerald-200/50 flex items-center justify-between text-[11px] text-emerald-800">
-            <span>تسویه شده: {paidCount.toLocaleString('fa-IR')} صورت‌وضعیت</span>
+            <span>تسویه شده: {formatDecimal(dash.paid.count)} صورت‌وضعیت</span>
             <span className="font-bold">ثبت شده در هزینه پروژه</span>
           </div>
         </div>
@@ -371,13 +334,13 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-purple-950 tracking-tight">
-              {formatMoneyCompact(totalStatementsGross)}
+              {formatMoneyCompact(dash.statementsGross)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-purple-200/50 flex items-center justify-between text-[11px] text-purple-800">
-            <span>{totalStatementsCount.toLocaleString('fa-IR')} دوره ثبت‌شده</span>
+            <span>{formatDecimal(dash.statementCount)} دوره ثبت‌شده</span>
             <span className="font-bold">
-              تأییدشده: {formatMoneyCompact(totalApprovedStatements)}
+              تأییدشده: {formatMoneyCompact(totals.approved)}
             </span>
           </div>
         </div>
@@ -392,16 +355,13 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-950 tracking-tight">
-              {formatMoneyCompact(totalRemainingPayableDebt)}
+              {formatMoneyCompact(totals.debt)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-amber-300/60 flex items-center justify-between text-[11px] text-amber-900">
             <span>تأییدشده منهای پرداخت‌شده</span>
             <span className="font-bold">
-              {totalApprovedStatements > 0
-                ? Number(((totalRemainingPayableDebt / totalApprovedStatements) * 100).toFixed(1)).toLocaleString('fa-IR')
-                : '۰'}
-              ٪ تعهد مانده
+              {formatPercent(totals.debtOfApprovedPercent)} تعهد مانده
             </span>
           </div>
         </div>
@@ -416,16 +376,13 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-teal-950 tracking-tight">
-              {formatMoneyCompact(totalRemainingWorkCapacity)}
+              {formatMoneyCompact(totals.remainingCapacity)}
             </span>
                       </div>
           <div className="mt-3 pt-2 border-t border-teal-200/50 flex items-center justify-between text-[11px] text-teal-800">
             <span>حجم کارهای انجام‌نشده</span>
             <span className="font-bold">
-              {totalContractCommitments > 0
-                ? Number(((totalRemainingWorkCapacity / totalContractCommitments) * 100).toFixed(1)).toLocaleString('fa-IR')
-                : '۰'}
-              ٪ سقف پیمان‌ها
+              {formatPercent(totals.remainingCapacityPercent)} سقف پیمان‌ها
             </span>
           </div>
         </div>
@@ -449,8 +406,8 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-300 font-medium">انتخاب پیمانکار جزء:</label>
-            <select
+            <label htmlFor="subcontractor-dashboard-1" className="text-xs text-slate-300 font-medium">انتخاب پیمانکار جزء:</label>
+            <select id="subcontractor-dashboard-1"
               value={drilldownContractId}
               onChange={(e) => setDrilldownContractId(e.target.value)}
               className="px-3 py-2 bg-slate-800/90 border border-slate-600 rounded-xl text-white text-xs font-bold focus:ring-2 focus:ring-amber-400 cursor-pointer"
@@ -514,7 +471,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                   {formatMoneyCompact(drilldownContract.executedValue)}
                 </span>
                 <span className="text-[10px] text-blue-400 block mt-0.5">
-                  {Number(((drilldownContract.executedValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪ پیشرفت
+                  {formatPercent(drill!.executedPercent)} پیشرفت
                 </span>
               </div>
 
@@ -524,7 +481,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                   {formatMoneyCompact(drilldownContract.approvedStatementsValue)}
                 </span>
                 <span className="text-[10px] text-purple-400 block mt-0.5">
-                  {Number(((drilldownContract.approvedStatementsValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪ از پیمان
+                  {formatPercent(drill!.approvedPercent)} از پیمان
                 </span>
               </div>
 
@@ -534,10 +491,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                   {formatMoneyCompact(drilldownContract.paidValue)}
                 </span>
                 <span className="text-[10px] text-emerald-400 block mt-0.5">
-                  {drilldownContract.approvedStatementsValue > 0
-                    ? Number(((drilldownContract.paidValue / drilldownContract.approvedStatementsValue) * 100).toFixed(1)).toLocaleString('fa-IR')
-                    : '۰'}
-                  ٪ وصولی پیمانکار
+                  {formatPercent(drill!.settledPercent)} وصولی پیمانکار
                 </span>
               </div>
 
@@ -555,7 +509,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                   {formatMoneyCompact(drilldownContract.remainingContractValue)}
                 </span>
                 <span className="text-[10px] text-teal-300 block mt-0.5">
-                  {Number(((drilldownContract.remainingContractValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪ ظرفیت مانده
+                  {formatPercent(drill!.remainingPercent)} ظرفیت مانده
                 </span>
               </div>
             </div>
@@ -571,33 +525,19 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                 {/* Paid portion (emerald) */}
                 <div
                   className="bg-emerald-500 h-full transition-all"
-                  style={{
-                    width: `${Math.min(100, (drilldownContract.paidValue / drilldownContract.contractValue) * 100)}%`,
-                  }}
+                  style={{ width: barWidth(drill!.paidOfContractPercent) }}
                   title={`پرداخت‌شده: ${formatMoneyCompact(drilldownContract.paidValue)}`}
                 />
                 {/* Approved unpaid portion (rose) */}
                 <div
                   className="bg-rose-500 h-full transition-all"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (drilldownContract.remainingPayableValue / drilldownContract.contractValue) * 100
-                    )}%`,
-                  }}
+                  style={{ width: barWidth(drill!.unpaidApprovedPercent) }}
                   title={`تأییدشده پرداخت‌نشده: ${formatMoneyCompact(drilldownContract.remainingPayableValue)}`}
                 />
                 {/* Executed unbilled portion (blue) */}
                 <div
                   className="bg-blue-500 h-full transition-all"
-                  style={{
-                    width: `${Math.max(
-                      0,
-                      ((drilldownContract.executedValue - drilldownContract.approvedStatementsValue) /
-                        drilldownContract.contractValue) *
-                        100
-                    )}%`,
-                  }}
+                  style={{ width: barWidth(drill!.unapprovedExecutedPercent) }}
                   title="کارکرد در دست بررسی کارگاه"
                 />
               </div>
@@ -605,19 +545,19 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               <div className="flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2 pt-1">
                 <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  پرداخت‌شده: {Number(((drilldownContract.paidValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪
+                  پرداخت‌شده: {formatPercent(drill!.paidOfContractPercent)}
                 </span>
                 <span className="flex items-center gap-1.5 text-rose-400 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                  مانده بدهی تاییدشده: {Number(((drilldownContract.remainingPayableValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪
+                  مانده بدهی تاییدشده: {formatPercent(drill!.unpaidApprovedPercent)}
                 </span>
                 <span className="flex items-center gap-1.5 text-blue-400 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                  کارکرد اجراشده در انتظار تأیید: {drilldownContract.executedValue - drilldownContract.approvedStatementsValue > 0 ? Number((((drilldownContract.executedValue - drilldownContract.approvedStatementsValue) / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪
+                  کارکرد اجراشده در انتظار تأیید: {formatPercent(drill!.unapprovedExecutedPercent)}
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-400">
                   <span className="w-2.5 h-2.5 rounded-full bg-slate-700 inline-block" />
-                  ظرفیت باقیمانده کار: {Number(((drilldownContract.remainingContractValue / drilldownContract.contractValue) * 100).toFixed(1)).toLocaleString('fa-IR')}٪
+                  ظرفیت باقیمانده کار: {formatPercent(drill!.remainingPercent)}
                 </span>
               </div>
             </div>
@@ -677,8 +617,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
           </div>
 
           <div className="space-y-2.5">
-            {filteredStatements
-              .filter((s) => s.status !== 'paid')
+            {dash.open
               .slice(0, 4)
               .map((stmt) => (
                 <div
@@ -766,8 +705,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredContracts.map((c) => {
-                  const payRatio =
-                    c.approvedStatementsValue > 0 ? (c.paidValue / c.approvedStatementsValue) * 100 : 0;
+                  const payRatio = subcontractProgress(c).settledPercent;
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-2.5 font-bold text-slate-900">
@@ -787,7 +725,7 @@ export const SubcontractorDashboard: React.FC<SubcontractorDashboardProps> = ({
                       <td className="p-2.5 text-left font-bold text-emerald-700">
                         {formatMoneyCompact(c.paidValue)}
                         <div className="text-[9px] text-emerald-600 font-normal">
-                          {formatInt(Math.round(payRatio))}٪ تسویه
+                          {formatPercent(payRatio, 0)} تسویه
                         </div>
                       </td>
                       <td className="p-2.5 text-left font-black text-rose-600">

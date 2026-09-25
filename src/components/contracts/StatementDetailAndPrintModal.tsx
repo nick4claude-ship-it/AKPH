@@ -23,17 +23,20 @@ import {
   Send,
   BookOpen,
 } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
-import { formatMoney, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
-import { downloadCsv } from '../../utils/export';
-import { formatPercent } from '../../utils/formatters';
+import { Dialog } from '../../ui/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { downloadTable } from '../../utils/export';
+import { clientStatementItemsCsv } from '../../store/views/exports';
+import { formatPercent, formatDecimal } from '../../utils/formatters';
 import { useCompany } from '../../store/session';
+import { clientStatementActions, statementVatPercent } from '../../store/views/contracts';
 
 interface StatementDetailAndPrintModalProps {
   statement: DetailedProgressStatement;
   currentUser: UserProfile;
   onClose: () => void;
-  onUpdateStatus: (statementId: string, newStatus: DetailedProgressStatement['status'], reason?: string) => void;
+  /** Next approval step, or return to the site with a reason (runs the store workflow). */
+  onDecide: (statementId: string, decision: 'approve' | 'return', reason?: string) => void;
   onIssueAccountingEntry?: (statement: DetailedProgressStatement) => void;
 }
 
@@ -41,7 +44,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   statement,
   currentUser,
   onClose,
-  onUpdateStatus,
+  onDecide,
   onIssueAccountingEntry,
 }) => {
   const company = useCompany();
@@ -50,8 +53,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectError, setRejectError] = useState(false);
   const [accountingIssued, setAccountingIssued] = useState(!!statement.accountingJournalEntryId);
-  // VAT is charged on the period's work, adjustments and allowable items; the shown rate is the stored one.
-  const vatBase = statement.workAmountCurrent + statement.adjustmentAmount + statement.otherAllowableItemsAmount;
+  const actions = clientStatementActions(currentUser, statement);
 
   // Status mapping
   const statusMeta: Record<string, { label: string; color: string }> = {
@@ -74,26 +76,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
     window.print();
   };
 
-  const handleExportExcel = () => {
-    const unit = moneyUnitLabel();
-    downloadCsv(
-      `${statement.statementNumber}_${statement.contractCode}.csv`,
-      ['ردیف', 'کد آیتم', 'شرح عملیات', 'واحد', 'مقدار قرارداد', 'مقدار قبلی', 'این دوره', 'تجمعی', `بهای واحد (${unit})`, `مبلغ این دوره (${unit})`, `مبلغ تجمعی (${unit})`],
-      statement.items.map((i) => [
-        i.rowNumber,
-        i.code,
-        i.description,
-        i.unit,
-        i.contractQuantity,
-        i.previousQuantity,
-        i.currentQuantity,
-        i.cumulativeQuantity,
-        toDisplayAmount(i.unitRate),
-        toDisplayAmount(i.currentAmount),
-        toDisplayAmount(i.cumulativeAmount),
-      ])
-    );
-  };
+  const handleExportExcel = () => downloadTable(clientStatementItemsCsv(statement));
 
   const handleCreateAccountingEntry = () => {
     if (onIssueAccountingEntry) {
@@ -217,42 +200,27 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {statement.status === 'draft' && (
+                  {actions.advance && (
                     <button
-                      onClick={() => onUpdateStatus(statement.id, 'submitted_to_consultant')}
-                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer"
+                      onClick={() => onDecide(statement.id, 'approve')}
+                      disabled={!actions.advance.allowed}
+                      title={actions.advance.reason}
+                      className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer"
                     >
-                      ارسال به مهندس مشاور
+                      {actions.advance.label}
                     </button>
                   )}
 
-                  {(statement.status === 'submitted_to_consultant' || statement.status === 'under_consultant_review') && (
-                    <>
-                      <button
-                        onClick={() => onUpdateStatus(statement.id, 'approved_by_consultant')}
-                        className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold cursor-pointer"
-                      >
-                        تأیید توسط مهندس مشاور
-                      </button>
-                      <button
-                        onClick={() => setShowRejectBox(true)}
-                        className="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold cursor-pointer"
-                      >
-                        بازگشت جهت اصلاح کارگاهی
-                      </button>
-                    </>
-                  )}
-
-                  {statement.status === 'approved_by_consultant' && (
+                  {actions.canReturn && (
                     <button
-                      onClick={() => onUpdateStatus(statement.id, 'approved_by_employer')}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                      onClick={() => setShowRejectBox(true)}
+                      className="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold cursor-pointer"
                     >
-                      تأیید نهایی کارفرما و صدور حواله
+                      بازگشت جهت اصلاح کارگاهی
                     </button>
                   )}
 
-                  {statement.status === 'approved_by_employer' && !accountingIssued && (
+                  {actions.employerApproved && !accountingIssued && (
                     <button
                       onClick={handleCreateAccountingEntry}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs"
@@ -306,7 +274,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                           setRejectError(true);
                           return;
                         }
-                        onUpdateStatus(statement.id, 'returned_for_correction', rejectReason);
+                        onDecide(statement.id, 'return', rejectReason);
                         setShowRejectBox(false);
                         setRejectError(false);
                       }}
@@ -344,16 +312,16 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                           <td className="p-2.5 font-mono font-bold text-blue-700">{i.code}</td>
                           <td className="p-2.5 max-w-xs font-medium text-slate-900">{i.description}</td>
                           <td className="p-2.5 text-center font-bold text-slate-600">{i.unit}</td>
-                          <td className="p-2.5 text-left font-mono">{i.contractQuantity.toLocaleString('fa-IR')}</td>
-                          <td className="p-2.5 text-left font-mono">{i.previousQuantity.toLocaleString('fa-IR')}</td>
+                          <td className="p-2.5 text-left font-mono">{formatDecimal(i.contractQuantity)}</td>
+                          <td className="p-2.5 text-left font-mono">{formatDecimal(i.previousQuantity)}</td>
                           <td className="p-2.5 text-left font-mono font-bold text-amber-700">
-                            {i.currentQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(i.currentQuantity)}
                           </td>
                           <td className="p-2.5 text-left font-mono font-bold text-indigo-900">
-                            {i.cumulativeQuantity.toLocaleString('fa-IR')}
+                            {formatDecimal(i.cumulativeQuantity)}
                             {i.isExceeded && (
                               <span className="block text-[9px] text-rose-600 font-bold">
-                                مازاد بر پیمان (+{i.exceededQuantity})
+                                مازاد بر پیمان (+{formatDecimal(i.exceededQuantity)})
                               </span>
                             )}
                           </td>
@@ -502,7 +470,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                         <td className="p-1.5 border border-slate-300 font-mono text-center">{i.code}</td>
                         <td className="p-1.5 border border-slate-300">{i.description}</td>
                         <td className="p-1.5 border border-slate-300 text-center">{i.unit}</td>
-                        <td className="p-1.5 border border-slate-300 text-left font-mono">{i.currentQuantity.toLocaleString('fa-IR')}</td>
+                        <td className="p-1.5 border border-slate-300 text-left font-mono">{formatDecimal(i.currentQuantity)}</td>
                         <td className="p-1.5 border border-slate-300 text-left font-mono">{formatMoney(i.unitRate, false)}</td>
                         <td className="p-1.5 border border-slate-300 text-left font-mono font-bold">{formatMoney(i.currentAmount, false)}</td>
                       </tr>
@@ -526,7 +494,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                   <span className="font-mono font-bold">+{formatMoney(statement.otherAllowableItemsAmount)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>۴. مالیات بر ارزش افزوده ({formatPercent(vatBase ? (statement.vatAmount * 100) / vatBase : 0)}):</span>
+                  <span>۴. مالیات بر ارزش افزوده ({formatPercent(statementVatPercent(statement))}):</span>
                   <span className="font-mono font-bold">+{formatMoney(statement.vatAmount)}</span>
                 </div>
                 <div className="flex justify-between py-1.5 bg-slate-200 px-2 rounded font-black text-slate-900">

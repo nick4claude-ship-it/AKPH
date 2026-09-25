@@ -19,8 +19,11 @@ import {
   DollarSign,
   PieChart,
 } from 'lucide-react';
-import { formatMoney, formatMoneyCompact, moneyUnitLabel, toDisplayAmount } from '../../utils/money';
-import { downloadCsv } from '../../utils/export';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
+import { formatPercent } from '../../utils/formatters';
+import { downloadTable } from '../../utils/export';
+import { contractProgress } from '../../store/views/contracts';
+import { clientReceivablesCsv, clientStatementsCsv, contractProgressCsv } from '../../store/views/exports';
 import { useCompany } from '../../store/session';
 
 interface ContractReportsViewProps {
@@ -45,49 +48,10 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
     window.print();
   };
 
-  // Amounts are exported in the display currency (named in each header) as plain integers.
   const handleExportCSV = () => {
-    const unit = moneyUnitLabel();
-    const m = (rial: number) => toDisplayAmount(rial);
-    if (activeReport === 'progress') {
-      downloadCsv(
-        'گزارش_کارکرد_پیمان‌ها.csv',
-        ['کد پیمان', 'عنوان پروژه', 'کارفرما', `مبلغ پیمان (${unit})`, `کارکرد متره شده (${unit})`, 'درصد پیشرفت', `صورت‌وضعیت ارسالی (${unit})`, `وصولی (${unit})`],
-        contracts.map((c) => [
-          c.code,
-          c.projectTitle,
-          c.employer,
-          m(c.currentValue),
-          m(c.executedValue),
-          c.currentValue ? ((c.executedValue / c.currentValue) * 100).toFixed(1) : '0',
-          m(c.billedValue),
-          m(c.receivedValue),
-        ])
-      );
-    } else if (activeReport === 'statements') {
-      downloadCsv(
-        'گزارش_جامع_صورت‌وضعیت‌ها.csv',
-        ['شماره', 'پیمان', 'پروژه', 'دوره', `ناخالص (${unit})`, `کسورات (${unit})`, `خالص (${unit})`, `دریافتی (${unit})`, `مانده طلب (${unit})`, 'وضعیت'],
-        statements.map((s) => [
-          s.statementNumber,
-          s.contractCode,
-          s.projectName,
-          `${s.periodStartDate} تا ${s.periodEndDate}`,
-          m(s.grossAmount),
-          m(s.totalDeductions),
-          m(s.netPayable),
-          m(s.receivedAmount),
-          m(s.remainingPayable),
-          s.status,
-        ])
-      );
-    } else {
-      downloadCsv(
-        'گزارش_مطالبات_کارفرمایان.csv',
-        ['پیمان', 'پروژه', 'کارفرما', `مانده طلب (${unit})`],
-        contracts.map((c) => [c.code, c.projectTitle, c.employer, m(c.receivableValue)])
-      );
-    }
+    if (activeReport === 'progress') downloadTable(contractProgressCsv(contracts));
+    else if (activeReport === 'statements') downloadTable(clientStatementsCsv(statements));
+    else downloadTable(clientReceivablesCsv(contracts));
   };
 
   return (
@@ -181,7 +145,7 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {contracts.map((c) => {
-                  const execPct = (c.executedValue / c.currentValue) * 100;
+                  const progress = contractProgress(c);
                   return (
                     <tr key={c.id} className="hover:bg-slate-50">
                       <td className="p-3 font-mono font-bold text-amber-900">{c.code}</td>
@@ -195,7 +159,7 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
                       </td>
                       <td className="p-3 text-center">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-800">
-                          {execPct.toFixed(1)}٪
+                          {formatPercent(progress.executedPercent)}
                         </span>
                       </td>
                       <td className="p-3 text-left font-mono text-purple-700">

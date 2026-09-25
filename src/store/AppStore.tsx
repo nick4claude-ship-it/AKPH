@@ -207,6 +207,16 @@ export function usePostFinancialEvent(): PostFinancialEvent {
   return useStoreContext().postFinancialEvent;
 }
 
+/**
+ * Derived data for the UI: `useSelector(selectX)` or `useSelector((s) => selectX(s, id), [id])`.
+ * Recomputed only when the state or a listed dependency changes.
+ */
+export function useSelector<T>(select: (state: AppState) => T, deps: React.DependencyList = []): T {
+  const state = useStoreContext().state;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => select(state), [state, ...deps]);
+}
+
 /** useState-like access to one slice of the central store. */
 export function useStoreSlice<K extends SliceKey>(key: K): [AppState[K], (updater: SliceUpdater<K>) => void] {
   const { state, dispatch } = useStoreContext();

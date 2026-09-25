@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Warehouse,
   MaterialItem,
@@ -35,7 +35,8 @@ import {
   Search,
 } from 'lucide-react';
 import { formatInt, formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
-import { formatPercent } from '../../utils/formatters';
+import { formatPercent, formatDecimal } from '../../utils/formatters';
+import { selectInventoryDashboard } from '../../store/views/inventory';
 
 interface InventoryDashboardProps {
   warehouses: Warehouse[];
@@ -74,26 +75,12 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 }) => {
   const [selectedWarehouseFilter, setSelectedWarehouseFilter] = useState<string>('all');
 
-  // Calculations
-  const totalInventoryValuation = warehouses.reduce((sum, w) => sum + w.totalValuation, 0);
-
-  // Critical items (Stock below reorder level)
-  const criticalItems = materials.filter((m) => m.currentStock <= m.reorderLevel);
-  const severelyLowItems = materials.filter((m) => m.currentStock <= m.minSafetyStock);
-
-  // Total receipts this month
-  const totalReceiptsValue = receipts.reduce((sum, r) => sum + r.totalAmount, 0);
-
-  // Total issues this month
-  const totalIssuesValue = issues.reduce((sum, i) => sum + i.totalCost, 0);
-
-  // Subcontractor Contra issues (مصالح کسر شده از صورت‌وضعیت پیمانکاران)
-  const subcontractorContraValue = issues
-    .filter((i) => i.isSubcontractorContra)
-    .reduce((sum, i) => sum + i.totalCost, 0);
-
-  // Pending Transfers in transit
-  const inTransitTransfers = transfers.filter((t) => t.status === 'در مسیر حمل');
+  // Figures of the dashboard (store view model).
+  const dash = useMemo(
+    () => selectInventoryDashboard(warehouses, materials, receipts, issues, transfers),
+    [warehouses, materials, receipts, issues, transfers]
+  );
+  const { totalInventoryValuation, criticalItems, severelyLowItems, totalReceiptsValue, totalIssuesValue, subcontractorContraValue, inTransitTransfers } = dash;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
@@ -386,7 +373,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                         {r.netWeightKg ? (
                           <span className="flex items-center gap-1 font-mono">
                             <Scale className="w-3 h-3 text-slate-400" />
-                            {r.netWeightKg.toLocaleString('fa-IR')} kg
+                            {formatDecimal(r.netWeightKg)} kg
                           </span>
                         ) : (
                           <span className="text-slate-400">تعدادی/کیسه‌ای</span>
@@ -523,7 +510,7 @@ export const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                 className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer text-right"
               >
                 <span>کاتالوگ استاندارد مصالح و کالاها</span>
-                <span className="text-slate-400 text-[10px]">{materials.length} قلم ←</span>
+                <span className="text-slate-400 text-[10px]">{formatInt(materials.length)} قلم ←</span>
               </button>
             </div>
           </div>

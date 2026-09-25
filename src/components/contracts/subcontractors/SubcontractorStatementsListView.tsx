@@ -30,6 +30,8 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../../utils/money';
+import { formatPercent, formatInt } from '../../../utils/formatters';
+import { sumSubcontractorStatements } from '../../../store/views/contracts';
 
 interface SubcontractorStatementsListViewProps {
   statements: SubcontractorProgressStatement[];
@@ -77,12 +79,8 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
   }, [statements, searchTerm, selectedProjectId, statusFilter, tradeFilter]);
 
   // Totals
-  const totalGross = filteredStatements.reduce((sum, s) => sum + s.grossAmount, 0);
-  const totalSiteVerified = filteredStatements.reduce((sum, s) => sum + s.siteVerifiedAmount, 0);
-  const totalDeductions = filteredStatements.reduce((sum, s) => sum + s.totalDeductions, 0);
-  const totalNet = filteredStatements.reduce((sum, s) => sum + s.netPayable, 0);
-  const totalPaid = filteredStatements.reduce((sum, s) => sum + s.paidAmount, 0);
-  const totalRemaining = filteredStatements.reduce((sum, s) => sum + s.remainingPayable, 0);
+  const totals = useMemo(() => sumSubcontractorStatements(filteredStatements), [filteredStatements]);
+  const { gross: totalGross, siteVerified: totalSiteVerified, deductions: totalDeductions, net: totalNet, paid: totalPaid, remaining: totalRemaining } = totals;
 
   // Status badge helper
   const renderStatusBadge = (status: SubcontractorStatementWorkflowStatus) => {
@@ -163,7 +161,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-black text-slate-900">صورت‌وضعیت‌های پیمانکاران جزء</h3>
             <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-bold">
-              {filteredStatements.length} دوره
+              {formatInt(filteredStatements.length)} دوره
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -195,7 +193,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
             {formatMoneyCompact(totalSiteVerified)}
           </span>
           <span className="text-[10px] text-blue-600 block mt-0.5">
-            {totalGross > 0 ? Number(((totalSiteVerified / totalGross) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ پذیرش
+            {formatPercent(totals.acceptedPercent)} پذیرش
           </span>
         </div>
 
@@ -219,7 +217,7 @@ export const SubcontractorStatementsListView: React.FC<SubcontractorStatementsLi
             {formatMoneyCompact(totalPaid)}
           </span>
           <span className="text-[10px] text-emerald-600 block mt-0.5 font-bold">
-            {totalNet > 0 ? Number(((totalPaid / totalNet) * 100).toFixed(1)).toLocaleString('fa-IR') : '۰'}٪ تسویه
+            {formatPercent(totals.settledPercent)} تسویه
           </span>
         </div>
 

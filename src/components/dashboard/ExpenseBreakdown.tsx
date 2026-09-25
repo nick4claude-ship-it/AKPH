@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import { ExpenseCategoryTotal } from '../../store/selectors';
-import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
+import { formatCurrencyCompact, formatPercent, formatNumber, barWidth } from '../../utils/formatters';
 import { PieChart, Layers, Split } from 'lucide-react';
+import { expenseBreakdown } from '../../store/views/dashboard';
 
 export const ExpenseBreakdown: React.FC<{ totals: ExpenseCategoryTotal[] }> = ({ totals }) => {
   const [filterType, setFilterType] = useState<'all' | 'direct' | 'indirect'>('all');
 
-  const filteredTotals = totals.filter((item) => {
-    if (filterType === 'direct') return item.isDirect;
-    if (filterType === 'indirect') return !item.isDirect;
-    return true;
-  });
-
-  const totalExpense = filteredTotals.reduce((sum, item) => sum + item.amount, 0);
+  const breakdown = expenseBreakdown(totals, filterType);
+  const filteredTotals = breakdown.rows;
+  const totalExpense = breakdown.total;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
@@ -67,12 +64,12 @@ export const ExpenseBreakdown: React.FC<{ totals: ExpenseCategoryTotal[] }> = ({
       <div className="pt-4 pb-2">
         <div className="h-4 w-full bg-slate-100 rounded-lg overflow-hidden flex shadow-inner">
           {filteredTotals.map((cat) => {
-            const widthPct = (cat.amount / totalExpense) * 100;
+            const widthPct = cat.percent;
             return (
               <div
                 key={cat.name}
-                style={{ width: `${widthPct}%`, backgroundColor: cat.color }}
-                title={`${cat.name}: ${formatCurrencyCompact(cat.amount)} (${widthPct.toFixed(1)}٪)`}
+                style={{ width: barWidth(widthPct), backgroundColor: cat.color }}
+                title={`${cat.name}: ${formatCurrencyCompact(cat.amount)} (${formatPercent(widthPct)})`}
                 className="h-full hover:opacity-85 transition-opacity"
               />
             );
@@ -83,7 +80,6 @@ export const ExpenseBreakdown: React.FC<{ totals: ExpenseCategoryTotal[] }> = ({
       {/* Category List with Amounts & Percentages */}
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
         {filteredTotals.map((item) => {
-          const relativePercent = ((item.amount / totalExpense) * 100).toFixed(1);
           return (
             <div
               key={item.name}
@@ -99,7 +95,7 @@ export const ExpenseBreakdown: React.FC<{ totals: ExpenseCategoryTotal[] }> = ({
               <div className="flex items-center gap-2 font-mono tabular-nums shrink-0">
                 <span className="font-bold text-slate-900">{formatCurrencyCompact(item.amount)}</span>
                 <span className="text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                  {relativePercent}٪
+                  {formatPercent(item.percent)}
                 </span>
               </div>
             </div>

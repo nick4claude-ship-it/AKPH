@@ -6,10 +6,10 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, AlertCircle, AlertTriangle, Info, EyeOff, RotateCcw, ArrowUpLeft } from 'lucide-react';
-import { useAppState, useStoreSlice } from '../store/AppStore';
+import { useAppState } from '../store/AppStore';
 import { selectNotifications } from '../store/domainSelectors';
 import { NotificationKind, AlertPriority } from '../types';
-import { formatCurrencyCompact } from '../utils/formatters';
+import { formatCurrencyCompact, formatDecimal } from '../utils/formatters';
 import { useDismissedNotifications } from '../store/notifications';
 
 const KIND_LABELS: Record<NotificationKind, string> = {
@@ -63,7 +63,7 @@ export const NotificationCenterPage: React.FC = () => {
           onClick={() => setKind('all')}
           className={`px-3 py-1.5 rounded-lg border cursor-pointer ${kind === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-600'}`}
         >
-          همه ({all.filter((n) => !dismissed.includes(n.id)).length.toLocaleString('fa-IR')})
+          همه ({formatDecimal(all.filter((n) => !dismissed.includes(n.id)).length)})
         </button>
         {counts.map(([k, n]) => (
           <button
@@ -71,7 +71,7 @@ export const NotificationCenterPage: React.FC = () => {
             onClick={() => setKind(k)}
             className={`px-3 py-1.5 rounded-lg border cursor-pointer ${kind === k ? 'bg-slate-900 text-white border-slate-900' : 'bg-white border-slate-200 text-slate-600'}`}
           >
-            {KIND_LABELS[k]} ({n.toLocaleString('fa-IR')})
+            {KIND_LABELS[k]} ({formatDecimal(n)})
           </button>
         ))}
       </div>

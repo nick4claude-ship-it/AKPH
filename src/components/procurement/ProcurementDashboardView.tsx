@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ShoppingCart,
   Clock,
@@ -25,7 +25,9 @@ import {
   Project,
   ProcurementSubTab,
 } from '../../types';
-import { formatMoney, formatMoneyCompact } from '../../utils/money';
+import { formatInt, formatMoney, formatMoneyCompact } from '../../utils/money';
+import { barWidth, formatDecimal, formatPercent } from '../../utils/formatters';
+import { selectProcurementDashboard } from '../../store/views/procurement';
 
 interface ProcurementDashboardViewProps {
   orders: PurchaseOrder[];
@@ -52,31 +54,11 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
   onOpenNewRequisition,
   onOpenNewOrder,
 }) => {
-  // Aggregate KPIs
-  const totalOrdersAmount = orders.reduce((acc, o) => acc + o.totalOrderAmount, 0);
-  const activeOrdersCount = orders.filter((o) => o.status !== 'تسویه حساب نهایی و مختومه' && o.status !== 'فسخ شده').length;
-  
-  const urgentRequisitions = requisitions.filter(
-    (r) => r.priority === 'فوری کارگاهی (حیاتی)' && r.status !== 'سفارش صادر شده (PO)' && r.status !== 'لغو شده'
+  const dash = useMemo(
+    () => selectProcurementDashboard(orders, requisitions, rfqs, invoices, suppliers),
+    [orders, requisitions, rfqs, invoices, suppliers]
   );
-  const pendingApprovalsCount = requisitions.filter(
-    (r) => r.status.includes('تأیید') || r.status.includes('پیش‌نویس')
-  ).length;
-
-  const activeRfqsCount = rfqs.filter((r) => r.status === 'در حال استعلام' || r.status === 'کمیسیون معاملات و ارزیابی').length;
-  const totalSavings = rfqs.reduce((acc, r) => acc + (r.savingsVsBudgetAmount || 0), 0);
-
-  const pendingInvoices = invoices.filter((i) => i.status === 'در حال تطبیق' || i.status === 'دارای مغایرت و متوقف');
-  const totalAccountsPayable = invoices.reduce((acc, i) => acc + i.remainingBalance, 0);
-
-  // Spend per category, from issued orders grouped by the supplier's category.
-  const categorySpend: Record<string, number> = {};
-  for (const o of orders) {
-    if (o.status === 'فسخ شده') continue;
-    const category = suppliers.find((sup) => sup.id === o.supplierId)?.category ?? 'سایر';
-    categorySpend[category] = (categorySpend[category] ?? 0) + o.totalOrderAmount;
-  }
-  const categoryTotal = Object.values(categorySpend).reduce((a, b) => a + b, 0);
+  const { totalOrdersAmount, activeOrdersCount, urgentRequisitions, pendingApprovalsCount, activeRfqsCount, totalSavings, pendingInvoices, totalAccountsPayable } = dash;
 
   return (
     <div className="space-y-6">
@@ -133,7 +115,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
                       </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>تعداد سفارشات در جریان:</span>
-            <span className="font-bold text-indigo-700 font-mono">{activeOrdersCount} سفارش</span>
+            <span className="font-bold text-indigo-700 font-mono">{formatInt(activeOrdersCount)} سفارش</span>
           </div>
         </div>
 
@@ -147,13 +129,13 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-black text-slate-900">
-              {requisitions.length.toLocaleString('fa-IR')}
+              {formatDecimal(requisitions.length)}
             </span>
             <span className="text-[11px] text-slate-500">درخواست خرید</span>
           </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">در انتظار تاییدیه:</span>
-            <span className="font-bold text-amber-600 font-mono">{pendingApprovalsCount} فقره</span>
+            <span className="font-bold text-amber-600 font-mono">{formatInt(pendingApprovalsCount)} فقره</span>
           </div>
         </div>
 
@@ -167,7 +149,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-black text-rose-600">
-              {urgentRequisitions.length.toLocaleString('fa-IR')}
+              {formatDecimal(urgentRequisitions.length)}
             </span>
             <span className="text-[11px] text-rose-500 font-medium">نیاز فوری توقف‌زا</span>
           </div>
@@ -187,7 +169,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-black text-slate-900">
-              {activeRfqsCount.toLocaleString('fa-IR')}
+              {formatDecimal(activeRfqsCount)}
             </span>
             <span className="text-[11px] text-slate-500">استعلام بها</span>
           </div>
@@ -212,7 +194,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
                       </div>
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <span className="text-slate-500">فاکتورهای در تطبیق:</span>
-            <span className="font-bold text-blue-700 font-mono">{pendingInvoices.length} فاکتور</span>
+            <span className="font-bold text-blue-700 font-mono">{formatInt(pendingInvoices.length)} فاکتور</span>
           </div>
         </div>
 
@@ -226,7 +208,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-black text-slate-900">
-              {suppliers.length.toLocaleString('fa-IR')}
+              {formatDecimal(suppliers.length)}
             </span>
             <span className="text-[11px] text-slate-500">شرکت تأییدشده</span>
           </div>
@@ -290,7 +272,7 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
                   <div className="text-xs text-slate-700 space-y-1 mb-3">
                     {req.items.map((it) => (
                       <div key={it.id} className="flex items-center justify-between text-slate-600">
-                        <span>• {it.materialName} ({it.requestedQty.toLocaleString('fa-IR')} {it.unit})</span>
+                        <span>• {it.materialName} ({formatDecimal(it.requestedQty)} {it.unit})</span>
                         <span className="font-mono text-slate-800 font-bold">
                           {formatMoney(it.estimatedTotalPrice)}
                         </span>
@@ -418,18 +400,17 @@ export const ProcurementDashboardView: React.FC<ProcurementDashboardViewProps> =
             </div>
 
             <div className="space-y-3">
-              {Object.entries(categorySpend).map(([catName, amount]) => {
-                const pct = Math.round((amount / categoryTotal) * 100);
+              {dash.categorySpend.map(({ category: catName, amount, percent: pct }) => {
                 return (
                   <div key={catName} className="space-y-1">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-700 font-medium">{catName}</span>
-                      <span className="font-mono text-slate-900 font-bold">{pct}٪</span>
+                      <span className="font-mono text-slate-900 font-bold">{formatPercent(pct, 0)}</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                       <div
                         className="bg-indigo-600 h-full rounded-full"
-                        style={{ width: `${pct}%` }}
+                        style={{ width: barWidth(pct) }}
                       ></div>
                     </div>
                     <div className="text-[10px] text-left text-slate-400 font-mono">

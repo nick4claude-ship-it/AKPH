@@ -25,6 +25,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact } from '../../utils/money';
+import { sumStoreIssues } from '../../store/views/inventory';
 
 interface StoreIssuesListViewProps {
   issues: StoreIssueVoucher[];
@@ -67,10 +68,7 @@ export const StoreIssuesListView: React.FC<StoreIssuesListViewProps> = ({
     });
   }, [issues, searchQuery, selectedWarehouseId, contraFilter]);
 
-  const totalCost = filteredIssues.reduce((s, i) => s + i.totalCost, 0);
-  const totalContra = filteredIssues
-    .filter((i) => i.isSubcontractorContra)
-    .reduce((s, i) => s + i.totalCost, 0);
+  const { totalCost, contraCost: totalContra } = sumStoreIssues(filteredIssues);
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Wallet,
   Clock,
@@ -23,8 +23,8 @@ import {
   PettyCashReplenishmentRequest,
   PettyCashSubTab,
 } from '../../types';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { monthlyTotals } from '../../store/selectors';
+import { barWidth, formatCurrency, formatNumber, formatDecimal, formatPercent } from '../../utils/formatters';
+import { selectPettyCashDashboard } from '../../store/views/pettyCash';
 
 interface PettyCashDashboardViewProps {
   accounts: PettyCashAccount[];
@@ -49,37 +49,9 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
   onOpenReplenishment,
   onOpenReplenishRequest,
 }) => {
-  // Aggregate Metrics
-  const totalActualBalance = accounts.reduce((acc, a) => acc + a.actualBalance, 0);
-  const totalPendingExpenses = accounts.reduce((acc, a) => acc + a.pendingExpenses, 0);
-  const totalUsableBalance = accounts.reduce((acc, a) => acc + a.usableBalance, 0);
-  const totalMonthlySpent = accounts.reduce((acc, a) => acc + a.monthlySpent, 0);
-
-  const lowBalanceAccounts = accounts.filter(
-    (a) => a.usableBalance <= a.minBalanceWarning && a.status === 'active'
-  );
-
-  const pendingApprovalsCount = expenses.filter(
-    (e) => e.status === 'pending_approval' || e.status === 'submitted'
-  ).length;
-
-  // Category Breakdown for expenses
-  const categoryTotals: { [key: string]: number } = {};
-  expenses
-    .filter((e) => e.status === 'approved' || e.status === 'accounting_posted')
-    .forEach((e) => {
-      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
-    });
-
-  const categoryEntries = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
-  const maxCategoryAmount = categoryEntries[0]?.[1] || 1;
-
-  // Monthly spending of approved expenses (last five months with data).
-  const monthlyTrends = monthlyTotals(
-    expenses.filter((e) => e.status === 'approved' || e.status === 'accounting_posted'),
-    5
-  ).map((m) => ({ month: m.label, key: m.period, amount: m.amount }));
-  const maxMonthlyAmount = Math.max(1, ...monthlyTrends.map((m) => m.amount));
+  // Figures of the dashboard (store view model).
+  const dash = useMemo(() => selectPettyCashDashboard(accounts, expenses), [accounts, expenses]);
+  const { totalActualBalance, totalPendingExpenses, totalUsableBalance, totalMonthlySpent, lowBalanceAccounts, pendingApprovalsCount, monthlyTrends } = dash;
 
   return (
     <div className="space-y-6">
@@ -93,7 +65,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-sm font-bold text-amber-950">
-                  هشدار کاهش موجودی در {lowBalanceAccounts.length.toLocaleString('fa-IR')} تنخواه‌گردان کارگاهی
+                  هشدار کاهش موجودی در {formatDecimal(lowBalanceAccounts.length)} تنخواه‌گردان کارگاهی
                 </h4>
                 <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-semibold">
                   نیاز به شارژ مجدد
@@ -142,7 +114,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             <div className="text-[11px] text-slate-500 mt-1">موجودی نقد فیزیکی و بانکی تنخواه‌ها</div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-700 font-medium">
-            <span>{accounts.length.toLocaleString('fa-IR')} حساب تنخواه فعال</span>
+            <span>{formatDecimal(accounts.length)} حساب تنخواه فعال</span>
             <CheckCircle2 className="w-3.5 h-3.5" />
           </div>
         </div>
@@ -162,7 +134,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             <div className="text-[11px] text-slate-500 mt-1">مبالغ هزینه ثبت‌شده و بلاتکلیف</div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-amber-800 font-medium">
-            <span>{pendingApprovalsCount.toLocaleString('fa-IR')} فاکتور در کارتابل</span>
+            <span>{formatDecimal(pendingApprovalsCount)} فاکتور در کارتابل</span>
             <button
               onClick={() => onNavigateTab('approvals')}
               className="text-amber-700 hover:text-amber-900 underline flex items-center"
@@ -192,7 +164,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
           <div className="mt-3 pt-2.5 border-t border-emerald-100 flex items-center justify-between text-[11px] text-emerald-800">
             <span>ظرفیت مخارج آزاد</span>
             <span className="font-bold">
-              {((totalUsableBalance / (totalActualBalance || 1)) * 100).toFixed(0)}٪ کل
+              {formatPercent(dash.usablePercent, 0)} کل
             </span>
           </div>
         </div>
@@ -215,12 +187,12 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
                 lowBalanceAccounts.length > 0 ? 'text-rose-600' : 'text-slate-800'
               }`}
             >
-              {lowBalanceAccounts.length.toLocaleString('fa-IR')} تنخواه
+              {formatDecimal(lowBalanceAccounts.length)} تنخواه
             </div>
             <div className="text-[11px] text-slate-500 mt-1">زیر حداقل مجاز تعیین‌شده</div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-            <span>درخواست‌های شارژ باز: {requests.length.toLocaleString('fa-IR')}</span>
+            <span>درخواست‌های شارژ باز: {formatDecimal(requests.length)}</span>
             <button
               onClick={() => onNavigateTab('requests')}
               className="text-blue-600 hover:text-blue-800 underline"
@@ -453,7 +425,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
 
           <div className="space-y-3.5 pt-2">
             {monthlyTrends.map((trend) => {
-              const pct = (trend.amount / maxMonthlyAmount) * 100;
+              const pct = trend.barPercent;
               return (
                 <div key={trend.key} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
@@ -465,7 +437,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
                   <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
                     <div
                       className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%` }}
+                      style={{ width: barWidth(pct) }}
                     />
                   </div>
                 </div>
@@ -490,8 +462,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
           </div>
 
           <div className="space-y-3 pt-1">
-            {categoryEntries.slice(0, 6).map(([cat, amount]) => {
-              const pct = (amount / maxCategoryAmount) * 100;
+            {dash.categoryBars.slice(0, 6).map(({ category: cat, amount, barPercent: pct }) => {
               return (
                 <div key={cat} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
@@ -503,7 +474,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
                   <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                     <div
                       className="bg-slate-800 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%` }}
+                      style={{ width: barWidth(pct) }}
                     />
                   </div>
                 </div>

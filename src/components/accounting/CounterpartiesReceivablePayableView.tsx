@@ -17,8 +17,9 @@ import {
   AccountsPayableItem,
   Subledger,
 } from '../../types';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { formatCurrency, formatNumber, formatInt } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
+import { sumPayables, sumReceivables } from '../../store/views/accounting';
 
 interface CounterpartiesReceivablePayableViewProps {
   viewMode: 'counterparties' | 'receivables' | 'payables';
@@ -42,10 +43,7 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
 
   // RECEIVABLES VIEW
   if (viewMode === 'receivables') {
-    const totalBilled = receivables.reduce((s, r) => s + r.billedAmount, 0);
-    const totalReceived = receivables.reduce((s, r) => s + r.receivedAmount, 0);
-    const totalRemaining = receivables.reduce((s, r) => s + r.remainingClaim, 0);
-    const overdueCount = receivables.filter((r) => r.status.includes('معوق')).length;
+    const { billed: totalBilled, received: totalReceived, remaining: totalRemaining, overdueCount } = sumReceivables(receivables);
 
     return (
       <div className="space-y-4 animate-in fade-in duration-150">
@@ -65,7 +63,7 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
           </div>
           <div className="bg-white p-3.5 rounded-xl border border-slate-200">
             <span className="text-[11px] font-sans text-slate-500 block mb-1">مطالبات معوق سررسید گذشته</span>
-            <strong className="text-sm text-amber-700">{overdueCount} کارفرما</strong>
+            <strong className="text-sm text-amber-700">{formatInt(overdueCount)} کارفرما</strong>
           </div>
         </div>
 
@@ -134,9 +132,7 @@ export const CounterpartiesReceivablePayableView: React.FC<CounterpartiesReceiva
 
   // PAYABLES VIEW
   if (viewMode === 'payables') {
-    const totalIncurred = payables.reduce((s, p) => s + p.incurredDebt, 0);
-    const totalPaid = payables.reduce((s, p) => s + p.paidAmount, 0);
-    const totalRemainingPayable = payables.reduce((s, p) => s + p.remainingDebt, 0);
+    const { incurred: totalIncurred, paid: totalPaid, remaining: totalRemainingPayable } = sumPayables(payables);
 
     return (
       <div className="space-y-4 animate-in fade-in duration-150">

@@ -13,7 +13,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { KpiItem } from '../../types';
-import { formatCurrencyCompact, formatPercent, formatNumber } from '../../utils/formatters';
+import { formatCurrencyCompact, formatPercent, formatNumber, formatDecimal } from '../../utils/formatters';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 
 interface KpiCardsProps {
@@ -88,7 +88,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ kpis, onCardClick }) => {
                 </div>
                 <div className="text-[11px] text-slate-400 font-mono tabular-nums mt-0.5 truncate">
                   {kpi.unit === 'درصد'
-                    ? `${kpi.value.toFixed(1)} درصد سود انباشته`
+                    ? `${formatDecimal(kpi.value, 1)} درصد سود انباشته`
                     : formatMoney(kpi.value)}
                 </div>
               </div>
@@ -107,7 +107,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({ kpis, onCardClick }) => {
                   )}
                   <span>
                     {isPositiveChange ? '+' : ''}
-                    {kpi.changePercent.toFixed(1)}٪
+                    {formatPercent(kpi.changePercent)}
                   </span>
                   <span className="font-normal text-slate-400 text-[10px]">نسبت به دوره قبل</span>
                 </div>

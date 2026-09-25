@@ -21,7 +21,7 @@ import {
   FileText,
   Printer,
 } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { useAppState } from '../../store/AppStore';
 import { selectProjects, selectProjectCostBreakdown, selectProjectCashFlow } from '../../store/selectors';
 

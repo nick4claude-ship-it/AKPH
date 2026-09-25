@@ -10,17 +10,17 @@ import {
   UserProfile,
 } from '../../types';
 import { X, Package, Plus } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { moneyUnitLabel } from '../../utils/money';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
-import { generateUUID, nextDocNumber } from '../../utils/ids';
-import { useAppState } from '../../store/AppStore';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
+import type { NewMaterialInput } from '../../store/recordWorkflows';
 
 interface NewMaterialModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
-  onSubmitMaterial: (material: MaterialItem) => void;
+  /** Adds the item through the workflow (code and zero stock are set there). */
+  onSubmitMaterial: (input: NewMaterialInput) => { ok: boolean; message: string };
 }
 
 const CATEGORIES: MaterialCategory[] = [
@@ -40,7 +40,6 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
   currentUser,
   onSubmitMaterial,
 }) => {
-  const existingCodes = useAppState().materials.map((m) => m.code);
   const [name, setName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [category, setCategory] = useState<MaterialCategory>('آهن‌آلات و میلگرد');
@@ -54,29 +53,9 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setFormError('نام کالا را وارد کنید.');
-    if (minSafetyStock > reorderLevel && reorderLevel > 0) return setFormError('حداقل موجودی ایمن نباید از نقطه سفارش بیشتر باشد.');
-
-    // Stock and its cost enter only through goods receipts (so the ledger and the kardex agree).
-    const newMat: MaterialItem = {
-      id: generateUUID(),
-      code: nextDocNumber(existingCodes, 'MAT'),
-      name: name.trim(),
-      category,
-      unit,
-      specifications: specifications.trim() || 'مشخصات استاندارد مهندسی',
-      standardGrade: standardGrade.trim() || undefined,
-      reorderLevel,
-      minSafetyStock,
-      maxCapacity,
-      currentStock: 0,
-      averageUnitPrice: 0,
-      totalStockValue: 0,
-      requiresInspection: true,
-      storageLocationBin: storageLocationBin.trim() || 'انبار سرپوشیده',
-    };
-
-    onSubmitMaterial(newMat);
+    // The code is issued by the workflow; stock and its cost enter only through goods receipts.
+    const result = onSubmitMaterial({ name, category, unit, specifications, standardGrade, reorderLevel, minSafetyStock, maxCapacity, storageLocationBin });
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
@@ -111,8 +90,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1">نام کامل مصالح و برند کالا *</label>
-              <input
+              <label htmlFor="new-material-modal-1" className="font-bold text-slate-700 block mb-1">نام کامل مصالح و برند کالا *</label>
+              <input id="new-material-modal-1"
                 type="text"
                 required
                 value={name}
@@ -123,8 +102,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">دسته‌بندی تخصصی *</label>
-              <select
+              <label htmlFor="new-material-modal-2" className="font-bold text-slate-700 block mb-1">دسته‌بندی تخصصی *</label>
+              <select id="new-material-modal-2"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MaterialCategory)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer"
@@ -138,8 +117,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">واحد سنجش *</label>
-              <input
+              <label htmlFor="new-material-modal-3" className="font-bold text-slate-700 block mb-1">واحد سنجش *</label>
+              <input id="new-material-modal-3"
                 type="text"
                 required
                 value={unit}
@@ -150,8 +129,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             </div>
 
             <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1">مشخصات فنی و کاربرد در WBS</label>
-              <input
+              <label htmlFor="new-material-modal-4" className="font-bold text-slate-700 block mb-1">مشخصات فنی و کاربرد در WBS</label>
+              <input id="new-material-modal-4"
                 type="text"
                 value={specifications}
                 onChange={(e) => setSpecifications(e.target.value)}
@@ -161,8 +140,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">گرید استاندارد</label>
-              <input
+              <label htmlFor="new-material-modal-5" className="font-bold text-slate-700 block mb-1">گرید استاندارد</label>
+              <input id="new-material-modal-5"
                 type="text"
                 value={standardGrade}
                 onChange={(e) => setStandardGrade(e.target.value)}
@@ -172,8 +151,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">محل استقرار / پالت (Bin)</label>
-              <input
+              <label htmlFor="new-material-modal-6" className="font-bold text-slate-700 block mb-1">محل استقرار / پالت (Bin)</label>
+              <input id="new-material-modal-6"
                 type="text"
                 value={storageLocationBin}
                 onChange={(e) => setStorageLocationBin(e.target.value)}
@@ -188,8 +167,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
             <h4 className="font-bold text-slate-900">کنترل سطح موجودی و هشدارها</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label className="text-[10px] text-slate-500 block mb-1">نقطه سفارش مجدد</label>
-                <IntegerInput
+                <label htmlFor="new-material-modal-7" className="text-[10px] text-slate-500 block mb-1">نقطه سفارش مجدد</label>
+                <IntegerInput id="new-material-modal-7"
                   value={reorderLevel}
                   onValueChange={(v) => setReorderLevel(v)}
                   className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center"
@@ -197,8 +176,8 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-500 block mb-1">حداقل موجودی ایمن</label>
-                <IntegerInput
+                <label htmlFor="new-material-modal-8" className="text-[10px] text-slate-500 block mb-1">حداقل موجودی ایمن</label>
+                <IntegerInput id="new-material-modal-8"
                   value={minSafetyStock}
                   onValueChange={(v) => setMinSafetyStock(v)}
                   className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center text-rose-600"

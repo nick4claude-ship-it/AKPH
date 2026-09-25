@@ -19,6 +19,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact } from '../../utils/money';
+import { sumClientStatements } from '../../store/views/contracts';
 
 interface ProgressStatementsListViewProps {
   statements: DetailedProgressStatement[];
@@ -53,11 +54,7 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
   }, [statements, searchTerm, statusFilter, typeFilter]);
 
   // Aggregate metrics
-  const totalGross = filteredStatements.reduce((sum, s) => sum + s.grossAmount, 0);
-  const totalDeductions = filteredStatements.reduce((sum, s) => sum + s.totalDeductions, 0);
-  const totalNet = filteredStatements.reduce((sum, s) => sum + s.netPayable, 0);
-  const totalReceived = filteredStatements.reduce((sum, s) => sum + s.receivedAmount, 0);
-  const totalRemaining = filteredStatements.reduce((sum, s) => sum + s.remainingPayable, 0);
+  const totals = useMemo(() => sumClientStatements(filteredStatements), [filteredStatements]);
 
   const statusMeta: Record<string, { label: string; color: string }> = {
     draft: { label: 'پیش‌نویس کارگاه', color: 'bg-slate-100 text-slate-800' },
@@ -102,31 +99,31 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
         <div>
           <span className="text-slate-500 block text-[11px]">مجموع ناخالص کارکرد:</span>
           <span className="font-black text-slate-900 font-mono text-sm">
-            {formatMoneyCompact(totalGross)}
+            {formatMoneyCompact(totals.gross)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">مجموع کسورات قانونی:</span>
           <span className="font-bold text-rose-700 font-mono text-sm">
-            {formatMoneyCompact(totalDeductions)}
+            {formatMoneyCompact(totals.deductions)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">خالص مصوب قابل پرداخت:</span>
           <span className="font-black text-indigo-900 font-mono text-sm">
-            {formatMoneyCompact(totalNet)}
+            {formatMoneyCompact(totals.net)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">کل دریافتی نقد و اسناد:</span>
           <span className="font-bold text-emerald-700 font-mono text-sm">
-            {formatMoneyCompact(totalReceived)}
+            {formatMoneyCompact(totals.received)}
           </span>
         </div>
         <div>
           <span className="text-slate-500 block text-[11px]">مانده مطالبات وصول‌نشده:</span>
           <span className="font-black text-rose-600 font-mono text-sm">
-            {formatMoneyCompact(totalRemaining)}
+            {formatMoneyCompact(totals.remaining)}
           </span>
         </div>
       </div>

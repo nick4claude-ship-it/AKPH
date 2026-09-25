@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, FileCheck, Check, Truck } from 'lucide-react';
-import { Project, Supplier, PurchaseOrder, PurchaseOrderItem } from '../../types';
-import { Dialog } from '../common/Dialog';
-import { formatMoney, moneyUnitLabel, roundRial } from '../../utils/money';
-import { generateUUID, nextDocNumber } from '../../utils/ids';
-import { toPersianDate, getRelativePersianDate } from '../../utils/date';
-import { toPersianDigits } from '../../utils/formatters';
-import { useAppState } from '../../store/AppStore';
-import { useCurrentUser } from '../../store/session';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
+import { Project, Supplier } from '../../types';
+import { Dialog } from '../../ui/Dialog';
+import { formatMoney, moneyUnitLabel } from '../../utils/money';
+import { getRelativePersianDate } from '../../utils/date';
+import { toPersianDigits, formatInt } from '../../utils/formatters';
+import { useSelector } from '../../store/AppStore';
+import {
+  blankPurchaseOrderLine,
+  computePurchaseOrderDraft,
+  type PurchaseOrderFormInput,
+  type PurchaseOrderLineInput,
+} from '../../store/views/procurement';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 
 interface NewPurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   projects: Project[];
   suppliers: Supplier[];
-  onAddOrder: (order: PurchaseOrder) => { ok: boolean; message: string } | void;
+  /** Issues the order through the workflow, which recomputes every amount. */
+  onAddOrder: (form: PurchaseOrderFormInput) => { ok: boolean; message: string };
 }
 
 export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
@@ -25,9 +30,6 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
   suppliers,
   onAddOrder,
 }) => {
-  const store = useAppState();
-  const user = useCurrentUser();
-  const vatRate = store.financeSettings.vatRatePercent / 100;
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [destinationWarehouse, setDestinationWarehouse] = useState('');
@@ -36,31 +38,17 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
   const [advancePaymentAmount, setAdvancePaymentAmount] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
 
-  type DraftItem = {
-    id: string;
-    materialCode: string;
-    materialName: string;
-    specifications: string;
-    orderedQty: number;
-    unit: string;
-    unitPrice: number;
-    freightAndUnloadingCost: number;
-  };
-  const emptyItem = (): DraftItem => ({
-    id: generateUUID(),
-    materialCode: '',
-    materialName: '',
-    specifications: '',
-    orderedQty: 0,
-    unit: '',
-    unitPrice: 0,
-    freightAndUnloadingCost: 0,
-  });
-  const [items, setItems] = useState<DraftItem[]>(() => [emptyItem()]);
+  type DraftItem = PurchaseOrderLineInput;
+  const [items, setItems] = useState<DraftItem[]>(() => [blankPurchaseOrderLine()]);
+
+  const form: PurchaseOrderFormInput = { projectId, supplierId, destinationWarehouse, deliveryDueDate, paymentTerms, advancePaymentAmount, items };
+  // Every amount is a whole number of Rials; VAT uses the rate stored in the finance settings.
+  const draft = useSelector((s) => computePurchaseOrderDraft(s, form), [JSON.stringify(form)]);
+  const { lines, subtotal, totalVat, totalFreight, grandTotal } = draft;
 
   if (!isOpen) return null;
 
-  const handleAddItem = () => setItems((prev) => [...prev, emptyItem()]);
+  const handleAddItem = () => setItems((prev) => [...prev, blankPurchaseOrderLine()]);
 
   const handleRemoveItem = (id: string) => {
     if (items.length <= 1) return;
@@ -72,78 +60,11 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
   };
 
-  // Every amount is a whole number of Rials; VAT uses the rate stored in the finance settings.
-  const lines = items.map((it) => {
-    const net = it.orderedQty * it.unitPrice;
-    const vat = roundRial(net * vatRate);
-    return { ...it, net, vat, gross: net + vat + it.freightAndUnloadingCost };
-  });
-  const subtotal = lines.reduce((acc, l) => acc + l.net, 0);
-  const totalVat = lines.reduce((acc, l) => acc + l.vat, 0);
-  const totalFreight = lines.reduce((acc, l) => acc + l.freightAndUnloadingCost, 0);
-  const grandTotal = subtotal + totalVat + totalFreight;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedProj = projects.find((p) => p.id === projectId);
-    const selectedSup = suppliers.find((s) => s.id === supplierId);
-    if (!selectedProj) return setFormError('پروژه را انتخاب کنید.');
-    if (!selectedSup) return setFormError('تأمین‌کننده را انتخاب کنید.');
-    if (lines.some((l) => !l.materialName.trim() || !l.unit.trim() || l.orderedQty <= 0 || l.unitPrice <= 0)) {
-      return setFormError('برای هر ردیف نام کالا، واحد، مقدار و فی را وارد کنید.');
-    }
-    if (advancePaymentAmount > grandTotal) return setFormError('پیش‌پرداخت از جمع سفارش بیشتر است.');
-
-    const newPO: PurchaseOrder = {
-      id: generateUUID(),
-      poNumber: nextDocNumber(store.purchaseOrders.map((o) => o.poNumber), 'PO'),
-      issueDate: toPersianDate(new Date()),
-      deliveryDueDate,
-      projectId: selectedProj.id,
-      projectName: selectedProj.name,
-      costCenterId: selectedProj.costCenterIds?.[0],
-      destinationWarehouse,
-      supplierId: selectedSup.id,
-      counterpartyId: store.counterparties.find((c) => c.kind === 'supplier' && c.name === selectedSup.name)?.id,
-      supplierName: selectedSup.name,
-      supplierPhone: selectedSup.phone,
-      supplierAddress: selectedSup.address,
-      items: lines.map((l) => ({
-        id: l.id,
-        materialCode: l.materialCode,
-        materialName: l.materialName.trim(),
-        specifications: l.specifications,
-        orderedQty: l.orderedQty,
-        receivedQty: 0,
-        unit: l.unit.trim(),
-        unitPrice: l.unitPrice,
-        totalNetPrice: l.net,
-        vatRate,
-        vatAmount: l.vat,
-        freightAndUnloadingCost: l.freightAndUnloadingCost,
-        totalGrossAmount: l.gross,
-      })),
-      subtotalAmount: subtotal,
-      totalVatAmount: totalVat,
-      totalFreightCost: totalFreight,
-      totalOrderAmount: grandTotal,
-      paymentTerms,
-      advancePaymentAmount,
-      // Issuing the order does not pay the advance; treasury does.
-      advancePaymentPaid: false,
-      status: 'صادر شده و ابلاغ به فروشنده',
-      deliveryProgressPercentage: 0,
-      termsAndConditions: [
-        'توزین نهایی ملاک تسویه، باسکول دیجیتال پای کارگاه می‌باشد.',
-        'فروشنده متعهد به صدور فاکتور رسمی در سامانه مودیان مالیاتی کشور است.',
-        'هرگونه مغایرت فنی در آزمایشگاه موجب عودت کل بار به هزینه فروشنده است.',
-      ],
-      issuedBy: `${user.name} (${user.role})`,
-      approvedBy: '',
-    };
-
-    const result = onAddOrder(newPO);
-    if (result && !result.ok) return setFormError(result.message);
+    if (draft.error) return setFormError(draft.error);
+    const result = onAddOrder(form);
+    if (!result.ok) return setFormError(result.message);
     onClose();
   };
 
@@ -172,8 +93,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
           {/* Supplier & Project */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">انتخاب تأمین‌کننده از وندورلیست (AVL):</label>
-              <select
+              <label htmlFor="new-purchase-order-modal-1" className="block font-bold text-slate-700 mb-1">انتخاب تأمین‌کننده از وندورلیست (AVL):</label>
+              <select id="new-purchase-order-modal-1"
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden font-bold text-slate-800"
@@ -187,8 +108,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">پروژه مقصد تحویل:</label>
-              <select
+              <label htmlFor="new-purchase-order-modal-2" className="block font-bold text-slate-700 mb-1">پروژه مقصد تحویل:</label>
+              <select id="new-purchase-order-modal-2"
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
@@ -202,8 +123,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">محل دقیق تخلیه بار / انبار:</label>
-              <input
+              <label htmlFor="new-purchase-order-modal-3" className="block font-bold text-slate-700 mb-1">محل دقیق تخلیه بار / انبار:</label>
+              <input id="new-purchase-order-modal-3"
                 type="text"
                 value={destinationWarehouse}
                 onChange={(e) => setDestinationWarehouse(e.target.value)}
@@ -213,8 +134,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">مهلت تحویل پای کار:</label>
-              <input
+              <label htmlFor="new-purchase-order-modal-4" className="block font-bold text-slate-700 mb-1">مهلت تحویل پای کار:</label>
+              <input id="new-purchase-order-modal-4"
                 type="text"
                 value={deliveryDueDate}
                 onChange={(e) => setDeliveryDueDate(e.target.value)}
@@ -224,8 +145,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">شرایط تسویه مالی:</label>
-              <input
+              <label htmlFor="new-purchase-order-modal-5" className="block font-bold text-slate-700 mb-1">شرایط تسویه مالی:</label>
+              <input id="new-purchase-order-modal-5"
                 type="text"
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value)}
@@ -239,7 +160,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
           {/* Items Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-sm">اقلام سفارش رسمی ({items.length} قلم):</span>
+              <span className="font-bold text-slate-800 text-sm">اقلام سفارش رسمی ({formatInt(items.length)} قلم):</span>
               <button
                 type="button"
                 onClick={handleAddItem}
@@ -268,8 +189,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">شرح کالا:</label>
-                      <input
+                      <label htmlFor="new-purchase-order-modal-6" className="block text-[11px] text-slate-600 mb-1">شرح کالا:</label>
+                      <input id="new-purchase-order-modal-6"
                         type="text"
                         value={item.materialName}
                         onChange={(e) => handleUpdateItem(item.id, 'materialName', e.target.value)}
@@ -279,8 +200,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">مشخصات فنی و استاندارد کارخانه‌ای:</label>
-                      <input
+                      <label htmlFor="new-purchase-order-modal-7" className="block text-[11px] text-slate-600 mb-1">مشخصات فنی و استاندارد کارخانه‌ای:</label>
+                      <input id="new-purchase-order-modal-7"
                         type="text"
                         value={item.specifications}
                         onChange={(e) => handleUpdateItem(item.id, 'specifications', e.target.value)}
@@ -292,8 +213,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">تعداد/مقدار سفارش:</label>
-                      <IntegerInput
+                      <label htmlFor="new-purchase-order-modal-8" className="block text-[11px] text-slate-600 mb-1">تعداد/مقدار سفارش:</label>
+                      <IntegerInput id="new-purchase-order-modal-8"
                         value={item.orderedQty}
                         onValueChange={(v) => handleUpdateItem(item.id, 'orderedQty', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
@@ -301,8 +222,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">واحد:</label>
-                      <input
+                      <label htmlFor="new-purchase-order-modal-9" className="block text-[11px] text-slate-600 mb-1">واحد:</label>
+                      <input id="new-purchase-order-modal-9"
                         type="text"
                         value={item.unit}
                         onChange={(e) => handleUpdateItem(item.id, 'unit', e.target.value)}
@@ -312,8 +233,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">نرخ توافقی فی ({moneyUnitLabel()}):</label>
-                      <MoneyInput
+                      <label htmlFor="new-purchase-order-modal-10" className="block text-[11px] text-slate-600 mb-1">نرخ توافقی فی ({moneyUnitLabel()}):</label>
+                      <MoneyInput id="new-purchase-order-modal-10"
                         value={item.unitPrice}
                         onValueChange={(v) => handleUpdateItem(item.id, 'unitPrice', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
@@ -321,8 +242,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-slate-600 mb-1">کرایه حمل و تخلیه:</label>
-                      <MoneyInput
+                      <label htmlFor="new-purchase-order-modal-11" className="block text-[11px] text-slate-600 mb-1">کرایه حمل و تخلیه:</label>
+                      <MoneyInput id="new-purchase-order-modal-11"
                         value={item.freightAndUnloadingCost}
                         onValueChange={(v) => handleUpdateItem(item.id, 'freightAndUnloadingCost', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-amber-500 outline-hidden"
@@ -341,7 +262,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
               <span className="font-mono font-bold">{formatMoney(subtotal)}</span>
             </div>
             <div className="flex justify-between items-center text-slate-600">
-              <span>مالیات بر ارزش افزوده ({toPersianDigits(store.financeSettings.vatRatePercent)}٪):</span>
+              <span>مالیات بر ارزش افزوده ({toPersianDigits(draft.vatRatePercent)}٪):</span>
               <span className="font-mono font-bold">{formatMoney(totalVat)}</span>
             </div>
             <div className="flex justify-between items-center text-slate-600">

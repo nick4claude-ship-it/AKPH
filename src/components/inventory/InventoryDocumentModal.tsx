@@ -16,9 +16,10 @@ import {
   User,
   CheckCircle2,
 } from 'lucide-react';
-import { Dialog } from '../common/Dialog';
+import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { useCompany } from '../../store/session';
+import { formatDecimal } from '../../utils/formatters';
 
 interface InventoryDocumentModalProps {
   receipt: GoodsReceiptNote | null;
@@ -99,7 +100,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                 <option value="">— کالا —</option>
                 {lines.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.name} ({l.qty.toLocaleString('fa-IR')})
+                    {l.name} ({formatDecimal(l.qty)})
                   </option>
                 ))}
               </select>
@@ -188,9 +189,9 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                     اطلاعات توزین و باسکول
                   </span>
                   <div className="flex justify-between text-[11px] text-slate-600 pt-1">
-                    <span>وزن ناخالص: {receipt.grossWeightKg?.toLocaleString('fa-IR') || '—'} kg</span>
-                    <span>وزن طاره: {receipt.tareWeightKg?.toLocaleString('fa-IR') || '—'} kg</span>
-                    <span className="font-bold text-emerald-700">خالص: {receipt.netWeightKg?.toLocaleString('fa-IR') || '—'} kg</span>
+                    <span>وزن ناخالص: {formatDecimal(receipt.grossWeightKg) || '—'} kg</span>
+                    <span>وزن طاره: {formatDecimal(receipt.tareWeightKg) || '—'} kg</span>
+                    <span className="font-bold text-emerald-700">خالص: {formatDecimal(receipt.netWeightKg) || '—'} kg</span>
                   </div>
                   <div className="text-[10px] text-slate-500 pt-1">
                     راننده: {receipt.driverName} ({receipt.truckPlateNumber})
@@ -231,7 +232,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                       <td className="border border-slate-300 p-2 font-bold">{item.materialName}</td>
                       <td className="border border-slate-300 p-2 text-center">{item.unit}</td>
                       <td className="border border-slate-300 p-2 text-center font-mono font-bold">
-                        {item.acceptedQty.toLocaleString('fa-IR')}
+                        {formatDecimal(item.acceptedQty)}
                       </td>
                       <td className="border border-slate-300 p-2 text-left font-mono">
                         {formatMoney(item.unitPrice, false)}
@@ -321,7 +322,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
                       <td className="border border-slate-300 p-2 font-bold">{item.materialName}</td>
                       <td className="border border-slate-300 p-2 text-center">{item.unit}</td>
                       <td className="border border-slate-300 p-2 text-center font-mono font-bold">
-                        {item.issuedQty.toLocaleString('fa-IR')}
+                        {formatDecimal(item.issuedQty)}
                       </td>
                       <td className="border border-slate-300 p-2 text-left font-mono">
                         {formatMoney(item.unitCost, false)}

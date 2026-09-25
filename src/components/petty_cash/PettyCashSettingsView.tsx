@@ -13,10 +13,10 @@ import {
 import { PettyCashCategoryItem } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
-import { generateUUID } from '../../utils/ids';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { IntegerInput, MoneyInput } from '../common/NumberInput';
-import { moneyUnitLabel, parseIntegerAmount } from '../../utils/money';
+import { newPettyCategory } from '../../store/views/pettyCash';
+import { formatCurrency, formatNumber, formatDecimal } from '../../utils/formatters';
+import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
+import { moneyUnitLabel } from '../../utils/money';
 
 interface PettyCashSettingsViewProps {
   categories: PettyCashCategoryItem[];
@@ -50,12 +50,7 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) return;
-    const newCat: PettyCashCategoryItem = {
-      id: generateUUID(),
-      name: newCategoryName.trim(),
-      subcategories: [],
-    };
-    const updated = [...categoryList, newCat];
+    const updated = [...categoryList, newPettyCategory(newCategoryName)];
     setCategoryList(updated);
     onUpdateCategories(updated);
     setNewCategoryName('');
@@ -112,7 +107,7 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
               <h3 className="text-sm font-bold text-slate-900">دسته‌بندی‌های هزینه و زیردسته‌ها</h3>
             </div>
             <span className="text-[11px] text-slate-500">
-              {categoryList.length.toLocaleString('fa-IR')} دسته اصلی
+              {formatDecimal(categoryList.length)} دسته اصلی
             </span>
           </div>
 
@@ -150,7 +145,7 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
                 >
                   <span>{cat.name}</span>
                   <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
-                    {cat.subcategories.length.toLocaleString('fa-IR')}
+                    {formatDecimal(cat.subcategories.length)}
                   </span>
                 </button>
               ))}
@@ -213,10 +208,10 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
+                <label htmlFor="petty-cash-settings-view-1" className="block text-slate-700 font-semibold mb-1">
                   سقف مرحله اول: تأیید {chain('site_manager_and_finance')} ({moneyUnitLabel()})
                 </label>
-                <MoneyInput
+                <MoneyInput id="petty-cash-settings-view-1"
                   value={thresholdLevel1}
                   onValueChange={(v) => setThresholdLevel1(v)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
@@ -227,10 +222,10 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
+                <label htmlFor="petty-cash-settings-view-2" className="block text-slate-700 font-semibold mb-1">
                   سقف مرحله دوم: تأیید {chain('project_and_finance')} ({moneyUnitLabel()})
                 </label>
-                <MoneyInput
+                <MoneyInput id="petty-cash-settings-view-2"
                   value={thresholdLevel2}
                   onValueChange={(v) => setThresholdLevel2(v)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
@@ -255,24 +250,24 @@ export const PettyCashSettingsView: React.FC<PettyCashSettingsViewProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
+                <label htmlFor="petty-cash-settings-view-3" className="block text-slate-700 font-semibold mb-1">
                   درصد هشدار حداقل موجودی قابل مصرف نسبت به سقف تنخواه
                 </label>
                 <div className="flex items-center gap-2">
-                  <input
+                  <input id="petty-cash-settings-view-3"
                     type="range"
                     min="10"
                     max="50"
                     value={lowBalancePercent}
-                    onChange={(e) => setLowBalancePercent(Math.min(100, parseIntegerAmount(e.target.value)))}
+                    onChange={(e) => setLowBalancePercent(Number(e.target.value))}
                     className="flex-1 accent-amber-500"
                   />
                   <span className="font-mono font-bold w-12 text-left tabular-nums">
-                    {lowBalancePercent}٪
+                    {formatDecimal(lowBalancePercent)}٪
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-500 mt-1 block">
-                  هرگاه مانده آزاد تنخواه به زیر {lowBalancePercent}٪ سقف برسد، وضعیت هشدار شارژ فعال می‌گردد.
+                  هرگاه مانده آزاد تنخواه به زیر {formatDecimal(lowBalancePercent)}٪ سقف برسد، وضعیت هشدار شارژ فعال می‌گردد.
                 </span>
               </div>
 

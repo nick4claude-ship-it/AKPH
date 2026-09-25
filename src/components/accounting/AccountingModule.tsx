@@ -1,13 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AccountingSubTab, AuditLog, UserProfile } from '../../types';
-import { useAppState, useStoreSlice } from '../../store/AppStore';
+import { AccountingSubTab, UserProfile } from '../../types';
+import { useAppState, useSelector } from '../../store/AppStore';
 import { selectProjects, selectLedgerTotals, selectCashFlowByMonth } from '../../store/selectors';
 import { selectReceivablesAging, selectPayablesAging } from '../../store/domainSelectors';
-import { reversedEntryIds } from '../../store/postingEngine';
+import { selectAccountingOverview, type ManualEntryFormInput } from '../../store/views/accounting';
 import { useWorkflows } from '../../store/useWorkflows';
 import { usePermission } from '../../store/session';
-import type { WorkflowResult } from '../../store/workflows';
+import type { WorkflowResult } from '../../store/workflowKit';
 import { AccountingNav } from './AccountingNav';
 import { AccountingDashboardView } from './AccountingDashboardView';
 import { JournalEntriesView } from './JournalEntriesView';
@@ -18,8 +18,6 @@ import { CounterpartiesReceivablePayableView } from './CounterpartiesReceivableP
 import { ChartOfAccountsView } from './ChartOfAccountsView';
 import { FinancialReportsView } from './FinancialReportsView';
 import { PeriodClosingAndAuditView } from './PeriodClosingAndAuditView';
-import { generateUUID } from '../../utils/ids';
-import { toPersianDate, toPersianTime } from '../../utils/date';
 import { emitToast } from '../../store/toast';
 
 interface AccountingModuleProps {
@@ -44,40 +42,17 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
   const payables = useMemo(() => selectPayablesAging(appState), [appState]);
   const ledger = useMemo(() => selectLedgerTotals(appState), [appState]);
   const cashFlow = useMemo(() => selectCashFlowByMonth(appState), [appState]);
-  const reversedIds = useMemo(() => reversedEntryIds(appState), [appState]);
-  const [reconciliationItems, setReconciliationItems] = useStoreSlice('bankReconciliations');
-  const [auditLogs, setAuditLogs] = useStoreSlice('auditLogs');
+  const overview = useSelector(selectAccountingOverview);
+  const reversedIds = overview.reversedIds;
+  const { bankReconciliations: reconciliationItems, auditLogs } = appState;
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
-
-  const logAudit = useCallback(
-    (action: AuditLog['action'], targetDoc: string, description: string) => {
-      const now = new Date();
-      setAuditLogs((prev) => [
-        { id: generateUUID(), date: toPersianDate(now), time: toPersianTime(now), user: currentUser.name, role: currentUser.role, action, targetDoc, description },
-        ...prev,
-      ]);
-    },
-    [currentUser, setAuditLogs]
-  );
-
-  /** Runs a workflow and records it in the audit trail when it succeeds. */
-  const audited = (result: WorkflowResult, action: AuditLog['action'], target: string, description: string) => {
-    if (result.ok) logAudit(action, result.docNumber || target, description);
-    return result;
-  };
 
   const projectName = useCallback((id?: string) => projects.find((p) => p.id === id)?.name, [projects]);
 
   // Bank reconciliation: a statement line without a ledger document becomes a pending voucher (second approval).
-  const handleReconcile = (itemId: string) => {
-    const item = reconciliationItems.find((r) => r.id === itemId);
-    if (!item) return;
-    const result = wf.reconcileBankItem(itemId);
-    emitToast(result.message);
-    if (result.ok) logAudit('تطبیق بانکی', result.docNumber || item.id, `تطبیق قلم صورت‌حساب بانکی: ${item.description}`);
-  };
+  const handleReconcile = (itemId: string) => emitToast(wf.reconcileBankItemLogged(itemId).message);
 
-  const pendingApprovalsCount = journalEntries.filter((e) => e.status === 'در انتظار تأیید').length;
+  const pendingApprovalsCount = overview.pendingApprovalsCount;
   const openNewDoc = can('journal.create')
     ? () => {
         setActiveSubTab('journal_entries');
@@ -103,7 +78,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
         <AccountingDashboardView
           bankAccounts={bankAccounts}
           cashDesks={cashDesks}
-          pettyCashTotal={appState.pettyCashAccounts.reduce((a, p) => a + p.actualBalance, 0)}
+          pettyCashTotal={overview.pettyCashTotal}
           journalEntries={journalEntries}
           receipts={receipts}
           payments={payments}
@@ -125,10 +100,10 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
           projects={projects}
           costCenters={costCenters}
           subledgers={subledgers}
-          onCreateEntry={(entry) => audited(wf.createManualJournalEntry(entry), 'ایجاد سند', entry.title, `ثبت سند دستی «${entry.title}»`)}
-          onApproveEntry={(id) => audited(wf.approveJournalEntry(id), 'تأیید سند', id, 'تأیید و ثبت قطعی سند دستی')}
-          onRejectEntry={(id, reason) => audited(wf.rejectJournalEntry(id, reason), 'رد سند', id, `رد سند: ${reason}`)}
-          onReverseEntry={(id, reason) => audited(wf.reverseJournalEntry(id, reason), 'سند معکوس', id, `صدور سند معکوس: ${reason}`)}
+          onCreateEntry={(form: ManualEntryFormInput) => wf.submitManualJournalEntryForm(form)}
+          onApproveEntry={(id) => wf.approveJournalEntryLogged(id)}
+          onRejectEntry={(id, reason) => wf.rejectJournalEntryLogged(id, reason)}
+          onReverseEntry={(id, reason) => wf.reverseJournalEntryLogged(id, reason)}
           isNewDocModalOpen={isNewDocModalOpen}
           setIsNewDocModalOpen={setIsNewDocModalOpen}
         />
@@ -169,7 +144,7 @@ export const AccountingModule: React.FC<AccountingModuleProps> = ({ currentUser 
           auditLogs={auditLogs}
           journalEntries={journalEntries}
           closedFiscalYears={appState.financeSettings.closedFiscalYears}
-          onCloseFiscalYear={(year) => audited(wf.closeFiscalYear(year), 'بستن دوره', `FY-${year}`, `بستن سال مالی ${year}`)}
+          onCloseFiscalYear={(year) => wf.closeFiscalYearLogged(year)}
         />
       )}
     </div>
