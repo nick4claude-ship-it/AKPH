@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Send, Bot, User, CornerDownLeft, RefreshCw, X, MessageSquare, ArrowRight } from 'lucide-react';
-import { formatCurrencyCompact } from '../../utils/formatters';
+import { formatCurrencyCompact, formatText } from '../../utils/formatters';
 import { useCurrentUser } from '../../store/session';
 import { useAssistant, type AssistantMessage } from '../../store/useAssistant';
 
@@ -63,27 +63,27 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
     <div
       className={`${
         isFloating
-          ? 'fixed bottom-6 left-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-2xl shadow-2xl border border-amber-500/30'
+          ? 'fixed bottom-6 left-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-xl shadow-2xl border border-amber-500/30'
           : 'bg-white rounded-xl border border-slate-200 shadow-xs'
       } bg-white flex flex-col overflow-hidden text-right`}
     >
       {/* Agent Top Header */}
-      <div className="bg-gradient-to-l from-slate-900 via-slate-800 to-amber-950 p-3.5 text-white flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      <div className="bg-gradient-to-l from-slate-900 via-slate-800 to-amber-950 p-3 text-white flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-xs font-bold text-amber-300">دستیار مدیریت</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-amber-300">دستیار مدیریت</h3>
               <span
-                className="text-[9px] bg-rose-500/25 text-rose-100 border border-rose-300/40 px-1.5 py-0.5 rounded font-bold"
+                className="text-xs bg-rose-500/25 text-rose-100 border border-rose-300/40 px-2 py-1 rounded font-bold"
                 title="به مدل زبانی متصل نیست؛ پاسخ‌ها با قواعد ثابت از داده‌های سامانه محاسبه می‌شود."
               >
                 نسخه نمایشی
               </span>
             </div>
-            <p className="text-[10px] text-slate-300">پاسخ از داده‌های ثبت‌شده؛ بدون اتصال به مدل زبانی</p>
+            <p className="text-sm text-slate-300">پاسخ از داده‌های ثبت‌شده؛ بدون اتصال به مدل زبانی</p>
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
           <button
             onClick={onClose}
             aria-label="بستن"
-            className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+            className="p-1 text-slate-500 hover:text-white rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -99,17 +99,17 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
       </div>
 
       {/* Suggested Fast Prompts */}
-      <div className="p-2.5 bg-slate-50 border-b border-slate-200/80">
-        <div className="text-[10px] text-slate-500 font-semibold mb-1.5 flex items-center gap-1">
-          <MessageSquare className="w-3 h-3 text-amber-600" />
+      <div className="p-2 bg-slate-50 border-b border-slate-200/80">
+        <div className="text-xs text-slate-500 font-medium mb-2 flex items-center gap-1">
+          <MessageSquare className="w-3 h-3 text-amber-700" />
           <span>پرسش‌های پیشنهادی:</span>
         </div>
-        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
           {samplePrompts.map((p) => (
             <button
               key={p}
               onClick={() => handleSend(p)}
-              className="text-[11px] bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 px-2 py-1 rounded-md text-right transition-colors cursor-pointer"
+              className="text-xs bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-slate-200 hover:border-amber-300 px-2 py-1 rounded-md text-right transition-colors cursor-pointer"
             >
               {p}
             </button>
@@ -118,7 +118,7 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
       </div>
 
       {/* Chat Messages Log */}
-      <div className="p-3.5 space-y-3 overflow-y-auto h-72 max-h-80 text-xs bg-slate-50/40">
+      <div className="p-3 space-y-3 overflow-y-auto h-72 max-h-80 text-sm bg-slate-50/40">
         {messages.map((m) => (
           <div
             key={m.id}
@@ -131,34 +131,34 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
                   : 'bg-white border border-slate-200 text-slate-800 rounded-br-xs shadow-2xs'
               }`}
             >
-              <div className="flex items-center gap-1.5 mb-1 text-[10px] opacity-75">
+              <div className="flex items-center gap-2 mb-1 text-sm opacity-75">
                 {m.sender === 'ai' ? (
                   <>
-                    <Bot className="w-3 h-3 text-amber-600" />
+                    <Bot className="w-3 h-3 text-amber-700" />
                     <span className="font-bold text-amber-800">دستیار (نسخه نمایشی)</span>
                   </>
                 ) : (
                   <>
                     <User className="w-3 h-3 text-slate-300" />
-                    <span>{user.name}</span>
+                    <span>{formatText(user.name)}</span>
                   </>
                 )}
                 <span>·</span>
-                <span>{m.time}</span>
+                <span>{formatText(m.time)}</span>
               </div>
 
-              <p className="text-xs whitespace-pre-line">{m.text}</p>
+              <p className="text-sm whitespace-pre-line">{formatText(m.text)}</p>
 
               {/* Structured Key Metrics Pill Island if present */}
               {m.dataPoints && (
-                <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-1 gap-1 font-mono">
+                <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-1 gap-1 tabular-nums">
                   {m.dataPoints.map((dp) => (
                     <div
                       key={dp.label}
-                      className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200/60"
+                      className="flex items-center justify-between text-xs bg-slate-50 px-2 py-1 rounded border border-slate-200/60"
                     >
-                      <span className="text-slate-600">{dp.label}:</span>
-                      <strong className="text-slate-900 font-bold">{dp.value}</strong>
+                      <span className="text-slate-600">{formatText(dp.label)}:</span>
+                      <strong className="text-slate-900 font-bold">{formatText(dp.value)}</strong>
                     </div>
                   ))}
                 </div>
@@ -168,27 +168,28 @@ export const AiAgentWidget: React.FC<AiAgentWidgetProps> = ({
         ))}
 
         {isTyping && (
-          <div className="flex items-center gap-2 text-slate-400 text-xs p-2">
-            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+          <div className="flex items-center gap-2 text-slate-500 text-xs p-2">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
             <span>دستیار در حال تجمیع و تحلیل داده‌های مالی پروژه‌ها...</span>
           </div>
         )}
       </div>
 
       {/* Input Bar */}
-      <div className="p-2.5 border-t border-slate-200 bg-white flex items-center gap-2">
-        <input
+      <div className="p-2 border-t border-slate-200 bg-white flex items-center gap-2">
+        <input aria-label="پرسش از دستیار"
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           placeholder="سوالی درباره سود، هزینه، تنخواه یا پروژه‌ها بپرسید..."
-          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500"
         />
         <button
           onClick={() => handleSend()}
           disabled={!inputValue.trim()}
-          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 p-2 rounded-lg transition-colors cursor-pointer"
+          aria-label="ارسال پرسش"
+              className="btn btn-primary btn-icon"
         >
           <Send className="w-3.5 h-3.5 rotate-180" />
         </button>

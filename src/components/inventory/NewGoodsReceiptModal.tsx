@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { X, ArrowDownLeft, Truck, ShieldCheck } from 'lucide-react';
 import { GoodsReceiptNote, MaterialItem, PurchaseOrder, Warehouse } from '../../types';
 import type { ReceiveFromPOLine } from '../../store/workflows';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, formatText } from '../../utils/formatters';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 
@@ -76,13 +76,13 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
   };
 
   return (
-    <Dialog as="form" onClose={onClose} label="رسید انبار از سفارش خرید (GRN)" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto" className="bg-white rounded-2xl w-full max-w-4xl text-xs overflow-hidden my-auto" onSubmit={submit}>
+    <Dialog as="form" onClose={onClose} label="رسید انبار از سفارش خرید (GRN)" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto" className="bg-white rounded-xl w-full max-w-4xl text-sm overflow-hidden my-auto" onSubmit={submit}>
       
         <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <ArrowDownLeft className="w-4 h-4 text-emerald-400" /> رسید انبار از سفارش خرید (GRN)
+          <h3 className="text-base font-bold flex items-center gap-2">
+            <ArrowDownLeft className="w-4 h-4 text-emerald-400" /> رسید انبار از سفارش خرید
           </h3>
-          <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-white cursor-pointer">
+          <button type="button" onClick={onClose} className="p-1 text-slate-500 hover:text-white cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -106,7 +106,7 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
                   >
                     {openOrders.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.poNumber} · {p.supplierName} · {p.projectName}
+                        {formatText(p.poNumber)} · {formatText(p.supplierName)} · {formatText(p.projectName)}
                       </option>
                     ))}
                   </select>
@@ -117,17 +117,18 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
                     <option value="">— انتخاب انبار —</option>
                     {projectWarehouses.map((w) => (
                       <option key={w.id} value={w.id}>
-                        {w.name} ({w.type})
+                        {formatText(w.name)} ({w.type})
                       </option>
                     ))}
                   </select>
-                  {po && <span className="text-[10px] text-slate-400">مقصد در سفارش: {po.destinationWarehouse}</span>}
+                  {po && <span className="text-xs text-slate-500">مقصد در سفارش: {formatText(po.destinationWarehouse)}</span>}
                 </label>
               </div>
 
               {po && (
-                <table className="w-full text-right border border-slate-200 rounded-lg overflow-hidden">
-                  <thead className="bg-slate-50 text-slate-500 text-[11px]">
+                <div className="table-scroll">
+                  <table className="w-full text-right border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-50 text-slate-500 text-xs">
                     <tr>
                       <th className="p-2">قلم سفارش</th>
                       <th className="p-2 text-left">مانده سفارش</th>
@@ -147,34 +148,35 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
                         return (
                           <tr key={i.id}>
                             <td className="p-2">
-                              <div className="font-bold">{i.materialName}</div>
-                              <div className="text-[10px] text-slate-400 font-mono">{i.materialCode}</div>
+                              <div className="font-bold">{formatText(i.materialName)}</div>
+                              <div className="text-xs text-slate-500 tabular-nums">{formatText(i.materialCode)}</div>
                             </td>
-                            <td className="p-2 text-left font-mono">
-                              {formatNumber(remaining)} {i.unit}
+                            <td className="p-2 text-left tabular-nums">
+                              {formatNumber(remaining)} {formatText(i.unit)}
                             </td>
                             <td className="p-2">
-                              <select value={l.materialId} onChange={(e) => set({ materialId: e.target.value })} className="w-full p-1.5 rounded border border-slate-300">
+                              <select aria-label="کالا" value={l.materialId} onChange={(e) => set({ materialId: e.target.value })} className="w-full p-2 rounded border border-slate-300">
                                 <option value="">— انتخاب —</option>
                                 {materials.map((m) => (
                                   <option key={m.id} value={m.id}>
-                                    {m.name}
+                                    {formatText(m.name)}
                                   </option>
                                 ))}
                               </select>
                             </td>
                             <td className="p-2">
-                              <input value={l.delivered} onChange={(e) => set({ delivered: e.target.value.replace(/[^\d.]/g, '') })} className="w-24 p-1.5 rounded border border-slate-300 font-mono" />
+                              <input value={l.delivered} onChange={(e) => set({ delivered: e.target.value.replace(/[^\d.]/g, '') })} className="w-24 p-2 rounded border border-slate-300 tabular-nums" />
                             </td>
                             <td className="p-2">
-                              <input value={l.rejected} onChange={(e) => set({ rejected: e.target.value.replace(/[^\d.]/g, '') })} className="w-20 p-1.5 rounded border border-slate-300 font-mono" />
+                              <input value={l.rejected} onChange={(e) => set({ rejected: e.target.value.replace(/[^\d.]/g, '') })} className="w-20 p-2 rounded border border-slate-300 tabular-nums" />
                             </td>
-                            <td className="p-2 text-left font-mono">{formatMoney(i.unitPrice, false)}</td>
+                            <td className="p-2 text-left tabular-nums">{formatMoney(i.unitPrice, false)}</td>
                           </tr>
                         );
                       })}
                   </tbody>
                 </table>
+                </div>
               )}
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -209,14 +211,14 @@ export const NewGoodsReceiptModal: React.FC<NewGoodsReceiptModalProps> = ({ onCl
               </div>
             </>
           )}
-          {error && <p className="text-rose-600 font-bold">{error}</p>}
+          {error && <p className="text-rose-700 font-bold">{error}</p>}
         </div>
 
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 cursor-pointer">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
             انصراف
           </button>
-          <button type="submit" disabled={!po} className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-bold disabled:opacity-40 cursor-pointer">
+          <button type="submit" disabled={!po} className="btn btn-primary">
             ثبت رسید و ورود به انبار
           </button>
         </div>

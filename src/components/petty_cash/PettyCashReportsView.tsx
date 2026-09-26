@@ -22,10 +22,11 @@ import {
 } from '../../types';
 import { useSelector } from '../../store/AppStore';
 import { pettyReportFigures } from '../../store/views/pettyCash';
-import { formatCurrency, formatNumber, formatPercent, formatDecimal } from '../../utils/formatters';
+import { formatCurrency, formatNumber, formatPercent, formatDecimal, formatText } from '../../utils/formatters';
 import { toPersianDate } from '../../utils/date';
 import { Dialog } from '../../ui/Dialog';
 import { formatInt, moneyUnitLabel } from '../../utils/money';
+import { Money } from '../common/Money';
 
 interface PettyCashReportsViewProps {
   accounts: PettyCashAccount[];
@@ -75,7 +76,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
           <h2 className="text-base font-bold text-slate-900">
             گزارش‌های تحلیلی و خروجی‌های رسمی تنخواه‌گردان
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-1">
             صورت‌حساب گردش تنخواه، گزارش تفکیکی پروژه‌ها، اسناد دارای نقص مدرک و صورتجلسه رسمی چاپی
           </p>
         </div>
@@ -83,7 +84,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPrintModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors shadow-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-lg transition-colors shadow-xs"
           >
             <Printer className="w-4 h-4 text-amber-400" />
             نمایش نسخه چاپی و PDF رسمی
@@ -95,7 +96,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
       <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-2">
         <button
           onClick={() => setSelectedReportType('statement')}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
             selectedReportType === 'statement'
               ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -106,7 +107,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
         <button
           onClick={() => setSelectedReportType('project_category')}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
             selectedReportType === 'project_category'
               ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -117,7 +118,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
         <button
           onClick={() => setSelectedReportType('missing_docs')}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
             selectedReportType === 'missing_docs'
               ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -128,7 +129,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
         <button
           onClick={() => setSelectedReportType('rejected')}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
             selectedReportType === 'rejected'
               ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -139,7 +140,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
         <button
           onClick={() => setSelectedReportType('reconciliation_sheet')}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+          className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
             selectedReportType === 'reconciliation_sheet'
               ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -156,11 +157,11 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
           <select id="petty-cash-reports-view-1"
             value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
-            className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium w-80"
+            className="text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium w-80"
           >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.title} ({a.projectName})
+                {formatText(a.title)} ({a.projectName})
               </option>
             ))}
           </select>
@@ -174,49 +175,49 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
           <div>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  صورت گردش حساب تنخواه: {selectedAccount.title}
+                <h3 className="text-base font-bold text-slate-900">
+                  صورت گردش حساب تنخواه: {formatText(selectedAccount.title)}
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  مسئول: {selectedAccount.holderName} | پروژه: {selectedAccount.projectName} | سقف:{' '}
-                  {formatCurrency(selectedAccount.ceilingLimit)}
+                <p className="text-xs text-slate-500 mt-1">
+                  مسئول: {formatText(selectedAccount.holderName)} | پروژه: {formatText(selectedAccount.projectName)} | سقف:{' '}
+                  <Money rial={selectedAccount.ceilingLimit} />
                 </p>
               </div>
               <div className="text-left">
                 <span className="text-xs text-slate-500 block">مانده قابل مصرف نهایی:</span>
-                <span className="text-sm font-mono font-black text-emerald-700 tabular-nums">
-                  {formatCurrency(selectedAccount.usableBalance)}
+                <span className="text-sm font-bold text-emerald-700 tabular-nums">
+                  <Money rial={selectedAccount.usableBalance} />
                 </span>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
+            <div className="table-scroll">
+              <table className="w-full text-right text-sm">
                 <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-4">نوع</th>
-                    <th className="py-2.5 px-4">تاریخ</th>
-                    <th className="py-2.5 px-4">شماره مدرک</th>
-                    <th className="py-2.5 px-4">شرح سند</th>
-                    <th className="py-2.5 px-4">طرف حساب / فروشنده</th>
-                    <th className="py-2.5 px-4 text-left">واریز (شارژ)</th>
-                    <th className="py-2.5 px-4 text-left">برداشت (هزینه)</th>
-                    <th className="py-2.5 px-4 text-center">وضعیت تایید</th>
+                    <th className="py-2 px-4">نوع</th>
+                    <th className="py-2 px-4">تاریخ</th>
+                    <th className="py-2 px-4">شماره مدرک</th>
+                    <th className="py-2 px-4">شرح سند</th>
+                    <th className="py-2 px-4">طرف حساب / فروشنده</th>
+                    <th className="py-2 px-4 text-left">واریز (شارژ)</th>
+                    <th className="py-2 px-4 text-left">برداشت (هزینه)</th>
+                    <th className="py-2 px-4 text-center">وضعیت تایید</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {accountReplenishments.map((r) => (
                     <tr key={r.id} className="bg-emerald-50/20 hover:bg-emerald-50/40">
                       <td className="py-3 px-4 font-bold text-emerald-800">شارژ تنخواه</td>
-                      <td className="py-3 px-4 text-slate-600">{r.date}</td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">{r.docNumber}</td>
-                      <td className="py-3 px-4 font-medium text-slate-900">{r.description}</td>
-                      <td className="py-3 px-4 text-slate-600">{r.sourceBankAccountName}</td>
-                      <td className="py-3 px-4 text-left font-mono font-bold text-emerald-700 tabular-nums">
-                        +{formatCurrency(r.amount)}
+                      <td className="py-3 px-4 text-slate-600">{formatText(r.date)}</td>
+                      <td className="py-3 px-4 tabular-nums text-sm text-slate-600">{formatText(r.docNumber)}</td>
+                      <td className="py-3 px-4 font-medium text-slate-900">{formatText(r.description)}</td>
+                      <td className="py-3 px-4 text-slate-600">{formatText(r.sourceBankAccountName)}</td>
+                      <td className="py-3 px-4 text-left font-bold text-emerald-700 tabular-nums">
+                        +<Money rial={r.amount} />
                       </td>
-                      <td className="py-3 px-4 text-left font-mono text-slate-400">-</td>
-                      <td className="py-3 px-4 text-center text-emerald-700 font-semibold text-[10px]">
+                      <td className="py-3 px-4 text-left tabular-nums text-slate-500">-</td>
+                      <td className="py-3 px-4 text-center text-emerald-700 font-medium text-sm">
                         واریز قطعی
                       </td>
                     </tr>
@@ -225,17 +226,17 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                   {accountExpenses.map((e) => (
                     <tr key={e.id} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-medium text-slate-700">هزینه ({e.category})</td>
-                      <td className="py-3 px-4 text-slate-600">{e.date}</td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">{e.invoiceNumber}</td>
-                      <td className="py-3 px-4 font-medium text-slate-900">{e.description}</td>
-                      <td className="py-3 px-4 text-slate-600">{e.vendor}</td>
-                      <td className="py-3 px-4 text-left font-mono text-slate-400">-</td>
-                      <td className="py-3 px-4 text-left font-mono font-bold text-slate-900 tabular-nums">
-                        -{formatCurrency(e.amount)}
+                      <td className="py-3 px-4 text-slate-600">{formatText(e.date)}</td>
+                      <td className="py-3 px-4 tabular-nums text-sm text-slate-600">{formatText(e.invoiceNumber)}</td>
+                      <td className="py-3 px-4 font-medium text-slate-900">{formatText(e.description)}</td>
+                      <td className="py-3 px-4 text-slate-600">{formatText(e.vendor)}</td>
+                      <td className="py-3 px-4 text-left tabular-nums text-slate-500">-</td>
+                      <td className="py-3 px-4 text-left font-bold text-slate-900 tabular-nums">
+                        -<Money rial={e.amount} />
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                          className={`text-xs px-2 py-1 rounded-full font-medium ${
                             e.status === 'approved' || e.status === 'accounting_posted'
                               ? 'bg-emerald-100 text-emerald-800'
                               : e.status === 'rejected'
@@ -262,16 +263,16 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
         {selectedReportType === 'project_category' && (
           <div className="p-5 space-y-5">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900">
                 گزارش جامع هزینه‌های تنخواه‌گردان به تفکیک سرفصل
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-1">
                 توزیع کل مبالغ مصرفی پروژه‌ها در دسته‌بندی‌های استاندارد عمرانی
               </p>
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-right text-xs">
+            <div className="border border-slate-200 rounded-xl table-scroll">
+              <table className="w-full text-right text-sm">
                 <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                   <tr>
                     <th className="py-3 px-4">سرفصل هزینه</th>
@@ -284,13 +285,13 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {categoryRows.map((row) => (
                     <tr key={row.cat} className="hover:bg-slate-50">
-                      <td className="py-3 px-4 font-bold text-slate-900">{row.cat}</td>
-                      <td className="py-3 px-4 font-mono text-slate-700">{formatInt(row.count)}</td>
-                      <td className="py-3 px-4 text-left font-mono font-bold text-slate-900 tabular-nums">
-                        {formatCurrency(row.total)}
+                      <td className="py-3 px-4 font-bold text-slate-900">{formatText(row.cat)}</td>
+                      <td className="py-3 px-4 tabular-nums text-slate-700">{formatInt(row.count)}</td>
+                      <td className="py-3 px-4 text-left font-bold text-slate-900 tabular-nums">
+                        <Money rial={row.total} />
                       </td>
-                      <td className="py-3 px-4 text-slate-600">{row.projects}</td>
-                      <td className="py-3 px-4 text-left font-mono font-semibold text-amber-700">
+                      <td className="py-3 px-4 text-slate-600">{formatText(row.projects)}</td>
+                      <td className="py-3 px-4 text-left tabular-nums font-medium text-amber-700">
                         {formatPercent(row.share)}
                       </td>
                     </tr>
@@ -305,22 +306,22 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
         {selectedReportType === 'missing_docs' && (
           <div className="p-5 space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900">
                 گزارش اسناد و فاکتورهای دارای نقص مدرک
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-1">
                 فاکتورهایی که فاقد شماره پیگیری یا تصویر باکیفیت پیوست هستند
               </p>
             </div>
 
             {missingDocsExpenses.length === 0 ? (
               <div className="p-8 text-center text-slate-500 text-xs">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <CheckCircle2 className="w-8 h-8 text-emerald-700 mx-auto mb-2" />
                 تمامی هزینه‌ها دارای مدارک، شماره رسمی و فایل پیوست معتبر می‌باشند.
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-right text-xs">
+              <div className="border border-slate-200 rounded-xl table-scroll">
+                <table className="w-full text-right text-sm">
                   <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                     <tr>
                       <th className="py-3 px-4">کد هزینه</th>
@@ -333,11 +334,11 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                   <tbody className="divide-y divide-slate-100">
                     {missingDocsExpenses.map((exp) => (
                       <tr key={exp.id}>
-                        <td className="py-3 px-4 font-mono font-bold">{exp.expenseNumber}</td>
-                        <td className="py-3 px-4">{exp.pettyCashTitle}</td>
-                        <td className="py-3 px-4">{exp.description}</td>
-                        <td className="py-3 px-4 font-mono font-bold">{formatCurrency(exp.amount)}</td>
-                        <td className="py-3 px-4 text-rose-600 font-medium">فاقد شماره یا تصویر فاکتور</td>
+                        <td className="py-3 px-4 tabular-nums font-bold">{formatText(exp.expenseNumber)}</td>
+                        <td className="py-3 px-4">{formatText(exp.pettyCashTitle)}</td>
+                        <td className="py-3 px-4">{formatText(exp.description)}</td>
+                        <td className="py-3 px-4 tabular-nums font-bold"><Money rial={exp.amount} /></td>
+                        <td className="py-3 px-4 text-rose-700 font-medium">فاقد شماره یا تصویر فاکتور</td>
                       </tr>
                     ))}
                   </tbody>
@@ -351,16 +352,16 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
         {selectedReportType === 'rejected' && (
           <div className="p-5 space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900">
                 سیاهه فاکتورهای ردشده کارگاه‌ها و علل رد
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-1">
                 مواردی که در کارتابل تأیید، تأیید نگردیده‌اند
               </p>
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-right text-xs">
+            <div className="border border-slate-200 rounded-xl table-scroll">
+              <table className="w-full text-right text-sm">
                 <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                   <tr>
                     <th className="py-3 px-4">شماره هزینه</th>
@@ -374,17 +375,17 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {rejectedExpenses.map((exp) => (
                     <tr key={exp.id} className="bg-rose-50/20">
-                      <td className="py-3 px-4 font-mono font-bold text-rose-800">
-                        {exp.expenseNumber}
+                      <td className="py-3 px-4 tabular-nums font-bold text-rose-800">
+                        {formatText(exp.expenseNumber)}
                       </td>
-                      <td className="py-3 px-4 font-medium text-slate-900">{exp.pettyCashTitle}</td>
-                      <td className="py-3 px-4 text-slate-600">{exp.date}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900 tabular-nums">
-                        {formatCurrency(exp.amount)}
+                      <td className="py-3 px-4 font-medium text-slate-900">{formatText(exp.pettyCashTitle)}</td>
+                      <td className="py-3 px-4 text-slate-600">{formatText(exp.date)}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900 tabular-nums">
+                        <Money rial={exp.amount} />
                       </td>
-                      <td className="py-3 px-4 text-slate-700">{exp.vendor}</td>
+                      <td className="py-3 px-4 text-slate-700">{formatText(exp.vendor)}</td>
                       <td className="py-3 px-4 text-rose-700 font-medium">
-                        {exp.rejectionReason || 'عدم رعایت آیین‌نامه معاملات و سرفصل بودجه'}
+                        {formatText(exp.rejectionReason || 'عدم رعایت آیین‌نامه معاملات و سرفصل بودجه')}
                       </td>
                     </tr>
                   ))}
@@ -399,40 +400,40 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-base font-bold text-slate-900">
                   صورتجلسه تسویه و کنترل مانده نقدینگی تنخواه‌گردان
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-1">
                   جهت اخذ امضاهای قانونی تنخواه‌دار، مدیر پروژه، مدیر مالی و مدیرعامل
                 </p>
               </div>
               <button
                 onClick={() => setIsPrintModalOpen(true)}
-                className="px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5"
+                className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center gap-2"
               >
                 <Printer className="w-3.5 h-3.5" />
                 پیش‌نمایش چاپ
               </button>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-3">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <span className="text-slate-500 block text-[11px]">عنوان تنخواه:</span>
-                  <span className="font-bold text-slate-900">{selectedAccount.title}</span>
+                  <span className="text-slate-500 block text-xs">عنوان تنخواه:</span>
+                  <span className="font-bold text-slate-900">{formatText(selectedAccount.title)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[11px]">پروژه مربوطه:</span>
-                  <span className="font-bold text-slate-900">{selectedAccount.projectName}</span>
+                  <span className="text-slate-500 block text-xs">پروژه مربوطه:</span>
+                  <span className="font-bold text-slate-900">{formatText(selectedAccount.projectName)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[11px]">مسئول تنخواه:</span>
-                  <span className="font-bold text-slate-900">{selectedAccount.holderName}</span>
+                  <span className="text-slate-500 block text-xs">مسئول تنخواه:</span>
+                  <span className="font-bold text-slate-900">{formatText(selectedAccount.holderName)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[11px]">سقف مصوب تنخواه:</span>
-                  <span className="font-mono font-bold text-slate-900 tabular-nums">
-                    {formatCurrency(selectedAccount.ceilingLimit)}
+                  <span className="text-slate-500 block text-xs">سقف مصوب تنخواه:</span>
+                  <span className=" font-bold text-slate-900 tabular-nums">
+                    <Money rial={selectedAccount.ceilingLimit} />
                   </span>
                 </div>
               </div>
@@ -441,20 +442,20 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
             {/* Reconciliation Signature Matrix Preview */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
               <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-xs font-bold text-slate-700 block">تنخواه‌دار / کارپرداز</span>
-                <span className="text-[11px] text-slate-500 block">{selectedAccount.holderName}</span>
+                <span className="text-sm font-bold text-slate-700 block">تنخواه‌دار / کارپرداز</span>
+                <span className="text-xs text-slate-500 block">{formatText(selectedAccount.holderName)}</span>
               </div>
               <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-xs font-bold text-slate-700 block">سرپرست / مدیر پروژه</span>
-                <span className="text-[11px] text-slate-500 block">مهندس ناظر پروژه</span>
+                <span className="text-sm font-bold text-slate-700 block">سرپرست / مدیر پروژه</span>
+                <span className="text-xs text-slate-500 block">مهندس ناظر پروژه</span>
               </div>
               <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-xs font-bold text-slate-700 block">مدیر امور مالی</span>
-                <span className="text-[11px] text-slate-500 block">دکتر صمدیان</span>
+                <span className="text-sm font-bold text-slate-700 block">مدیر امور مالی</span>
+                <span className="text-xs text-slate-500 block">دکتر صمدیان</span>
               </div>
               <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-xs font-bold text-slate-700 block">مدیرعامل</span>
-                <span className="text-[11px] text-slate-500 block">مهندس رادمنش</span>
+                <span className="text-sm font-bold text-slate-700 block">مدیرعامل</span>
+                <span className="text-xs text-slate-500 block">مهندس رادمنش</span>
               </div>
             </div>
           </div>
@@ -463,24 +464,24 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
       {/* Official Print/PDF Modal (Prompt Section 25 & 16) */}
       {isPrintModalOpen && (
-        <Dialog onClose={() => setIsPrintModalOpen(false)} label="پیش‌نمایش چاپ گزارش تنخواه" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 print:shadow-none print:border-none print:m-0 print:p-0">
+        <Dialog onClose={() => setIsPrintModalOpen(false)} label="پیش‌نمایش چاپ گزارش تنخواه" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 print:shadow-none print:border-none print:m-0 print:p-0">
           
             {/* Modal Print Toolbar */}
             <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl flex items-center justify-between print:hidden">
-              <div className="text-xs font-bold text-slate-800">
+              <div className="text-sm font-bold text-slate-800">
                 پیش‌نمایش فرم چاپی و خروجی رسمی صورتجلسه تنخواه
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrint}
-                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                  className="btn btn-secondary"
                 >
                   <Printer className="w-4 h-4 text-amber-400" />
                   چاپ یا ذخیره PDF
                 </button>
                 <button
                   onClick={() => setIsPrintModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg"
+                  className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -492,10 +493,10 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
               {/* Header Letterhead */}
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
                 <div>
-                  <h1 className="text-lg font-black text-slate-950">
+                  <h1 className="text-lg font-bold text-slate-950">
                     شرکت مهندسی و پیمانکاری سازه گستر پیشرو
                   </h1>
-                  <h2 className="text-xs font-bold text-slate-600 mt-1">
+                  <h2 className="text-sm font-bold text-slate-600 mt-1">
                     سامانه جامع مدیریت مالی و پروژه‌های عمرانی
                   </h2>
                 </div>
@@ -504,7 +505,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                   صورتجلسه تسویه دوره‌ای و تطبیق تنخواه‌گردان
                 </div>
 
-                <div className="text-left text-xs space-y-1 font-mono">
+                <div className="text-left text-sm space-y-1 tabular-nums">
                   <div>شماره مدرک: {lastReconciliation?.reconNumber ?? '—'}</div>
                   <div>تاریخ تنظیم: {toPersianDate(new Date())}</div>
                   <div>پیوست: دارد</div>
@@ -512,14 +513,14 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
               </div>
 
               {/* Account Profile Table */}
-              <div className="border border-slate-300 rounded-lg overflow-hidden text-xs">
-                <div className="grid grid-cols-2 md:grid-cols-4 bg-slate-50 font-bold p-2.5 border-b border-slate-300">
-                  <div>عنوان تنخواه: {selectedAccount.title}</div>
-                  <div>کد تنخواه: {selectedAccount.code}</div>
-                  <div>پروژه: {selectedAccount.projectName}</div>
-                  <div>مسئول: {selectedAccount.holderName}</div>
+              <div className="border border-slate-300 rounded-lg overflow-hidden text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 bg-slate-50 font-bold p-2 border-b border-slate-300">
+                  <div>عنوان تنخواه: {formatText(selectedAccount.title)}</div>
+                  <div>کد تنخواه: {formatText(selectedAccount.code)}</div>
+                  <div>پروژه: {formatText(selectedAccount.projectName)}</div>
+                  <div>مسئول: {formatText(selectedAccount.holderName)}</div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 p-2.5">
+                <div className="grid grid-cols-2 md:grid-cols-4 p-2">
                   <div>سقف مصوب: {formatCurrency(selectedAccount.ceilingLimit)}</div>
                   <div>موجودی واقعی: {formatCurrency(selectedAccount.actualBalance)}</div>
                   <div>تعهدات در انتظار: {formatCurrency(selectedAccount.pendingExpenses)}</div>
@@ -529,10 +530,10 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
               {/* Expenses breakdown table in Print */}
               <div>
-                <h4 className="text-xs font-bold text-slate-900 mb-2">
+                <h4 className="text-sm font-bold text-slate-900 mb-2">
                   سیاهه هزینه‌های مصوب تنخواه در دوره مالی شهریور ۱۴۰۳:
                 </h4>
-                <table className="w-full text-right text-xs border border-slate-300">
+                <div className="table-scroll"><table className="w-full text-right text-sm border border-slate-300">
                   <thead className="bg-slate-100 border-b border-slate-300 font-bold">
                     <tr>
                       <th className="p-2 border-l border-slate-300">ردیف</th>
@@ -547,43 +548,43 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
                   <tbody className="divide-y divide-slate-200">
                     {accountExpenses.slice(0, 6).map((exp, idx) => (
                       <tr key={exp.id}>
-                        <td className="p-2 border-l border-slate-200 text-center font-mono">
+                        <td className="p-2 border-l border-slate-200 text-center tabular-nums">
                           {formatDecimal(idx + 1)}
                         </td>
-                        <td className="p-2 border-l border-slate-200 font-mono text-[11px]">
-                          {exp.expenseNumber}
+                        <td className="p-2 border-l border-slate-200 tabular-nums text-sm">
+                          {formatText(exp.expenseNumber)}
                         </td>
-                        <td className="p-2 border-l border-slate-200">{exp.date}</td>
-                        <td className="p-2 border-l border-slate-200">{exp.category}</td>
-                        <td className="p-2 border-l border-slate-200">{exp.vendor}</td>
-                        <td className="p-2 border-l border-slate-200">{exp.description}</td>
-                        <td className="p-2 text-left font-mono font-bold tabular-nums">
-                          {formatCurrency(exp.amount)}
+                        <td className="p-2 border-l border-slate-200">{formatText(exp.date)}</td>
+                        <td className="p-2 border-l border-slate-200">{formatText(exp.category)}</td>
+                        <td className="p-2 border-l border-slate-200">{formatText(exp.vendor)}</td>
+                        <td className="p-2 border-l border-slate-200">{formatText(exp.description)}</td>
+                        <td className="p-2 text-left font-bold tabular-nums">
+                          <Money rial={exp.amount} />
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
 
               {/* Settlement Signatures */}
               <div className="pt-8">
-                <div className="grid grid-cols-4 gap-4 text-center text-xs">
+                <div className="grid grid-cols-4 gap-4 text-center text-sm">
                   <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
                     <span className="font-bold text-slate-800">امضای تنخواه‌دار</span>
-                    <span className="text-[11px] text-slate-500">{selectedAccount.holderName}</span>
+                    <span className="text-xs text-slate-500">{formatText(selectedAccount.holderName)}</span>
                   </div>
                   <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
                     <span className="font-bold text-slate-800">امضای مدیر پروژه</span>
-                    <span className="text-[11px] text-slate-500">مهندس ناظر کارگاه</span>
+                    <span className="text-xs text-slate-500">مهندس ناظر کارگاه</span>
                   </div>
                   <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
                     <span className="font-bold text-slate-800">امضای مدیر امور مالی</span>
-                    <span className="text-[11px] text-slate-500">دکتر صمدیان</span>
+                    <span className="text-xs text-slate-500">دکتر صمدیان</span>
                   </div>
                   <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
                     <span className="font-bold text-slate-800">امضای مدیرعامل</span>
-                    <span className="text-[11px] text-slate-500">مهندس رادمنش</span>
+                    <span className="text-xs text-slate-500">مهندس رادمنش</span>
                   </div>
                 </div>
               </div>

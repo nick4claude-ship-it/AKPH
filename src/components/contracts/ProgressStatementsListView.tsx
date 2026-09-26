@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { formatMoney, formatMoneyCompact } from '../../utils/money';
 import { sumClientStatements } from '../../store/views/contracts';
+import { Money } from '../common/Money';
+import { formatText } from '../../utils/formatters';
 
 interface ProgressStatementsListViewProps {
   statements: DetailedProgressStatement[];
@@ -77,17 +79,17 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
       {/* Top Banner and Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
         <div>
-          <h2 className="text-sm font-bold text-slate-900">
-            دفتر ثبت و مدیریت صورت‌وضعیت‌های کارکرد و تعدیل (Statements Directory)
+          <h2 className="text-base font-bold text-slate-900">
+            دفتر ثبت و مدیریت صورت‌وضعیت‌های کارکرد و تعدیل
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-1">
             گردش کار کارگاه، بررسی مشاور، تصویب کارفرما، استرداد کسورات و ثبت اسناد دریافتنی در حسابداری
           </p>
         </div>
 
         <button
           onClick={onOpenNewStatement}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-xs cursor-pointer"
+          className="btn btn-primary"
         >
           <Plus className="w-4 h-4" />
           <span>صورت‌وضعیت جدید</span>
@@ -95,44 +97,44 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
       </div>
 
       {/* Aggregate KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-sm">
         <div>
-          <span className="text-slate-500 block text-[11px]">مجموع ناخالص کارکرد:</span>
-          <span className="font-black text-slate-900 font-mono text-sm">
-            {formatMoneyCompact(totals.gross)}
+          <span className="text-slate-500 block text-xs">مجموع ناخالص کارکرد:</span>
+          <span className="font-bold text-slate-900 tabular-nums text-sm">
+            <Money rial={totals.gross} compact />
           </span>
         </div>
         <div>
-          <span className="text-slate-500 block text-[11px]">مجموع کسورات قانونی:</span>
-          <span className="font-bold text-rose-700 font-mono text-sm">
-            {formatMoneyCompact(totals.deductions)}
+          <span className="text-slate-500 block text-xs">مجموع کسورات قانونی:</span>
+          <span className="font-bold text-rose-700 tabular-nums text-sm">
+            <Money rial={totals.deductions} compact />
           </span>
         </div>
         <div>
-          <span className="text-slate-500 block text-[11px]">خالص مصوب قابل پرداخت:</span>
-          <span className="font-black text-indigo-900 font-mono text-sm">
-            {formatMoneyCompact(totals.net)}
+          <span className="text-slate-500 block text-xs">خالص مصوب قابل پرداخت:</span>
+          <span className="font-bold text-indigo-900 tabular-nums text-sm">
+            <Money rial={totals.net} compact />
           </span>
         </div>
         <div>
-          <span className="text-slate-500 block text-[11px]">کل دریافتی نقد و اسناد:</span>
-          <span className="font-bold text-emerald-700 font-mono text-sm">
-            {formatMoneyCompact(totals.received)}
+          <span className="text-slate-500 block text-xs">کل دریافتی نقد و اسناد:</span>
+          <span className="font-bold text-emerald-700 tabular-nums text-sm">
+            <Money rial={totals.received} compact />
           </span>
         </div>
         <div>
-          <span className="text-slate-500 block text-[11px]">مانده مطالبات وصول‌نشده:</span>
-          <span className="font-black text-rose-600 font-mono text-sm">
-            {formatMoneyCompact(totals.remaining)}
+          <span className="text-slate-500 block text-xs">مانده مطالبات وصول‌نشده:</span>
+          <span className="font-bold text-rose-700 tabular-nums text-sm">
+            <Money rial={totals.remaining} compact />
           </span>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 text-xs">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 text-sm">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-          <input
+          <Search className="w-4 h-4 text-slate-500 absolute right-3 top-2.5" />
+          <input aria-label="جستجو در شماره صورت‌وضعیت، پیمان، پروژه یا کارفرما"
             type="text"
             placeholder="جستجو در شماره صورت‌وضعیت، پیمان، پروژه یا کارفرما..."
             value={searchTerm}
@@ -142,7 +144,7 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
+          <select aria-label="فیلتر: مراحل گردش کار"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="p-2 rounded-lg border border-slate-200 bg-white"
@@ -158,7 +160,7 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
             <option value="returned_for_correction">بازگشت جهت اصلاح</option>
           </select>
 
-          <select
+          <select aria-label="فیلتر: انواع صورت‌وضعیت"
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             className="p-2 rounded-lg border border-slate-200 bg-white"
@@ -173,8 +175,8 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
       </div>
 
       {/* Statements Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
-        <table className="w-full text-right text-xs">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-xs table-scroll">
+        <table className="w-full text-right text-sm">
           <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
             <tr>
               <th className="p-3">شماره سند</th>
@@ -200,48 +202,48 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
                   onClick={() => onSelectStatement(stm)}
                   className="hover:bg-slate-50/80 transition-colors cursor-pointer"
                 >
-                  <td className="p-3 font-bold text-slate-900">{stm.statementNumber}</td>
+                  <td className="p-3 font-bold text-slate-900">{formatText(stm.statementNumber)}</td>
                   <td className="p-3 max-w-xs">
-                    <span className="font-bold text-slate-800 block truncate">{stm.projectName}</span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">
-                      {stm.contractCode} · {stm.client}
+                    <span className="font-bold text-slate-800 block truncate">{formatText(stm.projectName)}</span>
+                    <span className="text-xs text-slate-500 block mt-1">
+                      {formatText(stm.contractCode)} · {formatText(stm.client)}
                     </span>
                   </td>
-                  <td className="p-3 text-slate-600 font-mono text-[11px]">
-                    {stm.periodStartDate} تا {stm.periodEndDate}
+                  <td className="p-3 text-slate-600 tabular-nums text-sm">
+                    {formatText(stm.periodStartDate)} تا {formatText(stm.periodEndDate)}
                   </td>
                   <td className="p-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700">
-                      {stm.type}
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-slate-100 text-slate-700">
+                      {formatText(stm.type)}
                     </span>
                   </td>
-                  <td className="p-3 text-left font-mono font-bold text-slate-800">
+                  <td className="p-3 text-left tabular-nums font-bold text-slate-800">
                     {formatMoney(stm.grossAmount, false)}
                   </td>
-                  <td className="p-3 text-left font-mono text-rose-700">
+                  <td className="p-3 text-left tabular-nums text-rose-700">
                     {formatMoney(stm.totalDeductions, false)}
                   </td>
-                  <td className="p-3 text-left font-mono font-bold text-indigo-900">
+                  <td className="p-3 text-left tabular-nums font-bold text-indigo-900">
                     {formatMoney(stm.netPayable, false)}
                   </td>
-                  <td className="p-3 text-left font-mono font-bold text-emerald-700">
+                  <td className="p-3 text-left tabular-nums font-bold text-emerald-700">
                     {formatMoney(stm.receivedAmount, false)}
                   </td>
-                  <td className="p-3 text-left font-mono font-bold text-rose-600">
+                  <td className="p-3 text-left tabular-nums font-bold text-rose-700">
                     {formatMoney(stm.remainingPayable, false)}
                   </td>
                   <td className="p-3 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${meta.color}`}>
-                      {meta.label}
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${meta.color}`}>
+                      {formatText(meta.label)}
                     </span>
                   </td>
                   <td className="p-3 text-center">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`px-2 py-1 rounded-full text-xs font-bold ${
                         stm.paymentStatus === 'Paid'
                           ? 'bg-emerald-100 text-emerald-800'
                           : stm.paymentStatus === 'Overdue'
-                          ? 'bg-rose-100 text-rose-800 font-black'
+                          ? 'bg-rose-100 text-rose-800 font-bold'
                           : stm.paymentStatus === 'Partially Paid'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-slate-100 text-slate-700'
@@ -262,7 +264,7 @@ export const ProgressStatementsListView: React.FC<ProgressStatementsListViewProp
                         e.stopPropagation();
                         onSelectStatement(stm);
                       }}
-                      className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold cursor-pointer"
+                      className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold cursor-pointer"
                     >
                       مشاهده و چاپ
                     </button>

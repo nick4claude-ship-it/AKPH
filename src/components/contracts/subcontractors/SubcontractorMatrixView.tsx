@@ -18,8 +18,9 @@ import {
   Download,
 } from 'lucide-react';
 import { formatMoneyCompact } from '../../../utils/money';
-import { formatDecimal, formatPercent, formatInt } from '../../../utils/formatters';
+import { formatDecimal, formatPercent, formatInt, formatText } from '../../../utils/formatters';
 import { subcontractMatrix } from '../../../store/views/contracts';
+import { Money } from '../../common/Money';
 
 interface SubcontractorMatrixViewProps {
   contracts: SubcontractorContract[];
@@ -64,10 +65,10 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+      <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-black text-slate-900">
+            <h3 className="text-lg font-bold text-slate-900">
               ماتریس جامع مالی: تفکیک بر اساس پروژه و پیمانکار جزء
             </h3>
             <p className="text-xs text-slate-500 mt-1">
@@ -76,7 +77,7 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+            <span className="text-sm font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-lg border border-slate-200">
               {formatInt(filteredContracts.length)} پیمانکار در ماتریس
             </span>
           </div>
@@ -85,36 +86,36 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100">
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-            <input
+            <Search className="w-4 h-4 text-slate-500 absolute right-3 top-3" />
+            <input aria-label="جستجو در پیمانکار یا رشته"
               type="text"
               placeholder="جستجو در پیمانکار یا رشته..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
             />
           </div>
 
           <div>
-            <select
+            <select aria-label="فیلتر: پروژه‌ها"
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium cursor-pointer"
             >
               <option value="all">همه پروژه‌ها</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {formatText(p.name)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <select
+            <select aria-label="فیلتر: رشته‌های کاری"
               value={selectedTrade}
               onChange={(e) => setSelectedTrade(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium cursor-pointer"
             >
               <option value="all">همه رشته‌های کاری</option>
               {tradeTypes.map((t) => (
@@ -137,53 +138,53 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
           return (
             <div
               key={projectId}
-              className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden"
+              className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden"
             >
               {/* Project Header Bar */}
               <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
                     <Building className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">{projectName}</h4>
-                    <span className="text-[11px] text-slate-300">
+                    <h4 className="font-bold text-base">{projectName}</h4>
+                    <span className="text-sm text-slate-300">
                       تعداد پیمانکاران جزء: {formatDecimal(projectContracts.length)} اکیپ
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-4 text-sm">
                   <div>
-                    <span className="text-slate-400 text-[10px] block">کل تعهدات پروژه:</span>
+                    <span className="text-slate-500 text-xs block">کل تعهدات پروژه:</span>
                     <strong className="text-amber-400">
-                      {formatMoneyCompact(prjContractTotal)}
+                      <Money rial={prjContractTotal} compact />
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[10px] block">کارکرد متره:</span>
+                    <span className="text-slate-500 text-xs block">کارکرد متره:</span>
                     <strong className="text-blue-400">
-                      {formatMoneyCompact(prjExecutedTotal)}
+                      <Money rial={prjExecutedTotal} compact />
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[10px] block">پرداخت‌شده:</span>
+                    <span className="text-slate-500 text-xs block">پرداخت‌شده:</span>
                     <strong className="text-emerald-400">
-                      {formatMoneyCompact(prjPaidTotal)}
+                      <Money rial={prjPaidTotal} compact />
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[10px] block">مانده بدهی تاییدشده:</span>
-                    <strong className="text-rose-400 font-black">
-                      {formatMoneyCompact(prjDebtTotal)}
+                    <span className="text-slate-500 text-xs block">مانده بدهی تاییدشده:</span>
+                    <strong className="text-rose-400 font-bold">
+                      <Money rial={prjDebtTotal} compact />
                     </strong>
                   </div>
                 </div>
               </div>
 
               {/* Table of Subcontractors for this Project */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
+              <div className="table-scroll">
+                <table className="w-full text-right text-sm">
                   <thead>
                     <tr className="bg-slate-100/70 text-slate-600 font-bold border-b border-slate-200">
                       <th className="p-3">رشته و پیمانکار جزء</th>
@@ -201,60 +202,60 @@ export const SubcontractorMatrixView: React.FC<SubcontractorMatrixViewProps> = (
                       return (
                         <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                           <td className="p-3">
-                            <div className="font-bold text-slate-900">{c.subcontractorName}</div>
-                            <div className="text-[10px] text-amber-700 font-medium flex items-center gap-1 mt-0.5">
+                            <div className="font-bold text-slate-900">{formatText(c.subcontractorName)}</div>
+                            <div className="text-sm text-amber-700 font-medium flex items-center gap-1 mt-1">
                               <Hammer className="w-3 h-3" />
-                              <span>{c.tradeType}</span>
-                              <span className="text-slate-400 font-mono">({c.contractNumber})</span>
+                              <span>{formatText(c.tradeType)}</span>
+                              <span className="text-slate-500 tabular-nums">({c.contractNumber})</span>
                             </div>
                           </td>
 
-                          <td className="p-3 text-left font-black text-slate-900">
-                            {formatMoneyCompact(c.contractValue)}
+                          <td className="p-3 text-left font-bold text-slate-900">
+                            <Money rial={c.contractValue} compact />
                                                       </td>
 
                           <td className="p-3 text-left font-bold text-blue-700">
-                            {formatMoneyCompact(c.executedValue)}
-                            <span className="text-[10px] text-blue-500 block font-normal">
+                            <Money rial={c.executedValue} compact />
+                            <span className="text-sm text-blue-700 block font-normal">
                               {formatPercent(progressOf.get(c.id)!.executedPercent, 0)} پیشرفت
                             </span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-purple-700">
-                            {formatMoneyCompact(c.approvedStatementsValue)}
-                            <span className="text-[10px] text-purple-500 block font-normal">
+                            <Money rial={c.approvedStatementsValue} compact />
+                            <span className="text-sm text-purple-700 block font-normal">
                               {formatPercent(progressOf.get(c.id)!.approvedPercent, 0)} پیمان
                             </span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-emerald-700">
-                            {formatMoneyCompact(c.paidValue)}
-                            <span className="text-[10px] text-emerald-600 block font-normal">
+                            <Money rial={c.paidValue} compact />
+                            <span className="text-sm text-emerald-700 block font-normal">
                               {formatPercent(progressOf.get(c.id)!.settledPercent, 0)} تسویه
                             </span>
                           </td>
 
-                          <td className="p-3 text-left font-black text-rose-700">
-                            {formatMoneyCompact(c.remainingPayableValue)}
-                            <span className="text-[10px] text-rose-500 block font-normal">بدهی فوری</span>
+                          <td className="p-3 text-left font-bold text-rose-700">
+                            <Money rial={c.remainingPayableValue} compact />
+                            <span className="text-sm text-rose-700 block font-normal">بدهی فوری</span>
                           </td>
 
                           <td className="p-3 text-left font-bold text-teal-700">
-                            {formatMoneyCompact(c.remainingContractValue)}
-                            <span className="text-[10px] text-teal-600 block font-normal">ظرفیت کار</span>
+                            <Money rial={c.remainingContractValue} compact />
+                            <span className="text-sm text-teal-700 block font-normal">ظرفیت کار</span>
                           </td>
 
                           <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                            <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={() => onSelectContract(c)}
-                                className="px-2 py-1 rounded bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 text-[11px] font-bold transition-all cursor-pointer"
+                                className="px-2 py-1 rounded bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 text-xs font-bold transition-all cursor-pointer"
                               >
                                 جزئیات
                               </button>
                               <button
                                 onClick={() => onOpenNewStatement(c)}
-                                className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-black transition-all cursor-pointer"
+                                className="btn btn-primary btn-sm"
                               >
                                 صورت‌وضعیت
                               </button>

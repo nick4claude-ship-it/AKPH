@@ -4,7 +4,7 @@ import { Project, Supplier } from '../../types';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { getRelativePersianDate } from '../../utils/date';
-import { toPersianDigits, formatInt } from '../../utils/formatters';
+import { toPersianDigits, formatInt, formatText } from '../../utils/formatters';
 import { useSelector } from '../../store/AppStore';
 import {
   blankPurchaseOrderLine,
@@ -13,6 +13,7 @@ import {
   type PurchaseOrderLineInput,
 } from '../../store/views/procurement';
 import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
+import { Money } from '../common/Money';
 
 interface NewPurchaseOrderModalProps {
   isOpen: boolean;
@@ -69,39 +70,39 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="صدور برگ سفارش قطعی خرید (PO)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="صدور برگ سفارش قطعی خرید (PO)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
       
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+            <div className="p-2 bg-amber-50 text-amber-700 rounded-lg">
               <FileCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">صدور برگ سفارش قطعی خرید (PO)</h3>
+              <h3 className="text-base font-bold text-slate-800">صدور برگ سفارش قطعی خرید</h3>
               <p className="text-xs text-slate-500">انعقاد قرارداد رسمی تأمین کالا، شرایط تحویل و تسویه مالی</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-6 text-sm">
           {/* Supplier & Project */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="new-purchase-order-modal-1" className="block font-bold text-slate-700 mb-1">انتخاب تأمین‌کننده از وندورلیست (AVL):</label>
+              <label htmlFor="new-purchase-order-modal-1" className="block font-bold text-slate-700 mb-1">انتخاب تأمین‌کننده از وندورلیست:</label>
               <select id="new-purchase-order-modal-1"
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden font-bold text-slate-800"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden font-bold text-slate-800"
               >
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} - رسته: {s.category} (گرید {s.grade})
+                    {formatText(s.name)} - رسته: {formatText(s.category)} (گرید {formatText(s.grade)})
                   </option>
                 ))}
               </select>
@@ -112,10 +113,10 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
               <select id="new-purchase-order-modal-2"
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
               >
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                  <option key={p.id} value={p.id}>{formatText(p.name)} ({p.code})</option>
                 ))}
               </select>
             </div>
@@ -129,7 +130,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                 value={destinationWarehouse}
                 onChange={(e) => setDestinationWarehouse(e.target.value)}
                 placeholder="انبار مرکزی یا پای کارگاه"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
                 required
               />
             </div>
@@ -140,7 +141,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                 value={deliveryDueDate}
                 onChange={(e) => setDeliveryDueDate(e.target.value)}
                 placeholder="۱۴۰۳/۰۷/۲۰"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
                 required
               />
             </div>
@@ -151,7 +152,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value)}
                 placeholder="مثلاً چک صیادی ۶۰ روزه"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
                 required
               />
             </div>
@@ -164,7 +165,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg font-bold hover:bg-amber-100 transition-colors cursor-pointer"
+                className="btn btn-primary"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>افزودن قلم کالا</span>
@@ -180,7 +181,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(item.id)}
-                        className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                        className="text-rose-700 hover:text-rose-700 p-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -189,64 +190,64 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
-                      <label htmlFor="new-purchase-order-modal-6" className="block text-[11px] text-slate-600 mb-1">شرح کالا:</label>
+                      <label htmlFor="new-purchase-order-modal-6" className="block text-xs text-slate-600 mb-1">شرح کالا:</label>
                       <input id="new-purchase-order-modal-6"
                         type="text"
                         value={item.materialName}
                         onChange={(e) => handleUpdateItem(item.id, 'materialName', e.target.value)}
                         placeholder="نام رسمی کالا"
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-purchase-order-modal-7" className="block text-[11px] text-slate-600 mb-1">مشخصات فنی و استاندارد کارخانه‌ای:</label>
+                      <label htmlFor="new-purchase-order-modal-7" className="block text-xs text-slate-600 mb-1">مشخصات فنی و استاندارد کارخانه‌ای:</label>
                       <input id="new-purchase-order-modal-7"
                         type="text"
                         value={item.specifications}
                         onChange={(e) => handleUpdateItem(item.id, 'specifications', e.target.value)}
                         placeholder="آلیاژ، تست کشش، ضخامت"
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
-                      <label htmlFor="new-purchase-order-modal-8" className="block text-[11px] text-slate-600 mb-1">تعداد/مقدار سفارش:</label>
+                      <label htmlFor="new-purchase-order-modal-8" className="block text-xs text-slate-600 mb-1">تعداد/مقدار سفارش:</label>
                       <IntegerInput id="new-purchase-order-modal-8"
                         value={item.orderedQty}
                         onValueChange={(v) => handleUpdateItem(item.id, 'orderedQty', v)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-purchase-order-modal-9" className="block text-[11px] text-slate-600 mb-1">واحد:</label>
+                      <label htmlFor="new-purchase-order-modal-9" className="block text-xs text-slate-600 mb-1">واحد:</label>
                       <input id="new-purchase-order-modal-9"
                         type="text"
                         value={item.unit}
                         onChange={(e) => handleUpdateItem(item.id, 'unit', e.target.value)}
                         placeholder="کیلوگرم، شاخه"
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-amber-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-purchase-order-modal-10" className="block text-[11px] text-slate-600 mb-1">نرخ توافقی فی ({moneyUnitLabel()}):</label>
+                      <label htmlFor="new-purchase-order-modal-10" className="block text-xs text-slate-600 mb-1">نرخ توافقی فی ({moneyUnitLabel()}):</label>
                       <MoneyInput id="new-purchase-order-modal-10"
                         value={item.unitPrice}
                         onValueChange={(v) => handleUpdateItem(item.id, 'unitPrice', v)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums font-bold focus:ring-2 focus:ring-amber-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-purchase-order-modal-11" className="block text-[11px] text-slate-600 mb-1">کرایه حمل و تخلیه:</label>
+                      <label htmlFor="new-purchase-order-modal-11" className="block text-xs text-slate-600 mb-1">کرایه حمل و تخلیه:</label>
                       <MoneyInput id="new-purchase-order-modal-11"
                         value={item.freightAndUnloadingCost}
                         onValueChange={(v) => handleUpdateItem(item.id, 'freightAndUnloadingCost', v)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-amber-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums focus:ring-2 focus:ring-amber-500 outline-hidden"
                       />
                     </div>
                   </div>
@@ -259,24 +260,24 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
           <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-2">
             <div className="flex justify-between items-center text-slate-600">
               <span>مبلغ خالص کالا:</span>
-              <span className="font-mono font-bold">{formatMoney(subtotal)}</span>
+              <span className="tabular-nums font-bold"><Money rial={subtotal} /></span>
             </div>
             <div className="flex justify-between items-center text-slate-600">
               <span>مالیات بر ارزش افزوده ({toPersianDigits(draft.vatRatePercent)}٪):</span>
-              <span className="font-mono font-bold">{formatMoney(totalVat)}</span>
+              <span className="tabular-nums font-bold"><Money rial={totalVat} /></span>
             </div>
             <div className="flex justify-between items-center text-slate-600">
               <span>مجموع هزینه حمل:</span>
-              <span className="font-mono font-bold">{formatMoney(totalFreight)}</span>
+              <span className="tabular-nums font-bold"><Money rial={totalFreight} /></span>
             </div>
-            <div className="border-t border-slate-200 pt-2 flex justify-between items-center font-black text-slate-900 text-sm">
+            <div className="border-t border-slate-200 pt-2 flex justify-between items-center font-bold text-slate-900 text-sm">
               <span>مبلغ نهایی سفارش (ناخالص):</span>
-              <span className="font-mono text-amber-600 text-base">{formatMoney(grandTotal)}</span>
+              <span className="tabular-nums text-amber-700 text-base"><Money rial={grandTotal} /></span>
             </div>
           </div>
 
           {formError && (
-            <p className="text-xs text-rose-700 font-bold" role="alert">
+            <p className="text-sm text-rose-700 font-bold" role="alert">
               {formError}
             </p>
           )}
@@ -285,13 +286,13 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+              className="btn btn-secondary"
             >
               انصراف
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-sm cursor-pointer"
+              className="btn btn-primary"
             >
               <Check className="w-4 h-4" />
               <span>صدور سفارش رسمی و ابلاغ به فروشنده</span>

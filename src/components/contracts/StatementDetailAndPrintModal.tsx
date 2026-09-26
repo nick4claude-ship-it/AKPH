@@ -27,9 +27,10 @@ import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { downloadTable } from '../../utils/export';
 import { clientStatementItemsCsv } from '../../store/views/exports';
-import { formatPercent, formatDecimal } from '../../utils/formatters';
+import { formatPercent, formatDecimal, formatText } from '../../utils/formatters';
 import { useCompany } from '../../store/session';
 import { clientStatementActions, statementVatPercent } from '../../store/views/contracts';
+import { Money } from '../common/Money';
 
 interface StatementDetailAndPrintModalProps {
   statement: DetailedProgressStatement;
@@ -86,7 +87,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   };
 
   return (
-    <Dialog onClose={onClose} label="صورت‌وضعیت موقت / کارکرد پیمان" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="صورت‌وضعیت موقت / کارکرد پیمان" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
       
         {/* Top Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between no-print">
@@ -96,20 +97,20 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900">{statement.statementNumber}</h2>
-                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${statusMeta[statement.status]?.color || 'bg-slate-100'}`}>
+                <h2 className="text-base font-bold text-slate-900">{formatText(statement.statementNumber)}</h2>
+                <span className={`px-2 py-1 rounded text-xs font-bold ${statusMeta[statement.status]?.color || 'bg-slate-100'}`}>
                   {statusMeta[statement.status]?.label || statement.status}
                 </span>
-                <span className="text-xs text-slate-500 font-mono">پیمان: {statement.contractCode}</span>
+                <span className="text-xs text-slate-500 tabular-nums">پیمان: {formatText(statement.contractCode)}</span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                پروژه: {statement.projectName} · کارفرما: {statement.client}
+              <p className="text-xs text-slate-500 mt-1">
+                پروژه: {formatText(statement.projectName)} · کارفرما: {formatText(statement.client)}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-xs font-medium">
+            <div className="flex items-center bg-slate-200/80 p-1 rounded-lg text-sm font-medium">
               <button
                 onClick={() => setActiveView('detail')}
                 className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
@@ -144,7 +145,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -159,29 +160,29 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               {/* Executive Financial Summary Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div>
-                  <span className="text-[11px] text-slate-500 block">کارکرد ناخالص این دوره:</span>
-                  <span className="text-base font-black text-slate-900 font-mono">
-                    {formatMoney(statement.grossAmount)}
+                  <span className="text-xs text-slate-500 block">کارکرد ناخالص این دوره:</span>
+                  <span className="text-base font-bold text-slate-900 tabular-nums">
+                    <Money rial={statement.grossAmount} />
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-500 block">مجموع کسورات قانونی:</span>
-                  <span className="text-base font-black text-rose-700 font-mono">
-                    {formatMoney(statement.totalDeductions)}
+                  <span className="text-xs text-slate-500 block">مجموع کسورات قانونی:</span>
+                  <span className="text-base font-bold text-rose-700 tabular-nums">
+                    <Money rial={statement.totalDeductions} />
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-500 block">مبلغ خالص قابل پرداخت:</span>
-                  <span className="text-base font-black text-indigo-900 font-mono">
-                    {formatMoney(statement.netPayable)}
+                  <span className="text-xs text-slate-500 block">مبلغ خالص قابل پرداخت:</span>
+                  <span className="text-base font-bold text-indigo-900 tabular-nums">
+                    <Money rial={statement.netPayable} />
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-500 block">دریافت شده / مانده طلب:</span>
-                  <span className="text-sm font-bold text-emerald-700 font-mono block">
+                  <span className="text-xs text-slate-500 block">دریافت شده / مانده طلب:</span>
+                  <span className="text-sm font-bold text-emerald-700 tabular-nums block">
                     دریافتی: {formatMoney(statement.receivedAmount, false)}
                   </span>
-                  <span className="text-xs font-bold text-rose-600 font-mono block">
+                  <span className="text-sm font-bold text-rose-700 tabular-nums block">
                     مانده: {formatMoney(statement.remainingPayable)}
                   </span>
                 </div>
@@ -190,11 +191,11 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               {/* Workflow Actions Section */}
               <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-700" />
                     گردش تأییدات و عملیات صورت‌وضعیت
                   </h4>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
+                  <p className="text-sm text-slate-600 mt-1">
                     مرحله فعلی: <strong>{statusMeta[statement.status]?.label}</strong>
                   </p>
                 </div>
@@ -205,16 +206,16 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                       onClick={() => onDecide(statement.id, 'approve')}
                       disabled={!actions.advance.allowed}
                       title={actions.advance.reason}
-                      className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer"
+                      className="px-3 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold cursor-pointer"
                     >
-                      {actions.advance.label}
+                      {formatText(actions.advance.label)}
                     </button>
                   )}
 
                   {actions.canReturn && (
                     <button
                       onClick={() => setShowRejectBox(true)}
-                      className="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold cursor-pointer"
+                      className="px-3 py-2 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-sm font-bold cursor-pointer"
                     >
                       بازگشت جهت اصلاح کارگاهی
                     </button>
@@ -223,7 +224,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                   {actions.employerApproved && !accountingIssued && (
                     <button
                       onClick={handleCreateAccountingEntry}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                      className="btn btn-primary"
                     >
                       <BookOpen className="w-3.5 h-3.5" />
                       <span>ثبت سند شناسایی درآمد و مطالبات در حسابداری</span>
@@ -231,7 +232,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                   )}
 
                   {accountingIssued && (
-                    <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 text-xs font-bold flex items-center gap-1">
+                    <span className="px-2 py-1 rounded-lg bg-indigo-100 text-indigo-900 text-xs font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
                       سند حسابداری صادر شده است
                     </span>
@@ -242,9 +243,9 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               {/* Reject / Return with Reason Box */}
               {showRejectBox && (
                 <div className="p-4 rounded-xl bg-rose-50 border border-rose-300 space-y-2 animate-in fade-in">
-                  <h5 className="text-xs font-bold text-rose-900">علت بازگشت یا رد صورت‌وضعیت (اجباری):</h5>
+                  <h5 className="text-sm font-bold text-rose-900">علت بازگشت یا رد صورت‌وضعیت (اجباری):</h5>
                   {rejectError && (
-                    <p className="text-[11px] font-bold text-rose-700 bg-rose-100 p-1.5 rounded">
+                    <p className="text-sm font-bold text-rose-700 bg-rose-100 p-2 rounded">
                       لطفاً دلیل بازگشت یا اصلاح صورت‌وضعیت را بنویسید.
                     </p>
                   )}
@@ -255,7 +256,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                       if (e.target.value.trim()) setRejectError(false);
                     }}
                     placeholder="مغایرت در احجام بتن‌ریزی، عدم ارائه صورتجلسه کارگاهی، اشتباه در ضرایب تعدیل..."
-                    className="w-full text-xs p-2.5 rounded-lg border border-rose-300 bg-white focus:outline-rose-500"
+                    className="w-full text-sm p-2 rounded-lg border border-rose-300 bg-white focus:outline-rose-500"
                     rows={2}
                   />
                   <div className="flex justify-end gap-2">
@@ -264,7 +265,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                         setShowRejectBox(false);
                         setRejectError(false);
                       }}
-                      className="px-3 py-1 rounded text-xs text-slate-600 hover:bg-slate-200 cursor-pointer"
+                      className="px-3 py-1 rounded text-sm text-slate-600 hover:bg-slate-200 cursor-pointer"
                     >
                       انصراف
                     </button>
@@ -278,7 +279,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                         setShowRejectBox(false);
                         setRejectError(false);
                       }}
-                      className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+                      className="px-3 py-1 rounded bg-rose-700 hover:bg-rose-800 text-white text-sm font-bold cursor-pointer"
                     >
                       ثبت بازگشت به کارگاه
                     </button>
@@ -288,45 +289,45 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
 
               {/* Items Table */}
               <div>
-                <h4 className="text-xs font-bold text-slate-800 mb-2">ریز اقلام کارکرد این دوره (BOQ Items):</h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-right text-xs">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">ریز اقلام کارکرد این دوره:</h4>
+                <div className="rounded-xl border border-slate-200 table-scroll">
+                  <table className="w-full text-right text-sm">
                     <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                       <tr>
-                        <th className="p-2.5">ردیف</th>
-                        <th className="p-2.5">کد</th>
-                        <th className="p-2.5">شرح عملیات</th>
-                        <th className="p-2.5 text-center">واحد</th>
-                        <th className="p-2.5 text-left">مقدار پیمان</th>
-                        <th className="p-2.5 text-left">کارکرد قبلی</th>
-                        <th className="p-2.5 text-left">این دوره</th>
-                        <th className="p-2.5 text-left">تجمعی</th>
-                        <th className="p-2.5 text-left">بهای واحد</th>
-                        <th className="p-2.5 text-left">مبلغ این دوره</th>
+                        <th className="p-2">ردیف</th>
+                        <th className="p-2">کد</th>
+                        <th className="p-2">شرح عملیات</th>
+                        <th className="p-2 text-center">واحد</th>
+                        <th className="p-2 text-left">مقدار پیمان</th>
+                        <th className="p-2 text-left">کارکرد قبلی</th>
+                        <th className="p-2 text-left">این دوره</th>
+                        <th className="p-2 text-left">تجمعی</th>
+                        <th className="p-2 text-left">بهای واحد</th>
+                        <th className="p-2 text-left">مبلغ این دوره</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {statement.items.map((i) => (
                         <tr key={i.id} className="hover:bg-slate-50">
-                          <td className="p-2.5 font-mono text-slate-500">{i.rowNumber}</td>
-                          <td className="p-2.5 font-mono font-bold text-blue-700">{i.code}</td>
-                          <td className="p-2.5 max-w-xs font-medium text-slate-900">{i.description}</td>
-                          <td className="p-2.5 text-center font-bold text-slate-600">{i.unit}</td>
-                          <td className="p-2.5 text-left font-mono">{formatDecimal(i.contractQuantity)}</td>
-                          <td className="p-2.5 text-left font-mono">{formatDecimal(i.previousQuantity)}</td>
-                          <td className="p-2.5 text-left font-mono font-bold text-amber-700">
+                          <td className="p-2 tabular-nums text-slate-500">{formatText(i.rowNumber)}</td>
+                          <td className="p-2 tabular-nums font-bold text-blue-700">{formatText(i.code)}</td>
+                          <td className="p-2 max-w-xs font-medium text-slate-900">{formatText(i.description)}</td>
+                          <td className="p-2 text-center font-bold text-slate-600">{formatText(i.unit)}</td>
+                          <td className="p-2 text-left tabular-nums">{formatDecimal(i.contractQuantity)}</td>
+                          <td className="p-2 text-left tabular-nums">{formatDecimal(i.previousQuantity)}</td>
+                          <td className="p-2 text-left tabular-nums font-bold text-amber-700">
                             {formatDecimal(i.currentQuantity)}
                           </td>
-                          <td className="p-2.5 text-left font-mono font-bold text-indigo-900">
+                          <td className="p-2 text-left tabular-nums font-bold text-indigo-900">
                             {formatDecimal(i.cumulativeQuantity)}
                             {i.isExceeded && (
-                              <span className="block text-[9px] text-rose-600 font-bold">
+                              <span className="block text-sm text-rose-700 font-bold">
                                 مازاد بر پیمان (+{formatDecimal(i.exceededQuantity)})
                               </span>
                             )}
                           </td>
-                          <td className="p-2.5 text-left font-mono">{formatMoney(i.unitRate, false)}</td>
-                          <td className="p-2.5 text-left font-mono font-bold text-slate-900">
+                          <td className="p-2 text-left tabular-nums">{formatMoney(i.unitRate, false)}</td>
+                          <td className="p-2 text-left tabular-nums font-bold text-slate-900">
                             {formatMoney(i.currentAmount, false)}
                           </td>
                         </tr>
@@ -338,40 +339,40 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
 
               {/* Deductions Breakdown Table */}
               <div>
-                <h4 className="text-xs font-bold text-slate-800 mb-2">جدول تفکیک کسورات قانونی و قراردادی:</h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-right text-xs">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">جدول تفکیک کسورات قانونی و قراردادی:</h4>
+                <div className="rounded-xl border border-slate-200 table-scroll">
+                  <table className="w-full text-right text-sm">
                     <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                       <tr>
-                        <th className="p-2.5">عنوان کسری</th>
-                        <th className="p-2.5">نوع محاسبه</th>
-                        <th className="p-2.5 text-center">درصد / ضریب</th>
-                        <th className="p-2.5 text-left">مبلغ مبنا ({moneyUnitLabel()})</th>
-                        <th className="p-2.5 text-left">مبلغ کسور ({moneyUnitLabel()})</th>
-                        <th className="p-2.5">توضیحات و مستندات</th>
+                        <th className="p-2">عنوان کسری</th>
+                        <th className="p-2">نوع محاسبه</th>
+                        <th className="p-2 text-center">درصد / ضریب</th>
+                        <th className="p-2 text-left">مبلغ مبنا ({moneyUnitLabel()})</th>
+                        <th className="p-2 text-left">مبلغ کسور ({moneyUnitLabel()})</th>
+                        <th className="p-2">توضیحات و مستندات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {statement.deductions.map((d) => (
                         <tr key={d.id} className="hover:bg-slate-50">
-                          <td className="p-2.5 font-bold text-slate-900">{d.title}</td>
-                          <td className="p-2.5 text-slate-600">{d.mode === 'percentage' ? 'درصدی' : 'مبلغ مقطوع'}</td>
-                          <td className="p-2.5 text-center font-bold text-slate-700">{d.rate > 0 ? `${d.rate}٪` : '-'}</td>
-                          <td className="p-2.5 text-left font-mono">{formatMoney(d.baseAmount, false)}</td>
-                          <td className="p-2.5 text-left font-mono font-bold text-rose-700">
+                          <td className="p-2 font-bold text-slate-900">{formatText(d.title)}</td>
+                          <td className="p-2 text-slate-600">{d.mode === 'percentage' ? 'درصدی' : 'مبلغ مقطوع'}</td>
+                          <td className="p-2 text-center font-bold text-slate-700">{d.rate > 0 ? `${d.rate}٪` : '-'}</td>
+                          <td className="p-2 text-left tabular-nums">{formatMoney(d.baseAmount, false)}</td>
+                          <td className="p-2 text-left tabular-nums font-bold text-rose-700">
                             {formatMoney(d.calculatedAmount, false)}
                           </td>
-                          <td className="p-2.5 text-slate-500 text-[11px]">{d.description || '-'}</td>
+                          <td className="p-2 text-slate-500 text-xs">{formatText(d.description || '-')}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                       <tr>
-                        <td colSpan={4} className="p-2.5 text-left font-black">
+                        <td colSpan={4} className="p-2 text-left font-bold">
                           مجموع کل کسورات دوره:
                         </td>
-                        <td className="p-2.5 text-left font-mono font-black text-rose-800">
-                          {formatMoney(statement.totalDeductions)}
+                        <td className="p-2 text-left tabular-nums font-bold text-rose-800">
+                          <Money rial={statement.totalDeductions} />
                         </td>
                         <td></td>
                       </tr>
@@ -382,33 +383,33 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
             </div>
           ) : (
             /* OFFICIAL PRINT PREVIEW (FORMAL IRANIAN CONTRACT PROGRESS STATEMENT) */
-            <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-xs max-w-4xl mx-auto space-y-6 font-sans text-xs">
+            <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-xs max-w-4xl mx-auto space-y-6 font-sans text-sm">
               {/* Letterhead */}
               <div className="border-b-2 border-slate-900 pb-4 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <Building className="w-6 h-6 text-slate-900" />
-                    <span className="text-base font-black text-slate-900 tracking-tight">
-                      {company.legalName}
+                    <span className="text-base font-bold text-slate-900">
+                      {formatText(company.legalName)}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-600 block mt-1">
+                  <span className="text-sm text-slate-600 block mt-1">
                     دفتر فنی و امور قراردادهای پروژه‌های عمرانی
                   </span>
                 </div>
 
                 <div className="text-center">
-                  <h3 className="text-sm font-black text-slate-900 border-2 border-slate-900 px-4 py-1 rounded">
+                  <h3 className="text-base font-bold text-slate-900 border-2 border-slate-900 px-4 py-1 rounded">
                     صورت‌وضعیت موقت / کارکرد پیمان
                   </h3>
-                  <span className="text-[10px] text-slate-500 block mt-1">
+                  <span className="text-xs text-slate-500 block mt-1">
                     منطبق بر نشریه ۴۳۱۱ سازمان برنامه و بودجه
                   </span>
                 </div>
 
-                <div className="text-left text-[11px] text-slate-600 space-y-0.5 font-mono">
-                  <div>شماره سند: <strong>{statement.statementNumber}</strong></div>
-                  <div>تاریخ تهیه: <strong>{statement.preparationDate}</strong></div>
+                <div className="text-left text-sm text-slate-600 space-y-1 tabular-nums">
+                  <div>شماره سند: <strong>{formatText(statement.statementNumber)}</strong></div>
+                  <div>تاریخ تهیه: <strong>{formatText(statement.preparationDate)}</strong></div>
                   <div>صفحه: <strong>۱ از ۳</strong></div>
                 </div>
               </div>
@@ -416,63 +417,63 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               {/* Contract Information Box */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded border border-slate-200 text-slate-800">
                 <div>
-                  <span className="text-[10px] text-slate-500 block">پروژه:</span>
-                  <span className="font-bold">{statement.projectName}</span>
+                  <span className="text-xs text-slate-500 block">پروژه:</span>
+                  <span className="font-bold">{formatText(statement.projectName)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">شماره و تاریخ پیمان:</span>
-                  <span className="font-mono">{statement.contractNumber}</span>
+                  <span className="text-xs text-slate-500 block">شماره و تاریخ پیمان:</span>
+                  <span className="tabular-nums">{formatText(statement.contractNumber)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">دستگاه اجرایی / کارفرما:</span>
-                  <span className="font-bold">{statement.client}</span>
+                  <span className="text-xs text-slate-500 block">دستگاه اجرایی / کارفرما:</span>
+                  <span className="font-bold">{formatText(statement.client)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">مهندسین مشاور:</span>
-                  <span className="font-bold">{statement.consultant}</span>
+                  <span className="text-xs text-slate-500 block">مهندسین مشاور:</span>
+                  <span className="font-bold">{formatText(statement.consultant)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">دوره کارکرد:</span>
-                  <span className="font-mono">از {statement.periodStartDate} تا {statement.periodEndDate}</span>
+                  <span className="text-xs text-slate-500 block">دوره کارکرد:</span>
+                  <span className="tabular-nums">از {formatText(statement.periodStartDate)} تا {formatText(statement.periodEndDate)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">پیمانکار:</span>
-                  <span className="font-bold">{company.name}</span>
+                  <span className="text-xs text-slate-500 block">پیمانکار:</span>
+                  <span className="font-bold">{formatText(company.name)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">تعدیل آحادبها:</span>
-                  <span className="font-mono font-bold">{formatMoney(statement.adjustmentAmount)}</span>
+                  <span className="text-xs text-slate-500 block">تعدیل آحادبها:</span>
+                  <span className="tabular-nums font-bold"><Money rial={statement.adjustmentAmount} /></span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">مالیات بر ارزش افزوده:</span>
-                  <span className="font-mono font-bold">{formatMoney(statement.vatAmount)}</span>
+                  <span className="text-xs text-slate-500 block">مالیات بر ارزش افزوده:</span>
+                  <span className="tabular-nums font-bold"><Money rial={statement.vatAmount} /></span>
                 </div>
               </div>
 
               {/* Items Condensed Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-[11px] border border-slate-300 border-collapse">
+              <div className="table-scroll">
+                <table className="w-full text-right text-sm border border-slate-300 border-collapse">
                   <thead>
                     <tr className="bg-slate-200 text-slate-900 border-b border-slate-300 font-bold">
-                      <th className="p-1.5 border border-slate-300">ردیف</th>
-                      <th className="p-1.5 border border-slate-300">کد</th>
-                      <th className="p-1.5 border border-slate-300">شرح مختصر عملیات</th>
-                      <th className="p-1.5 border border-slate-300 text-center">واحد</th>
-                      <th className="p-1.5 border border-slate-300 text-left">کارکرد این دوره</th>
-                      <th className="p-1.5 border border-slate-300 text-left">بهای واحد</th>
-                      <th className="p-1.5 border border-slate-300 text-left">مبلغ دوره ({moneyUnitLabel()})</th>
+                      <th className="p-2 border border-slate-300">ردیف</th>
+                      <th className="p-2 border border-slate-300">کد</th>
+                      <th className="p-2 border border-slate-300">شرح مختصر عملیات</th>
+                      <th className="p-2 border border-slate-300 text-center">واحد</th>
+                      <th className="p-2 border border-slate-300 text-left">کارکرد این دوره</th>
+                      <th className="p-2 border border-slate-300 text-left">بهای واحد</th>
+                      <th className="p-2 border border-slate-300 text-left">مبلغ دوره ({moneyUnitLabel()})</th>
                     </tr>
                   </thead>
                   <tbody>
                     {statement.items.map((i) => (
                       <tr key={i.id} className="border-b border-slate-200">
-                        <td className="p-1.5 border border-slate-300 font-mono text-center">{i.rowNumber}</td>
-                        <td className="p-1.5 border border-slate-300 font-mono text-center">{i.code}</td>
-                        <td className="p-1.5 border border-slate-300">{i.description}</td>
-                        <td className="p-1.5 border border-slate-300 text-center">{i.unit}</td>
-                        <td className="p-1.5 border border-slate-300 text-left font-mono">{formatDecimal(i.currentQuantity)}</td>
-                        <td className="p-1.5 border border-slate-300 text-left font-mono">{formatMoney(i.unitRate, false)}</td>
-                        <td className="p-1.5 border border-slate-300 text-left font-mono font-bold">{formatMoney(i.currentAmount, false)}</td>
+                        <td className="p-2 border border-slate-300 tabular-nums text-center">{formatText(i.rowNumber)}</td>
+                        <td className="p-2 border border-slate-300 tabular-nums text-center">{formatText(i.code)}</td>
+                        <td className="p-2 border border-slate-300">{formatText(i.description)}</td>
+                        <td className="p-2 border border-slate-300 text-center">{formatText(i.unit)}</td>
+                        <td className="p-2 border border-slate-300 text-left tabular-nums">{formatDecimal(i.currentQuantity)}</td>
+                        <td className="p-2 border border-slate-300 text-left tabular-nums">{formatMoney(i.unitRate, false)}</td>
+                        <td className="p-2 border border-slate-300 text-left tabular-nums font-bold">{formatMoney(i.currentAmount, false)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -480,45 +481,45 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               </div>
 
               {/* Financial Calculation Statement */}
-              <div className="bg-slate-50 p-4 rounded border border-slate-300 space-y-2 text-xs">
+              <div className="bg-slate-50 p-4 rounded border border-slate-300 space-y-2 text-sm">
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۱. کارکرد عملیات این دوره:</span>
-                  <span className="font-mono font-bold">{formatMoney(statement.workAmountCurrent)}</span>
+                  <span className="tabular-nums font-bold"><Money rial={statement.workAmountCurrent} /></span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۲. تعدیل آحادبها و مابه‌التفاوت مصالح:</span>
-                  <span className="font-mono font-bold">+{formatMoney(statement.adjustmentAmount)}</span>
+                  <span className="tabular-nums font-bold">+<Money rial={statement.adjustmentAmount} /></span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۳. مصالح پای‌کار و سایر اقلام مجاز:</span>
-                  <span className="font-mono font-bold">+{formatMoney(statement.otherAllowableItemsAmount)}</span>
+                  <span className="tabular-nums font-bold">+<Money rial={statement.otherAllowableItemsAmount} /></span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-200">
                   <span>۴. مالیات بر ارزش افزوده ({formatPercent(statementVatPercent(statement))}):</span>
-                  <span className="font-mono font-bold">+{formatMoney(statement.vatAmount)}</span>
+                  <span className="tabular-nums font-bold">+<Money rial={statement.vatAmount} /></span>
                 </div>
-                <div className="flex justify-between py-1.5 bg-slate-200 px-2 rounded font-black text-slate-900">
-                  <span>مجموع ناخالص کارکرد دوره (Gross Amount):</span>
-                  <span className="font-mono">{formatMoney(statement.grossAmount)}</span>
+                <div className="flex justify-between py-2 bg-slate-200 px-2 rounded font-bold text-slate-900">
+                  <span>مجموع ناخالص کارکرد دوره:</span>
+                  <span className="tabular-nums"><Money rial={statement.grossAmount} /></span>
                 </div>
                 <div className="flex justify-between py-1 text-rose-700">
                   <span>کسورات قانونی و قراردادی (استرداد پیش‌پرداخت، حسن انجام کار، بیمه و...):</span>
-                  <span className="font-mono font-bold">-{formatMoney(statement.totalDeductions)}</span>
+                  <span className="tabular-nums font-bold">-<Money rial={statement.totalDeductions} /></span>
                 </div>
-                <div className="flex justify-between py-2 bg-amber-100 text-amber-950 px-2 rounded font-black text-sm">
-                  <span>مبلغ خالص قابل پرداخت به پیمانکار (Net Payable):</span>
-                  <span className="font-mono">{formatMoney(statement.netPayable)}</span>
+                <div className="flex justify-between py-2 bg-amber-100 text-amber-950 px-2 rounded font-bold text-sm">
+                  <span>مبلغ خالص قابل پرداخت به پیمانکار:</span>
+                  <span className="tabular-nums"><Money rial={statement.netPayable} /></span>
                 </div>
               </div>
 
               {/* Matrix of 4 Legal Signatures */}
-              <div className="pt-6 border-t-2 border-slate-400 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-[10px]">
+              <div className="pt-6 border-t-2 border-slate-400 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
                 <div className="space-y-12">
                   <div>
-                    <span className="font-bold text-slate-800 block">پیمانکار - {company.name}</span>
+                    <span className="font-bold text-slate-800 block">پیمانکار - {formatText(company.name)}</span>
                     <span className="text-slate-500 block">سرپرست کارگاه و مدیر پروژه</span>
                   </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-400">
+                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
                     امضا و مهر
                   </div>
                 </div>
@@ -528,7 +529,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                     <span className="font-bold text-slate-800 block">مهندسین مشاور سازه‌اندیش</span>
                     <span className="text-slate-500 block">سرناظر مقیم و مدیر فنی</span>
                   </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-400">
+                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
                     امضا و مهر
                   </div>
                 </div>
@@ -538,7 +539,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                     <span className="font-bold text-slate-800 block">دستگاه اجرایی / کارفرما</span>
                     <span className="text-slate-500 block">نماینده فنی و مدیر طرح</span>
                   </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-400">
+                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
                     امضا و مهر
                   </div>
                 </div>
@@ -548,7 +549,7 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                     <span className="font-bold text-slate-800 block">مدیریت امور مالی شرکت</span>
                     <span className="text-slate-500 block">کنترل و تطبیق حسابداری</span>
                   </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-400">
+                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
                     امضا و مهر
                   </div>
                 </div>

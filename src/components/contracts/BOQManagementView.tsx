@@ -17,7 +17,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
-import { formatDecimal, formatInt } from '../../utils/formatters';
+import { formatDecimal, formatInt, formatText } from '../../utils/formatters';
 
 interface BOQManagementViewProps {
   contracts: Contract[];
@@ -54,28 +54,28 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
         <div>
-          <h2 className="text-sm font-bold text-slate-900">
-            مدیریت فهرست‌بها، مقادیر کارکرد و انبار (BOQ & Quantity Control Engine)
+          <h2 className="text-base font-bold text-slate-900">
+            مدیریت فهرست‌بها، مقادیر کارکرد و انبار
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-1">
             پایش هوشمند انحراف احجام، هشدار عبور از سقف ۲۵٪ پیمان، و اتصال مصالح به انبار کارگاهی
           </p>
         </div>
 
         {surplusCount > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold">
+            <AlertTriangle className="w-4 h-4 text-rose-700" />
             <span>{formatDecimal(surplusCount)} ردیف مازاد بر سقف پیمان نیازمند الحاقیه</span>
           </div>
         )}
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 text-xs">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 text-sm">
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
-            <input
+            <Search className="w-4 h-4 text-slate-500 absolute right-3 top-2.5" />
+            <input aria-label="جستجو در شرح عملیات، کد آیتم یا فصل"
               type="text"
               placeholder="جستجو در شرح عملیات، کد آیتم یا فصل..."
               value={searchTerm}
@@ -84,7 +84,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
             />
           </div>
 
-          <select
+          <select aria-label="فیلتر: قراردادها"
             value={selectedContractId}
             onChange={(e) => setSelectedContractId(e.target.value)}
             className="p-2 rounded-lg border border-slate-200 bg-white"
@@ -92,7 +92,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
             <option value="all">همه قراردادها</option>
             {contracts.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.code} - {c.projectTitle.slice(0, 30)}...
+                {formatText(c.code)} - {c.projectTitle.slice(0, 30)}...
               </option>
             ))}
           </select>
@@ -101,9 +101,9 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSurplusOnly(!surplusOnly)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 ${
               surplusOnly
-                ? 'bg-rose-600 text-white'
+                ? 'bg-rose-700 text-white'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
             }`}
           >
@@ -114,8 +114,8 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
       </div>
 
       {/* BOQ Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
-        <table className="w-full text-right text-xs">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-xs table-scroll">
+        <table className="w-full text-right text-sm">
           <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
             <tr>
               <th className="p-3">ردیف</th>
@@ -128,7 +128,7 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
               <th className="p-3 text-left">مقدار کارکرد اجراشده</th>
               <th className="p-3 text-left">مبلغ کل کارکرد</th>
               <th className="p-3 text-center">پیشرفت احجام</th>
-              <th className="p-3 text-center">اتصال به انبار (Inventory Link)</th>
+              <th className="p-3 text-center">اتصال به انبار</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -141,44 +141,44 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                     item.isSurplusQuantity ? 'bg-rose-50/40' : ''
                   }`}
                 >
-                  <td className="p-3 font-mono text-slate-500">{item.rowNumber}</td>
+                  <td className="p-3 tabular-nums text-slate-500">{formatText(item.rowNumber)}</td>
                   <td className="p-3">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
-                      {contract?.code}
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-800">
+                      {formatText(contract?.code)}
                     </span>
                   </td>
-                  <td className="p-3 font-mono font-bold text-blue-700">{item.code}</td>
+                  <td className="p-3 tabular-nums font-bold text-blue-700">{formatText(item.code)}</td>
                   <td className="p-3 max-w-sm">
-                    <span className="font-bold text-slate-900 block">{item.description}</span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">{item.chapter}</span>
+                    <span className="font-bold text-slate-900 block">{formatText(item.description)}</span>
+                    <span className="text-xs text-slate-500 block mt-1">{formatText(item.chapter)}</span>
                   </td>
-                  <td className="p-3 text-center font-bold text-slate-600">{item.unit}</td>
-                  <td className="p-3 text-left font-mono font-medium">
+                  <td className="p-3 text-center font-bold text-slate-600">{formatText(item.unit)}</td>
+                  <td className="p-3 text-left tabular-nums font-medium">
                     {formatDecimal(item.initialQuantity)}
                   </td>
-                  <td className="p-3 text-left font-mono text-slate-600">
+                  <td className="p-3 text-left tabular-nums text-slate-600">
                     {formatMoney(item.unitRate, false)}
                   </td>
-                  <td className="p-3 text-left font-mono">
+                  <td className="p-3 text-left tabular-nums">
                     <span
                       className={`font-bold ${
-                        item.isSurplusQuantity ? 'text-rose-700 font-black' : 'text-indigo-900'
+                        item.isSurplusQuantity ? 'text-rose-700 font-bold' : 'text-indigo-900'
                       }`}
                     >
                       {formatDecimal(item.cumulativeExecutedQuantity)}
                     </span>
                     {item.isSurplusQuantity && (
-                      <span className="block text-[10px] font-bold text-rose-600">
+                      <span className="block text-sm font-bold text-rose-700">
                         مازاد: +{formatDecimal(item.surplusQuantity)}
                       </span>
                     )}
                   </td>
-                  <td className="p-3 text-left font-mono font-bold text-slate-900">
+                  <td className="p-3 text-left tabular-nums font-bold text-slate-900">
                     {formatMoney(item.executedAmount, false)}
                   </td>
                   <td className="p-3 text-center">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-2 py-1 rounded text-xs font-bold ${
                         item.progressPercentage > 100
                           ? 'bg-rose-100 text-rose-800 border border-rose-300'
                           : item.progressPercentage >= 80
@@ -191,19 +191,19 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
                   </td>
                   <td className="p-3 text-center">
                     {item.inventoryMaterialCode ? (
-                      <div className="inline-block text-right bg-slate-50 p-1.5 rounded border border-slate-200">
+                      <div className="inline-block text-right bg-slate-50 p-2 rounded border border-slate-200">
                         <div className="flex items-center gap-1">
                           <Package className="w-3 h-3 text-indigo-600" />
-                          <span className="text-[10px] font-mono font-bold text-indigo-900">
-                            {item.inventoryMaterialCode}
+                          <span className="text-sm tabular-nums font-bold text-indigo-900">
+                            {formatText(item.inventoryMaterialCode)}
                           </span>
                         </div>
-                        <span className="text-[9px] text-slate-500 block">
-                          مصرف انبار: {formatDecimal(item.inventoryConsumedQty)} {item.unit}
+                        <span className="text-xs text-slate-500 block">
+                          مصرف انبار: {formatDecimal(item.inventoryConsumedQty)} {formatText(item.unit)}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-slate-400 text-[10px]">-</span>
+                      <span className="text-slate-500 text-xs">-</span>
                     )}
                   </td>
                 </tr>
@@ -214,17 +214,17 @@ export const BOQManagementView: React.FC<BOQManagementViewProps> = ({
       </div>
 
       {/* Inventory & Warehouse Integration Banner */}
-      <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200 text-sm text-indigo-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Package className="w-5 h-5 text-indigo-600 shrink-0" />
           <div>
-            <h4 className="font-bold">نقطه اتصال به ماژول انبار کارگاه (Inventory Integration Point)</h4>
-            <p className="text-[11px] text-indigo-800 mt-0.5">
+            <h4 className="font-bold">نقطه اتصال به ماژول انبار کارگاه</h4>
+            <p className="text-sm text-indigo-800 mt-1">
               مقادیر مصالح مصرفی کارگاه (آهن‌آلات، بتن، سیمان و تجهیزات) به صورت بلادرنگ با مقادیر اجراشده در صورت‌وضعیت مطابقت داده می‌شود تا از پرت مصالح جلوگیری شود.
             </p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-indigo-200/80 text-indigo-950 text-[11px] font-bold shrink-0">
+        <span className="px-2 py-1 rounded bg-indigo-200/80 text-indigo-950 text-xs font-bold shrink-0">
           تطبیق کارکرد با حواله خروج انبار
         </span>
       </div>

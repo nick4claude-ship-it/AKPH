@@ -13,7 +13,12 @@
 //   node scripts/ui-screens.mjs --no-build      reuse the demo build in .ui-build/
 //   node scripts/ui-screens.mjs --only=projects,ai
 //
-// Screenshots go to ui-screenshots/<width>/<route>.png (a CI artifact), the audit to ui-screenshots/audit.json.
+//   node scripts/ui-screens.mjs --skip=digits    leave a check out
+//
+// Besides the typography test it checks Latin digits in displayed text, contrast (4.5:1, large text 3:1),
+// buttons and links without an accessible name, form controls without a label and horizontal page overflow.
+// Screenshots go to ui-screenshots/<width>/<route>.png (full page) and <width>/top/<route>.png (first screen),
+// a CI artifact; the audit to ui-screenshots/audit.json.
 // The browser is Playwright's Chromium; PLAYWRIGHT_CHROMIUM (or PLAYWRIGHT_BROWSERS_PATH) selects another build.
 import { execFileSync } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -66,46 +71,129 @@ function serve(dir) {
   });
 }
 
-/** Runs in the page: every visible element that holds text of its own, with its computed type. */
+/**
+ * Runs in the page. Every visible element that holds text of its own is checked for:
+ *   small    — font size below the minimum;
+ *   font     — a family other than Vazirmatn (or any monospace) in the computed font-family;
+ *   digits   — Latin digits in displayed text (numbers are shown with Persian digits);
+ *   contrast — text/background contrast below 4.5:1 (3:1 for large text);
+ * plus buttons without an accessible name, form controls without a label, and horizontal page overflow.
+ */
 function auditPage(minPx) {
-  const out = { small: [], font: [], checked: 0 };
-  const seen = new Set();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const out = { small: [], font: [], digits: [], contrast: [], names: [], labels: [], overflow: [], checked: 0 };
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (css) => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = css;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return [r, g, b, a / 255];
+  };
+  const over = (top, under) => {
+    const a = top[3] + under[3] * (1 - top[3]);
+    if (a === 0) return [255, 255, 255, 0];
+    return [0, 1, 2].map((i) => (top[i] * top[3] + under[i] * under[3] * (1 - top[3])) / a).concat(a);
+  };
+  /**
+   * Opaque backgrounds behind an element: one color, or one per color stop when a gradient is in the way
+   * (the text must read on every stop). null when an image (url()) is behind it.
+   */
+  const backgrounds = (el) => {
+    const layers = [];
+    let stops = null;
+    for (let e = el; e; e = e.parentElement) {
+      const st = getComputedStyle(e);
+      if (st.backgroundImage && st.backgroundImage !== 'none') {
+        if (/url\(/.test(st.backgroundImage)) return null;
+        const colors = st.backgroundImage.match(/(rgba?|oklch|oklab|hsla?|color)\([^()]*\)|#[0-9a-f]{3,8}\b/gi) || [];
+        if (colors.length) {
+          stops = colors.map(rgba);
+          if (stops.every((c) => c[3] >= 1)) break;
+        }
+      }
+      const c = rgba(st.backgroundColor);
+      if (c[3] > 0) layers.push(c);
+      if (c[3] >= 1 && !stops) break;
+    }
+    let base = [255, 255, 255, 1];
+    for (let i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
+    return (stops || [[0, 0, 0, 0]]).map((stop) => over(stop, base));
+  };
+  const lum = ([r, g, b]) => {
+    const f = (v) => {
+      v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
   const describe = (el) => {
-    const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60);
-    const cls = typeof el.className === 'string' ? el.className.split(/\s+/).slice(0, 6).join(' ') : '';
+    const text = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    const cls = typeof el.className === 'string' ? el.className.split(/\s+/).slice(0, 8).join(' ') : '';
     return `<${el.tagName.toLowerCase()} class="${cls}"> ${text}`;
   };
+  const hidden = (el, style) =>
+    style.visibility === 'hidden' || style.display === 'none' || el.closest('[aria-hidden="true"], .sr-only, script, style, noscript');
+  const seen = new Set();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (!node.nodeValue || !node.nodeValue.trim()) continue;
+    const value = node.nodeValue || '';
+    if (!value.trim()) continue;
     const el = node.parentElement;
-    if (!el || seen.has(el)) continue;
-    seen.add(el);
+    if (!el) continue;
     const style = getComputedStyle(el);
-    if (style.visibility === 'hidden' || style.display === 'none' || el.closest('[aria-hidden="true"], .sr-only, script, style, noscript')) continue;
+    if (hidden(el, style)) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) continue;
+    if (/[0-9]/.test(value) && !el.closest('input, textarea, [data-latin]')) out.digits.push(`«${value.trim().slice(0, 40)}» ${describe(el)}`);
+    if (seen.has(el)) continue;
+    seen.add(el);
     out.checked++;
     const size = parseFloat(style.fontSize);
     if (size < minPx - 0.01) out.small.push(`${size}px ${describe(el)}`);
     const families = style.fontFamily.split(',').map((f) => f.trim().replace(/^["']|["']$/g, '').toLowerCase());
     if (!families[0].startsWith('vazirmatn') || families.some((f) => f.includes('mono'))) out.font.push(`${style.fontFamily} ${describe(el)}`);
+    if (!el.closest('button:disabled, [aria-disabled="true"], option')) {
+      const bgs = backgrounds(el);
+      if (bgs) {
+        const large = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700);
+        const r = Math.min(...bgs.map((bg) => ratio(over(rgba(style.color), bg), bg)));
+        if (r < (large ? 3 : 4.5) - 0.01) out.contrast.push(`${r.toFixed(2)} ${describe(el)}`);
+      }
+    }
   }
-  // Form controls render their own text (value, options, placeholder).
-  for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea, button')) {
+  for (const el of document.querySelectorAll('input:not([type=hidden]), select, textarea, button, [role=button], a[href]')) {
     const style = getComputedStyle(el);
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0 || style.display === 'none' || style.visibility === 'hidden') continue;
-    if (el.tagName !== 'BUTTON' || !seen.has(el)) {
+    if (rect.width === 0 || rect.height === 0 || hidden(el, style)) continue;
+    const isControl = /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName);
+    if (isControl) {
       if (parseFloat(style.fontSize) < minPx - 0.01) out.small.push(`${style.fontSize} <${el.tagName.toLowerCase()}> control`);
       const first = style.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
       if (!first.startsWith('vazirmatn') || /mono/i.test(style.fontFamily)) out.font.push(`${style.fontFamily} <${el.tagName.toLowerCase()}> control`);
+      const labelled = (el.labels && el.labels.length) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title');
+      if (!labelled) out.labels.push(describe(el) + ` name=${el.getAttribute('name') || ''} placeholder=${el.getAttribute('placeholder') || ''}`);
+    } else {
+      const name = (el.innerText || '').trim() || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title');
+      if (!name) out.names.push(describe(el) + ` ${el.outerHTML.slice(0, 120)}`);
     }
   }
+  if (document.documentElement.scrollWidth > window.innerWidth + 1) out.overflow.push(`page ${document.documentElement.scrollWidth}px wide in a ${window.innerWidth}px viewport`);
   const loaded = [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family.replace(/["']/g, ''));
   out.loadedFonts = [...new Set(loaded)];
   return out;
 }
+
+/** Violation kinds. The first two are the typography test; all of them fail the run unless --report. */
+const KINDS = ['small', 'font', 'digits', 'contrast', 'names', 'labels', 'overflow'];
+const KIND_LABELS = { small: `زیر ${MIN_FONT_PX}px`, font: 'فونت غیر Vazirmatn', digits: 'رقم لاتین', contrast: 'کنتراست کم', names: 'دکمه بی‌نام', labels: 'کنترل بی‌برچسب', overflow: 'اسکرول افقی صفحه' };
+const skipKinds = (args.find((a) => a.startsWith('--skip=')) || '--skip=').slice('--skip='.length).split(',').filter(Boolean);
 
 async function main() {
   if (!noBuild || !existsSync(join(buildDir, 'index.html'))) buildDemo();
@@ -119,7 +207,7 @@ async function main() {
   const pageErrors = [];
   try {
     for (const vp of VIEWPORTS) {
-      mkdirSync(join(outDir, vp.name), { recursive: true });
+      mkdirSync(join(outDir, vp.name, 'top'), { recursive: true });
       const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1, isMobile: vp.isMobile, hasTouch: vp.isMobile, locale: 'fa-IR' });
       const page = await context.newPage();
       page.on('pageerror', (e) => pageErrors.push(`${vp.name} ${page.url()}: ${e.message}`));
@@ -129,12 +217,13 @@ async function main() {
         await page.waitForSelector('main', { timeout: 20000 });
         await page.evaluate(() => document.fonts.ready);
         await page.waitForTimeout(400); // lazy chunks and chart transitions
-        const file = join(outDir, vp.name, `${route.id}.png`);
-        await page.screenshot({ path: file, fullPage: true });
+        await page.screenshot({ path: join(outDir, vp.name, `${route.id}.png`), fullPage: true });
+        await page.screenshot({ path: join(outDir, vp.name, 'top', `${route.id}.png`) });
         const audit = await page.evaluate(auditPage, MIN_FONT_PX);
         results.push({ viewport: vp.name, route: route.id, path: route.path, ...audit });
-        const flag = audit.small.length || audit.font.length ? '✘' : '✔';
-        console.log(`  ${flag} ${vp.name.padStart(4)} ${route.path.padEnd(26)} texts ${String(audit.checked).padStart(4)}  <${MIN_FONT_PX}px: ${audit.small.length}  font: ${audit.font.length}`);
+        const counts = KINDS.filter((k) => !skipKinds.includes(k)).map((k) => `${k} ${audit[k].length}`);
+        const flag = KINDS.some((k) => !skipKinds.includes(k) && audit[k].length) ? '✘' : '✔';
+        console.log(`  ${flag} ${vp.name.padStart(4)} ${route.path.padEnd(26)} texts ${String(audit.checked).padStart(4)}  ${counts.join('  ')}`);
       }
       await context.close();
     }
@@ -143,22 +232,23 @@ async function main() {
     server.close();
   }
   writeFileSync(join(outDir, 'audit.json'), JSON.stringify({ results, pageErrors }, null, 2));
-  const small = results.reduce((n, r) => n + r.small.length, 0);
-  const font = results.reduce((n, r) => n + r.font.length, 0);
+  const totals = Object.fromEntries(KINDS.map((k) => [k, results.reduce((n, r) => n + r[k].length, 0)]));
   const fonts = [...new Set(results.flatMap((r) => r.loadedFonts))];
   const nonVazir = fonts.filter((f) => !/^vazirmatn/i.test(f));
   console.log(`\n${routes.length} مسیر × ${VIEWPORTS.length} عرض؛ اسکرین‌شات‌ها در ${outDir}`);
-  console.log(`متن زیر ${MIN_FONT_PX}px: ${small} · فونت غیر Vazirmatn: ${font} · فونت‌های بارگذاری‌شده: ${fonts.join('، ') || '—'} · خطای صفحه: ${pageErrors.length}`);
-  for (const r of results) {
-    for (const s of [...r.small.slice(0, 3), ...r.font.slice(0, 3)]) console.log(`    ${r.viewport} ${r.route}: ${s}`);
+  console.log(KINDS.map((k) => `${KIND_LABELS[k]}: ${totals[k]}${skipKinds.includes(k) ? ' (بررسی نشد)' : ''}`).join(' · '));
+  console.log(`فونت‌های بارگذاری‌شده: ${fonts.join('، ') || '—'} · خطای صفحه: ${pageErrors.length}`);
+  for (const k of KINDS) {
+    if (skipKinds.includes(k)) continue;
+    for (const r of results) for (const v of r[k].slice(0, 2)) console.log(`    [${k}] ${r.viewport} ${r.route}: ${v}`);
   }
   for (const e of pageErrors.slice(0, 10)) console.log(`    خطای صفحه: ${e}`);
-  const failed = small > 0 || font > 0 || nonVazir.length > 0 || pageErrors.length > 0;
+  const failed = KINDS.some((k) => !skipKinds.includes(k) && totals[k] > 0) || nonVazir.length > 0 || pageErrors.length > 0;
   if (failed && !report) {
-    console.log('\n✘ آزمون تایپوگرافی رد شد.');
+    console.log('\n✘ آزمون ظاهر رد شد.');
     process.exit(1);
   }
-  console.log(failed ? '\n(حالت گزارش: رد نمی‌شود)' : '\n✔ همه متن‌ها ۱۲px یا بزرگ‌تر و با فونت Vazirmatn هستند.');
+  console.log(failed ? '\n(حالت گزارش: رد نمی‌شود)' : `\n✔ همه متن‌ها ${MIN_FONT_PX}px یا بزرگ‌تر، با فونت Vazirmatn، ارقام فارسی و کنتراست کافی؛ دکمه‌ها و کنترل‌ها نام دارند؛ صفحه اسکرول افقی ندارد.`);
 }
 
 await main();

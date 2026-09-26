@@ -83,7 +83,7 @@ export const MoneyInput: React.FC<BaseProps & { showUnit?: boolean }> = ({ value
   return (
     <div className="relative">
       {input}
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">{moneyUnitLabel()}</span>
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none">{moneyUnitLabel()}</span>
     </div>
   );
 };

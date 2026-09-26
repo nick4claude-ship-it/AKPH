@@ -35,9 +35,10 @@ import {
   subFlowIndex,
   subcontractorStatementActions,
 } from '../../store/views/contracts';
-import { formatNumber, formatCurrencyCompact } from '../../utils/formatters';
+import { formatNumber, formatCurrencyCompact, formatText } from '../../utils/formatters';
 import { CLIENT_STATUS_LABELS, SUB_STATUS_LABELS } from './statementLabels';
 import { formatInt, formatMoney } from '../../utils/money';
+import { Money } from '../common/Money';
 
 type StatementsTab = 'client_statements' | 'subcontractor_statements';
 
@@ -52,8 +53,8 @@ const FlowBar: React.FC<{ steps: string[]; index: number }> = ({ steps, index })
     {steps.map((s, i) => (
       <React.Fragment key={s}>
         <span
-          className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-            i < index ? 'bg-emerald-100 text-emerald-800' : i === index ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-100 text-slate-400'
+          className={`text-xs px-2 py-1 rounded font-medium ${
+            i < index ? 'bg-emerald-100 text-emerald-800' : i === index ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-100 text-slate-500'
           }`}
         >
           {s}
@@ -124,11 +125,11 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
             disabled={!permission.ok}
             title={permission.ok ? '' : permission.reason}
             onClick={() => run(wf.advanceClientStatement(s.id))}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
           >
-            <CheckCircle2 className="w-3 h-3" /> {step.label}
+            <CheckCircle2 className="w-3 h-3" /> {formatText(step.label)}
           </button>
-          <button disabled={!canReturn} onClick={() => setReturning({ kind: 'client', id: s.id })} className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 disabled:opacity-40 cursor-pointer" title="برگشت جهت اصلاح">
+          <button disabled={!canReturn} onClick={() => setReturning({ kind: 'client', id: s.id })} className="p-1 rounded-lg text-rose-700 hover:bg-rose-50 disabled:opacity-40 cursor-pointer" title="برگشت جهت اصلاح">
             <Undo2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -138,13 +139,13 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
       return (
         <button
           onClick={() => navigate(`/finance/receipts?statement=${s.id}`)}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 cursor-pointer mr-auto"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer mr-auto"
         >
           <Wallet className="w-3 h-3" /> ثبت دریافت
         </button>
       );
     }
-    return <span className="text-[11px] text-slate-400">—</span>;
+    return <span className="text-xs text-slate-500">—</span>;
   };
 
   const subAction = (s: SubcontractorProgressStatement) => {
@@ -159,11 +160,11 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
             disabled={!permission.ok}
             title={permission.ok ? '' : permission.reason}
             onClick={() => run(wf.advanceSubcontractorStatement(s.id))}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
           >
-            <CheckCircle2 className="w-3 h-3" /> {step.label}
+            <CheckCircle2 className="w-3 h-3" /> {formatText(step.label)}
           </button>
-          <button disabled={!canReturn} onClick={() => setReturning({ kind: 'sub', id: s.id })} className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 disabled:opacity-40 cursor-pointer" title="برگشت جهت اصلاح">
+          <button disabled={!canReturn} onClick={() => setReturning({ kind: 'sub', id: s.id })} className="p-1 rounded-lg text-rose-700 hover:bg-rose-50 disabled:opacity-40 cursor-pointer" title="برگشت جهت اصلاح">
             <Undo2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -173,39 +174,39 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
       return (
         <button
           onClick={() => navigate(`/finance/payments?source=${s.id}`)}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500 text-slate-950 text-[11px] font-bold hover:bg-amber-600 cursor-pointer mr-auto"
+          className="btn btn-primary btn-sm mr-auto"
         >
           <Wallet className="w-3 h-3" /> پرداخت در خزانه
         </button>
       );
     }
-    return <span className="text-[11px] text-slate-400">—</span>;
+    return <span className="text-xs text-slate-500">—</span>;
   };
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded font-mono">
-              ماژول صورت‌وضعیت‌ها (Progress Statements)
+            <span className="text-xs bg-amber-500 text-slate-950 font-bold px-2 py-1 rounded tabular-nums">
+              ماژول صورت‌وضعیت‌ها
             </span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded tabular-nums">
               کارفرما ← مطالبات • پیمانکار جزء ← بدهی
             </span>
           </div>
           <h2 className="text-base font-bold text-slate-900">
             {tab === 'client_statements' ? 'صورت‌وضعیت کارفرما — پولی که شرکت دریافت می‌کند' : 'صورت‌وضعیت پیمانکار جزء — پولی که شرکت پرداخت می‌کند'}
           </h2>
-          <div className="mt-1.5">
+          <div className="mt-2">
             <FlowBar steps={tab === 'client_statements' ? CLIENT_FLOW_STEPS : SUB_FLOW_STEPS} index={-1} />
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
           <button
             onClick={() => navigate('/statements/client')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
               tab === 'client_statements' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -214,11 +215,11 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
           </button>
           <button
             onClick={() => navigate('/statements/subcontractor')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
               tab === 'subcontractor_statements' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <ArrowUpRight className="w-3.5 h-3.5 text-amber-600" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-amber-700" />
             <span>پیمانکار جزء</span>
           </button>
         </div>
@@ -228,8 +229,8 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 block mb-1">مانده مطالبات صورت‌وضعیت‌های مصوب کارفرما</span>
-            <div className="text-lg font-bold text-blue-700 font-mono">{formatMoney(receivable)}</div>
-            <span className="text-[11px] text-slate-400 font-medium">
+            <div className="text-lg font-bold text-blue-700 tabular-nums"><Money rial={receivable} /></div>
+            <span className="text-xs text-slate-500 font-medium">
               {formatInt(approvedClientCount)} صورت‌وضعیت مصوب · وصول در لایه دریافت‌ها
             </span>
           </div>
@@ -240,125 +241,125 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 block mb-1">مانده بدهی صورت‌وضعیت‌های مصوب پیمانکاران جزء</span>
-            <div className="text-lg font-bold text-amber-700 font-mono">{formatMoney(payable)}</div>
-            <span className="text-[11px] text-slate-400 font-medium">
+            <div className="text-lg font-bold text-amber-700 tabular-nums"><Money rial={payable} /></div>
+            <span className="text-xs text-slate-500 font-medium">
               {formatInt(approvedSubCount)} صورت‌وضعیت با تأیید مدیر ارشد · پرداخت فقط در خزانه
             </span>
           </div>
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+          <div className="p-3 bg-amber-50 text-amber-700 rounded-xl">
             <HardHat className="w-6 h-6" />
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col md:flex-row md:items-center gap-3 text-xs">
+      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col md:flex-row md:items-center gap-3 text-sm">
         <div className="relative flex-1 max-w-sm">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-          <input
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-2.5" />
+          <input aria-label="جستجوی شماره صورت‌وضعیت، پروژه، کارفرما یا پیمانکار"
             type="text"
             placeholder="جستجوی شماره صورت‌وضعیت، پروژه، کارفرما یا پیمانکار..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-3 pr-8 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:border-amber-500"
+            className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:border-amber-500"
           />
         </div>
-        <select
+        <select aria-label="فیلتر: پروژه‌ها"
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
-          className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
+          className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
         >
           <option value="all">همه پروژه‌ها</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}
+              {formatText(p.name)}
             </option>
           ))}
         </select>
-        <span className="text-slate-400 mr-auto">
-          نقش شما: <strong className="text-slate-700">{user.role}</strong>
+        <span className="text-slate-500 mr-auto">
+          نقش شما: <strong className="text-slate-700">{formatText(user.role)}</strong>
         </span>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-x-auto">
-        <table className="w-full text-xs text-right">
-          <thead className="bg-slate-50 text-slate-500 text-[11px] border-b border-slate-200">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs table-scroll">
+        <table className="w-full text-sm text-right">
+          <thead className="bg-slate-50 text-slate-500 text-xs border-b border-slate-200">
             <tr>
-              <th className="py-2.5 px-3">شماره</th>
-              <th className="py-2.5 px-3">پروژه / {tab === 'client_statements' ? 'کارفرما' : 'پیمانکار'}</th>
-              <th className="py-2.5 px-3 text-left">ناخالص</th>
-              <th className="py-2.5 px-3 text-left">کسورات</th>
-              <th className="py-2.5 px-3 text-left">خالص</th>
-              <th className="py-2.5 px-3 text-left">{tab === 'client_statements' ? 'وصول‌شده' : 'پرداخت‌شده'}</th>
-              <th className="py-2.5 px-3 text-left">مانده</th>
-              <th className="py-2.5 px-3">مرحله گردش‌کار</th>
-              <th className="py-2.5 px-3 text-left">اقدام</th>
+              <th className="py-2 px-3">شماره</th>
+              <th className="py-2 px-3">پروژه / {tab === 'client_statements' ? 'کارفرما' : 'پیمانکار'}</th>
+              <th className="py-2 px-3 text-left">ناخالص</th>
+              <th className="py-2 px-3 text-left">کسورات</th>
+              <th className="py-2 px-3 text-left">خالص</th>
+              <th className="py-2 px-3 text-left">{tab === 'client_statements' ? 'وصول‌شده' : 'پرداخت‌شده'}</th>
+              <th className="py-2 px-3 text-left">مانده</th>
+              <th className="py-2 px-3">مرحله گردش‌کار</th>
+              <th className="py-2 px-3 text-left">اقدام</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {tab === 'client_statements'
               ? clientRows.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/70">
-                    <td className="py-2.5 px-3">
+                    <td className="py-2 px-3">
                       <button onClick={() => setDetail({ kind: 'client', id: s.id })} className="font-bold text-slate-900 hover:text-amber-700 cursor-pointer text-right">
-                        {s.statementNumber}
+                        {formatText(s.statementNumber)}
                       </button>
-                      <div className="text-[10px] text-slate-400 font-mono">{s.contractCode}</div>
+                      <div className="text-xs text-slate-500 tabular-nums">{formatText(s.contractCode)}</div>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <div className="text-slate-800">{s.projectName}</div>
-                      <div className="text-[10px] text-slate-500">{s.client}</div>
+                    <td className="py-2 px-3">
+                      <div className="text-slate-800">{formatText(s.projectName)}</div>
+                      <div className="text-xs text-slate-500">{formatText(s.client)}</div>
                     </td>
-                    <td className="py-2.5 px-3 text-left font-mono">{formatCurrencyCompact(s.grossAmount)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-rose-600">{formatCurrencyCompact(s.totalDeductions)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono font-bold">{formatCurrencyCompact(s.netPayable)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatCurrencyCompact(s.receivedAmount)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-blue-700">
+                    <td className="py-2 px-3 text-left tabular-nums"><Money rial={s.grossAmount} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums text-rose-700"><Money rial={s.totalDeductions} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums font-bold"><Money rial={s.netPayable} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums text-emerald-700"><Money rial={s.receivedAmount} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums text-blue-700">
                       {clientStatementStage(s).approved ? formatCurrencyCompact(s.remainingPayable) : '—'}
                     </td>
-                    <td className="py-2.5 px-3 min-w-[140px]">
-                      <span className="text-[11px] font-bold text-slate-700">{CLIENT_STATUS_LABELS[s.status]}</span>
+                    <td className="py-2 px-3 min-w-[140px]">
+                      <span className="text-sm font-bold text-slate-700">{CLIENT_STATUS_LABELS[s.status]}</span>
                       {clientStatementStage(s).nextLabel && (
-                        <div className="text-[10px] text-slate-400">بعدی: {clientStatementStage(s).nextLabel}</div>
+                        <div className="text-xs text-slate-500">بعدی: {clientStatementStage(s).nextLabel}</div>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-left">{clientAction(s)}</td>
+                    <td className="py-2 px-3 text-left">{clientAction(s)}</td>
                   </tr>
                 ))
               : subRows.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/70">
-                    <td className="py-2.5 px-3">
+                    <td className="py-2 px-3">
                       <button onClick={() => setDetail({ kind: 'sub', id: s.id })} className="font-bold text-slate-900 hover:text-amber-700 cursor-pointer text-right">
-                        {s.statementNumber}
+                        {formatText(s.statementNumber)}
                       </button>
-                      <div className="text-[10px] text-slate-400 font-mono">{s.subcontractorContractNumber}</div>
+                      <div className="text-xs text-slate-500 tabular-nums">{formatText(s.subcontractorContractNumber)}</div>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <div className="text-slate-800">{s.projectName}</div>
-                      <div className="text-[10px] text-slate-500">
-                        {s.subcontractorName} · {s.tradeType}
+                    <td className="py-2 px-3">
+                      <div className="text-slate-800">{formatText(s.projectName)}</div>
+                      <div className="text-xs text-slate-500">
+                        {formatText(s.subcontractorName)} · {formatText(s.tradeType)}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-left font-mono">{formatCurrencyCompact(s.grossAmount)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-rose-600">{formatCurrencyCompact(s.totalDeductions)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono font-bold">{formatCurrencyCompact(s.netPayable)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-emerald-700">{formatCurrencyCompact(s.paidAmount)}</td>
-                    <td className="py-2.5 px-3 text-left font-mono text-amber-700">
+                    <td className="py-2 px-3 text-left tabular-nums"><Money rial={s.grossAmount} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums text-rose-700"><Money rial={s.totalDeductions} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums font-bold"><Money rial={s.netPayable} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums text-emerald-700"><Money rial={s.paidAmount} compact /></td>
+                    <td className="py-2 px-3 text-left tabular-nums text-amber-700">
                       {subcontractorStatementStage(s).approved ? formatCurrencyCompact(s.remainingPayable) : '—'}
                     </td>
-                    <td className="py-2.5 px-3 min-w-[140px]">
-                      <span className="text-[11px] font-bold text-slate-700">{SUB_STATUS_LABELS[s.status]}</span>
+                    <td className="py-2 px-3 min-w-[140px]">
+                      <span className="text-sm font-bold text-slate-700">{SUB_STATUS_LABELS[s.status]}</span>
                       {subcontractorStatementStage(s).nextLabel && (
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-xs text-slate-500">
                           بعدی: {subcontractorStatementStage(s).nextLabel} ({subcontractorStatementStage(s).nextRole})
                         </div>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-left">{subAction(s)}</td>
+                    <td className="py-2 px-3 text-left">{subAction(s)}</td>
                   </tr>
                 ))}
             {(tab === 'client_statements' ? clientRows : subRows).length === 0 && (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-slate-400">
+                <td colSpan={9} className="py-8 text-center text-slate-500">
                   صورت‌وضعیتی مطابق فیلتر یافت نشد.
                 </td>
               </tr>
@@ -372,9 +373,9 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
           onClose={() => setReturning(null)}
           label="برگشت صورت‌وضعیت جهت اصلاح"
           overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4"
-          className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs"
+          className="bg-white rounded-xl p-5 w-full max-w-md space-y-3 text-sm"
         >
-            <h3 className="text-sm font-bold text-slate-900">برگشت صورت‌وضعیت جهت اصلاح</h3>
+            <h3 className="text-base font-bold text-slate-900">برگشت صورت‌وضعیت جهت اصلاح</h3>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -383,7 +384,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
               className="w-full rounded-lg border border-slate-200 p-2 focus:outline-none focus:border-amber-500"
             />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setReturning(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer">
+              <button onClick={() => setReturning(null)} className="px-3 py-2 rounded-lg border border-slate-200 cursor-pointer">
                 انصراف
               </button>
               <button
@@ -394,7 +395,7 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                   setReturning(null);
                   setReason('');
                 }}
-                className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer disabled:opacity-40"
+                className="px-3 py-2 rounded-lg bg-rose-700 text-white font-bold cursor-pointer disabled:opacity-40"
               >
                 ثبت برگشت
               </button>
@@ -407,16 +408,16 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
           onClose={() => setDetail(null)}
           label={detailClient?.statementNumber || detailSub?.statementNumber || 'جزئیات صورت‌وضعیت'}
           overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4 overflow-y-auto"
-          className="bg-white rounded-2xl w-full max-w-3xl text-xs overflow-hidden"
+          className="bg-white rounded-xl w-full max-w-3xl text-sm overflow-hidden"
         >
             <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold">{detailClient?.statementNumber || detailSub?.statementNumber}</h3>
-                <p className="text-[11px] text-slate-400">
+                <h3 className="text-base font-bold">{formatText(detailClient?.statementNumber || detailSub?.statementNumber)}</h3>
+                <p className="text-xs text-slate-500">
                   {detailClient ? `${detailClient.projectName} · ${detailClient.client}` : `${detailSub!.projectName} · ${detailSub!.subcontractorName}`}
                 </p>
               </div>
-              <button onClick={() => setDetail(null)} aria-label="بستن" className="p-1 text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => setDetail(null)} aria-label="بستن" className="p-1 text-slate-500 hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -433,38 +434,38 @@ export const ProgressStatementsModule: React.FC<ProgressStatementsModuleProps> =
                   ['مانده', (detailClient || detailSub)!.remainingPayable],
                 ].map(([label, v]) => (
                   <div key={label as string} className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                    <div className="text-[10px] text-slate-500">{label}</div>
-                    <div className="font-bold font-mono">{formatMoney(v as number, false)}</div>
+                    <div className="text-xs text-slate-500">{label}</div>
+                    <div className="font-bold tabular-nums">{formatMoney(v as number, false)}</div>
                   </div>
                 ))}
               </div>
-              <div className="text-[11px] text-slate-600">
+              <div className="text-sm text-slate-600">
                 سند حسابداری:{' '}
-                <strong className="font-mono">{detailClient?.accountingJournalEntryId || detailSub?.projectExpenseRecordId || 'هنوز صادر نشده (پس از تأیید نهایی)'}</strong>
+                <strong className="tabular-nums">{formatText(detailClient?.accountingJournalEntryId || detailSub?.projectExpenseRecordId || 'هنوز صادر نشده (پس از تأیید نهایی)')}</strong>
               </div>
               <div>
-                <h4 className="font-bold text-slate-800 mb-1.5">سوابق گردش‌کار</h4>
+                <h4 className="font-bold text-slate-800 mb-2">سوابق گردش‌کار</h4>
                 <div className="space-y-1 max-h-48 overflow-y-auto">
                   {(detailClient?.workflowHistory || detailSub?.workflowHistory || []).map((h) => (
                     <div key={`${h.date}|${h.time}|${h.fromStatus}|${h.toStatus}|${h.user}`} className="flex justify-between bg-slate-50 rounded px-2 py-1">
                       <span>
-                        {h.action} — {h.user} ({h.role})
+                        {formatText(h.action)} — {formatText(h.user)} ({h.role})
                       </span>
-                      <span className="text-slate-400 font-mono">{h.date}</span>
+                      <span className="text-slate-500 tabular-nums">{formatText(h.date)}</span>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <h4 className="font-bold text-slate-800 mb-1.5">اسناد پیوست (مرکز اسناد)</h4>
+                <h4 className="font-bold text-slate-800 mb-2">اسناد پیوست (مرکز اسناد)</h4>
                 {detailDocs.length === 0 ? (
-                  <p className="text-slate-400">سندی متصل نیست.</p>
+                  <p className="text-slate-500">سندی متصل نیست.</p>
                 ) : (
                   detailDocs.map((d) => (
                     <div key={d.id} className="flex items-center gap-2 py-1">
-                      <FileText className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{d.title}</span>
-                      <span className="text-slate-400">({d.type})</span>
+                      <FileText className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{formatText(d.title)}</span>
+                      <span className="text-slate-500">({d.type})</span>
                     </div>
                   ))
                 )}

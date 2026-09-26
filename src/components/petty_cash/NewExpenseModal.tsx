@@ -21,13 +21,14 @@ import {
   User,
   AppDocument,
 } from '../../types';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { formatCurrency, formatNumber, formatText } from '../../utils/formatters';
 import { toPersianDate } from '../../utils/date';
 import { useSelector } from '../../store/AppStore';
 import { attachmentFromFile, checkPettyExpenseForm, type PettyExpenseFormInput } from '../../store/views/pettyCash';
 import { Dialog } from '../../ui/Dialog';
 import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { moneyUnitLabel } from '../../utils/money';
+import { Money } from '../common/Money';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -150,17 +151,17 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
       onClose={onClose}
       label="ثبت هزینه جدید از محل تنخواه‌گردان"
       overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-      className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200"
+      className="bg-white rounded-xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200"
     >
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
+              <span className="text-xs bg-amber-100 text-amber-900 px-2 py-1 rounded font-bold">
                 فرم استاندارد هزینه کارگاهی
               </span>
               <span className="text-xs text-slate-500">•</span>
-              <span className="text-xs text-slate-600">چرخه ثبت، الصاق فاکتور و تایید چندمرحله‌ای</span>
+              <span className="text-sm text-slate-600">چرخه ثبت، الصاق فاکتور و تایید چندمرحله‌ای</span>
             </div>
             <h3 className="text-base font-bold text-slate-900 mt-1">
               ثبت هزینه جدید از محل تنخواه‌گردان
@@ -170,7 +171,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <button
             onClick={onClose}
             aria-label="بستن"
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -179,8 +180,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {formError && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200 text-xs">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200 text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-700" />
               <span>{formError}</span>
             </div>
           )}
@@ -189,50 +190,50 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="new-expense-modal-1" className="block text-xs font-bold text-slate-700 mb-1">
-                  انتخاب حساب تنخواه‌گردان پرداختی <span className="text-rose-500">*</span>
+                  انتخاب حساب تنخواه‌گردان پرداختی <span className="text-rose-700">*</span>
                 </label>
                 <select id="new-expense-modal-1"
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
+                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.title} ({acc.code}) - {acc.projectName}
+                      {formatText(acc.title)} ({acc.code}) - {formatText(acc.projectName)}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <span className="block text-xs font-bold text-slate-700 mb-1">
+                <span className="block text-sm font-bold text-slate-700 mb-1">
                   پروژه و مرکز هزینه منظورشده
                 </span>
-                <div className="w-full text-xs px-3 py-2 bg-slate-200/70 border border-slate-300 rounded-lg text-slate-700 font-medium">
-                  {targetAccount?.projectName} ({targetAccount?.costCenterName})
+                <div className="w-full text-sm px-3 py-2 bg-slate-200/70 border border-slate-300 rounded-lg text-slate-700 font-medium">
+                  {formatText(targetAccount?.projectName)} ({targetAccount?.costCenterName})
                 </div>
               </div>
             </div>
 
             {/* Live Balances Banner */}
             {targetAccount && (
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 text-sm">
                 <div>
                   <span className="text-slate-500">موجودی واقعی: </span>
-                  <span className="font-mono font-bold text-slate-800 tabular-nums">
-                    {formatCurrency(targetAccount.actualBalance)}
+                  <span className=" font-bold text-slate-800 tabular-nums">
+                    <Money rial={targetAccount.actualBalance} />
                   </span>
                 </div>
                 <div>
                   <span className="text-amber-700">در انتظار تأیید قبلی: </span>
-                  <span className="font-mono font-bold text-amber-700 tabular-nums">
-                    {formatCurrency(targetAccount.pendingExpenses)}
+                  <span className=" font-bold text-amber-700 tabular-nums">
+                    <Money rial={targetAccount.pendingExpenses} />
                   </span>
                 </div>
                 <div className="bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-2xs">
                   <span className="font-bold text-emerald-800">مانده قابل مصرف: </span>
-                  <span className="font-mono font-black text-emerald-700 tabular-nums text-sm">
-                    {formatCurrency(targetAccount.usableBalance)}
+                  <span className=" font-bold text-emerald-700 tabular-nums text-sm">
+                    <Money rial={targetAccount.usableBalance} />
                   </span>
                 </div>
               </div>
@@ -243,45 +244,45 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label htmlFor="new-expense-modal-2" className="block text-xs font-bold text-slate-700 mb-1">
-                مبلغ فاکتور / هزینه ({moneyUnitLabel()}) <span className="text-rose-500">*</span>
+                مبلغ فاکتور / هزینه ({moneyUnitLabel()}) <span className="text-rose-700">*</span>
               </label>
               <MoneyInput id="new-expense-modal-2"
                 required
                 value={amount}
                 onValueChange={(v) => setAmount(v)}
                 placeholder={`مبلغ به ${moneyUnitLabel()}`}
-                className={`w-full text-xs px-3 py-2 border rounded-lg font-mono focus:ring-2 font-bold tabular-nums ${
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:ring-2 font-bold tabular-nums ${
                   isOverUsable
                     ? 'border-rose-500 bg-rose-50 text-rose-800 focus:ring-rose-500'
                     : 'border-slate-300 focus:ring-amber-500'
                 }`}
               />
-              <span className="text-[10px] text-slate-500 mt-0.5 block">
-                {formatCurrency(amount)}
+              <span className="text-xs text-slate-500 mt-1 block">
+                <Money rial={amount} />
               </span>
             </div>
 
             <div>
               <label htmlFor="new-expense-modal-3" className="block text-xs font-bold text-slate-700 mb-1">
-                تاریخ هزینه <span className="text-rose-500">*</span>
+                تاریخ هزینه <span className="text-rose-700">*</span>
               </label>
               <input id="new-expense-modal-3"
                 type="text"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 placeholder="۱۴۰۳/۰۷/۰۲"
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg tabular-nums focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
             <div>
               <label htmlFor="new-expense-modal-4" className="block text-xs font-bold text-slate-700 mb-1">
-                روش پرداخت از تنخواه <span className="text-rose-500">*</span>
+                روش پرداخت از تنخواه <span className="text-rose-700">*</span>
               </label>
               <select id="new-expense-modal-4"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
               >
                 <option value="کارت تنخواه">کارت بانکی تنخواه</option>
                 <option value="نقد">پرداخت نقدی کارگاه</option>
@@ -293,8 +294,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
           {/* Validation Warnings (Over-budget or Duplicate) */}
           {isOverUsable && (
-            <div className="bg-rose-50 border border-rose-300 rounded-xl p-3 flex items-center gap-2.5 text-xs text-rose-800">
-              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
+            <div className="bg-rose-50 border border-rose-300 rounded-xl p-3 flex items-center gap-2 text-sm text-rose-800">
+              <ShieldAlert className="w-5 h-5 text-rose-700 shrink-0" />
               <div>
                 <strong>کسری موجودی قابل مصرف:</strong> مبلغ وارد شده ({formatCurrency(amount)}) از
                 مانده قابل مصرف این تنخواه ({formatCurrency(targetAccount?.usableBalance || 0)}) بیشتر
@@ -304,10 +305,10 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           )}
 
           {duplicateExpense && (
-            <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center gap-2.5 text-xs text-amber-900">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-900">
+              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0" />
               <div>
-                <strong>هشدار احتمال فاکتور تکراری:</strong> فاکتوری با همین فروشنده ({vendor})، همین شماره ({invoiceNumber}) و مبلغ در سیستم قبلاً با کد {duplicateExpense.expenseNumber} ثبت شده است.
+                <strong>هشدار احتمال فاکتور تکراری:</strong> فاکتوری با همین فروشنده ({vendor})، همین شماره ({invoiceNumber}) و مبلغ در سیستم قبلاً با کد {formatText(duplicateExpense.expenseNumber)} ثبت شده است.
               </div>
             </div>
           )}
@@ -316,16 +317,16 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="new-expense-modal-5" className="block text-xs font-bold text-slate-700 mb-1">
-                دسته‌بندی اصلی هزینه <span className="text-rose-500">*</span>
+                دسته‌بندی اصلی هزینه <span className="text-rose-700">*</span>
               </label>
               <select id="new-expense-modal-5"
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.name}>
-                    {c.name}
+                    {formatText(c.name)}
                   </option>
                 ))}
               </select>
@@ -333,12 +334,12 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 
             <div>
               <label htmlFor="new-expense-modal-6" className="block text-xs font-bold text-slate-700 mb-1">
-                زیردسته تفکیکی <span className="text-rose-500">*</span>
+                زیردسته تفکیکی <span className="text-rose-700">*</span>
               </label>
               <select id="new-expense-modal-6"
                 value={selectedSubCategory}
                 onChange={(e) => setSelectedSubCategory(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
               >
                 {currentCategoryObj.subcategories.map((sub) => (
                   <option key={sub} value={sub}>
@@ -353,7 +354,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label htmlFor="new-expense-modal-7" className="block text-xs font-bold text-slate-700 mb-1">
-                فروشنده / طرف‌حساب <span className="text-rose-500">*</span>
+                فروشنده / طرف‌حساب <span className="text-rose-700">*</span>
               </label>
               <input id="new-expense-modal-7"
                 type="text"
@@ -361,13 +362,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 placeholder="نام فروشگاه، راننده، یا شخص"
                 value={vendor}
                 onChange={(e) => setVendor(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
             <div>
               <label htmlFor="new-expense-modal-8" className="block text-xs font-bold text-slate-700 mb-1">
-                شماره فاکتور / رسید <span className="text-rose-500">*</span>
+                شماره فاکتور / رسید <span className="text-rose-700">*</span>
               </label>
               <input id="new-expense-modal-8"
                 type="text"
@@ -375,7 +376,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 placeholder="INV-..."
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg tabular-nums focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
@@ -387,7 +388,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 type="text"
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg tabular-nums focus:ring-2 focus:ring-amber-500"
               />
             </div>
           </div>
@@ -395,7 +396,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           {/* Description */}
           <div>
             <label htmlFor="new-expense-modal-10" className="block text-xs font-bold text-slate-700 mb-1">
-              شرح دقیق هزینه و محل مصرف <span className="text-rose-500">*</span>
+              شرح دقیق هزینه و محل مصرف <span className="text-rose-700">*</span>
             </label>
             <textarea id="new-expense-modal-10"
               rows={2}
@@ -403,20 +404,20 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               placeholder="شرح دقیق اقلام خریداری شده و دلیل خرید اضطراری از محل تنخواه..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+              className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
           {/* Inventory Integration (بخش ۲۰: ارتباط با انبار) */}
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <span className="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <Package className="w-4 h-4 text-slate-600" />
                 نحوه تخصیص و ورود کالا (ارتباط با ماژول انبارداری):
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <label
                 className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                   inventoryTarget === 'direct_consumption'
@@ -429,11 +430,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   name="inventoryTarget"
                   checked={inventoryTarget === 'direct_consumption'}
                   onChange={() => setInventoryTarget('direct_consumption')}
-                  className="mt-0.5 text-amber-500"
+                  className="mt-1 text-amber-700"
                 />
                 <div>
                   <div>مصرف مستقیم در کارگاه</div>
-                  <div className="text-[11px] font-normal text-slate-500 mt-0.5">
+                  <div className="text-xs font-normal text-slate-500 mt-1">
                     مستقیماً در پروژه مصرف شده و نیازی به ورود به انبار ندارد (مثل سوخت یا بتن)
                   </div>
                 </div>
@@ -451,11 +452,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                   name="inventoryTarget"
                   checked={inventoryTarget === 'send_to_warehouse'}
                   onChange={() => setInventoryTarget('send_to_warehouse')}
-                  className="mt-0.5 text-blue-500"
+                  className="mt-1 text-blue-700"
                 />
                 <div>
                   <div>تحویل به انبار کارگاه (صدور رسید انبار)</div>
-                  <div className="text-[11px] font-normal text-slate-500 mt-0.5">
+                  <div className="text-xs font-normal text-slate-500 mt-1">
                     اقلام دوام‌دار یا مصالح انبارشدنی (ابزارآلات، تجهیزات ایمنی، اتصالات)
                   </div>
                 </div>
@@ -466,7 +467,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             {inventoryTarget === 'send_to_warehouse' && (
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
                 <div>
-                  <label htmlFor="new-expense-modal-11" className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <label htmlFor="new-expense-modal-11" className="block text-xs font-medium text-slate-600 mb-1">
                     کد کالا در انبار
                   </label>
                   <input id="new-expense-modal-11"
@@ -474,11 +475,11 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                     placeholder="TOOL-..."
                     value={inventoryItemCode}
                     onChange={(e) => setInventoryItemCode(e.target.value)}
-                    className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded font-mono"
+                    className="w-full text-xs px-2 py-2 border border-slate-300 rounded tabular-nums"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="new-expense-modal-12" className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <label htmlFor="new-expense-modal-12" className="block text-xs font-medium text-slate-600 mb-1">
                     نام قلم در انبار
                   </label>
                   <input id="new-expense-modal-12"
@@ -486,17 +487,17 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                     placeholder="عنوان دقیق کالا"
                     value={inventoryItemName}
                     onChange={(e) => setInventoryItemName(e.target.value)}
-                    className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded"
+                    className="w-full text-xs px-2 py-2 border border-slate-300 rounded"
                   />
                 </div>
                 <div>
-                  <label htmlFor="new-expense-modal-13" className="block text-[11px] font-medium text-slate-600 mb-1">
+                  <label htmlFor="new-expense-modal-13" className="block text-xs font-medium text-slate-600 mb-1">
                     مقدار / تعداد
                   </label>
                   <IntegerInput id="new-expense-modal-13"
                     value={inventoryQuantity}
                     onValueChange={(v) => setInventoryQuantity(v)}
-                    className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded font-mono"
+                    className="w-full text-xs px-2 py-2 border border-slate-300 rounded tabular-nums"
                   />
                 </div>
               </div>
@@ -507,9 +508,9 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label htmlFor="new-expense-modal-14" className="block text-xs font-bold text-slate-700">
-                پیوست تصویر فاکتور یا رسید رسمی <span className="text-rose-500">*</span>
+                پیوست تصویر فاکتور یا رسید رسمی <span className="text-rose-700">*</span>
               </label>
-              <span className="text-[11px] text-slate-500">
+              <span className="text-xs text-slate-500">
                 فرمت‌های مجاز: JPG, PNG, PDF (حداکثر ۱۰ مگابایت)
               </span>
             </div>
@@ -522,14 +523,14 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                 onChange={handleAddSimulatedFile}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-2">
                 <div className="p-2 bg-white rounded-full border border-slate-200 text-slate-600 shadow-2xs">
-                  <Upload className="w-5 h-5 text-amber-600" />
+                  <Upload className="w-5 h-5 text-amber-700" />
                 </div>
-                <div className="text-xs font-semibold text-slate-800">
+                <div className="text-sm font-medium text-slate-800">
                   فایل فاکتور را اینجا بکشید یا برای انتخاب کلیک کنید
                 </div>
-                <div className="text-[11px] text-slate-500">
+                <div className="text-xs text-slate-500">
                   جهت تسریع تایید فاکتور توسط حسابدار، تصویر باکیفیت و خوانا ضمیمه شود.
                 </div>
               </div>
@@ -540,12 +541,12 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               {attachments.map((att) => (
                 <div
                   key={att.id}
-                  className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <FileText className="w-4 h-4 text-slate-500 shrink-0" />
-                    <span className="truncate font-medium text-slate-800">{att.name}</span>
-                    <span className="text-[10px] text-slate-400 shrink-0 font-mono">({att.size})</span>
+                    <span className="truncate font-medium text-slate-800">{formatText(att.name)}</span>
+                    <span className="text-xs text-slate-500 shrink-0 tabular-nums">({att.size})</span>
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
@@ -563,7 +564,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
                       type="button"
                       onClick={() => handleRemoveAttachment(att.id)}
                       title="حذف پیوست"
-                      className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded"
+                      className="p-1 text-rose-700 hover:text-rose-700 hover:bg-rose-50 rounded"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -577,14 +578,14 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           <div className="flex items-center justify-between pt-4 border-t border-slate-200">
             <div className="text-xs text-slate-500">
               ثبت‌کننده سند:{' '}
-              <span className="font-semibold text-slate-800">{currentUser.name}</span> ({currentUser.role})
+              <span className="font-medium text-slate-800">{formatText(currentUser.name)}</span> ({currentUser.role})
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                className="btn btn-secondary"
               >
                 انصراف
               </button>
@@ -613,7 +614,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
           className="bg-white rounded-xl max-w-2xl w-full p-4 space-y-3"
         >
             <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-xs font-bold text-slate-900">{previewAttachment.name}</span>
+              <span className="text-sm font-bold text-slate-900">{formatText(previewAttachment.name)}</span>
               <button
                 onClick={() => setPreviewAttachment(null)}
                 aria-label="بستن"
@@ -626,7 +627,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               {previewAttachment.url && (
                 <img
                   src={previewAttachment.url}
-                  alt="Invoice Preview"
+                  alt="پیش‌نمایش فاکتور"
                   className="max-h-[60vh] object-contain rounded shadow"
                 />
               )}

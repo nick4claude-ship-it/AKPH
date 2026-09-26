@@ -7,6 +7,7 @@ import React, { useId } from 'react';
 import { X, ShieldCheck, Check } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { Dialog } from '../../ui/Dialog';
+import { formatText } from '../../utils/formatters';
 
 interface LoginModalProps {
   onClose: () => void;
@@ -26,27 +27,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, currentUser, us
       onClose={onClose}
       labelledBy={titleId}
       closeOnBackdrop
-      className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden text-right"
+      className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden text-right"
     >
       <div className="bg-slate-900 text-white p-5 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h3 id={titleId} className="text-sm font-bold text-white">
+            <h3 id={titleId} className="text-base font-bold text-white">
               تغییر کاربر (فقط محیط توسعه)
             </h3>
-            <p className="text-[11px] text-slate-400">نقش‌ها مطابق افزونه پرتال: مدیر سیستم، مدیر ارشد، مدیر پروژه، حسابدار</p>
+            <p className="text-xs text-slate-500">نقش‌ها مطابق افزونه پرتال: مدیر سیستم، مدیر ارشد، مدیر پروژه، حسابدار</p>
           </div>
         </div>
-        <button type="button" onClick={onClose} aria-label="بستن" className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer">
+        <button type="button" onClick={onClose} aria-label="بستن" className="p-1 text-slate-500 hover:text-white rounded-lg cursor-pointer">
           <X className="w-4 h-4" />
         </button>
       </div>
 
       <div className="p-5 space-y-3">
-        <p className="text-xs text-slate-600 mb-2">با تغییر کاربر، داده‌های قابل مشاهده برای همان نقش دوباره بارگذاری می‌شود.</p>
+        <p className="text-sm text-slate-600 mb-2">با تغییر کاربر، داده‌های قابل مشاهده برای همان نقش دوباره بارگذاری می‌شود.</p>
         {users.map((u) => {
           const isSelected = u.id === currentUser.id;
           return (
@@ -65,9 +66,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onClose, currentUser, us
               <div className="flex items-center gap-3">
                 <img src={u.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-slate-300" />
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900">{u.name}</h4>
-                  <p className="text-[11px] text-amber-700 font-medium">{u.role}</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{u.email}</p>
+                  <h4 className="text-sm font-bold text-slate-900">{formatText(u.name)}</h4>
+                  <p className="text-sm text-amber-700 font-medium">{formatText(u.role)}</p>
+                  <p className="text-xs text-slate-500 tabular-nums">{formatText(u.email)}</p>
                 </div>
               </div>
               {isSelected && (

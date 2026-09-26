@@ -85,7 +85,7 @@ export const navConfig: NavNode[] = [
   { id: 'approvals', label: 'تأییدات', icon: ShieldCheck, path: '/approvals', countKey: 'approvals' },
   { id: 'notifications', label: 'مرکز اعلان‌ها', icon: Bell, path: '/notifications', hidden: true },
   { id: 'reports', label: 'گزارش‌ها', icon: BarChart3, path: '/reports' },
-  { id: 'ai', label: 'دستیار (نسخه نمایشی)', icon: Sparkles, path: '/ai' },
+  { id: 'ai', label: 'دستیار مدیریت', icon: Sparkles, path: '/ai' },
   { id: 'settings', label: 'تنظیمات', icon: Settings, path: '/settings', requires: 'settings.manage' },
 ];
 

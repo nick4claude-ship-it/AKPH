@@ -10,9 +10,10 @@ import type { NewAmendmentInput } from '../../store/recordWorkflows';
 import { X, Plus, FileText, Calendar, DollarSign } from 'lucide-react';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
-import { formatPercent } from '../../utils/formatters';
+import { formatPercent, formatText } from '../../utils/formatters';
 import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { getRelativePersianDate } from '../../utils/date';
+import { Money } from '../common/Money';
 
 interface NewAmendmentModalProps {
   contract: Contract;
@@ -47,7 +48,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="ثبت الحاقیه، متمم یا تغییر مقادیر پیمان" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="ثبت الحاقیه، متمم یا تغییر مقادیر پیمان" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in duration-150">
       
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -56,20 +57,20 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">ثبت الحاقیه، متمم یا تغییر مقادیر پیمان</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                پیمان: <strong>{contract.code}</strong> · {contract.projectTitle.slice(0, 30)}...
+              <p className="text-xs text-slate-500 mt-1">
+                پیمان: <strong>{formatText(contract.code)}</strong> · {contract.projectTitle.slice(0, 30)}...
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="new-amendment-modal-1" className="block text-slate-700 font-bold mb-1">شماره یا عنوان الحاقیه:</label>
@@ -104,10 +105,10 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
               <MoneyInput id="new-amendment-modal-3"
                 value={amount}
                 onValueChange={(v) => setAmount(v)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono font-bold"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums font-bold"
                 required
               />
-              <span className="text-[10px] text-slate-500 mt-0.5 block">
+              <span className="text-xs text-slate-500 mt-1 block">
                 {formatPercent(changePercentage, 2)} از مبلغ اولیه
               </span>
             </div>
@@ -117,7 +118,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
               <IntegerInput id="new-amendment-modal-4"
                 value={extendedDays}
                 onValueChange={(v) => setExtendedDays(v)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
 
@@ -127,7 +128,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
                 type="text"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
                 required
               />
             </div>
@@ -159,17 +160,17 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             />
           </div>
 
-          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-950">
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-sm text-amber-950">
             <strong>اثر سیستمی:</strong> در صورت انتخاب «تأیید شده»، مبلغ سقف پیمان از{' '}
-            <span className="font-mono font-bold">{formatMoneyCompact(contract.currentValue)}</span> به{' '}
-            <span className="font-mono font-bold text-emerald-800">
-              {formatMoneyCompact((contract.currentValue + amount))}
+            <span className="tabular-nums font-bold"><Money rial={contract.currentValue} compact /></span> به{' '}
+            <span className="tabular-nums font-bold text-emerald-800">
+              <Money rial={(contract.currentValue + amount)} compact />
             </span>{' '}
             افزایش خواهد یافت.
           </div>
 
           {formError && (
-            <p className="text-xs text-rose-700 font-bold" role="alert">
+            <p className="text-sm text-rose-700 font-bold" role="alert">
               {formError}
             </p>
           )}
@@ -177,13 +178,13 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+              className="btn btn-secondary"
             >
               انصراف
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs cursor-pointer"
+              className="btn btn-primary"
             >
               ثبت و اعمال تغییرات
             </button>

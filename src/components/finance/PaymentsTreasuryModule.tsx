@@ -46,10 +46,11 @@ const TAB_PATHS: Partial<Record<TreasuryTab, string>> = {
   bank_accounts: '/finance/banks',
   cash_desks: '/finance/cash',
 };
-import { formatCurrencyCompact, formatInt } from '../../utils/formatters';
+import { formatCurrencyCompact, formatInt, formatText } from '../../utils/formatters';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { paymentRequestActions, selectTreasuryKpis } from '../../store/views/treasury';
+import { Money } from '../common/Money';
 
 interface PaymentsTreasuryModuleProps {
   /** Initial tab from the route (payments, receipts, banks, cash). */
@@ -173,13 +174,13 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
-              لایه مستقل مالی و خزانه‌داری (Treasury & Cash Management)
+            <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded">
+              لایه مستقل مالی و خزانه‌داری
             </span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded tabular-nums">
               جریان نقدینگی و کنترل بانک‌ها
             </span>
           </div>
@@ -195,7 +196,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           {can('payment_request.create') && (
           <button
             onClick={() => setIsNewRequestModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-sm transition-colors cursor-pointer shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>ثبت درخواست پرداخت جدید</span>
@@ -209,42 +210,42 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500">نقدینگی در دسترس (بانک‌ها و صندوق)</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg">
               <Landmark className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg font-bold text-slate-900 font-mono">
+          <div className="text-lg font-bold text-slate-900 tabular-nums">
             {formatMoney(totalLiquidCash, false)} <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
-          <span className="text-[11px] text-emerald-600 font-medium">موجودی تجمیعی ۳ حساب بانکی و ۳ صندوق</span>
+          <span className="text-sm text-emerald-700 font-medium">موجودی تجمیعی ۳ حساب بانکی و ۳ صندوق</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500">درخواست‌های پرداخت در صف</span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+            <div className="p-2 bg-amber-50 text-amber-700 rounded-lg">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg font-bold text-amber-700 font-mono">
-            {formatMoney(totalPendingPayments)}
+          <div className="text-lg font-bold text-amber-700 tabular-nums">
+            <Money rial={totalPendingPayments} />
           </div>
-          <span className="text-[11px] text-amber-600 font-medium">
-            {paymentRequests.filter((p) => p.status !== 'پرداخت شده').length} فقره دستور پرداخت آماده تسویه
+          <span className="text-sm text-amber-700 font-medium">
+            {formatInt(paymentRequests.filter((p) => p.status !== 'پرداخت شده').length)} فقره دستور پرداخت آماده تسویه
           </span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500">چک‌های سررسید جاری (۳۰ روز آینده)</span>
-            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+            <div className="p-2 bg-rose-50 text-rose-700 rounded-lg">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg font-bold text-rose-700 font-mono">
-            {formatMoney(upcomingChecksDue)}
+          <div className="text-lg font-bold text-rose-700 tabular-nums">
+            <Money rial={upcomingChecksDue} />
           </div>
-          <span className="text-[11px] text-rose-600 font-medium">تعهد چک‌های صیادی صادره به فروشندگان</span>
+          <span className="text-sm text-rose-700 font-medium">تعهد چک‌های صیادی صادره به فروشندگان</span>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
@@ -254,33 +255,33 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg font-bold text-blue-700 font-mono">
+          <div className="text-lg font-bold text-blue-700 tabular-nums">
             {formatMoney(totalPaidThisMonth, false)} <span className="text-xs text-slate-500 font-sans">{moneyUnitLabel()}</span>
           </div>
-          <span className="text-[11px] text-slate-500 font-medium">همراه با ثبت اتوماتیک در اسناد حسابداری</span>
+          <span className="text-xs text-slate-500 font-medium">همراه با ثبت اتوماتیک در اسناد حسابداری</span>
         </div>
       </div>
 
       {/* Module Navigation Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200 scrollbar-none">
         <button
           onClick={() => setActiveTab('payment_requests')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'payment_requests'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
           }`}
         >
           <ArrowDownLeft className="w-3.5 h-3.5 text-amber-400" />
-          <span>کارتابل درخواست‌های پرداخت (Payables)</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-800 text-amber-300">
+          <span>کارتابل درخواست‌های پرداخت</span>
+          <span className="text-xs px-2 py-1 rounded-full tabular-nums bg-slate-800 text-amber-300">
             {formatInt(paymentRequests.length)}
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('liquidity_calendar')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'liquidity_calendar'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
@@ -288,14 +289,14 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         >
           <Clock className="w-3.5 h-3.5 text-rose-400" />
           <span>برنامه پرداخت</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+          <span className="text-xs px-2 py-1 rounded-full tabular-nums bg-slate-100 text-slate-600">
             {formatInt(schedule.rows.length)}
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('receipts')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'receipts'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
@@ -303,14 +304,14 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         >
           <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
           <span>دریافت‌ها</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+          <span className="text-xs px-2 py-1 rounded-full tabular-nums bg-slate-100 text-slate-600">
             {formatInt(appState.receipts.length)}
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('bank_accounts')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'bank_accounts'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
@@ -318,14 +319,14 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         >
           <Landmark className="w-3.5 h-3.5 text-emerald-400" />
           <span>حساب‌های بانکی و مغایرت</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+          <span className="text-xs px-2 py-1 rounded-full tabular-nums bg-slate-100 text-slate-600">
             {formatInt(bankAccounts.length)}
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('checks')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'checks'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
@@ -333,14 +334,14 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         >
           <CreditCard className="w-3.5 h-3.5 text-blue-400" />
           <span>مدیریت چک‌های صیادی (وارده/صادره)</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+          <span className="text-xs px-2 py-1 rounded-full tabular-nums bg-slate-100 text-slate-600">
             {formatInt(checks.length)}
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('cash_desks')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'cash_desks'
               ? 'bg-slate-900 text-white shadow-xs'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
@@ -348,7 +349,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         >
           <Wallet className="w-3.5 h-3.5 text-purple-400" />
           <span>صندوق‌های نقد کارگاهی</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-100 text-slate-600">
+          <span className="text-xs px-2 py-1 rounded-full tabular-nums bg-slate-100 text-slate-600">
             {formatInt(cashDesks.length)}
           </span>
         </button>
@@ -358,23 +359,23 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
       {activeTab === 'payment_requests' && (
         <div className="space-y-4">
           {/* Filters Bar */}
-          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm">
             <div className="flex items-center gap-2 flex-1">
               <div className="relative flex-1 max-w-xs">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-                <input
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-2.5" />
+                <input aria-label="جستجوی شماره دستور، ذینفع، پروژه"
                   type="text"
                   placeholder="جستجوی شماره دستور، ذینفع، پروژه..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-3 pr-8 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:border-amber-500"
+                  className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              <select
+              <select aria-label="فیلتر: وضعیت‌ها"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
+                className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
               >
                 <option value="all">همه وضعیت‌ها</option>
                 <option value="در انتظار تأیید مالی">در انتظار تأیید مالی</option>
@@ -384,30 +385,30 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 <option value="رد شده">رد شده</option>
               </select>
 
-              <select
+              <select aria-label="فیلتر: پروژه‌ها"
                 value={selectedProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
+                className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
               >
                 <option value="all">همه پروژه‌ها</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {formatText(p.name)}
                   </option>
                 ))}
               </select>
             </div>
 
-            <span className="text-slate-400 font-mono text-[11px]">
+            <span className="text-slate-500 tabular-nums text-xs">
               تعداد موارد یافته شده: {formatInt(filteredRequests.length)}
             </span>
           </div>
 
           {/* Payment Requests Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+            <div className="table-scroll">
+              <table className="w-full text-right text-sm">
+                <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                   <tr>
                     <th className="py-3 px-3">شماره و تاریخ</th>
                     <th className="py-3 px-3">منبع و ارجاع</th>
@@ -426,41 +427,41 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                     return (
                       <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-3">
-                          <strong className="block text-slate-900 font-mono">{req.requestNumber}</strong>
-                          <span className="text-[10px] text-slate-400">{req.date}</span>
+                          <strong className="block text-slate-900 tabular-nums">{formatText(req.requestNumber)}</strong>
+                          <span className="text-xs text-slate-500">{formatText(req.date)}</span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-medium">
-                            {req.sourceType}
+                          <span className="inline-block px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-medium">
+                            {formatText(req.sourceType)}
                           </span>
-                          <span className="block text-[10px] text-slate-400 font-mono mt-0.5">
-                            {req.sourceRefNumber}
+                          <span className="block text-xs text-slate-500 tabular-nums mt-1">
+                            {formatText(req.sourceRefNumber)}
                           </span>
                         </td>
                         <td className="py-3 px-3">
                           <span className="font-medium text-slate-800 block truncate max-w-[160px]">
-                            {req.projectName}
+                            {formatText(req.projectName)}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">{req.costCenterId}</span>
+                          <span className="text-xs text-slate-500 tabular-nums">{formatText(req.costCenterId)}</span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className="font-bold text-slate-900 block">{req.beneficiaryName}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {req.beneficiaryAccount.bankName} - {req.beneficiaryAccount.accountNumber}
+                          <span className="font-bold text-slate-900 block">{formatText(req.beneficiaryName)}</span>
+                          <span className="text-xs text-slate-500 tabular-nums">
+                            {formatText(req.beneficiaryAccount.bankName)} - {formatText(req.beneficiaryAccount.accountNumber)}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-left font-mono font-bold text-slate-900">
+                        <td className="py-3 px-3 text-left tabular-nums font-bold text-slate-900">
                           {formatMoney(req.totalAmount, false)}
                         </td>
-                        <td className="py-3 px-3 text-left font-mono font-bold text-amber-700">
+                        <td className="py-3 px-3 text-left tabular-nums font-bold text-amber-700">
                           {formatMoney(req.remainingAmount, false)}
                         </td>
-                        <td className="py-3 px-3 font-mono text-slate-600">
-                          {req.dueDate}
+                        <td className="py-3 px-3 tabular-nums text-slate-600">
+                          {formatText(req.dueDate)}
                         </td>
                         <td className="py-3 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                            className={`px-2 py-1 rounded text-xs font-medium ${
                               req.status === 'پرداخت شده'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : req.status === 'تأیید مدیر ارشد'
@@ -472,22 +473,22 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                                 : 'bg-slate-100 text-slate-700'
                             }`}
                           >
-                            {req.status}
+                            {formatText(req.status)}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-2">
                             {paymentRequestActions(currentUser, req).canApprove && (
                               <>
                                 <button
                                   onClick={() => handleApproveRequest(req.id)}
-                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer"
+                                  className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-xs font-bold cursor-pointer"
                                 >
                                   تأیید
                                 </button>
                                 <button
                                   onClick={() => handleRejectRequest(req.id)}
-                                  className="px-2 py-1 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 rounded text-[10px] cursor-pointer"
+                                  className="px-2 py-1 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 rounded text-xs cursor-pointer"
                                 >
                                   رد
                                 </button>
@@ -497,7 +498,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                             {paymentRequestActions(currentUser, req).canPay && (
                               <button
                                 onClick={() => openPayment(req)}
-                                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                                className="btn btn-primary btn-sm"
                               >
                                 <CreditCard className="w-3 h-3" />
                                 <span>ثبت پرداخت وجه</span>
@@ -505,9 +506,9 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                             )}
 
                             {isFullyPaid && (
-                              <span className="text-[10px] text-emerald-600 font-mono flex items-center gap-1 justify-center">
+                              <span className="text-sm text-emerald-700 tabular-nums flex items-center gap-1 justify-center">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>{req.trackingNumber || 'تسویه شد'}</span>
+                                <span>{formatText(req.trackingNumber || 'تسویه شد')}</span>
                               </span>
                             )}
                           </div>
@@ -534,38 +535,38 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {bankAccounts.map((b) => (
-              <div key={b.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs relative overflow-hidden">
+              <div key={b.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-2 h-full bg-emerald-500" />
                 <div className="flex items-center justify-between mb-3">
-                  <span className="font-bold text-slate-900 text-sm">{b.bankName}</span>
-                  <span className="text-[10px] bg-emerald-50 text-emerald-700 font-mono px-2 py-0.5 rounded">
-                    {b.status}
+                  <span className="font-bold text-slate-900 text-sm">{formatText(b.bankName)}</span>
+                  <span className="text-xs bg-emerald-50 text-emerald-700 tabular-nums px-2 py-1 rounded">
+                    {formatText(b.status)}
                   </span>
                 </div>
-                <div className="space-y-1.5 text-xs text-slate-600 mb-4 font-mono">
+                <div className="space-y-2 text-sm text-slate-600 mb-4 tabular-nums">
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-sans">شماره حساب:</span>
-                    <span>{b.accountNumber}</span>
+                    <span className="text-slate-500 font-sans">شماره حساب:</span>
+                    <span>{formatText(b.accountNumber)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-sans">شماره شبا:</span>
-                    <span className="text-[11px]">{b.shebaNumber}</span>
+                    <span className="text-slate-500 font-sans">شماره شبا:</span>
+                    <span className="text-sm">{formatText(b.shebaNumber)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-sans">شعبه:</span>
-                    <span className="font-sans">{b.branch}</span>
+                    <span className="text-slate-500 font-sans">شعبه:</span>
+                    <span className="font-sans">{formatText(b.branch)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-sans">صاحب حساب:</span>
-                    <span className="font-sans font-medium text-slate-900">{b.holderName}</span>
+                    <span className="text-slate-500 font-sans">صاحب حساب:</span>
+                    <span className="font-sans font-medium text-slate-900">{formatText(b.holderName)}</span>
                   </div>
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-xs text-slate-500">موجودی فعلی:</span>
-                  <strong className="text-base font-bold text-slate-900 font-mono">
+                  <strong className="text-base font-bold text-slate-900 tabular-nums">
                     {formatMoney(b.balance, false)}{' '}
-                    <span className="text-[11px] font-sans font-normal text-slate-500">{moneyUnitLabel()}</span>
+                    <span className="text-xs font-sans font-normal text-slate-500">{moneyUnitLabel()}</span>
                   </strong>
                 </div>
               </div>
@@ -573,9 +574,9 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="text-xs font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-              <RefreshCw className="w-4 h-4 text-emerald-600" />
-              <span>وضعیت تطبیق و مغایرت‌گیری بانکی (Bank Reconciliation)</span>
+            <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-emerald-700" />
+              <span>وضعیت تطبیق و مغایرت‌گیری بانکی</span>
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
               کلیه واریزی‌های صورت‌وضعیت‌ها و برداشت‌های حواله ساتنا با صورتحساب رسمی بانک مرکزی مطابقت داده شده‌اند. در حال حاضر هیچ تراکنش باز یا مغایرت شناسایی‌نشده در پایان دوره جاری وجود ندارد.
@@ -588,18 +589,18 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
       {activeTab === 'checks' && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
           <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-blue-600" />
               <span>دفتر مدیریت چک‌های صیادی بنفش (سامانه صیاد بانک مرکزی)</span>
             </h3>
-            <span className="text-xs text-slate-500 font-mono">
+            <span className="text-xs text-slate-500 tabular-nums">
               تعداد چک‌های ثبتی: {formatInt(checks.length)}
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
+          <div className="table-scroll">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-medium">
                 <tr>
                   <th className="py-3 px-3">نوع چک</th>
                   <th className="py-3 px-3">شناسه ۱۶ رقمی صیاد</th>
@@ -616,44 +617,44 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   <tr key={chk.id} className="hover:bg-slate-50">
                     <td className="py-3 px-3">
                       <span
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                        className={`px-2 py-1 rounded text-xs font-medium ${
                           chk.checkType === 'صادره (پرداختی)'
                             ? 'bg-rose-50 text-rose-700'
                             : 'bg-emerald-50 text-emerald-700'
                         }`}
                       >
-                        {chk.checkType}
+                        {formatText(chk.checkType)}
                       </span>
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-slate-900 tracking-wider">
-                      {chk.sayadNumber}
+                    <td className="py-3 px-3 tabular-nums font-bold text-slate-900">
+                      {formatText(chk.sayadNumber)}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="font-medium text-slate-800">{chk.bankName}</span>
-                      <span className="block text-[10px] text-slate-400 font-mono">چک #{chk.checkNumber}</span>
+                      <span className="font-medium text-slate-800">{formatText(chk.bankName)}</span>
+                      <span className="block text-xs text-slate-500 tabular-nums">چک #{formatText(chk.checkNumber)}</span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="text-slate-900 block font-medium">{chk.payee}</span>
-                      <span className="text-[10px] text-slate-400">صادرکننده: {chk.drawer}</span>
+                      <span className="text-slate-900 block font-medium">{formatText(chk.payee)}</span>
+                      <span className="text-xs text-slate-500">صادرکننده: {formatText(chk.drawer)}</span>
                     </td>
                     <td className="py-3 px-3 text-slate-600">
-                      {chk.projectName || '---'}
+                      {formatText(chk.projectName || '---')}
                     </td>
-                    <td className="py-3 px-3 text-left font-mono font-bold text-slate-900">
+                    <td className="py-3 px-3 text-left tabular-nums font-bold text-slate-900">
                       {formatMoney(chk.amount, false)}
                     </td>
-                    <td className="py-3 px-3 font-mono text-slate-700 font-medium">
-                      {chk.dueDate}
+                    <td className="py-3 px-3 tabular-nums text-slate-700 font-medium">
+                      {formatText(chk.dueDate)}
                     </td>
                     <td className="py-3 px-3">
                       <span
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                        className={`px-2 py-1 rounded text-xs font-medium ${
                           chk.status === 'پاس شده و تسویه'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}
                       >
-                        {chk.status}
+                        {formatText(chk.status)}
                       </span>
                     </td>
                   </tr>
@@ -668,38 +669,38 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
       {activeTab === 'cash_desks' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {cashDesks.map((c) => (
-            <div key={c.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
+            <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-slate-900 text-sm">{c.title}</span>
-                <span className="text-[10px] bg-purple-50 text-purple-700 font-mono px-2 py-0.5 rounded">
-                  {c.code}
+                <span className="font-bold text-slate-900 text-sm">{formatText(c.title)}</span>
+                <span className="text-xs bg-purple-50 text-purple-700 tabular-nums px-2 py-1 rounded">
+                  {formatText(c.code)}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mb-4">{c.location}</p>
+              <p className="text-xs text-slate-500 mb-4">{formatText(c.location)}</p>
 
-              <div className="space-y-1.5 text-xs text-slate-600 mb-4 font-mono">
+              <div className="space-y-2 text-sm text-slate-600 mb-4 tabular-nums">
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">مسئول صندوق:</span>
-                  <span className="font-sans font-medium text-slate-900">{c.keeperName}</span>
+                  <span className="text-slate-500 font-sans">مسئول صندوق:</span>
+                  <span className="font-sans font-medium text-slate-900">{formatText(c.keeperName)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">پروژه:</span>
-                  <span className="font-sans">{c.projectName}</span>
+                  <span className="text-slate-500 font-sans">پروژه:</span>
+                  <span className="font-sans">{formatText(c.projectName)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">سقف مجاز:</span>
-                  <span>{formatMoney(c.ceilingLimit)}</span>
+                  <span className="text-slate-500 font-sans">سقف مجاز:</span>
+                  <span><Money rial={c.ceilingLimit} /></span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400 font-sans">آخرین شمارش فیزیکی:</span>
-                  <span>{c.lastAuditDate}</span>
+                  <span className="text-slate-500 font-sans">آخرین شمارش فیزیکی:</span>
+                  <span>{formatText(c.lastAuditDate)}</span>
                 </div>
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-xs text-slate-500">موجودی نقدی:</span>
-                <strong className="text-base font-bold text-purple-900 font-mono">
-                  {formatMoney(c.balance, false)} <span className="text-[11px] font-sans font-normal text-slate-500">{moneyUnitLabel()}</span>
+                <strong className="text-base font-bold text-purple-900 tabular-nums">
+                  {formatMoney(c.balance, false)} <span className="text-xs font-sans font-normal text-slate-500">{moneyUnitLabel()}</span>
                 </strong>
               </div>
             </div>
@@ -709,68 +710,68 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
       {/* Modal: Execute Payment to Beneficiary */}
       {selectedRequestForPay && (
-        <Dialog onClose={() => setSelectedRequestForPay(null)} label="دستور پرداخت و خروج نقدینگی از حساب" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog onClose={() => setSelectedRequestForPay(null)} label="دستور پرداخت و خروج نقدینگی از حساب" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
           
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                <div className="p-2 bg-amber-50 text-amber-700 rounded-xl">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">دستور پرداخت و خروج نقدینگی از حساب</h3>
-                  <span className="text-xs text-slate-500 font-mono">{selectedRequestForPay.requestNumber}</span>
+                  <h3 className="text-base font-bold text-slate-900">دستور پرداخت و خروج نقدینگی از حساب</h3>
+                  <span className="text-xs text-slate-500 tabular-nums">{formatText(selectedRequestForPay.requestNumber)}</span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedRequestForPay(null)}
-                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-4 space-y-1.5 text-xs">
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">دریافت‌کننده وجه (ذینفع):</span>
-                <strong className="text-slate-900">{selectedRequestForPay.beneficiaryName}</strong>
+                <strong className="text-slate-900">{formatText(selectedRequestForPay.beneficiaryName)}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">بابت:</span>
-                <span>{selectedRequestForPay.sourceType} ({selectedRequestForPay.sourceRefNumber})</span>
+                <span>{formatText(selectedRequestForPay.sourceType)} ({selectedRequestForPay.sourceRefNumber})</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">پروژه:</span>
-                <span>{selectedRequestForPay.projectName}</span>
+                <span>{formatText(selectedRequestForPay.projectName)}</span>
               </div>
               <div className="flex justify-between pt-1 border-t border-slate-200 text-sm">
                 <span className="font-bold text-slate-700">مانده قابل پرداخت:</span>
-                <strong className="text-amber-800 font-mono font-bold">
-                  {formatMoney(selectedRequestForPay.remainingAmount)}
+                <strong className="text-amber-800 tabular-nums font-bold">
+                  <Money rial={selectedRequestForPay.remainingAmount} />
                 </strong>
               </div>
             </div>
 
-            <form onSubmit={handleExecutePayment} className="space-y-4 text-xs">
+            <form onSubmit={handleExecutePayment} className="space-y-4 text-sm">
               <div>
                 <label htmlFor="payments-treasury-module-1" className="block font-medium text-slate-700 mb-1">حساب بانکی یا صندوق پرداخت‌کننده:</label>
                 <select id="payments-treasury-module-1"
                   value={paymentSourceId}
                   onChange={(e) => setPaymentSourceId(e.target.value)}
                   required
-                  className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs focus:outline-none focus:border-amber-500"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-amber-500"
                 >
                   <option value="">— انتخاب حساب پرداخت —</option>
                   <optgroup label="حساب‌های بانکی">
                     {bankAccounts.filter((b) => b.status === 'فعال').map((b) => (
                       <option key={b.id} value={`bank:${b.id}`}>
-                        {b.bankName} - {b.accountNumber} (موجودی: {formatCurrencyCompact(b.balance)})
+                        {formatText(b.bankName)} - {formatText(b.accountNumber)} (موجودی: {formatCurrencyCompact(b.balance)})
                       </option>
                     ))}
                   </optgroup>
                   <optgroup label="صندوق‌ها">
                     {cashDesks.map((c) => (
                       <option key={c.id} value={`cash:${c.id}`}>
-                        {c.title} (موجودی: {formatCurrencyCompact(c.balance)})
+                        {formatText(c.title)} (موجودی: {formatCurrencyCompact(c.balance)})
                       </option>
                     ))}
                   </optgroup>
@@ -787,7 +788,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                       setPayError(null);
                     }}
                     aria-invalid={paymentAmount <= 0 || paymentAmount > selectedRequestForPay.remainingAmount}
-                    className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:border-amber-500"
+                    className="mt-1 w-full p-2 rounded-lg border border-slate-300 bg-white text-sm tabular-nums focus:outline-none focus:border-amber-500"
                   />
                 </label>
                 {payError && (
@@ -805,7 +806,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   value={paymentTrackingNo}
                   onChange={(e) => setPaymentTrackingNo(e.target.value)}
                   required
-                  className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs font-mono focus:outline-none focus:border-amber-500"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm tabular-nums focus:outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -816,7 +817,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   placeholder="تسویه قطعی صورت‌وضعیت / پیش‌پرداخت خرید..."
                   value={paymentNotes}
                   onChange={(e) => setPaymentNotes(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs focus:outline-none focus:border-amber-500"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -830,7 +831,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer shadow-xs"
+                  className="btn btn-primary"
                 >
                   تأیید پرداخت و کسر از حساب بانک
                 </button>
@@ -841,25 +842,25 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
       {/* Modal: New Payment Request */}
       {isNewRequestModalOpen && (
-        <Dialog onClose={() => setIsNewRequestModalOpen(false)} label="ایجاد دستور پرداخت جدید در خزانه‌داری" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
+        <Dialog onClose={() => setIsNewRequestModalOpen(false)} label="ایجاد دستور پرداخت جدید در خزانه‌داری" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
           
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-sm font-bold text-slate-900">ایجاد دستور پرداخت جدید در خزانه‌داری</h3>
+              <h3 className="text-base font-bold text-slate-900">ایجاد دستور پرداخت جدید در خزانه‌داری</h3>
               <button
                 onClick={() => setIsNewRequestModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewRequest} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateNewRequest} className="space-y-3 text-sm">
               <div>
                 <label htmlFor="payments-treasury-module-4" className="block font-medium text-slate-700 mb-1">منبع ایجاد تعهد:</label>
                 <select id="payments-treasury-module-4"
                   value={newRequestSource}
                   onChange={(e) => setNewRequestSource(e.target.value as PaymentRequest['sourceType'])}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 >
                   <option value="سایر هزینه‌های عمومی">سایر هزینه‌های عمومی</option>
                   <option value="پیش‌پرداخت خرید">پیش‌پرداخت خرید</option>
@@ -874,7 +875,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   <select id="payments-treasury-module-5"
                     value={newRequestLiability}
                     onChange={(e) => setNewRequestLiability(e.target.value as typeof newRequestLiability)}
-                    className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                    className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                   >
                     <option value="insurance">حق بیمه (تأمین اجتماعی)</option>
                     <option value="vat">ارزش افزوده فروش</option>
@@ -892,7 +893,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   value={newRequestBeneficiary}
                   onChange={(e) => setNewRequestBeneficiary(e.target.value)}
                   required
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 />
               </div>
 
@@ -901,11 +902,11 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 <select id="payments-treasury-module-7"
                   value={newRequestProject}
                   onChange={(e) => setNewRequestProject(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 >
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {formatText(p.name)}
                     </option>
                   ))}
                 </select>
@@ -920,7 +921,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                       setNewRequestAmount(v);
                       setNewRequestError(null);
                     }}
-                    className="mt-1 w-full p-2 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                    className="mt-1 w-full p-2 rounded-lg border border-slate-300 bg-white text-sm tabular-nums"
                   />
                 </label>
                 {newRequestError && (
@@ -936,7 +937,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   type="text"
                   value={newRequestDueDate}
                   onChange={(e) => setNewRequestDueDate(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm tabular-nums"
                 />
               </div>
 
@@ -950,7 +951,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer"
+                  className="btn btn-primary"
                 >
                   ثبت در کارتابل پرداخت
                 </button>

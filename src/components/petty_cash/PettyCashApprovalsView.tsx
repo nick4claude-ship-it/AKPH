@@ -21,8 +21,9 @@ import { useAppState } from '../../store/AppStore';
 import { pettyExpenseApproval, pettyExpenseLists } from '../../store/views/pettyCash';
 import { Dialog } from '../../ui/Dialog';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { formatCurrency, formatNumber, toPersianDigits, formatDecimal } from '../../utils/formatters';
+import { formatCurrency, formatNumber, toPersianDigits, formatDecimal, formatText } from '../../utils/formatters';
 import { formatInt } from '../../utils/money';
+import { Money } from '../common/Money';
 
 interface PettyCashApprovalsViewProps {
   expenses: PettyCashExpense[];
@@ -106,19 +107,19 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
           <h2 className="text-base font-bold text-slate-900">
             کارتابل تأیید و کنترل چندمرحله‌ای هزینه‌های تنخواه
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-1">
             بررسی مدارک، فاکتورها، انطباق با پروژه و ثبت نهایی در هزینه‌های دفتری حسابداری
           </p>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
           <button
             onClick={() => {
               setFilterTab('pending');
               if (pendingList.length > 0) setSelectedExpenseId(pendingList[0].id);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
               filterTab === 'pending'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -126,7 +127,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
           >
             <span>در انتظار تأیید</span>
             {pendingList.length > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full tabular-nums">
+              <span className="bg-rose-700 text-white text-xs px-2 py-0.2 rounded-full tabular-nums">
                 {formatInt(pendingList.length)}
               </span>
             )}
@@ -137,14 +138,14 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
               setFilterTab('approved');
               if (approvedList.length > 0) setSelectedExpenseId(approvedList[0].id);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
               filterTab === 'approved'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <span>تأیید شده / ثبتی</span>
-            <span className="text-[10px] text-slate-500 tabular-nums">
+            <span className="text-xs text-slate-500 tabular-nums">
               ({formatInt(approvedList.length)})
             </span>
           </button>
@@ -154,7 +155,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
               setFilterTab('rejected');
               if (rejectedList.length > 0) setSelectedExpenseId(rejectedList[0].id);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
               filterTab === 'rejected'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -162,7 +163,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
           >
             <span>رد شده / اصلاحی</span>
             {rejectedList.length > 0 && (
-              <span className="bg-slate-300 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full tabular-nums">
+              <span className="bg-slate-300 text-slate-700 text-xs px-2 py-0.2 rounded-full tabular-nums">
                 {formatInt(rejectedList.length)}
               </span>
             )}
@@ -176,7 +177,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
         <div className="lg:col-span-5 space-y-3">
           {displayedList.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-xs">
-              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+              <CheckCircle2 className="w-8 h-8 text-emerald-700 mx-auto mb-2" />
               هیچ هزینه‌ای در این وضعیت وجود ندارد.
             </div>
           ) : (
@@ -194,36 +195,36 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                          {exp.expenseNumber}
+                      <div className="flex items-center gap-2">
+                        <span className="tabular-nums text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          {formatText(exp.expenseNumber)}
                         </span>
-                        <span className="text-[10px] font-medium text-slate-500">
-                          {exp.category}
+                        <span className="text-xs font-medium text-slate-500">
+                          {formatText(exp.category)}
                         </span>
                       </div>
-                      <h4 className="font-bold text-xs text-slate-900 line-clamp-1 mt-1">
-                        {exp.description}
+                      <h4 className="font-bold text-sm text-slate-900 line-clamp-1 mt-1">
+                        {formatText(exp.description)}
                       </h4>
                     </div>
 
-                    <div className="text-left font-mono font-bold text-xs text-slate-900 tabular-nums shrink-0">
-                      {formatCurrency(exp.amount)}
+                    <div className="text-left font-bold text-sm text-slate-900 tabular-nums shrink-0">
+                      <Money rial={exp.amount} />
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{exp.projectName}</span>
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <div className="flex items-center gap-2 truncate">
+                      <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
+                      <span className="truncate">{formatText(exp.projectName)}</span>
                     </div>
-                    <span className="shrink-0">{exp.date}</span>
+                    <span className="shrink-0">{formatText(exp.date)}</span>
                   </div>
 
-                  <div className="mt-2 flex items-center justify-between text-[10px]">
-                    <span className="text-slate-600 font-medium">ثبت: {exp.submitterName}</span>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-slate-600 font-medium">ثبت: {formatText(exp.submitterName)}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full font-semibold ${
+                      className={`px-2 py-1 rounded-full font-medium ${
                         exp.status === 'approved' || exp.status === 'accounting_posted'
                           ? 'bg-emerald-100 text-emerald-800'
                           : exp.status === 'rejected'
@@ -247,28 +248,28 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
         {/* Right Column: Full Detail Dossier & In-place Invoice Preview (7 cols) */}
         <div className="lg:col-span-7">
           {activeExpense ? (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden sticky top-32">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden sticky top-32">
               {/* Dossier Header */}
               <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded">
-                      {activeExpense.expenseNumber}
+                    <span className="tabular-nums text-xs font-bold bg-slate-200 text-slate-800 px-2 py-1 rounded">
+                      {formatText(activeExpense.expenseNumber)}
                     </span>
                     <span className="text-xs text-slate-500">•</span>
-                    <span className="text-xs font-medium text-slate-600">
-                      تنخواه: {activeExpense.pettyCashTitle}
+                    <span className="text-sm font-medium text-slate-600">
+                      تنخواه: {formatText(activeExpense.pettyCashTitle)}
                     </span>
                   </div>
-                  <h3 className="text-sm font-black text-slate-900 mt-1">
-                    {activeExpense.description}
+                  <h3 className="text-base font-bold text-slate-900 mt-1">
+                    {formatText(activeExpense.description)}
                   </h3>
                 </div>
 
                 <div className="text-left">
                   <div className="text-xs text-slate-500">مبلغ نهایی فاکتور:</div>
-                  <div className="text-lg font-black text-slate-900 font-mono tabular-nums">
-                    {formatCurrency(activeExpense.amount)}
+                  <div className="text-lg font-bold text-slate-900 tabular-nums">
+                    <Money rial={activeExpense.amount} />
                   </div>
                 </div>
               </div>
@@ -276,63 +277,63 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
               {/* Dossier Body */}
               <div className="p-5 space-y-5">
                 {/* Meta details grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-2.5 bg-slate-50 rounded-lg">
-                    <span className="text-slate-500 block text-[10px]">پروژه / مرکز هزینه</span>
-                    <span className="font-bold text-slate-800 mt-0.5 block truncate">
-                      {activeExpense.projectName}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-500 block text-xs">پروژه / مرکز هزینه</span>
+                    <span className="font-bold text-slate-800 mt-1 block truncate">
+                      {formatText(activeExpense.projectName)}
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-50 rounded-lg">
-                    <span className="text-slate-500 block text-[10px]">سرفصل هزینه</span>
-                    <span className="font-bold text-slate-800 mt-0.5 block">
-                      {activeExpense.category} ({activeExpense.subCategory})
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-500 block text-xs">سرفصل هزینه</span>
+                    <span className="font-bold text-slate-800 mt-1 block">
+                      {formatText(activeExpense.category)} ({activeExpense.subCategory})
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-50 rounded-lg">
-                    <span className="text-slate-500 block text-[10px]">فروشنده / طرف حساب</span>
-                    <span className="font-bold text-slate-800 mt-0.5 block">
-                      {activeExpense.vendor}
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-500 block text-xs">فروشنده / طرف حساب</span>
+                    <span className="font-bold text-slate-800 mt-1 block">
+                      {formatText(activeExpense.vendor)}
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-50 rounded-lg">
-                    <span className="text-slate-500 block text-[10px]">شماره و تاریخ فاکتور</span>
-                    <span className="font-mono font-bold text-slate-800 mt-0.5 block">
-                      {activeExpense.invoiceNumber} - {activeExpense.invoiceDate}
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-500 block text-xs">شماره و تاریخ فاکتور</span>
+                    <span className="tabular-nums font-bold text-slate-800 mt-1 block">
+                      {formatText(activeExpense.invoiceNumber)} - {formatText(activeExpense.invoiceDate)}
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-50 rounded-lg">
-                    <span className="text-slate-500 block text-[10px]">روش پرداخت</span>
-                    <span className="font-bold text-slate-800 mt-0.5 block">
-                      {activeExpense.paymentMethod}
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-500 block text-xs">روش پرداخت</span>
+                    <span className="font-bold text-slate-800 mt-1 block">
+                      {formatText(activeExpense.paymentMethod)}
                     </span>
                   </div>
 
-                  <div className="p-2.5 bg-slate-50 rounded-lg">
-                    <span className="text-slate-500 block text-[10px]">ثبت‌کننده سند</span>
-                    <span className="font-bold text-slate-800 mt-0.5 block">
-                      {activeExpense.submitterName} ({activeExpense.submitterRole})
+                  <div className="p-2 bg-slate-50 rounded-lg">
+                    <span className="text-slate-500 block text-xs">ثبت‌کننده سند</span>
+                    <span className="font-bold text-slate-800 mt-1 block">
+                      {formatText(activeExpense.submitterName)} ({activeExpense.submitterRole})
                     </span>
                   </div>
                 </div>
 
                 {/* Inventory Allocation Info (Section 20) */}
                 {activeExpense.inventoryTarget === 'send_to_warehouse' && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs flex items-center justify-between">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm flex items-center justify-between">
                     <div>
                       <div className="font-bold text-blue-900">
                         تحویل به انبار کارگاه ({activeExpense.inventoryItemName || 'کالای انبار'})
                       </div>
-                      <div className="text-[11px] text-blue-700 mt-0.5">
-                        کد کالا: {activeExpense.inventoryItemCode || '-'} | تعداد:{' '}
-                        {formatDecimal(activeExpense.inventoryQuantity)} {activeExpense.inventoryUnit}
+                      <div className="text-sm text-blue-700 mt-1">
+                        کد کالا: {formatText(activeExpense.inventoryItemCode || '-')} | تعداد:{' '}
+                        {formatDecimal(activeExpense.inventoryQuantity)} {formatText(activeExpense.inventoryUnit)}
                       </div>
                     </div>
-                    <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded font-medium">
+                    <span className="bg-blue-700 text-white text-xs px-2 py-1 rounded font-medium">
                       رسید انبار صادر شد
                     </span>
                   </div>
@@ -341,11 +342,11 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 {/* In-place Invoice Image Preview (Section 25) */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <FileText className="w-4 h-4 text-slate-600" />
                       پیش‌نمایش تصویر فاکتور و مدارک پیوست:
                     </span>
-                    <span className="text-[10px] text-slate-500">
+                    <span className="text-xs text-slate-500">
                       {formatInt(activeDocs.length)} پیوست
                     </span>
                   </div>
@@ -355,25 +356,25 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       <div className="relative group w-full flex justify-center">
                         <img
                           src={activeDocs[0].url}
-                          alt="Invoice Scan"
+                          alt="تصویر فاکتور"
                           className="max-h-56 rounded-lg object-contain border border-slate-200 shadow-2xs"
                         />
                         <a
                           href={activeDocs[0].url}
                           target="_blank"
                           rel="noreferrer"
-                          className="absolute bottom-2 bg-slate-900/80 text-white text-[10px] px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute bottom-2 bg-slate-900/80 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           مشاهده در ابعاد کامل
                         </a>
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-slate-400">
+                      <div className="text-center py-6 text-slate-500">
                         <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                        <span className="text-xs font-medium">
+                        <span className="text-sm font-medium">
                           {activeDocs[0]?.fileName || 'فاکتوری در مرکز اسناد پیوست نشده است'}
                         </span>
-                        <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                        <div className="text-xs text-slate-500 mt-1 tabular-nums">
                           ({activeDocs[0]?.fileSize || '-'})
                         </div>
                       </div>
@@ -385,10 +386,10 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 {(() => {
                   const approval = pettyExpenseApproval(currentUser, activeExpense, policy);
                   return (
-                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between text-sm">
                         <span className="font-bold text-slate-800">گردش کار تایید چندمرحله‌ای:</span>
-                        <span className="text-[10px] text-slate-500 font-mono">سطح الزامی: {approval.chainText}</span>
+                        <span className="text-xs text-slate-500 tabular-nums">سطح الزامی: {formatText(approval.chainText)}</span>
                       </div>
                       <div className="flex items-center justify-between gap-1 pt-2">
                         {approval.steps.map(({ label, done: stepDone, current: isCurrent }, i) => {
@@ -397,13 +398,13 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                               {i > 0 && <div className={`h-0.5 flex-1 ${stepDone ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
                               <div className="flex-1 text-center">
                                 <div
-                                  className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto text-[10px] font-bold ${
-                                    stepDone ? 'bg-emerald-500 text-white' : isCurrent ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-600'
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto text-sm font-bold ${
+                                    stepDone ? 'bg-emerald-500 text-slate-950' : isCurrent ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-600'
                                   }`}
                                 >
                                   {stepDone ? '✓' : toPersianDigits(i + 1)}
                                 </div>
-                                <span className="text-[10px] font-medium text-slate-700 block mt-1">{label}</span>
+                                <span className="text-sm font-medium text-slate-700 block mt-1">{label}</span>
                               </div>
                             </React.Fragment>
                           );
@@ -415,16 +416,16 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
 
                 {/* Rejection / Returned banner if applicable */}
                 {activeExpense.rejectionReason && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-800">
                     <strong className="block mb-1">دلیل رد:</strong>
-                    {activeExpense.rejectionReason}
+                    {formatText(activeExpense.rejectionReason)}
                   </div>
                 )}
 
                 {/* Interactive Action Controls (Approve, Reject, Return) */}
                 {activeExpense.status === 'pending_approval' && (
                   <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-xs text-slate-500">
                       با تایید نهایی، سند دوبل حسابداری به صورت خودکار صادر می‌گردد.
                     </div>
 
@@ -432,7 +433,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       <button
                         onClick={() => setIsReturnModalOpen(true)}
                         disabled={!canReject}
-                        className="disabled:opacity-40 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1"
+                        className="disabled:opacity-40 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         بازگشت جهت اصلاح
@@ -441,7 +442,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                       <button
                         onClick={() => setIsRejectModalOpen(true)}
                         disabled={!canReject}
-                        className="disabled:opacity-40 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                        className="disabled:opacity-40 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-sm font-bold rounded-lg transition-colors flex items-center gap-1"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         رد فاکتور
@@ -451,7 +452,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                         onClick={handleApprove}
                         disabled={!approvePermission.ok}
                         title={approvePermission.ok ? '' : approvePermission.reason}
-                        className="disabled:opacity-40 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+                        className="btn btn-primary"
                       >
                         <Check className="w-4 h-4" />
                         تأیید و ثبت در حسابداری
@@ -462,7 +463,7 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-500">
               یک هزینه را برای بررسی انتخاب کنید.
             </div>
           )}
@@ -477,15 +478,15 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
           overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
           className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200"
         >
-            <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+            <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
               <XCircle className="w-5 h-5" />
               رد فاکتور تنخواه
             </div>
-            <p className="text-xs text-slate-600">
+            <p className="text-sm text-slate-600">
               لطفاً علت رد هزینه را به صورت شفاف وارد نمایید (این پیام به تنخواه‌دار اعلام خواهد شد):
             </p>
             {rejectError && (
-              <p className="text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-200 font-bold">
+              <p className="text-sm text-rose-700 bg-rose-50 p-2 rounded border border-rose-200 font-bold">
                 لطفاً دلیل رد فاکتور را وارد فرمایید.
               </p>
             )}
@@ -497,18 +498,18 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 if (e.target.value.trim()) setRejectError(false);
               }}
               placeholder="مثال: عدم ارائه برگه باسکول، قیمت غیرمتعارف نسبت به استعلام، نقص مدارک فاکتور رسمی..."
-              className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500"
+              className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500"
             />
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setIsRejectModalOpen(false)}
-                className="px-3 py-1.5 border border-slate-300 text-slate-700 text-xs rounded-lg hover:bg-slate-50"
+                className="px-3 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50"
               >
                 انصراف
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg"
+                className="btn btn-danger"
               >
                 تأیید و ثبت رد فاکتور
               </button>
@@ -524,15 +525,15 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
           overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
           className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200"
         >
-            <div className="flex items-center gap-2 text-amber-600 font-bold text-sm">
+            <div className="flex items-center gap-2 text-amber-700 font-bold text-sm">
               <RotateCcw className="w-5 h-5" />
               بازگشت هزینه به کاربر جهت اصلاح
             </div>
-            <p className="text-xs text-slate-600">
+            <p className="text-sm text-slate-600">
               توضیحات و نواقص مدارک را شرح دهید تا کاربر فاکتور را ویرایش و مجدداً ارسال نماید:
             </p>
             {returnError && (
-              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 font-bold">
+              <p className="text-sm text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 font-bold">
                 لطفاً موارد نیازمند اصلاح را برای ثبت‌کننده تشریح کنید.
               </p>
             )}
@@ -544,18 +545,18 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                 if (e.target.value.trim()) setReturnError(false);
               }}
               placeholder="مثال: کیفیت اسکن فاکتور ناخواناست، لطفاً عکس مجدد واضح‌تر از مهر فروشگاه پیوست کنید..."
-              className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+              className="w-full text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
             />
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setIsReturnModalOpen(false)}
-                className="px-3 py-1.5 border border-slate-300 text-slate-700 text-xs rounded-lg hover:bg-slate-50"
+                className="px-3 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50"
               >
                 انصراف
               </button>
               <button
                 onClick={handleConfirmReturn}
-                className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-lg"
+                className="btn btn-primary"
               >
                 ارسال به تنخواه‌دار
               </button>

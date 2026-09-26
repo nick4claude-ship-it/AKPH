@@ -2,9 +2,10 @@ import React from 'react';
 import { ApprovalItem, DocumentEntityType } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { selectDocumentsFor } from '../../store/domainSelectors';
-import { formatCurrencyCompact, formatNumber, formatDecimal } from '../../utils/formatters';
+import { formatCurrencyCompact, formatNumber, formatDecimal, formatText } from '../../utils/formatters';
 import { X, FileText, CheckCircle2, ShieldCheck, Download, Printer } from 'lucide-react';
 import { Dialog } from '../../ui/Dialog';
+import { Money } from './Money';
 
 interface DocumentViewerModalProps {
   item: ApprovalItem | null;
@@ -33,7 +34,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   const attachment = docs[0];
 
   return (
-    <Dialog onClose={onClose} label="مشاهده سند مالی و فاکتور پیوست" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+    <Dialog onClose={onClose} label="مشاهده سند مالی و فاکتور پیوست" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
       
         {/* Header */}
         <div className="bg-slate-900 text-white p-4 border-b border-slate-800 flex items-center justify-between">
@@ -43,70 +44,70 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold text-white">مشاهده سند مالی و فاکتور پیوست</h3>
-                <span className="font-mono text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded">
-                  {item.docNumber}
+                <h3 className="text-sm font-bold text-white">مشاهده سند مالی و فاکتور پیوست</h3>
+                <span className="tabular-nums text-xs bg-slate-800 text-amber-300 px-2 py-1 rounded">
+                  {formatText(item.docNumber)}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">{item.projectName} · {item.costCenterName || '-'}</p>
+              <p className="text-xs text-slate-500">{formatText(item.projectName)} · {formatText(item.costCenterName || '-')}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+            className="p-1 text-slate-500 hover:text-white rounded-lg cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Voucher Sheet Presentation */}
-        <div className="p-6 space-y-4 text-xs font-sans">
+        <div className="p-6 space-y-4 text-sm font-sans">
           {/* Top metadata grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center tabular-nums">
             <div>
-              <span className="text-[10px] text-slate-500 block font-sans">شماره سند</span>
-              <span className="font-bold text-slate-900">{item.docNumber}</span>
+              <span className="text-xs text-slate-500 block font-sans">شماره سند</span>
+              <span className="font-bold text-slate-900">{formatText(item.docNumber)}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-500 block font-sans">تاریخ ثبت</span>
-              <span className="font-bold text-slate-900">{item.date}</span>
+              <span className="text-xs text-slate-500 block font-sans">تاریخ ثبت</span>
+              <span className="font-bold text-slate-900">{formatText(item.date)}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-500 block font-sans">ثبت‌کننده</span>
-              <span className="font-bold text-slate-900 font-sans text-[11px]">{item.requester}</span>
+              <span className="text-xs text-slate-500 block font-sans">ثبت‌کننده</span>
+              <span className="font-bold text-slate-900 font-sans text-sm">{formatText(item.requester)}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-500 block font-sans">طرف حساب (فروشنده)</span>
-              <span className="font-bold text-slate-900 font-sans text-[11px]">{item.counterpartyName || '-'}</span>
+              <span className="text-xs text-slate-500 block font-sans">طرف حساب (فروشنده)</span>
+              <span className="font-bold text-slate-900 font-sans text-sm">{formatText(item.counterpartyName || '-')}</span>
             </div>
           </div>
 
           {/* Core financial accounting card */}
           <div className="border border-slate-200 rounded-xl overflow-hidden">
-            <div className="bg-slate-100/70 p-2.5 font-bold text-slate-800 border-b border-slate-200 flex justify-between items-center">
+            <div className="bg-slate-100/70 p-2 font-bold text-slate-800 border-b border-slate-200 flex justify-between items-center">
               <span>شرح ردیف‌های هزینه و تراز سند</span>
-              <span className="text-[11px] font-normal text-slate-500">طبقه: {item.classification}</span>
+              <span className="text-xs font-normal text-slate-500">طبقه: {formatText(item.classification)}</span>
             </div>
             <div className="p-3 space-y-2">
               <div className="flex justify-between items-center py-1 border-b border-slate-100">
                 <span className="text-slate-600">شرح هزینه / کالا:</span>
-                <span className="font-medium text-slate-900">{item.title}</span>
+                <span className="font-medium text-slate-900">{formatText(item.title)}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-slate-100">
                 <span className="text-slate-600">سرفصل حسابداری:</span>
-                <span className="font-medium text-slate-900">{item.stage} ({item.moduleLabel})</span>
+                <span className="font-medium text-slate-900">{formatText(item.stage)} ({item.moduleLabel})</span>
               </div>
-              <div className="flex justify-between items-center py-1 border-b border-slate-100 font-mono">
+              <div className="flex justify-between items-center py-1 border-b border-slate-100 tabular-nums">
                 <span className="text-slate-600 font-sans">مبلغ کل بر اساس فاکتور رسمی:</span>
-                <span className="font-bold text-slate-900 text-sm">{formatCurrencyCompact(item.amount)}</span>
+                <span className="font-bold text-slate-900 text-sm"><Money rial={item.amount} compact /></span>
               </div>
-              <div className="flex justify-between items-center py-1 border-b border-slate-100 font-mono">
+              <div className="flex justify-between items-center py-1 border-b border-slate-100 tabular-nums">
                 <span className="text-slate-600 font-sans">مرحله در انتظار:</span>
-                <span className="font-bold text-emerald-700 font-sans">{item.stage}</span>
+                <span className="font-bold text-emerald-700 font-sans">{formatText(item.stage)}</span>
               </div>
-              <div className="flex justify-between items-center py-1 font-mono">
+              <div className="flex justify-between items-center py-1 tabular-nums">
                 <span className="text-slate-600 font-sans">نقش تأییدکننده:</span>
-                <span className="font-bold text-rose-600 font-sans">{item.approverRole}</span>
+                <span className="font-bold text-rose-700 font-sans">{formatText(item.approverRole)}</span>
               </div>
             </div>
           </div>
@@ -114,12 +115,12 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           {/* Attached Document Visual Simulation */}
           <div className="p-4 bg-slate-50 border border-dashed border-slate-300 rounded-xl flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center font-bold font-mono text-xs">
+              <div className="w-10 h-10 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-bold tabular-nums text-sm">
                 PDF
               </div>
               <div>
                 <p className="font-bold text-slate-900">{attachment ? attachment.fileName : 'سندی به این رکورد پیوست نشده است'}</p>
-                <p className="text-[10px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   {attachment ? `${attachment.type} · حجم ${attachment.fileSize} · ${formatDecimal(docs.length)} سند در مرکز اسناد` : 'از مرکز اسناد پیوست را بارگذاری و متصل کنید.'}
                 </p>
               </div>
@@ -137,7 +138,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                 a.click();
                 a.remove();
               }}
-              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{attachment?.url ? 'دانلود' : 'دانلود (به‌زودی)'}</span>
@@ -149,7 +150,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-medium cursor-pointer"
           >
             بستن پنجره
           </button>
@@ -158,7 +159,7 @@ export const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               onApprove(item.id);
               onClose();
             }}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+            className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>تأیید سند</span>

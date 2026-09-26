@@ -28,7 +28,7 @@ import { useWorkflows } from '../../store/useWorkflows';
 import { useCurrentUser } from '../../store/session';
 import { toPersianDate } from '../../utils/date';
 import { Dialog } from '../../ui/Dialog';
-import { formatInt } from '../../utils/formatters';
+import { formatInt, formatText } from '../../utils/formatters';
 
 /** Labels for what a document can be linked to. */
 const ENTITY_LABELS: Record<DocumentEntityType, string> = {
@@ -185,13 +185,13 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] bg-slate-900 text-amber-400 font-bold px-2 py-0.5 rounded font-mono">
-              مرکز اسناد یکپارچه سازمانی (Document Center DMS)
+            <span className="text-xs bg-slate-900 text-amber-400 font-bold px-2 py-1 rounded tabular-nums">
+              مرکز اسناد یکپارچه سازمانی
             </span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded tabular-nums">
               متصل به پروژه، قرارداد، صورت‌وضعیت و طرف‌حساب
             </span>
           </div>
@@ -205,7 +205,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
         <button
           onClick={() => setIsNewDocModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-sm transition-colors cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 text-amber-400" />
           <span>بارگذاری سند جدید</span>
@@ -213,55 +213,55 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-sm">
         <div className="flex items-center gap-2 flex-1 flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5" />
-            <input
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-2.5" />
+            <input aria-label="جستجو در عنوان، شماره سند، برچسب‌ها"
               type="text"
               placeholder="جستجو در عنوان، شماره سند، برچسب‌ها..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-3 pr-8 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:border-amber-500"
+              className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:border-amber-500"
             />
           </div>
 
-          <select
+          <select aria-label="فیلتر: دسته‌بندی"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
+            className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
           >
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.label}
+                {formatText(c.label)}
               </option>
             ))}
           </select>
 
-          <select
+          <select aria-label="فیلتر: پروژه‌ها"
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
+            className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
           >
             <option value="all">همه پروژه‌ها</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {formatText(p.name)}
               </option>
             ))}
           </select>
         </div>
 
-        <span className="text-slate-400 font-mono text-[11px]">
+        <span className="text-slate-500 tabular-nums text-xs">
           تعداد اسناد یافت شده: {formatInt(filteredDocs.length)}
         </span>
       </div>
 
       {/* Documents Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+        <div className="table-scroll">
+          <table className="w-full text-right text-sm">
+            <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
               <tr>
                 <th className="py-3 px-3">عنوان و شماره سند</th>
                 <th className="py-3 px-3">دسته‌بندی و فرمت</th>
@@ -277,45 +277,45 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               {filteredDocs.map((doc) => (
                 <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-3">
-                    <strong className="block text-slate-900 font-medium leading-snug">{doc.title}</strong>
-                    <span className="text-[10px] text-slate-400 font-mono">{doc.docNumber}</span>
+                    <strong className="block text-slate-900 font-medium leading-snug">{formatText(doc.title)}</strong>
+                    <span className="text-xs text-slate-500 tabular-nums">{formatText(doc.docNumber)}</span>
                   </td>
                   <td className="py-3 px-3">
-                    <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-medium">
-                      {doc.category}
+                    <span className="inline-block px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-medium">
+                      {formatText(doc.category)}
                     </span>
-                    <span className="inline-block mr-1 text-[10px] font-mono px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded font-bold">
-                      {doc.fileFormat}
+                    <span className="inline-block mr-1 text-xs tabular-nums px-2 py-0.2 bg-blue-50 text-blue-700 rounded font-bold">
+                      {formatText(doc.fileFormat)}
                     </span>
                   </td>
                   <td className="py-3 px-3">
                     <span className="text-slate-800 font-medium block truncate max-w-[170px]">
-                      {doc.projectName}
+                      {formatText(doc.projectName)}
                     </span>
                   </td>
                   <td className="py-3 px-3">
                     <span className="text-slate-700 block truncate max-w-[150px]">
-                      {doc.partnerName || 'دفتر مرکزی'}
+                      {formatText(doc.partnerName || 'دفتر مرکزی')}
                     </span>
                   </td>
-                  <td className="py-3 px-3 font-mono text-slate-500">{doc.date}</td>
-                  <td className="py-3 px-3 font-mono text-slate-500">{doc.fileSize}</td>
+                  <td className="py-3 px-3 tabular-nums text-slate-500">{formatText(doc.date)}</td>
+                  <td className="py-3 px-3 tabular-nums text-slate-500">{formatText(doc.fileSize)}</td>
                   <td className="py-3 px-3">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      className={`px-2 py-1 rounded text-xs font-medium ${
                         doc.status === 'معتبر و جاری'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : 'bg-amber-50 text-amber-700'
                       }`}
                     >
-                      {doc.status}
+                      {formatText(doc.status)}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => setSelectedDocForPreview(doc)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer"
+                        className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer"
                         title="مشاهده جزئیات و محتوا"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -323,7 +323,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                       <button
                         onClick={() => handleDownloadFile(doc)}
                         disabled={!doc.url}
-                        className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         title={doc.url ? 'دریافت فایل پیوست' : 'فایل اصلی هنوز بارگذاری نشده است (به‌زودی)'}
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -339,7 +339,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
       {/* Modal: Document Preview */}
       {selectedDocForPreview && (
-        <Dialog onClose={() => setSelectedDocForPreview(null)} label="پیش‌نمایش سند" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog onClose={() => setSelectedDocForPreview(null)} label="پیش‌نمایش سند" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
           
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
@@ -347,70 +347,70 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                   <FileText className="w-5 h-5 text-slate-700" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">{selectedDocForPreview.title}</h3>
-                  <span className="text-xs text-slate-400 font-mono">{selectedDocForPreview.docNumber}</span>
+                  <h3 className="text-base font-bold text-slate-900">{formatText(selectedDocForPreview.title)}</h3>
+                  <span className="text-xs text-slate-500 tabular-nums">{formatText(selectedDocForPreview.docNumber)}</span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedDocForPreview(null)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="text-slate-500 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs mb-4">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+            <div className="space-y-3 text-sm mb-4">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-500">پروژه منتسب:</span>
-                  <strong className="text-slate-900">{selectedDocForPreview.projectName}</strong>
+                  <strong className="text-slate-900">{formatText(selectedDocForPreview.projectName)}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">دسته‌بندی مدرک:</span>
-                  <span className="font-semibold text-slate-800">{selectedDocForPreview.category}</span>
+                  <span className="font-medium text-slate-800">{formatText(selectedDocForPreview.category)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">طرف‌حساب مرتبط:</span>
-                  <span>{selectedDocForPreview.partnerName || '---'}</span>
+                  <span>{formatText(selectedDocForPreview.partnerName || '---')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">تاریخ ثبت:</span>
-                  <span className="font-mono">{selectedDocForPreview.date}</span>
+                  <span className="tabular-nums">{formatText(selectedDocForPreview.date)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">فرمت و حجم:</span>
-                  <span className="font-mono">{selectedDocForPreview.fileFormat} • {selectedDocForPreview.fileSize}</span>
+                  <span className="tabular-nums">{formatText(selectedDocForPreview.fileFormat)} • {formatText(selectedDocForPreview.fileSize)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">سطح محرمانگی:</span>
-                  <span className="font-medium text-amber-800">{selectedDocForPreview.confidentiality}</span>
+                  <span className="font-medium text-amber-800">{formatText(selectedDocForPreview.confidentiality)}</span>
                 </div>
               </div>
 
               <div>
-                <span className="text-slate-400 text-[11px] block mb-1">شرح و محتوای سند:</span>
-                <p className="text-slate-700 bg-white p-3 rounded-xl border border-slate-200 leading-relaxed text-xs">
-                  {selectedDocForPreview.description}
+                <span className="text-slate-500 text-xs block mb-1">شرح و محتوای سند:</span>
+                <p className="text-slate-700 bg-white p-3 rounded-xl border border-slate-200 leading-relaxed text-sm">
+                  {formatText(selectedDocForPreview.description)}
                 </p>
               </div>
 
               <div>
-                <span className="text-slate-400 text-[11px] block mb-1">متصل به:</span>
+                <span className="text-slate-500 text-xs block mb-1">متصل به:</span>
                 <div className="flex flex-wrap gap-1 mb-2">
                   {selectedDocForPreview.links.map((l) => (
-                    <span key={`${l.entityType}:${l.entityId}`} className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-900 rounded text-[10px]">
+                    <span key={`${l.entityType}:${l.entityId}`} className="px-2 py-1 bg-amber-50 border border-amber-200 text-amber-900 rounded text-xs">
                       {linkLabel(l)}
                     </span>
                   ))}
                 </div>
                 <div className="flex items-center gap-1 mb-3">
-                  <select
+                  <select aria-label="نوع رکورد مرتبط"
                     value={linkType}
                     onChange={(e) => {
                       setLinkType(e.target.value as DocumentEntityType);
                       setLinkId('');
                     }}
-                    className="p-1 rounded border border-slate-200 text-[11px]"
+                    className="p-1 rounded border border-slate-200 text-sm"
                   >
                     {(Object.keys(ENTITY_LABELS) as DocumentEntityType[]).map((t) => (
                       <option key={t} value={t}>
@@ -418,11 +418,11 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                       </option>
                     ))}
                   </select>
-                  <select value={linkId} onChange={(e) => setLinkId(e.target.value)} className="p-1 rounded border border-slate-200 text-[11px] flex-1 min-w-0">
+                  <select aria-label="رکورد مرتبط" value={linkId} onChange={(e) => setLinkId(e.target.value)} className="p-1 rounded border border-slate-200 text-sm flex-1 min-w-0">
                     <option value="">— انتخاب رکورد —</option>
                     {entityOptions(linkType).map((o) => (
                       <option key={o.id} value={o.id}>
-                        {o.label}
+                        {formatText(o.label)}
                       </option>
                     ))}
                   </select>
@@ -434,7 +434,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                       if (d) setSelectedDocForPreview({ ...selectedDocForPreview, links: [...selectedDocForPreview.links, { entityType: linkType, entityId: linkId }] });
                       setLinkId('');
                     }}
-                    className="px-2 py-1 rounded bg-slate-900 text-white text-[11px] disabled:opacity-40 cursor-pointer"
+                    className="px-2 py-1 rounded bg-slate-900 text-white text-xs disabled:opacity-40 cursor-pointer"
                   >
                     پیوند
                   </button>
@@ -442,10 +442,10 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </div>
 
               <div>
-                <span className="text-slate-400 text-[11px] block mb-1">برچسب‌ها:</span>
+                <span className="text-slate-500 text-xs block mb-1">برچسب‌ها:</span>
                 <div className="flex flex-wrap gap-1">
                   {[...new Set(selectedDocForPreview.tags)].map((t) => (
-                    <span key={t} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px]">
+                    <span key={t} className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
                       #{t}
                     </span>
                   ))}
@@ -454,19 +454,19 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">ثبت‌کننده: {selectedDocForPreview.registeredBy}</span>
+              <span className="text-xs text-slate-500">ثبت‌کننده: {formatText(selectedDocForPreview.registeredBy)}</span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleDownloadFile(selectedDocForPreview)}
                   disabled={!selectedDocForPreview.url}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Download className="w-3.5 h-3.5 text-amber-400" />
                   <span>{selectedDocForPreview.url ? 'دانلود فایل پیوست' : 'دانلود فایل (به‌زودی)'}</span>
                 </button>
                 <button
                   onClick={() => setSelectedDocForPreview(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs cursor-pointer font-medium"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm cursor-pointer font-medium"
                 >
                   بستن
                 </button>
@@ -477,19 +477,19 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
       {/* Modal: Upload New Document */}
       {isNewDocModalOpen && (
-        <Dialog onClose={() => setIsNewDocModalOpen(false)} label="بارگذاری و بایگانی سند جدید" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
+        <Dialog onClose={() => setIsNewDocModalOpen(false)} label="بارگذاری و بایگانی سند جدید" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
           
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-sm font-bold text-slate-900">بارگذاری و بایگانی سند جدید</h3>
+              <h3 className="text-base font-bold text-slate-900">بارگذاری و بایگانی سند جدید</h3>
               <button
                 onClick={() => setIsNewDocModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUploadDoc} className="space-y-3 text-xs">
+            <form onSubmit={handleUploadDoc} className="space-y-3 text-sm">
               <div>
                 <label htmlFor="document-center-module-1" className="block font-medium text-slate-700 mb-1">عنوان سند:</label>
                 <input id="document-center-module-1"
@@ -498,7 +498,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                   value={newDocTitle}
                   onChange={(e) => setNewDocTitle(e.target.value)}
                   required
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs focus:outline-none focus:border-amber-500"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -507,11 +507,11 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 <select id="document-center-module-2"
                   value={newDocCategory}
                   onChange={(e) => setNewDocCategory(e.target.value as DocumentCategory)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 >
                   {categories.filter((c) => c.id !== 'all').map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.label}
+                      {formatText(c.label)}
                     </option>
                   ))}
                 </select>
@@ -522,11 +522,11 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 <select id="document-center-module-3"
                   value={newDocProject}
                   onChange={(e) => setNewDocProject(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 >
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {formatText(p.name)}
                     </option>
                   ))}
                 </select>
@@ -537,12 +537,12 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 <select id="document-center-module-4"
                   value={newDocPartner}
                   onChange={(e) => setNewDocPartner(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 >
                   <option value="">— اختیاری —</option>
                   {state.counterparties.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {formatText(c.name)}
                     </option>
                   ))}
                 </select>
@@ -557,7 +557,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                       setNewDocLinkType(e.target.value as DocumentEntityType);
                       setNewDocLinkId('');
                     }}
-                    className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                    className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                   >
                     {(Object.keys(ENTITY_LABELS) as DocumentEntityType[])
                       .filter((t) => t !== 'project' && t !== 'counterparty')
@@ -570,11 +570,11 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 </div>
                 <div>
                   <label htmlFor="document-center-module-6" className="block font-medium text-slate-700 mb-1">رکورد:</label>
-                  <select id="document-center-module-6" value={newDocLinkId} onChange={(e) => setNewDocLinkId(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs">
+                  <select id="document-center-module-6" value={newDocLinkId} onChange={(e) => setNewDocLinkId(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm">
                     <option value="">— بدون اتصال —</option>
                     {entityOptions(newDocLinkType, newDocProject).map((o) => (
                       <option key={o.id} value={o.id}>
-                        {o.label}
+                        {formatText(o.label)}
                       </option>
                     ))}
                   </select>
@@ -586,13 +586,13 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 <select id="document-center-module-7"
                   value={newDocFormat}
                   onChange={(e) => setNewDocFormat(e.target.value as AppDocument['fileFormat'])}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 >
-                  <option value="PDF">PDF Document</option>
-                  <option value="DWG">AutoCAD DWG</option>
-                  <option value="XLSX">Excel Spreadsheet</option>
-                  <option value="DOCX">Word Document</option>
-                  <option value="JPG">Image / Scan</option>
+                  <option value="PDF">سند PDF</option>
+                  <option value="DWG">نقشه اتوکد (DWG)</option>
+                  <option value="XLSX">صفحه‌گسترده اکسل</option>
+                  <option value="DOCX">سند ورد</option>
+                  <option value="JPG">تصویر یا اسکن</option>
                 </select>
               </div>
 
@@ -603,7 +603,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                   placeholder="شرح مختصر..."
                   value={newDocDesc}
                   onChange={(e) => setNewDocDesc(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
                 />
               </div>
 
@@ -617,7 +617,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg cursor-pointer"
+                  className="btn btn-secondary"
                 >
                   ذخیره و ثبت سند
                 </button>

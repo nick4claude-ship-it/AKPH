@@ -26,6 +26,18 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  design:
+    name: check:design
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:design
+
   php:
     name: php -l (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
@@ -108,9 +120,10 @@ jobs:
       - run: npm ci
       - name: Chromium for Playwright
         run: npx playwright install --with-deps chromium
-      # Baseline: the audit only reports here; the redesign makes it strict.
+      # Fails on text under 12px, a font other than Vazirmatn, Latin digits, contrast under 4.5:1, an unnamed
+      # button, an unlabelled control, horizontal page scroll or a page error; screenshots are kept either way.
       - name: Screenshots of every menu route and typography audit
-        run: npm run test:ui -- --report
+        run: npm run test:ui
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -29,7 +29,8 @@ import { PurchaseOrderPrintModal } from './PurchaseOrderPrintModal';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import type { WorkflowResult } from '../../store/workflowKit';
-import { formatInt } from '../../utils/formatters';
+import { formatInt, formatText } from '../../utils/formatters';
+import { PageHeader } from '../common/PageHeader';
 
 interface ProcurementModuleProps {
   projects: Project[];
@@ -76,62 +77,51 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
 
   const tabs = [
     { id: 'dashboard', label: 'داشبورد زنجیره تأمین', icon: Layers },
-    { id: 'requisitions', label: 'درخواست‌های خرید (PR)', count: requisitions.length, icon: FileSpreadsheet },
-    { id: 'rfq', label: 'استعلام بها و کمیسیون (RFQ)', count: rfqs.length, icon: Scale },
-    { id: 'purchase_orders', label: 'سفارش‌های خرید (PO)', count: orders.length, icon: ShoppingCart },
+    { id: 'requisitions', label: 'درخواست‌های خرید', count: requisitions.length, icon: FileSpreadsheet },
+    { id: 'rfq', label: 'استعلام بها و کمیسیون', count: rfqs.length, icon: Scale },
+    { id: 'purchase_orders', label: 'سفارش‌های خرید', count: orders.length, icon: ShoppingCart },
     { id: 'invoices', label: 'فاکتورها و تطبیق ۳جانبه', count: invoices.length, icon: FileCheck2 },
     { id: 'suppliers', label: 'وندورلیست تأمین‌کنندگان', count: suppliers.length, icon: Building2 },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Top Banner Navigation Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] bg-cyan-100 text-cyan-800 font-bold px-2 py-0.5 rounded">
-              ماژول زنجیره تأمین و بازرگانی (Procurement Engine)
-            </span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-              چرخه استاندارد EPC
-            </span>
-          </div>
-          <h2 className="text-base font-bold text-slate-900">
-            مدیریت تدارکات، استعلام بها، سفارش‌ها و وندورها
-          </h2>
-          <p className="text-xs text-slate-500">
-            درخواست خرید ← استعلام بها و کمیسیون ← صدور سفارش (PO) ← رسید انبار ← فاکتور و تطبیق ۳‌جانبه ← پرداخت
-          </p>
-        </div>
-
-        {/* Quick Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+      <PageHeader
+        icon={ShoppingCart}
+        title="تدارکات، استعلام بها و سفارش خرید"
+        description="درخواست خرید ← استعلام بها و کمیسیون ← صدور سفارش ← رسید انبار ← فاکتور و تطبیق سه‌جانبه ← پرداخت"
+        actions={
+          <>
           <button
             onClick={() => setIsNewRequisitionOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
+            type="button"
+            className="btn btn-primary"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>ثبت درخواست خرید (PR)</span>
+            <Plus className="w-4 h-4" />
+            <span>ثبت درخواست خرید</span>
           </button>
           <button
             onClick={() => setIsNewOrderOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-xs transition-colors cursor-pointer"
+            type="button"
+            className="btn btn-secondary"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>صدور سفارش خرید (PO)</span>
+            <Plus className="w-4 h-4" />
+            <span>صدور سفارش خرید</span>
           </button>
           <button
             onClick={() => setIsNewSupplierOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-xs transition-colors cursor-pointer"
+            type="button"
+            className="btn btn-secondary"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span>تأمین‌کننده جدید</span>
           </button>
-        </div>
-      </div>
+        </>
+        }
+      />
 
       {/* Module Navigation Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200 scrollbar-none">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -139,17 +129,17 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as ProcurementSubTab)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
                 isActive
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
-              <span>{tab.label}</span>
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
+              <span>{formatText(tab.label)}</span>
               {tab.count !== undefined && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                  className={`text-xs px-2 py-1 rounded-full tabular-nums ${
                     isActive ? 'bg-slate-800 text-amber-300' : 'bg-slate-100 text-slate-500'
                   }`}
                 >

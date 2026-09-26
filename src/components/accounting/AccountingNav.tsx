@@ -20,6 +20,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { AccountingSubTab } from '../../types';
+import { formatText } from '../../utils/formatters';
 
 interface AccountingNavProps {
   activeSubTab: AccountingSubTab;
@@ -45,7 +46,7 @@ export const AccountingNav: React.FC<AccountingNavProps> = ({
       label: 'اسناد حسابداری',
       icon: FileSpreadsheet,
       badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined,
-      badgeColor: 'bg-rose-500 text-white',
+      badgeColor: 'bg-rose-700 text-white',
     },
     { id: 'revenues', label: 'درآمدها (کارکرد)', icon: TrendingUp },
     { id: 'expenses', label: 'هزینه‌ها (سرفصل‌ها)', icon: Receipt },
@@ -65,8 +66,8 @@ export const AccountingNav: React.FC<AccountingNavProps> = ({
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs overflow-x-auto select-none">
-      <div className="flex items-center gap-1.5 min-w-max pb-1">
+    <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-xs overflow-x-auto select-none">
+      <div className="flex items-center gap-2 min-w-max pb-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSubTab === item.id;
@@ -75,21 +76,21 @@ export const AccountingNav: React.FC<AccountingNavProps> = ({
             <button
               key={item.id}
               onClick={() => onSelectSubTab(item.id)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
                 isActive
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-500'}`} />
-              <span>{item.label}</span>
+              <span>{formatText(item.label)}</span>
               {item.badge !== undefined && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                  className={`text-xs px-2 py-0.2 rounded-full tabular-nums font-bold ${
                     item.badgeColor || 'bg-slate-200 text-slate-700'
                   }`}
                 >
-                  {item.badge}
+                  {formatText(item.badge)}
                 </span>
               )}
             </button>
