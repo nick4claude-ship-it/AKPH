@@ -9,7 +9,8 @@ if (!defined('ABSPATH')) {
 }
 
 final class Akph_Roles {
-    const ROLES_VERSION = '1';
+    /** 1 — 0.3.0; 2 — akph_assistant_use (all four roles) and akph_ai_manage (system administrator). */
+    const ROLES_VERSION = '2';
     const OPTION_VERSION = 'akph_portal_roles_version';
 
     const ACCESS = 'akph_access';
@@ -29,6 +30,10 @@ final class Akph_Roles {
     const REPORTS = 'akph_reports';
     const AUDIT_READ = 'akph_audit_read';
     const SETTINGS = 'akph_settings';
+    /** Ask the management assistant (server-side language model, the user's own data scope). */
+    const ASSISTANT_USE = 'akph_assistant_use';
+    /** Assistant settings and the API key: system administrator only. */
+    const AI_MANAGE = 'akph_ai_manage';
 
     /** WordPress role slug → portal role label (docs/SERVER-RULES.md §1), in order of precedence. */
     const PORTAL_ROLES = array(
@@ -43,21 +48,22 @@ final class Akph_Roles {
             self::ACCESS, self::VIEW_ALL, self::PROJECTS_CREATE, self::PROJECTS_EDIT_BASE, self::PROJECTS_EDIT_BUDGET,
             self::PROJECTS_ASSIGN, self::PROJECTS_EDIT_EXEC_ALL, self::PROJECTS_EDIT_EXEC_OWN, self::PROJECTS_EDIT_FINANCIAL,
             self::MASTER_DATA, self::ACCOUNTS_MANAGE, self::JOURNAL_CREATE, self::JOURNAL_APPROVE, self::JOURNAL_REVERSE,
-            self::REPORTS, self::AUDIT_READ, self::SETTINGS,
+            self::REPORTS, self::AUDIT_READ, self::SETTINGS, self::ASSISTANT_USE, self::AI_MANAGE,
         );
     }
 
     /** Mirrors ROLE_PERMISSIONS in src/utils/permissions.ts: system admin and senior manager may do everything. */
     public static function grants() {
-        $senior = array_values(array_diff(self::all_caps(), array(self::PROJECTS_EDIT_EXEC_OWN)));
+        $senior = array_values(array_diff(self::all_caps(), array(self::PROJECTS_EDIT_EXEC_OWN, self::AI_MANAGE)));
         return array(
-            'administrator' => $senior,
+            'administrator' => array_merge($senior, array(self::AI_MANAGE)),
             'paydar_senior_manager' => $senior,
             'paydar_accountant' => array(
                 self::ACCESS, self::VIEW_ALL, self::PROJECTS_EDIT_FINANCIAL, self::MASTER_DATA, self::ACCOUNTS_MANAGE,
                 self::JOURNAL_CREATE, self::JOURNAL_APPROVE, self::JOURNAL_REVERSE, self::REPORTS, self::AUDIT_READ,
+                self::ASSISTANT_USE,
             ),
-            'paydar_project_manager' => array(self::ACCESS, self::PROJECTS_EDIT_EXEC_OWN, self::REPORTS),
+            'paydar_project_manager' => array(self::ACCESS, self::PROJECTS_EDIT_EXEC_OWN, self::REPORTS, self::ASSISTANT_USE),
         );
     }
 

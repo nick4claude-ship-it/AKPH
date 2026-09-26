@@ -41,6 +41,11 @@ final class Akph_Rest {
             '/account/avatar' => array(array('POST', 'account_avatar', $r::ACCESS), array('DELETE', 'account_avatar_delete', $r::ACCESS)),
             '/account/sessions' => array(array('GET', 'account_sessions', $r::ACCESS)),
             '/account/sessions/logout-others' => array(array('POST', 'account_logout_others', $r::ACCESS)),
+            // «دستیار مدیریت»: the language model is called by the server only; settings for the system administrator.
+            '/assistant/status' => array(array('GET', 'assistant_status', $r::ASSISTANT_USE)),
+            '/assistant/ask' => array(array('POST', 'assistant_ask', $r::ASSISTANT_USE)),
+            '/assistant/settings' => array(array('GET', 'assistant_settings', $r::AI_MANAGE), array('POST', 'assistant_update_settings', $r::AI_MANAGE)),
+            '/assistant/test' => array(array('POST', 'assistant_test', $r::AI_MANAGE)),
         );
         foreach ($routes as $path => $defs) {
             $args = array();
@@ -213,6 +218,61 @@ final class Akph_Rest {
             Akph_Account::assert_fields($request, $body, array());
             return Akph_Account::logout_others();
         });
+    }
+
+    // ------------------------------------------------------------------ assistant
+
+    public static function assistant_status(WP_REST_Request $request) {
+        return self::read(function () {
+            return Akph_Assistant::status();
+        });
+    }
+
+    /**
+     * Not a stored command: the answer is not kept with an Idempotency-Key (only in the request log, and its
+     * text only when the administrator chose so). The request log counts the daily limit.
+     */
+    public static function assistant_ask(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            $body = self::json_body($request);
+            Akph_Account::assert_fields($request, $body, array('question', 'conversation_id'));
+            return Akph_Assistant::ask($body);
+        });
+    }
+
+    public static function assistant_settings(WP_REST_Request $request) {
+        return self::read(function () {
+            return array('settings' => Akph_Assistant::public_settings());
+        });
+    }
+
+    public static function assistant_update_settings(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array('enabled', 'provider', 'base_url', 'model', 'max_tokens', 'daily_limit', 'log_content', 'api_key', 'clear_key'));
+            return array('message' => 'تنظیمات دستیار ذخیره شد.', 'records' => array('assistant_settings' => array(Akph_Assistant::update_settings($body))));
+        }, array('secret' => array('api_key')));
+    }
+
+    public static function assistant_test(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            Akph_Account::assert_fields($request, self::json_body($request), array());
+            return Akph_Assistant::test_connection();
+        });
+    }
+
+    /** JSON object body of a request that is not a stored command. */
+    private static function json_body(WP_REST_Request $request) {
+        $body = $request->get_json_params();
+        if ($body === null) {
+            if (trim((string) $request->get_body()) !== '') {
+                throw new Akph_Error('akph_invalid_json', 'بدنه درخواست JSON معتبر نیست.', 400);
+            }
+            return array();
+        }
+        if (!is_array($body)) {
+            throw new Akph_Error('akph_invalid_json', 'بدنه درخواست باید یک شیء JSON باشد.', 400);
+        }
+        return $body;
     }
 
     // ------------------------------------------------------------------ projects

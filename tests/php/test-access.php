@@ -67,6 +67,11 @@ class Test_Akph_Access extends Akph_Test_Case {
             array('DELETE', '/account/avatar', $all),
             array('GET', '/account/sessions', $all),
             array('POST', '/account/sessions/logout-others', $all),
+            array('GET', '/assistant/status', $all),
+            array('POST', '/assistant/ask', $all),
+            array('GET', '/assistant/settings', array('admin')),
+            array('POST', '/assistant/settings', array('admin')),
+            array('POST', '/assistant/test', array('admin')),
         );
     }
 

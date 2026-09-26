@@ -206,5 +206,7 @@ export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint
 export const apiClient = {
   get: <T>(endpoint: string, params?: Record<string, string | number | boolean>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
+  /** A POST that is not a stored command (e.g. a question to the assistant): sent once, never repeated. */
+  post: <T>(endpoint: string, body: unknown) => apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   command: sendCommand,
 };

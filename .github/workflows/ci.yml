@@ -101,6 +101,8 @@ jobs:
         run: |
           cp wordpress-develop/wp-tests-config-sample.php wordpress-develop/wp-tests-config.php
           sed -i "s/youremptytestdbnamehere/wp_tests/; s/yourusernamehere/root/; s/yourpasswordhere/root/; s/'localhost'/'127.0.0.1'/" wordpress-develop/wp-tests-config.php
+          # Unique keys and salts (the sample phrase is public; the assistant refuses to derive its key from it).
+          sed -i "s/put your unique phrase here/akph-ci-$(openssl rand -hex 24)/" wordpress-develop/wp-tests-config.php
       - name: Run the integration tests
         working-directory: tests/php
         env:

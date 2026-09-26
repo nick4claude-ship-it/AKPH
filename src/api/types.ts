@@ -7,6 +7,7 @@ import type { CompanyProfile, JournalEntry, UserProfile } from '../types';
 import type { AppState, SliceKey } from '../store/types';
 import type { CurrencyUnit } from '../utils/money';
 import type { AccountApi, AccountPreferences } from './account';
+import type { AssistantApi } from './assistant';
 
 /** Who is signed in and the ledger conventions of this installation. */
 export interface PortalSession {
@@ -79,6 +80,8 @@ export interface DataSource {
   listManagers?(): Promise<{ id: string; name: string }[]>;
   /** «حساب کاربری من»: the signed-in user's own account. */
   account?: AccountApi;
+  /** akph only: the management assistant through the server (absent: demo answers computed in the browser). */
+  assistant?: AssistantApi;
   /** DEV only: users the role switcher can sign in as. */
   devUsers?(): UserProfile[];
 }

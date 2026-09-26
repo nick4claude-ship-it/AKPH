@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Akph_Schema {
-    const DB_VERSION = '2';
+    const DB_VERSION = '3';
     const OPTION_VERSION = 'akph_portal_db_version';
     /** Tables that are not InnoDB (transactions and row locks would silently not work). */
     const OPTION_ENGINE_PROBLEMS = 'akph_portal_engine_problems';
@@ -181,6 +181,22 @@ final class Akph_Schema {
  PRIMARY KEY  (id),
  UNIQUE KEY user_key (user_id,idem_key),
  KEY created_at (created_at)",
+            'ai_requests' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+ user_id bigint(20) unsigned NOT NULL,
+ day date NOT NULL,
+ created_at datetime NOT NULL,
+ status varchar(16) NOT NULL DEFAULT 'pending',
+ provider varchar(16) NOT NULL DEFAULT '',
+ model varchar(100) NOT NULL DEFAULT '',
+ input_tokens int(10) unsigned NOT NULL DEFAULT 0,
+ output_tokens int(10) unsigned NOT NULL DEFAULT 0,
+ question_chars smallint(5) unsigned NOT NULL DEFAULT 0,
+ error_code varchar(32) NOT NULL DEFAULT '',
+ question longtext NULL,
+ answer longtext NULL,
+ PRIMARY KEY  (id),
+ KEY user_day (user_id,day),
+ KEY created_at (created_at)",
             'doc_sequences' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
  prefix varchar(8) NOT NULL,
  fiscal_year smallint(5) unsigned NOT NULL,
@@ -210,7 +226,7 @@ final class Akph_Schema {
      * the automatic retry waits for the backoff transient to expire.
      *
      * Versions: 1 — tables of 0.3.0; 2 — ledger_entries.reversal_target (the entry a reversal reverses, kept
-     * after a rejected reversal releases reversal_of).
+     * after a rejected reversal releases reversal_of); 3 — ai_requests (assistant requests: audit and daily limit).
      */
     public static function migrate() {
         global $wpdb;

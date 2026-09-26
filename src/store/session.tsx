@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { CompanyProfile, UserProfile } from '../types';
 import type { PortalSession } from '../api/types';
 import { DEFAULT_PREFERENCES, type AccountApi, type AccountPreferences } from '../api/account';
+import type { AssistantApi } from '../api/assistant';
 import type { CurrencyUnit } from '../utils/money';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
 import { matchNav } from '../navigation/navConfig';
@@ -34,6 +35,8 @@ interface SessionValue {
   listManagers?: () => Promise<{ id: string; name: string }[]>;
   /** «حساب کاربری من» API of the data source. */
   account?: AccountApi;
+  /** Server assistant (akph); absent with demo data. */
+  assistant?: AssistantApi;
   updateSession?: (patch: SessionPatch) => void;
 }
 

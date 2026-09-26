@@ -8,6 +8,7 @@ import { moneyUnitLabel } from '../utils/money';
 import { MoneyInput, PercentInput } from '../ui/NumberInput';
 import { PageHeader } from '../components/common/PageHeader';
 import { Button } from '../components/common/Button';
+import { AssistantSettingsCard } from '../components/settings/AssistantSettingsCard';
 
 const LEVEL_LABELS: Record<PettyCashApprovalLevel, string> = {
   site_manager_and_finance: 'سطح ۱',
@@ -123,6 +124,8 @@ export const SettingsPage: React.FC<{ onToast: (msg: string) => void }> = ({ onT
           ))}
         </div>
       </div>
+
+      <AssistantSettingsCard onToast={onToast} />
     </div>
   );
 };

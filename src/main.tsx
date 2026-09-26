@@ -93,6 +93,7 @@ function Root() {
         writablePaths={boot.source.writablePaths}
         listManagers={boot.source.listManagers}
         account={boot.source.account}
+        assistant={boot.source.assistant}
         updateSession={updateSession}
         devUsers={devUsers}
         switchUser={devUsers ? (userId) => load(userId, { source: boot.source, epoch: boot.epoch }) : undefined}

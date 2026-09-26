@@ -10,6 +10,7 @@ import { buildManualEntry, type ManualEntryFormInput } from '../../store/views/a
 import type { AccountFormInput, CostCenterFormInput, CounterpartyFormInput, ProjectFormInput } from '../../store/views/masterData';
 import { apiClient, ApiError } from '../client';
 import { createAkphAccountApi } from './account';
+import { createAkphAssistantApi } from './assistant';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
   arr,
@@ -219,6 +220,7 @@ export function createAkphDataSource(): DataSource {
     commands,
     writablePaths: WRITABLE_PATHS,
     account: createAkphAccountApi(),
+    assistant: createAkphAssistantApi(),
 
     async loadSession(): Promise<PortalSession> {
       const me = parseMe(await apiClient.get<unknown>('me'));
