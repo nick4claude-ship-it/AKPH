@@ -25,6 +25,15 @@ export function initCurrencyUnit(unit: CurrencyUnit): void {
   displayUnitLocked = true;
 }
 
+/**
+ * The signed-in user saved another display unit for themselves («حساب کاربری من»). The app draws its pages
+ * again right after this (AppShell keys its routes by the session currency).
+ */
+export function changeCurrencyUnit(unit: CurrencyUnit): void {
+  displayUnit = unit === 'rial' ? 'rial' : 'toman';
+  displayUnitLocked = true;
+}
+
 export function getCurrencyUnit(): CurrencyUnit {
   return displayUnit;
 }

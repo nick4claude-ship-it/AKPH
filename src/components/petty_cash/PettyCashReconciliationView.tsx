@@ -19,11 +19,12 @@ import {
   PettyCashReplenishment,
   User,
 } from '../../types';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { formatCurrency, formatNumber, formatText } from '../../utils/formatters';
 import { toPersianDate } from '../../utils/date';
 import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { moneyUnitLabel } from '../../utils/money';
 import { countDifference, pettyReconciliationFigures } from '../../store/views/pettyCash';
+import { Money } from '../common/Money';
 
 interface PettyCashReconciliationViewProps {
   accounts: PettyCashAccount[];
@@ -95,26 +96,26 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
       {/* Header */}
       <div>
         <h2 className="text-base font-bold text-slate-900">
-          تسویه و مغایرت‌گیری دوره‌ای تنخواه‌گردان (Petty Cash Reconciliation)
+          تسویه و مغایرت‌گیری دوره‌ای تنخواه‌گردان
         </h2>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-xs text-slate-500 mt-1">
           کنترل فرمول ریاضی: موجودی ابتدای دوره + شارژها - هزینه‌های تاییدشده = موجودی دفتری در برابر شمارش فیزیکی
         </p>
       </div>
 
       {notification && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold rounded-xl flex items-center gap-2 text-xs animate-in fade-in duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold rounded-xl flex items-center gap-2 text-sm animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
           <span>{notification}</span>
         </div>
       )}
 
       {/* Main Reconciliation Calculation Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Calculator className="w-5 h-5 text-amber-600" />
-            <h3 className="text-sm font-bold text-slate-900">
+            <Calculator className="w-5 h-5 text-amber-700" />
+            <h3 className="text-base font-bold text-slate-900">
               کاربرگ تسویه و تطبیق مانده نقدینگی تنخواه
             </h3>
           </div>
@@ -135,11 +136,11 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                   const acc = accounts.find((a) => a.id === e.target.value);
                   setActualCountedCash((acc?.actualBalance ?? 0) - (acc?.pendingExpenses ?? 0));
                 }}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.title} ({a.code}) - {a.projectName}
+                    {formatText(a.title)} ({a.code}) - {formatText(a.projectName)}
                   </option>
                 ))}
               </select>
@@ -151,7 +152,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                 type="text"
                 value={periodStartDate}
                 onChange={(e) => setPeriodStartDate(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-amber-500"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg tabular-nums focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
@@ -161,45 +162,45 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                 type="text"
                 value={periodEndDate}
                 readOnly
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg font-mono bg-slate-50"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg tabular-nums bg-slate-50"
               />
             </div>
           </div>
 
           {/* Formula Interactive Box (Prompt Section 13) */}
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <h4 className="text-xs font-bold text-slate-800 mb-3">
+            <h4 className="text-sm font-bold text-slate-800 mb-3">
               محاسبه مکانیزه موجودی مورد انتظار دفتری:
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
               <div className="p-3 bg-white rounded-lg border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">موجودی ابتدای دوره</span>
-                <span className="text-sm font-bold font-mono text-slate-900 mt-1 block tabular-nums">
-                  {formatCurrency(openingBalance)}
+                <span className="text-xs text-slate-500 block">موجودی ابتدای دوره</span>
+                <span className="text-sm font-bold text-slate-900 mt-1 block tabular-nums">
+                  <Money rial={openingBalance} />
                 </span>
               </div>
 
               <div className="p-3 bg-emerald-50/60 rounded-lg border border-emerald-200">
-                <span className="text-[11px] text-emerald-800 block">+ مجموع شارژهای واریزی</span>
-                <span className="text-sm font-bold font-mono text-emerald-700 mt-1 block tabular-nums">
-                  +{formatCurrency(accountReplenishmentsSum)}
+                <span className="text-sm text-emerald-800 block">+ مجموع شارژهای واریزی</span>
+                <span className="text-sm font-bold text-emerald-700 mt-1 block tabular-nums">
+                  +<Money rial={accountReplenishmentsSum} />
                 </span>
               </div>
 
               <div className="p-3 bg-rose-50/60 rounded-lg border border-rose-200">
-                <span className="text-[11px] text-rose-800 block">- هزینه‌های تأییدشده مصوب</span>
-                <span className="text-sm font-bold font-mono text-rose-700 mt-1 block tabular-nums">
-                  -{formatCurrency(accountApprovedExpensesSum)}
+                <span className="text-sm text-rose-800 block">- هزینه‌های تأییدشده مصوب</span>
+                <span className="text-sm font-bold text-rose-700 mt-1 block tabular-nums">
+                  -<Money rial={accountApprovedExpensesSum} />
                 </span>
               </div>
 
               <div className="p-3 bg-blue-50/80 rounded-lg border-2 border-blue-300">
-                <span className="text-[11px] text-blue-900 font-bold block">
+                <span className="text-sm text-blue-900 font-bold block">
                   = موجودی مورد انتظار دفتری
                 </span>
-                <span className="text-base font-black font-mono text-blue-950 mt-1 block tabular-nums">
-                  {formatCurrency(expectedBalance)}
+                <span className="text-base font-bold text-blue-950 mt-1 block tabular-nums">
+                  <Money rial={expectedBalance} />
                 </span>
               </div>
             </div>
@@ -209,15 +210,15 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
             <div className="space-y-3">
               <label htmlFor="petty-cash-reconciliation-view-4" className="block text-xs font-bold text-slate-800">
-                موجودی واقعی شمارش‌شده کارگاه / پرینت بانکی ({moneyUnitLabel()}) <span className="text-rose-500">*</span>
+                موجودی واقعی شمارش‌شده کارگاه / پرینت بانکی ({moneyUnitLabel()}) <span className="text-rose-700">*</span>
               </label>
               <MoneyInput id="petty-cash-reconciliation-view-4"
                 required
                 value={actualCountedCash}
                 onValueChange={(v) => setActualCountedCash(v)}
-                className="w-full text-sm px-3.5 py-2.5 border border-slate-300 rounded-xl font-mono font-bold focus:ring-2 focus:ring-amber-500 tabular-nums"
+                className="w-full text-sm px-3 py-2 border border-slate-300 rounded-xl font-bold focus:ring-2 focus:ring-amber-500 tabular-nums"
               />
-              <span className="text-[11px] text-slate-500 block">
+              <span className="text-xs text-slate-500 block">
                 مبلغ اعلام‌شده توسط تنخواه‌دار ({selectedAccount?.holderName}) در پایان دوره: {formatCurrency(actualCountedCash)}
               </span>
             </div>
@@ -233,7 +234,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
               }`}
             >
               <div>
-                <div className="flex items-center justify-between text-xs font-bold">
+                <div className="flex items-center justify-between text-sm font-bold">
                   <span>وضعیت تطبیق و مغایرت:</span>
                   <span>
                     {discrepancy === 0
@@ -243,14 +244,14 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                       : 'دارای مازاد صندوق'}
                   </span>
                 </div>
-                <div className="text-xl font-black font-mono mt-2 tabular-nums">
+                <div className="text-xl font-bold mt-2 tabular-nums">
                   {discrepancy === 0
                     ? 'بدون اختلاف'
                     : `${discrepancy > 0 ? '+' : ''}${formatCurrency(discrepancy)}`}
                 </div>
               </div>
 
-              <div className="text-[11px] mt-2 pt-2 border-t border-slate-200/60">
+              <div className="text-sm mt-2 pt-2 border-t border-slate-200/60">
                 {discrepancy === 0
                   ? 'حساب تنخواه بدون هیچ‌گونه انحراف با دفاتر قانونی تطبیق داده شد.'
                   : 'در صورت تایید مغایرت، سند تعدیل حسابداری در حسابرسی صادر خواهد شد.'}
@@ -262,7 +263,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           {discrepancy !== 0 && (
             <div className="space-y-3 p-4 bg-amber-50/70 border border-amber-300 rounded-xl">
               <label htmlFor="petty-cash-reconciliation-view-5" className="block text-xs font-bold text-amber-950">
-                علت مغایرت و انحراف مانده <span className="text-rose-500">*</span>
+                علت مغایرت و انحراف مانده <span className="text-rose-700">*</span>
               </label>
               <input id="petty-cash-reconciliation-view-5"
                 type="text"
@@ -270,7 +271,7 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
                 placeholder="مثال: کارمزد بانکی حواله‌ها، خطای شمارش دستی، گرد کردن ارقام ریز خریدهای مصالح..."
                 value={discrepancyReason}
                 onChange={(e) => setDiscrepancyReason(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
+                className="w-full text-sm px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
               />
             </div>
           )}
@@ -284,12 +285,12 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
               placeholder="نکات مطابقت مدارک، بررسی رسیدهای بانکی و تاییدات مدیر پروژه..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+              className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
           {formError && (
-            <p className="text-xs text-rose-700 font-bold" role="alert">
+            <p className="text-sm text-rose-700 font-bold" role="alert">
               {formError}
             </p>
           )}
@@ -297,12 +298,12 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
           <div className="flex items-center justify-between pt-4 border-t border-slate-200">
             <div className="text-xs text-slate-500">
               مسئول تسویه:{' '}
-              <span className="font-semibold text-slate-800">{currentUser.name}</span> ({currentUser.role})
+              <span className="font-medium text-slate-800">{formatText(currentUser.name)}</span> ({currentUser.role})
             </div>
 
             <button
               type="submit"
-              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+              className="btn btn-secondary"
             >
               <FileCheck className="w-4 h-4 text-emerald-400" />
               تأیید و صدور صورتجلسه تسویه
@@ -314,14 +315,14 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
       {/* History of Past Reconciliations */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-200">
-          <h3 className="text-sm font-bold text-slate-900">سوابق صورتجلسات تسویه دوره‌ای تنخواه‌ها</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h3 className="text-base font-bold text-slate-900">سوابق صورتجلسات تسویه دوره‌ای تنخواه‌ها</h3>
+          <p className="text-xs text-slate-500 mt-1">
             آرشیو رسمی صورتجلسات مغایرت‌گیری و تأییدات مالی
           </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
+        <div className="table-scroll">
+          <table className="w-full text-right text-sm">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4">شماره صورتجلسه</th>
@@ -338,45 +339,45 @@ export const PettyCashReconciliationView: React.FC<PettyCashReconciliationViewPr
             <tbody className="divide-y divide-slate-100">
               {reconciliations.map((rec) => (
                 <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
-                    {rec.reconNumber}
+                  <td className="py-3 px-4 tabular-nums font-bold text-slate-800">
+                    {formatText(rec.reconNumber)}
                   </td>
-                  <td className="py-3.5 px-4 font-bold text-slate-900">{rec.pettyCashTitle}</td>
-                  <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
-                    {rec.periodStartDate} تا {rec.periodEndDate}
+                  <td className="py-3 px-4 font-bold text-slate-900">{formatText(rec.pettyCashTitle)}</td>
+                  <td className="py-3 px-4 text-slate-600 tabular-nums text-sm">
+                    {formatText(rec.periodStartDate)} تا {formatText(rec.periodEndDate)}
                   </td>
-                  <td className="py-3.5 px-4 text-left font-mono tabular-nums text-slate-700">
-                    {formatCurrency(rec.expectedBalance)}
+                  <td className="py-3 px-4 text-left tabular-nums text-slate-700">
+                    <Money rial={rec.expectedBalance} />
                   </td>
-                  <td className="py-3.5 px-4 text-left font-mono font-bold tabular-nums text-slate-900">
-                    {formatCurrency(rec.actualCountedCash)}
+                  <td className="py-3 px-4 text-left font-bold tabular-nums text-slate-900">
+                    <Money rial={rec.actualCountedCash} />
                   </td>
-                  <td className="py-3.5 px-4 text-left font-mono font-bold tabular-nums">
+                  <td className="py-3 px-4 text-left font-bold tabular-nums">
                     <span
                       className={
                         rec.discrepancy === 0
                           ? 'text-emerald-700'
                           : rec.discrepancy < 0
-                          ? 'text-rose-600'
-                          : 'text-amber-600'
+                          ? 'text-rose-700'
+                          : 'text-amber-700'
                       }
                     >
                       {rec.discrepancy === 0 ? '۰' : formatCurrency(rec.discrepancy)}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-center">
+                  <td className="py-3 px-4 text-center">
                     <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      className={`text-xs font-medium px-2 py-1 rounded-full ${
                         rec.status.includes('متعادل')
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {rec.status}
+                      {formatText(rec.status)}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-slate-600">{rec.officerName}</td>
-                  <td className="py-3.5 px-4 text-slate-600 text-[11px]">{rec.financeApproverName}</td>
+                  <td className="py-3 px-4 text-slate-600">{formatText(rec.officerName)}</td>
+                  <td className="py-3 px-4 text-slate-600 text-sm">{formatText(rec.financeApproverName)}</td>
                 </tr>
               ))}
             </tbody>

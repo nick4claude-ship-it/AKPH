@@ -51,7 +51,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { formatMoney } from '../../utils/money';
-import { formatDecimal } from '../../utils/formatters';
+import { formatDecimal, formatText } from '../../utils/formatters';
 
 interface InventoryModuleProps {
   currentUser: UserProfile;
@@ -147,10 +147,10 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
   const navTabs: { id: InventorySubTab; label: string; icon: LucideIcon; count?: number }[] = [
     { id: 'dashboard', label: 'پیشخوان انبار و باسکول', icon: WarehouseIcon },
     { id: 'items', label: 'کاتالوگ کالا و مصالح', icon: Package, count: materials.length },
-    { id: 'receipts', label: 'رسید ورود و بارنامه (GRN)', icon: ArrowDownLeft, count: receipts.length },
-    { id: 'issues', label: 'حواله خروج و مصرف (SIV)', icon: ArrowUpRight, count: issues.length },
+    { id: 'receipts', label: 'رسید ورود و بارنامه', icon: ArrowDownLeft, count: receipts.length },
+    { id: 'issues', label: 'حواله خروج و مصرف', icon: ArrowUpRight, count: issues.length },
     { id: 'transfers', label: 'انتقال بین کارگاه‌ها', icon: ArrowRightLeft, count: transfers.length },
-    { id: 'kardex', label: 'کاردکس کالا (Kardex)', icon: FileSpreadsheet },
+    { id: 'kardex', label: 'کاردکس کالا', icon: FileSpreadsheet },
     { id: 'stocktake', label: 'انبارگردانی و مغایرت‌گیری', icon: Scale, count: stocktakes.length },
     { id: 'warehouses', label: 'انبارها و باراندازها', icon: Building, count: warehouses.length },
   ];
@@ -159,14 +159,14 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
     <div className="space-y-5">
       {/* Toast Alert */}
       {toast && (
-        <div className="fixed bottom-6 left-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 text-xs font-bold">
+        <div className="fixed bottom-6 left-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 text-sm font-bold">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
 
       {/* Sub Navigation Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-1.5 flex items-center gap-1 overflow-x-auto scrollbar-none text-xs">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-2 flex items-center gap-1 overflow-x-auto scrollbar-none text-sm">
         {navTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -174,17 +174,17 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
+              <span>{formatText(tab.label)}</span>
               {typeof tab.count === 'number' && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  className={`text-xs px-2 py-1 rounded-full ${
                     isActive ? 'bg-indigo-500/50 text-white' : 'bg-slate-200 text-slate-700'
                   }`}
                 >
@@ -295,23 +295,24 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
       {activeTab === 'warehouses' && (
         <div className="space-y-4">
           <WarehousesListView warehouses={warehouses} projects={projects} currentUser={currentUser} />
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-900">موجودی به تفکیک انبار (StockBalance)</h3>
+              <h3 className="text-base font-bold text-slate-900">موجودی به تفکیک انبار</h3>
               <select
                 value={stockWarehouseId || warehouses[0]?.id || ''}
                 onChange={(e) => setStockWarehouseId(e.target.value)}
-                className="py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs"
+                className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs"
               >
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name} ({w.type})
+                    {formatText(w.name)} ({w.type})
                   </option>
                 ))}
               </select>
             </div>
-            <table className="w-full text-xs text-right">
-              <thead className="text-[11px] text-slate-500 border-b border-slate-100">
+            <div className="table-scroll">
+              <table className="w-full text-sm text-right">
+              <thead className="text-xs text-slate-500 border-b border-slate-100">
                 <tr>
                   <th className="py-2">کالا</th>
                   <th className="py-2 text-left">موجودی</th>
@@ -324,19 +325,20 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                 {selectStockByWarehouse(appState, stockWarehouseId || warehouses[0]?.id || '').map((b) => (
                   <tr key={b.materialId}>
                     <td className="py-2">
-                      {b.material.name} <span className="text-[10px] text-slate-400 font-mono">{b.material.code}</span>
+                      {formatText(b.material.name)} <span className="text-xs text-slate-500 tabular-nums">{formatText(b.material.code)}</span>
                     </td>
-                    <td className="py-2 text-left font-mono">
-                      {formatDecimal(b.qty)} {b.material.unit}
+                    <td className="py-2 text-left tabular-nums">
+                      {formatDecimal(b.qty)} {formatText(b.material.unit)}
                     </td>
-                    <td className="py-2 text-left font-mono text-amber-700">{formatDecimal(b.reservedQty)}</td>
-                    <td className="py-2 text-left font-mono text-emerald-700">{formatDecimal(b.freeQty)}</td>
-                    <td className="py-2 text-left font-mono">{formatMoney(b.value, false)}</td>
+                    <td className="py-2 text-left tabular-nums text-amber-700">{formatDecimal(b.reservedQty)}</td>
+                    <td className="py-2 text-left tabular-nums text-emerald-700">{formatDecimal(b.freeQty)}</td>
+                    <td className="py-2 text-left tabular-nums">{formatMoney(b.value, false)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="text-[11px] text-slate-500">
+            </div>
+            <div className="text-xs text-slate-500">
               رزروهای فعال: {formatDecimal(selectActiveReservationCount(appState))} ·
               برگشت‌ها: {formatDecimal(appState.stockReturns.length)}
             </div>

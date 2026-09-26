@@ -26,6 +26,18 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  design:
+    name: check:design
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:design
+
   php:
     name: php -l (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
@@ -79,7 +91,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: mysqli, mbstring, intl
+          extensions: mysqli, mbstring, intl, gd, sodium
           coverage: none
           tools: composer
       - name: Install PHPUnit
@@ -89,12 +101,37 @@ jobs:
         run: |
           cp wordpress-develop/wp-tests-config-sample.php wordpress-develop/wp-tests-config.php
           sed -i "s/youremptytestdbnamehere/wp_tests/; s/yourusernamehere/root/; s/yourpasswordhere/root/; s/'localhost'/'127.0.0.1'/" wordpress-develop/wp-tests-config.php
+          # Unique keys and salts (the sample phrase is public; the assistant refuses to derive its key from it).
+          sed -i "s/put your unique phrase here/akph-ci-$(openssl rand -hex 24)/" wordpress-develop/wp-tests-config.php
       - name: Run the integration tests
         working-directory: tests/php
         env:
           WP_TESTS_DIR: ${{ github.workspace }}/wordpress-develop/tests/phpunit
           WP_TESTS_PHPUNIT_POLYFILLS_PATH: ${{ github.workspace }}/tests/php/vendor/yoast/phpunit-polyfills
         run: vendor/bin/phpunit -c phpunit.xml.dist
+
+  ui:
+    name: UI screenshots (demo, 1440px and 390px) and typography audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      # Fails on text under 12px, a font other than Vazirmatn, Latin digits, contrast under 4.5:1, an unnamed
+      # button, an unlabelled control, horizontal page scroll or a page error; screenshots are kept either way.
+      - name: Screenshots of every menu route and typography audit
+        run: npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: ui-screenshots/
+          if-no-files-found: error
 
   plugin:
     name: plugin ZIP (package check)

@@ -13,7 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { PettyCashSubTab } from '../../types';
-import { formatDecimal } from '../../utils/formatters';
+import { formatDecimal, formatText } from '../../utils/formatters';
 
 interface PettyCashNavProps {
   activeSubTab: PettyCashSubTab;
@@ -98,7 +98,7 @@ export const PettyCashNav: React.FC<PettyCashNavProps> = ({
   return (
     <div className="bg-white border-b border-slate-200 sticky top-16 z-20 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between overflow-x-auto no-scrollbar py-2.5 gap-1.5">
+        <div className="flex items-center justify-between overflow-x-auto no-scrollbar py-2 gap-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSubTab === item.id;
@@ -106,17 +106,17 @@ export const PettyCashNav: React.FC<PettyCashNavProps> = ({
               <button
                 key={item.id}
                 onClick={() => setActiveSubTab(item.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition-colors relative ${
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors relative ${
                   isActive
                     ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-slate-950' : 'text-slate-500'}`} />
-                <span>{item.label}</span>
+                <span>{formatText(item.label)}</span>
                 {item.badge !== undefined && item.badge > 0 && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full tabular-nums ${
+                    className={`text-xs px-2 py-1 rounded-full tabular-nums ${
                       isActive ? 'bg-slate-950 text-white' : item.badgeColor
                     }`}
                   >

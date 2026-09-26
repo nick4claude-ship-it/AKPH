@@ -79,7 +79,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="تعریف تأمین‌کننده در وندورلیست رسمی (AVL)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="تعریف تأمین‌کننده در وندورلیست رسمی (AVL)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
       
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
           <div className="flex items-center gap-2">
@@ -87,19 +87,19 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">تعریف تأمین‌کننده در وندورلیست رسمی (AVL)</h3>
+              <h3 className="text-base font-bold text-slate-800">تعریف تأمین‌کننده در وندورلیست رسمی</h3>
               <p className="text-xs text-slate-500">ثبت مشخصات حقوقی، بانکی، رسته تأمین و شرایط اعتباری تسویه</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-4 text-sm">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="new-supplier-modal-1" className="block font-bold text-slate-700 mb-1">نام رسمی شرکت / فروشگاه:</label>
@@ -108,7 +108,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="مثلاً شرکت فولاد خوزستان"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
                 required
               />
             </div>
@@ -117,7 +117,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               <select id="new-supplier-modal-2"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ProcurementCategory)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -132,7 +132,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               <select id="new-supplier-modal-3"
                 value={grade}
                 onChange={(e) => setGrade(e.target.value as VendorGrade)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
               >
                 <option value="A+">گرید A+ (تولیدکننده مادر / استراتژیک)</option>
                 <option value="A">گرید A (تأمین‌کننده معتبر و منظم)</option>
@@ -147,7 +147,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 value={nationalId}
                 onChange={(e) => setNationalId(e.target.value)}
                 placeholder="10100000000"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 outline-hidden"
                 required
               />
             </div>
@@ -158,7 +158,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 value={economicCode}
                 onChange={(e) => setEconomicCode(e.target.value)}
                 placeholder="411000000000"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 outline-hidden"
               />
             </div>
           </div>
@@ -171,7 +171,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 value={contactPerson}
                 onChange={(e) => setContactPerson(e.target.value)}
                 placeholder="مهندس احمدی"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                 required
               />
             </div>
@@ -182,7 +182,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="۰۲۱-۸۸۰۰۰۰۰۰"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 outline-hidden"
                 required
               />
             </div>
@@ -193,7 +193,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
                 placeholder="۰۹۱۲۰۰۰۰۰۰۰"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 outline-hidden"
               />
             </div>
           </div>
@@ -205,33 +205,33 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="تهران، شهرک صنعتی..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
               required
             />
           </div>
 
           {/* Banking Details */}
           <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/70 space-y-3">
-            <span className="font-bold text-slate-800 block text-xs">اطلاعات بانکی جهت واریز حواله و صدور چک صیادی:</span>
+            <span className="font-bold text-slate-800 block text-sm">اطلاعات بانکی جهت واریز حواله و صدور چک صیادی:</span>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="new-supplier-modal-10" className="block text-[11px] text-slate-600 mb-1">نام بانک و شعبه:</label>
+                <label htmlFor="new-supplier-modal-10" className="block text-xs text-slate-600 mb-1">نام بانک و شعبه:</label>
                 <input id="new-supplier-modal-10"
                   type="text"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   required
                 />
               </div>
               <div className="md:col-span-2">
-                <label htmlFor="new-supplier-modal-11" className="block text-[11px] text-slate-600 mb-1">شماره شبا (IBAN):</label>
+                <label htmlFor="new-supplier-modal-11" className="block text-xs text-slate-600 mb-1">شماره شبا:</label>
                 <input id="new-supplier-modal-11"
                   type="text"
                   value={shebaNumber}
                   onChange={(e) => setShebaNumber(e.target.value)}
                   placeholder="IR89012..."
-                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   required
                 />
               </div>
@@ -244,7 +244,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
               <select id="new-supplier-modal-12"
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value as Supplier['paymentTerms'])}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
               >
                 <option value="نقدی پیش از تحویل">نقدی پیش از تحویل</option>
                 <option value="نقدی پای کار">نقدی پای کار</option>
@@ -272,13 +272,13 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+              className="btn btn-secondary"
             >
               انصراف
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-sm cursor-pointer"
+              className="btn btn-primary"
             >
               <Check className="w-4 h-4" />
               <span>افزودن به وندورلیست رسمی</span>

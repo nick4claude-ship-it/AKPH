@@ -84,7 +84,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         }}
       />
 
-      <KpiCards kpis={kpis} onCardClick={(kpi) => onToast(`مشاهده ریز گزارش شاخص: ${kpi.title}`)} />
+      <KpiCards kpis={kpis} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <FinancialCharts data={trend} timeRange={timeRange} onChangeTimeRange={onChangeTimeRange} />

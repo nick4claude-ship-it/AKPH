@@ -1,123 +1,122 @@
 import React from 'react';
-import {
+import { useNavigate } from 'react-router-dom';
+import { TrendingUp, TrendingDown, Receipt, Coins, Percent as PercentIcon, Clock, FileSpreadsheet, Wallet, CreditCard, Minus, Plus } from 'lucide-react';
+import { KpiItem } from '../../types';
+import { formatPercent } from '../../utils/formatters';
+import { moneyUnitLabel } from '../../utils/money';
+import { Money, Percent } from '../common/Money';
+
+interface KpiCardsProps {
+  kpis: KpiItem[];
+  onCardClick?: (kpi: KpiItem) => void;
+}
+
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
   Receipt,
   Coins,
-  Percent,
+  Percent: PercentIcon,
   Clock,
   FileSpreadsheet,
   Wallet,
   CreditCard,
-  HelpCircle,
-} from 'lucide-react';
-import { KpiItem } from '../../types';
-import { formatCurrencyCompact, formatPercent, formatNumber, formatDecimal } from '../../utils/formatters';
-import { formatMoney, moneyUnitLabel } from '../../utils/money';
+};
 
-interface KpiCardsProps {
-  kpis: KpiItem[];
-  onCardClick: (kpi: KpiItem) => void;
-}
+/** Where each indicator's data comes from: the action that fills an empty card. */
+const EMPTY_ACTION: Record<string, { label: string; path: string }> = {
+  'kpi-1': { label: 'ثبت صورت‌وضعیت', path: '/statements/client' },
+  'kpi-2': { label: 'ثبت سند هزینه', path: '/finance/accounting' },
+  'kpi-3': { label: 'ثبت صورت‌وضعیت', path: '/statements/client' },
+  'kpi-4': { label: 'ثبت صورت‌وضعیت', path: '/statements/client' },
+  'kpi-5': { label: 'ثبت صورت‌وضعیت', path: '/statements/client' },
+  'kpi-6': { label: 'ثبت صورت‌وضعیت', path: '/statements/client' },
+  'kpi-7': { label: 'مشاهده بانک‌ها', path: '/finance/banks' },
+  'kpi-8': { label: 'ثبت فاکتور خرید', path: '/procurement' },
+};
+
+/** Change against the previous period, shown only when that period had data. */
+const Delta: React.FC<{ kpi: KpiItem }> = ({ kpi }) => {
+  if (kpi.previousValue === 0) return <span className="text-xs text-ink-subtle">دوره قبل داده‌ای برای مقایسه ندارد</span>;
+  if (kpi.changePercent === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
+        <Minus className="w-4 h-4" />
+        بدون تغییر نسبت به دوره قبل
+      </span>
+    );
+  }
+  const up = kpi.changePercent > 0;
+  const good = kpi.isPositiveGood ? up : !up;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${good ? 'text-success' : 'text-danger'}`}>
+      {up ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+      <span dir="ltr" className="tabular-nums">
+        {up ? '+' : ''}
+        {formatPercent(kpi.changePercent)}
+      </span>
+      <span className="font-normal text-ink-subtle">نسبت به دوره قبل</span>
+    </span>
+  );
+};
 
 export const KpiCards: React.FC<KpiCardsProps> = ({ kpis, onCardClick }) => {
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'TrendingUp':
-        return TrendingUp;
-      case 'Receipt':
-        return Receipt;
-      case 'Coins':
-        return Coins;
-      case 'Percent':
-        return Percent;
-      case 'Clock':
-        return Clock;
-      case 'FileSpreadsheet':
-        return FileSpreadsheet;
-      case 'Wallet':
-        return Wallet;
-      case 'CreditCard':
-        return CreditCard;
-      default:
-        return TrendingUp;
-    }
-  };
-
+  const navigate = useNavigate();
   return (
-    <section>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <span>شاخص‌های کلیدی عملکرد مالی (KPIs)</span>
-          <span className="text-xs font-normal text-slate-400">· کلیک برای جزئیات و پایش</span>
+    <section aria-labelledby="kpi-title">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+        <h3 id="kpi-title" className="text-base font-bold text-ink">
+          شاخص‌های کلیدی عملکرد مالی
         </h3>
-        <span className="text-xs text-slate-400 hidden sm:inline">واحد مبالغ: {moneyUnitLabel()}</span>
+        <span className="text-xs text-ink-subtle">واحد مبالغ: {moneyUnitLabel()}</span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.map((kpi) => {
-          const Icon = getIcon(kpi.icon);
-          const isPositiveChange = kpi.changePercent >= 0;
-          const isGood = kpi.isPositiveGood ? isPositiveChange : !isPositiveChange;
-
+          const Icon = ICONS[kpi.icon] || TrendingUp;
+          const empty = kpi.value === 0 && kpi.previousValue === 0;
+          const action = EMPTY_ACTION[kpi.id];
           return (
-            <button
-              key={kpi.id}
-              onClick={() => onCardClick(kpi)}
-              className="text-right p-4 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all duration-200 cursor-pointer group relative overflow-hidden"
-            >
-              {/* Top Row: Icon + Change Badge */}
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors">
-                  {kpi.title}
+            <article key={kpi.id} className="card p-4 flex flex-col gap-3" title={kpi.description}>
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="text-sm font-medium text-ink-muted">{kpi.title}</h4>
+                <span className="w-9 h-9 rounded-lg bg-canvas text-ink-muted flex items-center justify-center shrink-0">
+                  <Icon className="w-5 h-5" />
                 </span>
-                <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-amber-50 group-hover:text-amber-600 text-slate-600 flex items-center justify-center transition-colors">
-                  <Icon className="w-4 h-4" />
-                </div>
               </div>
 
-              {/* Main Metric Value */}
-              <div className="mb-2">
-                <div className="text-xl font-extrabold text-slate-900 tracking-tight tabular-nums">
-                  {kpi.unit === 'درصد' ? (
-                    <span>{formatPercent(kpi.value)}</span>
-                  ) : (
-                    <span>{formatCurrencyCompact(kpi.value)}</span>
+              {empty ? (
+                <div className="flex-1 flex flex-col items-start gap-2">
+                  <p className="text-sm text-ink-subtle">هنوز داده‌ای ثبت نشده</p>
+                  {action && (
+                    <button type="button" onClick={() => navigate(action.path)} className="btn btn-secondary btn-sm">
+                      <Plus className="w-4 h-4" />
+                      {action.label}
+                    </button>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-400 font-mono tabular-nums mt-0.5 truncate">
-                  {kpi.unit === 'درصد'
-                    ? `${formatDecimal(kpi.value, 1)} درصد سود انباشته`
-                    : formatMoney(kpi.value)}
-                </div>
-              </div>
-
-              {/* Bottom Row: Percentage Delta vs Previous Period */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div
-                  className={`flex items-center gap-1 font-semibold tabular-nums text-[11px] ${
-                    isGood ? 'text-emerald-600' : 'text-rose-600'
-                  }`}
-                >
-                  {isPositiveChange ? (
-                    <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-                  ) : (
-                    <TrendingDown className="w-3.5 h-3.5 shrink-0" />
-                  )}
-                  <span>
-                    {isPositiveChange ? '+' : ''}
-                    {formatPercent(kpi.changePercent)}
-                  </span>
-                  <span className="font-normal text-slate-400 text-[10px]">نسبت به دوره قبل</span>
-                </div>
-
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600 flex items-center gap-0.5 text-[10px] font-medium">
-                  <span>گزارش</span>
-                  <ArrowUpRight className="w-3 h-3" />
-                </div>
-              </div>
-            </button>
+              ) : (
+                <>
+                  <div>
+                    <div className="text-xl font-bold text-ink">
+                      {kpi.unit === 'درصد' ? <Percent value={kpi.value} /> : <Money rial={kpi.value} compact />}
+                    </div>
+                    {kpi.unit !== 'درصد' && (
+                      <div className="text-xs text-ink-subtle mt-1 truncate">
+                        <Money rial={kpi.value} unit={false} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-auto pt-3 border-t border-line flex items-center justify-between gap-2">
+                    <Delta kpi={kpi} />
+                    {onCardClick && (
+                      <button type="button" onClick={() => onCardClick(kpi)} className="text-xs font-medium text-brand-strong hover:underline cursor-pointer">
+                        جزئیات
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </article>
           );
         })}
       </div>

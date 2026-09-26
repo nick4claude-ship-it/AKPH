@@ -10,7 +10,7 @@ import { ReceiptRecord } from '../../types';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { selectReceiptsFigures } from '../../store/views/treasury';
-import { formatNumber, formatCurrencyCompact, formatDecimal } from '../../utils/formatters';
+import { formatNumber, formatCurrencyCompact, formatDecimal, formatText } from '../../utils/formatters';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { MoneyInput } from '../../ui/NumberInput';
@@ -72,35 +72,35 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">مانده مطالبات قابل وصول</span>
-          <div className="text-lg font-bold text-blue-700 font-mono">{formatMoney(receivable, false)}</div>
-          <span className="text-[11px] text-slate-400">{formatDecimal(collectible.length)} صورت‌وضعیت مصوب</span>
+          <div className="text-lg font-bold text-blue-700 tabular-nums">{formatMoney(receivable, false)}</div>
+          <span className="text-xs text-slate-500">{formatDecimal(collectible.length)} صورت‌وضعیت مصوب</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
           <span className="text-xs text-slate-500">جمع دریافت‌های ثبت‌شده</span>
-          <div className="text-lg font-bold text-emerald-700 font-mono">{formatMoney(totalReceived, false)}</div>
-          <span className="text-[11px] text-slate-400">{formatDecimal(state.receipts.length)} فقره</span>
+          <div className="text-lg font-bold text-emerald-700 tabular-nums">{formatMoney(totalReceived, false)}</div>
+          <span className="text-xs text-slate-500">{formatDecimal(state.receipts.length)} فقره</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-center">
           <button
             onClick={() => setOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 cursor-pointer"
           >
             <Plus className="w-4 h-4" /> ثبت دریافت جدید
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
-        <table className="w-full text-xs text-right">
-          <thead className="bg-slate-50 text-slate-500 text-[11px] border-b border-slate-200">
+      <div className="bg-white rounded-xl border border-slate-200 table-scroll">
+        <table className="w-full text-sm text-right">
+          <thead className="bg-slate-50 text-slate-500 text-xs border-b border-slate-200">
             <tr>
-              <th className="py-2.5 px-3">شماره / تاریخ</th>
-              <th className="py-2.5 px-3">منبع دریافت</th>
-              <th className="py-2.5 px-3">پرداخت‌کننده</th>
-              <th className="py-2.5 px-3">پروژه</th>
-              <th className="py-2.5 px-3">بانک مقصد</th>
-              <th className="py-2.5 px-3 text-left">مبلغ</th>
-              <th className="py-2.5 px-3">سند</th>
+              <th className="py-2 px-3">شماره / تاریخ</th>
+              <th className="py-2 px-3">منبع دریافت</th>
+              <th className="py-2 px-3">پرداخت‌کننده</th>
+              <th className="py-2 px-3">پروژه</th>
+              <th className="py-2 px-3">بانک مقصد</th>
+              <th className="py-2 px-3 text-left">مبلغ</th>
+              <th className="py-2 px-3">سند</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -108,19 +108,19 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
               const st = r.statementId ? state.clientStatements.find((s) => s.id === r.statementId) : undefined;
               return (
                 <tr key={r.id} className="hover:bg-slate-50/70">
-                  <td className="py-2.5 px-3">
-                    <div className="font-mono font-bold text-slate-900">{r.docNumber}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">{r.date}</div>
+                  <td className="py-2 px-3">
+                    <div className="tabular-nums font-bold text-slate-900">{formatText(r.docNumber)}</div>
+                    <div className="text-xs text-slate-500 tabular-nums">{formatText(r.date)}</div>
                   </td>
-                  <td className="py-2.5 px-3">
-                    <div>{r.sourceType || 'سایر'}</div>
-                    {st && <div className="text-[10px] text-blue-700">{st.statementNumber}</div>}
+                  <td className="py-2 px-3">
+                    <div>{formatText(r.sourceType || 'سایر')}</div>
+                    {st && <div className="text-sm text-blue-700">{formatText(st.statementNumber)}</div>}
                   </td>
-                  <td className="py-2.5 px-3">{r.payer}</td>
-                  <td className="py-2.5 px-3">{r.projectName || '-'}</td>
-                  <td className="py-2.5 px-3 text-[11px] text-slate-600">{r.destinationAccount}</td>
-                  <td className="py-2.5 px-3 text-left font-mono font-bold text-emerald-700">{formatMoney(r.amount, false)}</td>
-                  <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">{r.journalEntryId || '-'}</td>
+                  <td className="py-2 px-3">{formatText(r.payer)}</td>
+                  <td className="py-2 px-3">{formatText(r.projectName || '-')}</td>
+                  <td className="py-2 px-3 text-sm text-slate-600">{formatText(r.destinationAccount)}</td>
+                  <td className="py-2 px-3 text-left tabular-nums font-bold text-emerald-700">{formatMoney(r.amount, false)}</td>
+                  <td className="py-2 px-3 tabular-nums text-xs text-slate-500">{formatText(r.journalEntryId || '-')}</td>
                 </tr>
               );
             })}
@@ -129,13 +129,13 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
       </div>
 
       {open && (
-        <Dialog as="form" onClose={() => setOpen(false)} label="ثبت دریافت (مطالبات ← دریافت ← بانک ← حسابداری)" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4" className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-3 text-xs text-right" onSubmit={submit}>
+        <Dialog as="form" onClose={() => setOpen(false)} label="ثبت دریافت (مطالبات ← دریافت ← بانک ← حسابداری)" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full p-5 space-y-3 text-sm text-right" onSubmit={submit}>
           
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <ArrowDownLeft className="w-4 h-4 text-emerald-600" /> ثبت دریافت (مطالبات ← دریافت ← بانک ← حسابداری)
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <ArrowDownLeft className="w-4 h-4 text-emerald-700" /> ثبت دریافت (مطالبات ← دریافت ← بانک ← حسابداری)
               </h3>
-              <button type="button" onClick={() => setOpen(false)} className="p-1 text-slate-400 cursor-pointer">
+              <button type="button" onClick={() => setOpen(false)} className="p-1 text-slate-500 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -163,11 +163,11 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                   <option value="">— انتخاب صورت‌وضعیت —</option>
                   {collectible.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.statementNumber} · {s.projectName} · مانده {formatCurrencyCompact(s.remainingPayable)}
+                      {formatText(s.statementNumber)} · {formatText(s.projectName)} · مانده {formatCurrencyCompact(s.remainingPayable)}
                     </option>
                   ))}
                 </select>
-                {statement && <span className="text-[10px] text-slate-500">کارفرما: {statement.client}</span>}
+                {statement && <span className="text-xs text-slate-500">کارفرما: {formatText(statement.client)}</span>}
               </label>
             ) : (
               <div className="grid grid-cols-2 gap-2">
@@ -177,7 +177,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                     <option value="">— انتخاب —</option>
                     {(sourceType === 'پیش‌پرداخت' ? clients : state.counterparties).map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {formatText(c.name)}
                       </option>
                     ))}
                   </select>
@@ -188,7 +188,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                     <option value="">— بدون پروژه —</option>
                     {state.projects.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name}
+                        {formatText(p.name)}
                       </option>
                     ))}
                   </select>
@@ -203,7 +203,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                   .filter((b) => b.status === 'فعال')
                   .map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.bankName} - {b.accountNumber}
+                      {formatText(b.bankName)} - {formatText(b.accountNumber)}
                     </option>
                   ))}
               </select>
@@ -218,7 +218,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                     setError(null);
                   }}
                   aria-invalid={amount <= 0 || (!!statement && sourceType === 'صورت‌وضعیت کارفرما' && amount > statement.remainingPayable)}
-                  className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                  className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
                 />
               </label>
               <label className="block space-y-1">
@@ -234,7 +234,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
             </div>
             <label className="block space-y-1">
               <span className="text-slate-600">شماره پیگیری</span>
-              <input value={tracking} onChange={(e) => setTracking(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 font-mono" />
+              <input value={tracking} onChange={(e) => setTracking(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 tabular-nums" />
             </label>
             {error && (
               <p className="text-rose-700 font-bold" role="alert">
@@ -242,10 +242,10 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
               </p>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer">
+              <button type="button" onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg border border-slate-200 cursor-pointer">
                 انصراف
               </button>
-              <button type="submit" className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white font-bold cursor-pointer">
+              <button type="submit" className="btn btn-primary">
                 ثبت دریافت و صدور سند
               </button>
             </div>

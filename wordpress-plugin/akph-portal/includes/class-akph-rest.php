@@ -33,6 +33,19 @@ final class Akph_Rest {
             '/reports/trial-balance' => array(array('GET', 'trial_balance', $r::REPORTS)),
             '/reports/ledger' => array(array('GET', 'ledger', $r::REPORTS)),
             '/audit' => array(array('GET', 'audit', $r::AUDIT_READ)),
+            // «حساب کاربری من»: the signed-in user's own account only (no user id in any of these routes).
+            '/account' => array(array('GET', 'account', $r::ACCESS)),
+            '/account/profile' => array(array('POST', 'account_profile', $r::ACCESS)),
+            '/account/email' => array(array('POST', 'account_email', $r::ACCESS)),
+            '/account/password' => array(array('POST', 'account_password', $r::ACCESS)),
+            '/account/avatar' => array(array('POST', 'account_avatar', $r::ACCESS), array('DELETE', 'account_avatar_delete', $r::ACCESS)),
+            '/account/sessions' => array(array('GET', 'account_sessions', $r::ACCESS)),
+            '/account/sessions/logout-others' => array(array('POST', 'account_logout_others', $r::ACCESS)),
+            // «دستیار مدیریت»: the language model is called by the server only; settings for the system administrator.
+            '/assistant/status' => array(array('GET', 'assistant_status', $r::ASSISTANT_USE)),
+            '/assistant/ask' => array(array('POST', 'assistant_ask', $r::ASSISTANT_USE)),
+            '/assistant/settings' => array(array('GET', 'assistant_settings', $r::AI_MANAGE), array('POST', 'assistant_update_settings', $r::AI_MANAGE)),
+            '/assistant/test' => array(array('POST', 'assistant_test', $r::AI_MANAGE)),
         );
         foreach ($routes as $path => $defs) {
             $args = array();
@@ -112,17 +125,154 @@ final class Akph_Rest {
         return array(
             'id' => (string) $user->ID,
             'display_name' => $user->display_name,
+            'avatar_url' => Akph_Account::avatar_url($user->ID),
             'role' => Akph_Roles::label($slug),
             'role_slug' => $slug,
             'view_all' => Akph_Auth::view_all(),
             'project_ids' => Akph_Auth::view_all() ? array() : array_map('strval', Akph_Auth::own_project_ids()),
-            'currency' => Akph_Settings::get('currency'),
+            // Display unit for this user (personal preference, else the site setting); amounts are always Rials.
+            'currency' => Akph_Account::effective_currency($user->ID),
+            'site_currency' => Akph_Settings::get('currency'),
+            'preferences' => Akph_Account::preferences($user->ID),
             'fiscal_year' => Akph_Jalali::fiscal_year($today),
             'closed_fiscal_years' => Akph_Settings::get('closed_fiscal_years'),
             'today' => $today,
             'caps' => $caps,
             'server_version' => AKPH_PORTAL_VERSION,
         );
+    }
+
+    // ------------------------------------------------------------------ own account
+
+    public static function account(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            Akph_Account::assert_query($request);
+            return array('account' => Akph_Account::current());
+        });
+    }
+
+    public static function account_profile(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array('display_name', 'first_name', 'last_name', 'mobile', 'preferences', 'version'));
+            return Akph_Account::update_profile($body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function account_email(WP_REST_Request $request) {
+        return self::with_password_attempts(function () use ($request) {
+            return Akph_Command::run($request, function ($body) use ($request) {
+                Akph_Account::assert_fields($request, $body, array('email', 'current_password'));
+                return Akph_Account::change_email($body);
+            }, array('secret' => array('current_password')));
+        });
+    }
+
+    public static function account_password(WP_REST_Request $request) {
+        return self::with_password_attempts(function () use ($request) {
+            return Akph_Command::run($request, function ($body) use ($request) {
+                Akph_Account::assert_fields($request, $body, array('current_password', 'new_password'));
+                return Akph_Account::change_password($body);
+            }, array('secret' => array('current_password', 'new_password')));
+        });
+    }
+
+    /** Refuses while wrong-password attempts are used up; counts a wrong password after its command rolled back. */
+    private static function with_password_attempts(callable $command) {
+        $locked = Akph_Account::attempts_error();
+        if ($locked) {
+            return $locked;
+        }
+        $response = $command();
+        if (is_wp_error($response) && $response->get_error_code() === 'akph_wrong_password') {
+            Akph_Account::record_failure();
+        }
+        return $response;
+    }
+
+    public static function account_avatar(WP_REST_Request $request) {
+        $files = $request->get_file_params();
+        $tmp = isset($files['avatar']['tmp_name']) && is_string($files['avatar']['tmp_name']) ? $files['avatar']['tmp_name'] : '';
+        $fingerprint = $tmp !== '' && is_file($tmp) ? (string) hash_file('sha256', $tmp) : '';
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array());
+            return Akph_Account::upload_avatar($request);
+        }, array('fingerprint' => $fingerprint));
+    }
+
+    public static function account_avatar_delete(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array());
+            return Akph_Account::delete_avatar();
+        });
+    }
+
+    public static function account_sessions(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            Akph_Account::assert_query($request);
+            return Akph_Account::sessions();
+        });
+    }
+
+    public static function account_logout_others(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array());
+            return Akph_Account::logout_others();
+        });
+    }
+
+    // ------------------------------------------------------------------ assistant
+
+    public static function assistant_status(WP_REST_Request $request) {
+        return self::read(function () {
+            return Akph_Assistant::status();
+        });
+    }
+
+    /**
+     * Not a stored command: the answer is not kept with an Idempotency-Key (only in the request log, and its
+     * text only when the administrator chose so). The request log counts the daily limit.
+     */
+    public static function assistant_ask(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            $body = self::json_body($request);
+            Akph_Account::assert_fields($request, $body, array('question', 'conversation_id'));
+            return Akph_Assistant::ask($body);
+        });
+    }
+
+    public static function assistant_settings(WP_REST_Request $request) {
+        return self::read(function () {
+            return array('settings' => Akph_Assistant::public_settings());
+        });
+    }
+
+    public static function assistant_update_settings(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array('enabled', 'provider', 'base_url', 'model', 'max_tokens', 'daily_limit', 'log_content', 'api_key', 'clear_key'));
+            return array('message' => 'تنظیمات دستیار ذخیره شد.', 'records' => array('assistant_settings' => array(Akph_Assistant::update_settings($body))));
+        }, array('secret' => array('api_key')));
+    }
+
+    public static function assistant_test(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            Akph_Account::assert_fields($request, self::json_body($request), array());
+            return Akph_Assistant::test_connection();
+        });
+    }
+
+    /** JSON object body of a request that is not a stored command. */
+    private static function json_body(WP_REST_Request $request) {
+        $body = $request->get_json_params();
+        if ($body === null) {
+            if (trim((string) $request->get_body()) !== '') {
+                throw new Akph_Error('akph_invalid_json', 'بدنه درخواست JSON معتبر نیست.', 400);
+            }
+            return array();
+        }
+        if (!is_array($body)) {
+            throw new Akph_Error('akph_invalid_json', 'بدنه درخواست باید یک شیء JSON باشد.', 400);
+        }
+        return $body;
     }
 
     // ------------------------------------------------------------------ projects

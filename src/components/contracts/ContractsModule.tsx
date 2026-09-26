@@ -67,6 +67,7 @@ import { SubcontractorMatrixView } from './subcontractors/SubcontractorMatrixVie
 import { NewSubcontractorStatementModal } from './subcontractors/NewSubcontractorStatementModal';
 import { NewSubcontractorContractModal } from './subcontractors/NewSubcontractorContractModal';
 import { SubcontractorStatementDetailModal } from './subcontractors/SubcontractorStatementDetailModal';
+import { formatText } from '../../utils/formatters';
 
 interface ContractsModuleProps {
   /** Client (inbound revenue) and subcontract (outbound) contracts are separate pages. */
@@ -211,33 +212,29 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* =========================================================================
-          TOP LEVEL PRIMARY DUAL MODE SELECTOR (Requested explicitly by USER):
-          1. صورت‌وضعیت کارفرما (Client Progress Statements - پول ورودی به {company.name})
-          2. صورت‌وضعیت پیمانکاران جزء (Subcontractor Progress Statements - پول خروجی از {company.name})
-          ========================================================================= */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-2.5 text-white shadow-md border border-slate-700">
+      {/* Client or subcontractor statements (also chosen from the menu) */}
+      <div className="card p-2">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             {/* Tab 1: Client Statements */}
             <button
               onClick={() => setMainMode('client')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center sm:justify-start gap-2.5 px-4 py-2.5 rounded-xl transition-all cursor-pointer text-xs font-bold ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center sm:justify-start gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer text-sm font-bold ${
                 mainMode === 'client'
-                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  ? 'bg-brand-soft text-ink ring-1 ring-amber-300'
+                  : 'text-ink-muted hover:bg-canvas'
               }`}
             >
-              <ArrowDownLeft className={`w-4 h-4 ${mainMode === 'client' ? 'text-slate-950' : 'text-emerald-400'}`} />
+              <ArrowDownLeft className={`w-4 h-4 ${mainMode === 'client' ? 'text-success' : 'text-ink-subtle'}`} />
               <div className="text-right">
-                <span className="block">صورت‌وضعیت و مطالبات کارفرما (Client)</span>
-                <span className={`text-[10px] block font-normal ${mainMode === 'client' ? 'text-slate-900' : 'text-slate-400'}`}>
-                  پولی که {company.name} از کارفرما مطالبه می‌کند (درآمد و وصولی)
+                <span className="block">صورت‌وضعیت و مطالبات کارفرما</span>
+                <span className={`text-xs block font-normal text-ink-subtle`}>
+                  پولی که {formatText(company.name)} از کارفرما مطالبه می‌کند (درآمد و وصولی)
                 </span>
               </div>
               <span
-                className={`mr-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  mainMode === 'client' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300'
+                className={`mr-1 px-2 py-1 rounded-full text-xs font-bold ${
+                  mainMode === 'client' ? 'bg-amber-200 text-ink' : 'bg-canvas text-ink-muted'
                 }`}
               >
                 {formatInt(contracts.length)}
@@ -247,39 +244,34 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
             {/* Tab 2: Subcontractor Statements */}
             <button
               onClick={() => setMainMode('subcontractor')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center sm:justify-start gap-2.5 px-4 py-2.5 rounded-xl transition-all cursor-pointer text-xs font-bold ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center sm:justify-start gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer text-sm font-bold ${
                 mainMode === 'subcontractor'
-                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  ? 'bg-brand-soft text-ink ring-1 ring-amber-300'
+                  : 'text-ink-muted hover:bg-canvas'
               }`}
             >
-              <ArrowUpRight className={`w-4 h-4 ${mainMode === 'subcontractor' ? 'text-slate-950' : 'text-rose-400'}`} />
+              <ArrowUpRight className={`w-4 h-4 ${mainMode === 'subcontractor' ? 'text-danger' : 'text-ink-subtle'}`} />
               <div className="text-right">
-                <span className="block">صورت‌وضعیت و تعهدات پیمانکاران جزء (Subcontractors)</span>
-                <span className={`text-[10px] block font-normal ${mainMode === 'subcontractor' ? 'text-slate-900' : 'text-slate-400'}`}>
-                  پولی که جوشکار، آرماتوربند، بنّا، تأسیسات و... از {company.name} مطالبه می‌کنند
+                <span className="block">صورت‌وضعیت و تعهدات پیمانکاران جزء</span>
+                <span className={`text-xs block font-normal text-ink-subtle`}>
+                  پولی که جوشکار، آرماتوربند، بنّا، تأسیسات و... از {formatText(company.name)} مطالبه می‌کنند
                 </span>
               </div>
               <div className="flex items-center gap-1 mr-1">
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    mainMode === 'subcontractor' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300'
+                  className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    mainMode === 'subcontractor' ? 'bg-amber-200 text-ink' : 'bg-canvas text-ink-muted'
                   }`}
                 >
                   {formatInt(subContracts.length)}
                 </span>
                 {subCounts.urgentPayments > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500 text-white animate-pulse">
+                  <span className="px-2 py-1 rounded-full text-xs font-bold bg-rose-700 text-white animate-pulse">
                     {formatInt(subCounts.urgentPayments)} بدهی
                   </span>
                 )}
               </div>
             </button>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-400 pl-3">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>مدیریت یکپارچه جریان‌های ورودی و خروجی فاز ۴ پیمانکاری</span>
           </div>
         </div>
       </div>
@@ -291,7 +283,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         <div className="space-y-6">
           {/* Sub-navigation tabs for Client Contracts Module */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-2 shadow-2xs">
-            <div className="flex items-center overflow-x-auto gap-1 scrollbar-none text-xs font-medium">
+            <div className="flex items-center overflow-x-auto gap-1 scrollbar-none text-sm font-medium">
               {[
                 { id: 'dashboard', label: 'پیشخوان کارفرما', icon: PieChart },
                 { id: 'contracts', label: 'قراردادهای کارفرما', icon: Building, badge: contracts.length },
@@ -312,18 +304,18 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                       setActiveTab(tab.id as ContractsSubTab);
                       if (tab.id !== 'contract_detail') setSelectedContract(null);
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all shrink-0 cursor-pointer ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all shrink-0 cursor-pointer ${
                       isActive
                         ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-500'}`} />
-                    <span>{tab.label}</span>
+                    <span>{formatText(tab.label)}</span>
                     {tab.badge !== undefined && (
                       <span
-                        className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                          isActive ? 'bg-amber-600 text-white font-bold' : 'bg-slate-200 text-slate-700'
+                        className={`px-2 py-0.2 rounded-full text-xs ${
+                          isActive ? 'bg-amber-600 text-slate-950 font-bold' : 'bg-slate-200 text-slate-700'
                         }`}
                       >
                         {typeof tab.badge === 'number' ? formatInt(tab.badge) : tab.badge}
@@ -440,7 +432,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         <div className="space-y-6">
           {/* Sub-navigation tabs for Subcontractor Module */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-2 shadow-2xs">
-            <div className="flex items-center overflow-x-auto gap-1 scrollbar-none text-xs font-medium">
+            <div className="flex items-center overflow-x-auto gap-1 scrollbar-none text-sm font-medium">
               {[
                 { id: 'dashboard', label: 'پیشخوان پیمانکاران جزء', icon: PieChart },
                 {
@@ -473,19 +465,19 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
                   <button
                     key={tab.id}
                     onClick={() => setSubTab(tab.id as SubcontractorSubTab)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all shrink-0 cursor-pointer ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all shrink-0 cursor-pointer ${
                       isActive
                         ? 'bg-amber-500 text-slate-950 font-bold shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     }`}
                   >
                     <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-500'}`} />
-                    <span>{tab.label}</span>
+                    <span>{formatText(tab.label)}</span>
                     {tab.badge !== undefined && (
                       <span
-                        className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                        className={`px-2 py-0.2 rounded-full text-xs ${
                           isActive
-                            ? 'bg-amber-600 text-white font-bold'
+                            ? 'bg-amber-600 text-slate-950 font-bold'
                             : 'bg-slate-200 text-slate-700'
                         }`}
                       >

@@ -59,6 +59,19 @@ class Test_Akph_Access extends Akph_Test_Case {
             array('GET', '/reports/trial-balance', $all),
             array('GET', '/reports/ledger', $all),
             array('GET', '/audit', $office),
+            array('GET', '/account', $all),
+            array('POST', '/account/profile', $all),
+            array('POST', '/account/email', $all),
+            array('POST', '/account/password', $all),
+            array('POST', '/account/avatar', $all),
+            array('DELETE', '/account/avatar', $all),
+            array('GET', '/account/sessions', $all),
+            array('POST', '/account/sessions/logout-others', $all),
+            array('GET', '/assistant/status', $all),
+            array('POST', '/assistant/ask', $all),
+            array('GET', '/assistant/settings', array('admin')),
+            array('POST', '/assistant/settings', array('admin')),
+            array('POST', '/assistant/test', array('admin')),
         );
     }
 

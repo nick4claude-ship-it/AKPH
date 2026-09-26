@@ -27,10 +27,13 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { formatInt, formatMoney, formatMoneyCompact } from '../../utils/money';
-import { barWidth, formatPercent } from '../../utils/formatters';
+import { barWidth, formatPercent, formatText } from '../../utils/formatters';
 import { useSelector } from '../../store/AppStore';
 import { selectClientContractsDashboard, type AlertSeverity } from '../../store/views/contracts';
 import type { ContractsSubTab } from './ContractsModule';
+import { Money } from '../common/Money';
+import { PageHeader } from '../common/PageHeader';
+import { Button } from '../common/Button';
 
 interface ContractsDashboardProps {
   contracts: Contract[];
@@ -66,70 +69,42 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner: Action Bar & Context */}
-      <div className="bg-gradient-to-l from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-6 shadow-sm border border-slate-700/60 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -translate-x-20 -translate-y-20"></div>
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                فاز چهارم سامانه · چرخه جامع قراردادها و صورت‌وضعیت
-              </span>
-              <span className="text-xs text-slate-400">
-                Contract ➔ BOQ ➔ Execution ➔ Statement ➔ Deductions ➔ Approval ➔ Accounting
-              </span>
-            </div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight">
-              پیشخوان مدیریت قراردادها و صورت‌وضعیت‌های عمرانی
-            </h1>
-            <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-              پایش بلادرنگ ۴ متغیر بنیادین: <span className="text-amber-300 font-bold">ارزش پیمان</span>،{' '}
-              <span className="text-blue-300 font-bold">کارکرد واقعی متره</span>،{' '}
-              <span className="text-purple-300 font-bold">مبلغ صورت‌وضعیت (Billed)</span>، و{' '}
-              <span className="text-emerald-300 font-bold">دریافتی‌های نقدی (Receipt)</span> به تفکیک دستگاه‌های اجرایی.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              onClick={onOpenNewStatement}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>صورت‌وضعیت جدید</span>
-            </button>
-            <button
-              onClick={onOpenNewContract}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs border border-white/20 transition-all cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>ثبت قرارداد جدید</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="پیشخوان قراردادها و صورت‌وضعیت‌ها"
+        description="ارزش پیمان، کارکرد واقعی، مبلغ صورت‌وضعیت و دریافتی نقدی قراردادها به تفکیک کارفرما در یک نگاه."
+        actions={
+          <>
+            <Button variant="primary" icon={Plus} onClick={onOpenNewStatement}>
+              ثبت صورت‌وضعیت جدید
+            </Button>
+            <Button icon={FileText} onClick={onOpenNewContract}>
+              ثبت قرارداد جدید
+            </Button>
+          </>
+        }
+      />
 
       {/* 8 Primary Executive KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Active Contracts */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">قراردادهای فعال و جاری</span>
+            <span className="text-sm font-medium">قراردادهای فعال و جاری</span>
             <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
               <Building className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
+            <span className="text-2xl font-bold text-slate-900">
               {formatInt(dash.activeCount)}
             </span>
             <span className="text-xs text-slate-500">از مجموع {formatInt(dash.contractCount)} پیمان</span>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>تحویل موقت: {formatInt(dash.provisionalHandoverCount)} پروژه</span>
             <button
               onClick={() => onNavigateTab('contracts')}
-              className="text-blue-600 hover:underline font-medium flex items-center gap-0.5 cursor-pointer"
+              className="text-blue-600 hover:underline font-medium flex items-center gap-1 cursor-pointer"
             >
               مشاهده لیست
               <ChevronLeft className="w-3 h-3" />
@@ -140,36 +115,36 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
         {/* KPI 2: Total Contract Value */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">مبلغ کل قراردادها (فعلی)</span>
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
+            <span className="text-sm font-medium">مبلغ کل قراردادها (فعلی)</span>
+            <div className="p-2 rounded-lg bg-amber-50 text-amber-700">
               <FileText className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              {formatMoneyCompact(totals.contractValue)}
+            <span className="text-2xl font-bold text-slate-900">
+              <Money rial={totals.contractValue} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>الحاقیه‌های مصوب: {formatMoneyCompact(totals.approvedChanges)}</span>
-            <span className="text-emerald-600 font-medium">+{formatPercent(percents.changes)} افزایش سقف</span>
+            <span className="text-emerald-700 font-medium">+{formatPercent(percents.changes)} افزایش سقف</span>
           </div>
         </div>
 
         {/* KPI 3: Executed Value */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">کارکرد تجمعی اجراشده (متره)</span>
+            <span className="text-sm font-medium">کارکرد تجمعی اجراشده (متره)</span>
             <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-indigo-950 tracking-tight">
-              {formatMoneyCompact(totals.executedValue)}
+            <span className="text-2xl font-bold text-indigo-950">
+              <Money rial={totals.executedValue} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm">
             <span className="text-slate-500">پیشرفت ریالی کارکرد:</span>
             <span className="font-bold text-indigo-700">{formatPercent(percents.execution)}</span>
           </div>
@@ -178,17 +153,17 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
         {/* KPI 4: Total Billed */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">صورت‌وضعیت‌های ارسال‌شده</span>
+            <span className="text-sm font-medium">صورت‌وضعیت‌های ارسال‌شده</span>
             <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
               <FileSpreadsheet className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-purple-950 tracking-tight">
-              {formatMoneyCompact(totals.billedValue)}
+            <span className="text-2xl font-bold text-purple-950">
+              <Money rial={totals.billedValue} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>تأییدشده: {formatMoneyCompact(totals.approvedBilledValue)}</span>
             <span className="text-purple-600 font-medium">{formatPercent(percents.billing)} از پیمان</span>
           </div>
@@ -197,40 +172,40 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
         {/* KPI 5: Received Amount */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">کل دریافتی‌های نقدی و اسناد</span>
-            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+            <span className="text-sm font-medium">کل دریافتی‌های نقدی و اسناد</span>
+            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-emerald-700 tracking-tight">
-              {formatMoneyCompact(totals.receivedValue)}
+            <span className="text-2xl font-bold text-emerald-700">
+              <Money rial={totals.receivedValue} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm">
             <span className="text-slate-500">نسبت وصولی از صورت‌وضعیت:</span>
-            <span className="font-bold text-emerald-600">{formatPercent(percents.collection)}</span>
+            <span className="font-bold text-emerald-700">{formatPercent(percents.collection)}</span>
           </div>
         </div>
 
         {/* KPI 6: Receivables / Claims */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">مانده مطالبات از کارفرمایان</span>
-            <div className="p-2 rounded-lg bg-rose-50 text-rose-600">
+            <span className="text-sm font-medium">مانده مطالبات از کارفرمایان</span>
+            <div className="p-2 rounded-lg bg-rose-50 text-rose-700">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-rose-700 tracking-tight">
-              {formatMoneyCompact(totals.receivableValue)}
+            <span className="text-2xl font-bold text-rose-700">
+              <Money rial={totals.receivableValue} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="text-rose-600 font-medium">{formatMoneyCompact(totals.overdueAmount)} سررسید گذشته</span>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span className="text-rose-700 font-medium"><Money rial={totals.overdueAmount} compact /> سررسید گذشته</span>
             <button
               onClick={() => onNavigateTab('payments')}
-              className="text-rose-700 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+              className="text-rose-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
             >
               پیگیری وصول
               <ChevronLeft className="w-3 h-3" />
@@ -241,17 +216,17 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
         {/* KPI 7: Under Review Statements */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">در انتظار بررسی و تأیید</span>
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
+            <span className="text-sm font-medium">در انتظار بررسی و تأیید</span>
+            <div className="p-2 rounded-lg bg-amber-50 text-amber-700">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-amber-800 tracking-tight">
-              {formatMoneyCompact(totals.pendingAmount)}
+            <span className="text-2xl font-bold text-amber-800">
+              <Money rial={totals.pendingAmount} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>{formatInt(dash.pendingStatements.length)} فقره صورت‌وضعیت</span>
             <span className="text-amber-700 font-medium">مشاور و کارفرما</span>
           </div>
@@ -260,17 +235,17 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
         {/* KPI 8: Remaining Contract Work */}
         <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-medium">تعهد کارکرد باقیمانده پیمان</span>
-            <div className="p-2 rounded-lg bg-teal-50 text-teal-600">
+            <span className="text-sm font-medium">تعهد کارکرد باقیمانده پیمان</span>
+            <div className="p-2 rounded-lg bg-teal-50 text-teal-700">
               <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-teal-900 tracking-tight">
-              {formatMoneyCompact(totals.remainingWork)}
+            <span className="text-2xl font-bold text-teal-900">
+              <Money rial={totals.remainingWork} compact />
             </span>
                       </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>ظرفیت جذب کارگاه‌ها</span>
             <span className="text-teal-700 font-medium">{formatPercent(percents.remaining)} مانده</span>
           </div>
@@ -278,30 +253,30 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
       </div>
 
       {/* Visual Execution Hierarchy Bar (Requirement 23 & 32: Contract != Executed != Billed != Received) */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
+      <div className="bg-white rounded-xl p-6 border border-slate-200/80 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
-              تطابق موازنه ۴ متغیر بنیادین قراردادها (Quad-Variable Financial Balance)
+            <h2 className="text-base font-bold text-slate-900">
+              تطابق موازنه ۴ متغیر بنیادین قراردادها
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              اصل تفکیک قطعی: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">Contract Value ≠ Executed Value ≠ Billed Value ≠ Received Value</code>
+            <p className="text-xs text-slate-500 mt-1">
+              مبلغ قرارداد، کار اجراشده، مبلغ صورت‌وضعیت و مبلغ دریافتی جدا از هم پایش می‌شوند.
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-sm bg-slate-900"></span>
               <span className="text-slate-600">مبلغ قرارداد (۱۰۰٪)</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-sm bg-indigo-600"></span>
               <span className="text-slate-600">کارکرد اجراشده ({formatPercent(percents.execution, 0)})</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-sm bg-purple-600"></span>
               <span className="text-slate-600">ارسال‌شده ({formatPercent(percents.billing, 0)})</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-sm bg-emerald-600"></span>
               <span className="text-slate-600">وصول‌شده ({formatPercent(percents.received, 0)})</span>
             </div>
@@ -314,23 +289,23 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
             return (
               <div
                 key={contract.id}
-                className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/60 hover:border-slate-300 transition-all cursor-pointer"
+                className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/60 hover:border-slate-300 transition-all cursor-pointer"
                 onClick={() => onSelectContract(contract)}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-800">
-                      {contract.code}
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-slate-200 text-slate-800">
+                      {formatText(contract.code)}
                     </span>
-                    <span className="text-xs font-bold text-slate-900 hover:text-blue-700">
-                      {contract.projectTitle}
+                    <span className="text-sm font-bold text-slate-900 hover:text-blue-700">
+                      {formatText(contract.projectTitle)}
                     </span>
-                    <span className="text-[11px] text-slate-500">({contract.employer})</span>
+                    <span className="text-xs text-slate-500">({contract.employer})</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-600">
-                    <span>مبلغ فعلی: <strong>{formatMoneyCompact(contract.currentValue)}</strong> م.ت</span>
-                    <span>کارکرد: <strong className="text-indigo-700">{formatMoneyCompact(contract.executedValue)}</strong> م.ت</span>
-                    <span>وصولی: <strong className="text-emerald-700">{formatMoneyCompact(contract.receivedValue)}</strong> م.ت</span>
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <span>مبلغ فعلی: <strong><Money rial={contract.currentValue} compact /></strong> م.ت</span>
+                    <span>کارکرد: <strong className="text-indigo-700"><Money rial={contract.executedValue} compact /></strong> م.ت</span>
+                    <span>وصولی: <strong className="text-emerald-700"><Money rial={contract.receivedValue} compact /></strong> م.ت</span>
                     <span className="text-rose-700 font-bold">طلب: {formatMoneyCompact(contract.receivableValue)}</span>
                   </div>
                 </div>
@@ -355,7 +330,7 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                     ></div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="text-emerald-700 font-medium">
                       دریافتی نقدی: {formatPercent(progress.receivedPercent)}
                     </span>
@@ -365,7 +340,7 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                     <span className="text-indigo-700 font-bold">
                       پیشرفت فیزیکی کارکرد: {formatPercent(progress.executedPercent)}
                     </span>
-                    <span className="text-slate-400">سقف کل پیمان: ۱۰۰٪</span>
+                    <span className="text-slate-500">سقف کل پیمان: ۱۰۰٪</span>
                   </div>
                 </div>
               </div>
@@ -377,32 +352,32 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
       {/* Two Column Layout: Management Alerts & Recent Statements */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Section 1: Executive Alerts (هشدارهای مدیریتی قراردادها و صورت‌وضعیت) */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-bold text-slate-900">هشدارهای مدیریتی و ریسک‌های مالی قراردادها</h3>
+                <AlertTriangle className="w-4 h-4 text-amber-700" />
+                <h3 className="text-base font-bold text-slate-900">هشدارهای مدیریتی و ریسک‌های مالی قراردادها</h3>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              <span className="px-2 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                 {formatInt(alerts.length)} اعلان فعال
               </span>
             </div>
 
             <div className="space-y-2.5">
-              {alerts.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">هشدار فعالی برای قراردادها وجود ندارد.</p>}
+              {alerts.length === 0 && <p className="text-xs text-slate-500 py-4 text-center">هشدار فعالی برای قراردادها وجود ندارد.</p>}
               {alerts.map((a) => (
                 <div key={a.id} className={`p-3 rounded-xl border flex items-start gap-3 ${alertTone[a.severity]}`}>
-                  <span className="w-2 h-2 rounded-full bg-current mt-1.5 shrink-0 opacity-70"></span>
+                  <span className="w-2 h-2 rounded-full bg-current mt-2 shrink-0 opacity-70"></span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold">{a.title}</span>
-                      <span className="text-[10px] font-bold">{a.value}</span>
+                      <span className="text-sm font-bold">{formatText(a.title)}</span>
+                      <span className="text-sm font-bold">{formatText(a.value)}</span>
                     </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5">{a.description}</p>
+                    <p className="text-sm text-slate-600 mt-1">{formatText(a.description)}</p>
                     {a.tab && (
-                      <button onClick={() => onNavigateTab(a.tab!)} className="mt-1.5 text-[11px] font-bold hover:underline cursor-pointer">
-                        {a.actionLabel} ➔
+                      <button onClick={() => onNavigateTab(a.tab!)} className="mt-2 text-sm font-bold hover:underline cursor-pointer">
+                        {formatText(a.actionLabel)} ➔
                       </button>
                     )}
                   </div>
@@ -423,16 +398,16 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
         </div>
 
         {/* Section 2: Recent Statements & Fast Approvals */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">آخرین وضعیت گردش صورت‌وضعیت‌ها (Workflow)</h3>
+                <h3 className="text-base font-bold text-slate-900">آخرین وضعیت گردش صورت‌وضعیت‌ها</h3>
               </div>
               <button
                 onClick={() => onNavigateTab('statements')}
-                className="text-xs text-blue-600 hover:underline font-medium cursor-pointer"
+                className="text-sm text-blue-600 hover:underline font-medium cursor-pointer"
               >
                 مشاهده همه
               </button>
@@ -463,29 +438,29 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({
                     className="p-3 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50 transition-all cursor-pointer flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0">
                         {stm.type === 'قطعی' ? 'قطعی' : 'موقت'}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-900">{stm.statementNumber}</span>
-                          <span className="text-[10px] text-slate-400">({stm.projectName})</span>
+                          <span className="text-sm font-bold text-slate-900">{formatText(stm.statementNumber)}</span>
+                          <span className="text-xs text-slate-500">({stm.projectName})</span>
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
-                          <span>دوره: {stm.periodStartDate} تا {stm.periodEndDate}</span>
+                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                          <span>دوره: {formatText(stm.periodStartDate)} تا {formatText(stm.periodEndDate)}</span>
                           <span>·</span>
-                          <span>کارفرما: {stm.client}</span>
+                          <span>کارفرما: {formatText(stm.client)}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="text-left shrink-0">
-                      <div className="text-xs font-black text-slate-900">
-                        {formatMoney(stm.grossAmount)}
+                      <div className="text-sm font-bold text-slate-900">
+                        <Money rial={stm.grossAmount} />
                       </div>
-                      <div className="flex items-center justify-end gap-1.5 mt-1">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${st.bg} ${st.text}`}>
-                          {st.label}
+                      <div className="flex items-center justify-end gap-2 mt-1">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${st.bg} ${st.text}`}>
+                          {formatText(st.label)}
                         </span>
                       </div>
                     </div>

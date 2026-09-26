@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       پرتال مدیریت پیمانکاری AKPH
  * Description:       اپلیکیشن مدیریت پروژه، قرارداد، خزانه، تنخواه، انبار و حسابداری با سرور akph/v1 (پروژه‌ها، مراکز هزینه، طرف‌های حساب، کدینگ و اسناد حسابداری).
- * Version:           0.3.1
+ * Version:           0.4.0
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            AKPH
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AKPH_PORTAL_VERSION', '0.3.1');
+define('AKPH_PORTAL_VERSION', '0.4.0');
 define('AKPH_PORTAL_FILE', __FILE__);
 define('AKPH_PORTAL_DIR', plugin_dir_path(__FILE__));
 define('AKPH_PORTAL_URL', plugin_dir_url(__FILE__));
@@ -35,6 +35,8 @@ require_once AKPH_PORTAL_DIR . 'includes/class-akph-master-data.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-accounts.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-ledger.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-reports.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-account.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-assistant.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-rest.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-migration.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-admin.php';
@@ -58,6 +60,7 @@ final class Akph_Plugin {
         if (!wp_next_scheduled('akph_portal_daily')) {
             wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'akph_portal_daily');
         }
+        Akph_Account::boot();
         Akph_Admin::boot();
         Akph_App::boot();
     }

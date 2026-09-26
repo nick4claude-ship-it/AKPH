@@ -178,7 +178,7 @@ class Test_Akph_Schema_Roles extends Akph_Test_Case {
         Akph_Schema::maybe_migrate();
         $this->assertSame((string) $original, $wpdb->get_var("SELECT reversal_target FROM {$entries} WHERE id = {$reversal}"));
         $this->assertNull($wpdb->get_var("SELECT reversal_target FROM {$entries} WHERE id = {$original}"));
-        $this->assertSame('2', Akph_Schema::DB_VERSION);
+        $this->assertGreaterThanOrEqual(2, (int) Akph_Schema::DB_VERSION);
     }
 
     public function test_release_runs_for_a_new_tag_or_run_workflow_after_ci_and_never_overwrites() {

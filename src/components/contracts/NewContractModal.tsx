@@ -14,6 +14,8 @@ import { Dialog } from '../../ui/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { useCompany } from '../../store/session';
+import { Money } from '../common/Money';
+import { formatText } from '../../utils/formatters';
 
 interface NewContractModalProps {
   projects: Project[];
@@ -79,7 +81,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="ثبت قرارداد پیمانکاری جدید" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <Dialog onClose={onClose} label="ثبت قرارداد پیمانکاری جدید" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
       
         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -88,21 +90,21 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">ثبت قرارداد پیمانکاری جدید</h2>
-              <p className="text-xs text-slate-500 mt-0.5">ثبت مشخصات حقوقی، کارفرما، مبالغ و شرایط مالی پیمان</p>
+              <p className="text-xs text-slate-500 mt-1">ثبت مشخصات حقوقی، کارفرما، مبالغ و شرایط مالی پیمان</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-sm">
           {formError && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg flex items-center gap-2 animate-in fade-in duration-200">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-700" />
               <span>{formError}</span>
             </div>
           )}
@@ -113,7 +115,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
                 required
               />
             </div>
@@ -123,7 +125,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 type="text"
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
                 required
               />
             </div>
@@ -151,7 +153,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               >
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {formatText(p.name)}
                   </option>
                 ))}
               </select>
@@ -163,10 +165,10 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 onChange={(e) => setContractType(e.target.value as ContractType)}
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white"
               >
-                <option value="فهرست‌بهایی">فهرست‌بهایی (Unit Price)</option>
-                <option value="سرجمع (مقطوع)">سرجمع و مقطوع (Lump Sum)</option>
-                <option value="طراحی و ساخت (EPC)">طراحی و ساخت (EPC / Turnkey)</option>
-                <option value="مدیریت پیمان (MC)">مدیریت پیمان (Cost Plus / MC)</option>
+                <option value="فهرست‌بهایی">فهرست‌بهایی</option>
+                <option value="سرجمع (مقطوع)">سرجمع و مقطوع</option>
+                <option value="طراحی و ساخت (EPC)">طراحی و ساخت</option>
+                <option value="مدیریت پیمان (MC)">مدیریت پیمان</option>
                 <option value="BOT / مشارکتی">BOT و سرمایه‌گذاری مشارکتی</option>
               </select>
             </div>
@@ -212,11 +214,11 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               <MoneyInput id="new-contract-modal-9"
                 value={initialValue}
                 onValueChange={(v) => setInitialValue(v)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono font-bold"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums font-bold"
                 required
               />
-              <span className="text-[10px] text-slate-500 mt-0.5 block">
-                {formatMoneyCompact(initialValue)}
+              <span className="text-xs text-slate-500 mt-1 block">
+                <Money rial={initialValue} compact />
               </span>
             </div>
             <div>
@@ -224,7 +226,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               <IntegerInput id="new-contract-modal-10"
                 value={advancePaymentPercentage}
                 onValueChange={(v) => setAdvancePaymentPercentage(v)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
             <div>
@@ -232,7 +234,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               <IntegerInput id="new-contract-modal-11"
                 value={retentionPercentage}
                 onValueChange={(v) => setRetentionPercentage(v)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
           </div>
@@ -244,7 +246,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 type="text"
                 value={contractDate}
                 onChange={(e) => setContractDate(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
             <div>
@@ -253,7 +255,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 type="text"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
             <div>
@@ -262,7 +264,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 type="text"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
             <div>
@@ -270,7 +272,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               <IntegerInput id="new-contract-modal-15"
                 value={durationMonths}
                 onValueChange={(v) => setDurationMonths(v)}
-                className="w-full p-2 rounded-lg border border-slate-300 font-mono"
+                className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
               />
             </div>
           </div>
@@ -290,13 +292,13 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+              className="btn btn-secondary"
             >
               انصراف
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-xs cursor-pointer"
+              className="btn btn-primary"
             >
               ثبت و ایجاد قرارداد
             </button>

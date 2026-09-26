@@ -54,10 +54,13 @@
 | `src/components/**`، `src/pages/**`، `src/assets/**` | همه | |
 | `src/store/views/*` | همه | view modelهای هر ماژول: `contracts`، `procurement`، `inventory`، `pettyCash`، `accounting`، `treasury`، `dashboard`، `reports`، `people`، `approvals`، `exports`، `masterData` |
 | `src/store/AppStore` | `useAppState`، `useSelector` | خواندن وضعیت؛ `useSelector(select, deps)` نتیجه را memo می‌کند |
-| `src/store/session` | همه | `useSession`، `useCurrentUser`، `useCompany`، `usePermission`، `useDemoBanner`، `useReadOnlyNotice`، `useProjectManagers` |
+| `src/store/session` | همه | `useSession`، `useCurrentUser`، `useCompany`، `usePermission`، `useDemoBanner`، `useReadOnlyNotice`، `useProjectManagers`، `usePreferences`، `useApplyStartPage` |
 | `src/store/useWorkflows` | همه | **تنها راه نوشتن**: `const wf = useWorkflows(); const r = wf.createPurchaseOrder(input); onToast(r.message)` |
 | `src/store/useApprovalActions` | همه | تأیید/رد از کارتابل مرکزی |
-| `src/store/useAssistant` | همه | دستیار هوشمند |
+| `src/store/useAssistant` | همه | دستیار هوشمند (`useAssistant`: وضعیت، پیام‌ها، ارسال؛ `useAssistantSettings` و `PROVIDER_OPTIONS` برای کارت تنظیمات مدیر سیستم) |
+| `src/store/useAccount` | همه | «حساب کاربری من»: فرم‌ها، اعتبارسنجی، نشست‌ها، `checkAvatarFile` |
+| `src/store/useAvatarCrop` | همه | برش مربع تصویر پروفایل (جابه‌جایی، بزرگ‌نمایی، خروجی) |
+| `src/store/pagination` | همه | `usePagination(rows, resetKey)` با تعداد ردیف ترجیحی کاربر؛ نمایش با `<TablePager>` |
 | `src/store/notifications` | `useDismissedNotifications` | |
 | `src/store/toast` | همه | |
 | `src/store/selectors`، `src/store/domainSelectors` | همه | selectorهای مشترک (پروژه، KPI، تأییدها، اسناد، انبار، …) |
@@ -96,8 +99,9 @@
 | `/approvals` | `approvals/ApprovalCenterModule` | `onToast` | `useAppState`، `useCurrentUser`، `usePermission`، `useApprovalActions`؛ `selectApprovals`، `views/approvals` |
 | `/notifications` | `pages/NotificationCenterPage` | — | `useAppState`، `useDismissedNotifications`؛ `selectNotifications` |
 | `/reports` | `reports/ReportsBIModule` | `projects` | `useSelector`؛ `views/reports` |
-| `/ai` | `dashboard/AiAgentWidget` | `isOpen?`، `onClose?`، `isFloating?` | `useCurrentUser`، `useAssistant` |
-| `/settings` | `pages/SettingsPage` | `onToast` | `useAppState`، `usePermission`، `useWorkflows` |
+| `/ai` | `dashboard/AiAgentWidget` | `isOpen?`، `onClose?`، `isFloating?` | `useAssistant` |
+| `/settings` | `pages/SettingsPage` (+ `settings/AssistantSettingsCard`) | `onToast` | `useAppState`، `usePermission`، `useWorkflows`، `useAssistantSettings` |
+| `/account` | `pages/AccountPage` (+ `account/AvatarEditor`) | `onToast` | `useAccount`، `useAvatarCrop` |
 | پوسته | `layout/AppShell` (+ `Sidebar`، `Header`) | — | `useSession`، `useCompany`، `useDemoBanner`، `useReadOnlyNotice`، `usePermission`، `useApprovalActions`، `useToastListener`، `selectSidebarCounts`، `navConfig` |
 
 صفحه‌هایی که مجوز لازم دارند (حسابداری، خزانه، حقوق، تنظیمات) در پوسته با `guarded(...)` بسته می‌شوند؛
@@ -106,6 +110,16 @@
 نمی‌گیرد**؛ فقط همان مقدار را نمایش می‌دهد.
 
 ## ۵. قواعدی که ظاهر باید رعایت کند
+
+**سامانه طراحی (از ۰٫۴).** رنگ، اندازه متن، وزن، فاصله، گردی گوشه و سایه فقط از توکن‌های `@theme` در `src/index.css`
+(رنگ‌های معنایی: `canvas`، `surface`، `line`، `ink`، `ink-muted`، `ink-subtle`، `brand`، `success`، `warning`، `danger`، `info`، …).
+اندازه متن: ۱۲ (کمک و برچسب)، ۱۴ (متن)، ۱۶/۱۸/۲۲/۲۸ (عنوان‌ها)، ارتفاع خط ۱٫۶، وزن ۴۰۰/۵۰۰/۷۰۰؛ اندازه دلخواه مثل
+`text-[10px]` و فونت `mono` ممنوع است. اجزای مشترک در `src/components/common`: `Button` (primary/secondary/danger/ghost،
+disabled و loading)، `Card`/`CardHeader`، `PageHeader`، `EmptyState`، `ErrorState`/`ErrorBoundary`، `Skeleton`/`PageSkeleton`،
+`Money`/`Num`/`Percent` (عدد با `dir="ltr"` و واحد کوچک و کم‌رنگ یک بار)، `Field`/`FormStatus` (برچسب، راهنما و خطای کنار
+فیلد)، `TablePager`، `StepStrip`؛ کلاس‌های `.btn`، `.card`، `.input`، `.table-scroll` (اسکرول افقی داخل کارت و سرستون چسبان)،
+`.skeleton`. `npm run test:ui` همه مسیرهای منو را در ۱۴۴۰ و ۳۹۰ پیکسل می‌سنجد و با متن زیر ۱۲ پیکسل، فونت غیر Vazirmatn،
+رقم لاتین، کنتراست کمتر از ۴٫۵:۱، دکمه بی‌نام، کنترل بی‌برچسب یا اسکرول افقی صفحه شکست می‌خورد.
 
 1. **RTL و فارسی.** `index.html` دارای `dir="rtl"` و `lang="fa"` است. چیدمان با کلاس‌های منطقی
    (`ms-*`/`me-*`، `start`/`end`) یا با در نظر گرفتن RTL؛ آیکون‌های جهت‌دار (فلش «بعدی») به چپ اشاره کنند.
@@ -127,7 +141,7 @@
 6. **بدون منطق کسب‌وکار.** در `src/components` و `src/pages` این‌ها ممنوع است (و آزمون مرز شکست می‌خورد):
    `.reduce(`، `Math.`، `.toFixed(`، `.toLocaleString(`، `useStoreSlice` / `useAppDispatch` / `useGetState` /
    `usePostFinancialEvent` / `useDataSource`، `generateUUID` / `nextDocNumber`، `fetch(` /
-   `window.PaydarPortal`، `localStorage` / `sessionStorage`. عرض نوار پیشرفت: `barWidth(percent)`.
+   `window.AkphPortal`، `localStorage` / `sessionStorage`. عرض نوار پیشرفت: `barWidth(percent)`.
    فیلتر و مرتب‌سازی **نمایشی** (جست‌وجو، انتخاب پروژه، تب) مجاز است.
 7. **حالت فقط‌خواندنی و نمایشی.** نوار `useDemoBanner()` («نسخه نمایشی — داده ساختگی») و پیام
    `useReadOnlyNotice(pathname)` («فقط خواندنی — به‌زودی») باید در پوسته دیده شوند؛ حذف یا پنهان نشوند. «خلاصه دستی» پروژه
@@ -138,9 +152,8 @@
 
 ## ۶. مشکلات شناخته‌شده ظاهر
 
-- صفحه حسابداری (`#/finance/accounting`) در عرض ۱۴۴۰ پیکسل سرریز افقی دارد (جدول‌های پهن). جدول‌ها باید در
-  ظرف `overflow-x-auto` خودشان اسکرول شوند، نه کل صفحه.
-- در عرض موبایل، سایدبار ثابت (`mr-68`) بخشی از محتوا را می‌پوشاند؛ پوسته برای عرض کم حالت کشویی ندارد.
+- در ۰٫۴ رفع شد: سرریز افقی جدول‌های حسابداری (اکنون `.table-scroll` داخل کارت) و سایدبار ثابت در موبایل (اکنون کشوی
+  `<Dialog>` زیر ۱۰۲۴ پیکسل).
 
 ## ۷. فهرست بررسی پیش از تحویل ZIP
 
@@ -149,3 +162,4 @@
 - [ ] همه اعداد و مبالغ با توابع قالب‌بندی نمایش داده می‌شوند؛ هیچ رقم لاتین در متن فارسی نیست.
 - [ ] همه مودال‌ها `<Dialog>` و همه برچسب‌ها `htmlFor` دارند.
 - [ ] `npm run dev` اجرا شد و همه مسیرهای جدول بخش ۴ با داده نمایشی باز می‌شوند.
+- [ ] `npm run test:ui` (یا کار `ui` در CI) بدون خطا است و اسکرین‌شات‌های ۱۴۴۰ و ۳۹۰ پیکسل بررسی شده‌اند.

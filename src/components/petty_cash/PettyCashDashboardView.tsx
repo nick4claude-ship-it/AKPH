@@ -23,8 +23,9 @@ import {
   PettyCashReplenishmentRequest,
   PettyCashSubTab,
 } from '../../types';
-import { barWidth, formatCurrency, formatNumber, formatDecimal, formatPercent } from '../../utils/formatters';
+import { barWidth, formatCurrency, formatNumber, formatDecimal, formatPercent, formatText } from '../../utils/formatters';
 import { selectPettyCashDashboard } from '../../store/views/pettyCash';
+import { Money } from '../common/Money';
 
 interface PettyCashDashboardViewProps {
   accounts: PettyCashAccount[];
@@ -59,19 +60,19 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
       {lowBalanceAccounts.length > 0 && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-amber-500 text-slate-950 rounded-lg shrink-0 mt-0.5">
+            <div className="p-2 bg-amber-500 text-slate-950 rounded-lg shrink-0 mt-1">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-amber-950">
+                <h4 className="text-base font-bold text-amber-950">
                   هشدار کاهش موجودی در {formatDecimal(lowBalanceAccounts.length)} تنخواه‌گردان کارگاهی
                 </h4>
-                <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-semibold">
+                <span className="text-xs bg-amber-200 text-amber-900 px-2 py-1 rounded-full font-medium">
                   نیاز به شارژ مجدد
                 </span>
               </div>
-              <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+              <p className="text-sm text-amber-800 mt-1 leading-relaxed">
                 موجودی قابل مصرف تنخواه{' '}
                 {lowBalanceAccounts.map((a) => `${a.title} (${formatCurrency(a.usableBalance)})`).join(' و ')}{' '}
                 به کمتر از سقف مجاز هشدار رسیده است.
@@ -81,14 +82,14 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
           <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
             <button
               onClick={() => onOpenReplenishRequest(lowBalanceAccounts[0]?.id)}
-              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+              className="btn btn-primary"
             >
               <HelpCircle className="w-4 h-4" />
               ارسال درخواست شارژ
             </button>
             <button
               onClick={() => onOpenReplenishment(lowBalanceAccounts[0]?.id)}
-              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm rounded-lg transition-colors shadow-xs flex items-center gap-2"
             >
               <ArrowDownLeft className="w-4 h-4" />
               شارژ مستقیم
@@ -102,18 +103,18 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         {/* 1. Actual Balance */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">موجودی واقعی کل</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <span className="text-xs font-medium text-slate-500">موجودی واقعی کل</span>
+            <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg">
               <Wallet className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-xl font-black text-slate-900 tracking-tight tabular-nums">
-              {formatCurrency(totalActualBalance)}
+            <div className="text-xl font-bold text-slate-900 tabular-nums">
+              <Money rial={totalActualBalance} />
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">موجودی نقد فیزیکی و بانکی تنخواه‌ها</div>
+            <div className="text-xs text-slate-500 mt-1">موجودی نقد فیزیکی و بانکی تنخواه‌ها</div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-700 font-medium">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm text-emerald-700 font-medium">
             <span>{formatDecimal(accounts.length)} حساب تنخواه فعال</span>
             <CheckCircle2 className="w-3.5 h-3.5" />
           </div>
@@ -122,25 +123,25 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         {/* 2. Pending Expenses */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">در انتظار تأیید</span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+            <span className="text-xs font-medium text-slate-500">در انتظار تأیید</span>
+            <div className="p-2 bg-amber-50 text-amber-700 rounded-lg">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-xl font-black text-amber-600 tracking-tight tabular-nums">
-              {formatCurrency(totalPendingExpenses)}
+            <div className="text-xl font-bold text-amber-700 tabular-nums">
+              <Money rial={totalPendingExpenses} />
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">مبالغ هزینه ثبت‌شده و بلاتکلیف</div>
+            <div className="text-xs text-slate-500 mt-1">مبالغ هزینه ثبت‌شده و بلاتکلیف</div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-amber-800 font-medium">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm text-amber-800 font-medium">
             <span>{formatDecimal(pendingApprovalsCount)} فاکتور در کارتابل</span>
             <button
               onClick={() => onNavigateTab('approvals')}
               className="text-amber-700 hover:text-amber-900 underline flex items-center"
             >
               بررسی
-              <ChevronLeft className="w-3 h-3 mr-0.5" />
+              <ChevronLeft className="w-3 h-3 mr-1" />
             </button>
           </div>
         </div>
@@ -148,20 +149,20 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         {/* 3. Usable Balance */}
         <div className="bg-white rounded-xl p-4 border-2 border-emerald-500 shadow-xs relative overflow-hidden bg-gradient-to-br from-emerald-50/40 to-white">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-950">مانده قابل مصرف کل</span>
-            <div className="p-2 bg-emerald-500 text-white rounded-lg shadow-xs">
+            <span className="text-sm font-bold text-emerald-950">مانده قابل مصرف کل</span>
+            <div className="p-2 bg-emerald-700 text-white rounded-lg shadow-xs">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-xl font-black text-emerald-800 tracking-tight tabular-nums">
-              {formatCurrency(totalUsableBalance)}
+            <div className="text-xl font-bold text-emerald-800 tabular-nums">
+              <Money rial={totalUsableBalance} />
             </div>
-            <div className="text-[11px] text-emerald-700 mt-1 font-medium">
+            <div className="text-sm text-emerald-700 mt-1 font-medium">
               موجودی واقعی منهای اسناد در انتظار
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-emerald-100 flex items-center justify-between text-[11px] text-emerald-800">
+          <div className="mt-3 pt-2 border-t border-emerald-100 flex items-center justify-between text-sm text-emerald-800">
             <span>ظرفیت مخارج آزاد</span>
             <span className="font-bold">
               {formatPercent(dash.usablePercent, 0)} کل
@@ -172,10 +173,10 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         {/* 4. Low Balance Alerts */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">تنخواه‌های کم‌موجودی</span>
+            <span className="text-xs font-medium text-slate-500">تنخواه‌های کم‌موجودی</span>
             <div
               className={`p-2 rounded-lg ${
-                lowBalanceAccounts.length > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-500'
+                lowBalanceAccounts.length > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-500'
               }`}
             >
               <AlertTriangle className="w-4 h-4" />
@@ -183,15 +184,15 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
           </div>
           <div className="mt-2">
             <div
-              className={`text-xl font-black tracking-tight tabular-nums ${
-                lowBalanceAccounts.length > 0 ? 'text-rose-600' : 'text-slate-800'
+              className={`text-xl font-bold tabular-nums ${
+                lowBalanceAccounts.length > 0 ? 'text-rose-700' : 'text-slate-800'
               }`}
             >
               {formatDecimal(lowBalanceAccounts.length)} تنخواه
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">زیر حداقل مجاز تعیین‌شده</div>
+            <div className="text-xs text-slate-500 mt-1">زیر حداقل مجاز تعیین‌شده</div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm text-slate-600">
             <span>درخواست‌های شارژ باز: {formatDecimal(requests.length)}</span>
             <button
               onClick={() => onNavigateTab('requests')}
@@ -205,18 +206,18 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         {/* 5. Monthly Spent */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">مخارج ماه جاری</span>
+            <span className="text-xs font-medium text-slate-500">مخارج ماه جاری</span>
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-xl font-black text-slate-900 tracking-tight tabular-nums">
-              {formatCurrency(totalMonthlySpent)}
+            <div className="text-xl font-bold text-slate-900 tabular-nums">
+              <Money rial={totalMonthlySpent} />
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">مصارف تاییدشده شهریور ۱۴۰۳</div>
+            <div className="text-xs text-slate-500 mt-1">مصارف تاییدشده شهریور ۱۴۰۳</div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-blue-700 font-medium">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm text-blue-700 font-medium">
             <span>تخصیص به ۵ پروژه</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </div>
@@ -226,24 +227,24 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
       {/* Quick Action Bar */}
       <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-700 ml-2">دسترسی سریع عملیاتی:</span>
+          <span className="text-sm font-bold text-slate-700 ml-2">دسترسی سریع عملیاتی:</span>
           <button
             onClick={() => onOpenNewExpense()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition-colors shadow-xs"
+            className="btn btn-primary"
           >
             <PlusCircle className="w-4 h-4" />
             ثبت هزینه تنخواه
           </button>
           <button
             onClick={() => onOpenReplenishment()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm rounded-lg transition-colors shadow-xs"
           >
             <ArrowDownLeft className="w-4 h-4" />
             شارژ تنخواه‌گردان
           </button>
           <button
             onClick={() => onOpenReplenishRequest()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-lg transition-colors"
           >
             <HelpCircle className="w-4 h-4 text-slate-500" />
             درخواست شارژ مجدد
@@ -253,14 +254,14 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onNavigateTab('reconciliation')}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm rounded-lg transition-colors"
           >
             <Scale className="w-4 h-4 text-slate-500" />
             تسویه و مغایرت‌گیری
           </button>
           <button
             onClick={() => onNavigateTab('reports')}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-sm rounded-lg transition-colors"
           >
             گزارش‌های رسمی و PDF
           </button>
@@ -271,22 +272,22 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">فهرست تنخواه‌گردان‌های شرکت و کارگاه‌ها</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h3 className="text-base font-bold text-slate-900">فهرست تنخواه‌گردان‌های شرکت و کارگاه‌ها</h3>
+            <p className="text-xs text-slate-500 mt-1">
               پایش مانده تفکیکی، سقف مصوب، تعهدات در انتظار و موجودی قابل مصرف
             </p>
           </div>
           <button
             onClick={() => onNavigateTab('accounts')}
-            className="text-xs font-semibold text-amber-700 hover:text-amber-800 flex items-center gap-1 self-start sm:self-auto"
+            className="text-sm font-medium text-amber-700 hover:text-amber-800 flex items-center gap-1 self-start sm:self-auto"
           >
             مشاهده تمام کارنامه‌ها
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
+        <div className="table-scroll">
+          <table className="w-full text-right text-sm">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4">عنوان تنخواه</th>
@@ -311,61 +312,61 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
                       isLow ? 'bg-amber-50/30' : ''
                     }`}
                   >
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
+                    <td className="py-3 px-4 font-bold text-slate-900">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => onSelectAccount(account)}
                           className="hover:text-amber-700 text-right font-bold transition-colors"
                         >
-                          {account.title}
+                          {formatText(account.title)}
                         </button>
                         {isLow && (
-                          <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-sm font-semibold shrink-0">
+                          <span className="text-xs bg-rose-100 text-rose-700 px-2 py-1 rounded-sm font-medium shrink-0">
                             کسری موجودی
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">
-                      {account.code}
+                    <td className="py-3 px-4 text-slate-500 tabular-nums text-xs">
+                      {formatText(account.code)}
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-medium text-slate-900">{account.holderName}</div>
-                      <div className="text-[10px] text-slate-500">{account.holderRole}</div>
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-slate-900">{formatText(account.holderName)}</div>
+                      <div className="text-xs text-slate-500">{formatText(account.holderRole)}</div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-700">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{account.projectName}</span>
+                    <td className="py-3 px-4 text-slate-700">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span>{formatText(account.projectName)}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-left font-mono tabular-nums text-slate-600">
-                      {formatCurrency(account.ceilingLimit)}
+                    <td className="py-3 px-4 text-left tabular-nums text-slate-600">
+                      <Money rial={account.ceilingLimit} />
                     </td>
-                    <td className="py-3.5 px-4 text-left font-mono font-bold tabular-nums text-slate-900">
-                      {formatCurrency(account.actualBalance)}
+                    <td className="py-3 px-4 text-left font-bold tabular-nums text-slate-900">
+                      <Money rial={account.actualBalance} />
                     </td>
-                    <td className="py-3.5 px-4 text-left font-mono tabular-nums text-amber-700">
+                    <td className="py-3 px-4 text-left tabular-nums text-amber-700">
                       {account.pendingExpenses > 0 ? (
                         formatCurrency(account.pendingExpenses)
                       ) : (
-                        <span className="text-slate-400">۰</span>
+                        <span className="text-slate-500">۰</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-left font-mono font-bold tabular-nums">
+                    <td className="py-3 px-4 text-left font-bold tabular-nums">
                       <span
                         className={
                           isLow
-                            ? 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md'
+                            ? 'text-rose-700 bg-rose-50 px-2 py-1 rounded-md'
                             : 'text-emerald-700'
                         }
                       >
-                        {formatCurrency(account.usableBalance)}
+                        <Money rial={account.usableBalance} />
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-4 text-center">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           account.status === 'active'
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-slate-100 text-slate-600'
@@ -374,7 +375,7 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
                         {account.status === 'active' ? 'فعال' : 'معلق'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => onSelectAccount(account)}
@@ -386,14 +387,14 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
                         <button
                           onClick={() => onOpenNewExpense(account.id)}
                           title="ثبت هزینه تنخواه"
-                          className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-md transition-colors"
+                          className="p-1 text-amber-700 hover:text-amber-800 hover:bg-amber-50 rounded-md transition-colors"
                         >
                           <PlusCircle className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onOpenReplenishment(account.id)}
                           title="شارژ تنخواه"
-                          className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-md transition-colors"
+                          className="p-1 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-md transition-colors"
                         >
                           <ArrowDownLeft className="w-4 h-4" />
                         </button>
@@ -413,8 +414,8 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="text-sm font-bold text-slate-900">روند مخارج ماهانه تنخواه‌ها</h4>
-              <p className="text-xs text-slate-500 mt-0.5">روند مصرف نقدینگی در کارگاه‌ها در ۵ ماه گذشته</p>
+              <h4 className="text-base font-bold text-slate-900">روند مخارج ماهانه تنخواه‌ها</h4>
+              <p className="text-xs text-slate-500 mt-1">روند مصرف نقدینگی در کارگاه‌ها در ۵ ماه گذشته</p>
             </div>
             {monthlyTrends.length > 0 && (
               <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-md tabular-nums">
@@ -423,15 +424,15 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             )}
           </div>
 
-          <div className="space-y-3.5 pt-2">
+          <div className="space-y-3 pt-2">
             {monthlyTrends.map((trend) => {
               const pct = trend.barPercent;
               return (
                 <div key={trend.key} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700">{trend.month}</span>
-                    <span className="font-mono text-slate-900 font-bold tabular-nums">
-                      {formatCurrency(trend.amount)}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-700">{formatText(trend.month)}</span>
+                    <span className=" text-slate-900 font-bold tabular-nums">
+                      <Money rial={trend.amount} />
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
@@ -450,12 +451,12 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="text-sm font-bold text-slate-900">توزیع سرفصل‌های هزینه تنخواه</h4>
-              <p className="text-xs text-slate-500 mt-0.5">سهم هر دسته از مخارج جاری کارگاهی</p>
+              <h4 className="text-base font-bold text-slate-900">توزیع سرفصل‌های هزینه تنخواه</h4>
+              <p className="text-xs text-slate-500 mt-1">سهم هر دسته از مخارج جاری کارگاهی</p>
             </div>
             <button
               onClick={() => onNavigateTab('reports')}
-              className="text-xs text-amber-700 hover:text-amber-800 font-medium"
+              className="text-sm text-amber-700 hover:text-amber-800 font-medium"
             >
               مشاهده جزئیات
             </button>
@@ -465,10 +466,10 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             {dash.categoryBars.slice(0, 6).map(({ category: cat, amount, barPercent: pct }) => {
               return (
                 <div key={cat} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-slate-700">{cat}</span>
-                    <span className="font-mono text-slate-900 font-bold tabular-nums">
-                      {formatCurrency(amount)}
+                    <span className=" text-slate-900 font-bold tabular-nums">
+                      <Money rial={amount} />
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
@@ -488,12 +489,12 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-bold text-slate-900">آخرین هزینه‌های ثبت‌شده تنخواه</h4>
-            <p className="text-xs text-slate-500 mt-0.5">فاکتورها و خریدهای اخیر ثبت‌شده توسط کارپردازان</p>
+            <h4 className="text-base font-bold text-slate-900">آخرین هزینه‌های ثبت‌شده تنخواه</h4>
+            <p className="text-xs text-slate-500 mt-1">فاکتورها و خریدهای اخیر ثبت‌شده توسط کارپردازان</p>
           </div>
           <button
             onClick={() => onNavigateTab('approvals')}
-            className="text-xs font-semibold text-amber-700 hover:text-amber-800 flex items-center gap-1"
+            className="text-sm font-medium text-amber-700 hover:text-amber-800 flex items-center gap-1"
           >
             مشاهده کارتابل تاییدات
             <ChevronLeft className="w-3.5 h-3.5" />
@@ -505,33 +506,33 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             <div key={exp.id} className="p-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs text-slate-900">{exp.description}</span>
-                  <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-sm">
-                    {exp.category}
+                  <span className="font-bold text-sm text-slate-900">{formatText(exp.description)}</span>
+                  <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-sm">
+                    {formatText(exp.category)}
                   </span>
                   {exp.inventoryTarget === 'send_to_warehouse' && (
-                    <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm">
+                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-sm">
                       تحویل انبار
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                  <span>تنخواه: {exp.pettyCashTitle}</span>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span>تنخواه: {formatText(exp.pettyCashTitle)}</span>
                   <span>•</span>
-                  <span>فروشنده: {exp.vendor}</span>
+                  <span>فروشنده: {formatText(exp.vendor)}</span>
                   <span>•</span>
-                  <span>ثبت‌کننده: {exp.submitterName}</span>
+                  <span>ثبت‌کننده: {formatText(exp.submitterName)}</span>
                   <span>•</span>
-                  <span>تاریخ: {exp.date}</span>
+                  <span>تاریخ: {formatText(exp.date)}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 self-end sm:self-auto shrink-0">
-                <div className="text-left font-mono font-bold text-sm text-slate-900 tabular-nums">
-                  {formatCurrency(exp.amount)}
+                <div className="text-left font-bold text-sm text-slate-900 tabular-nums">
+                  <Money rial={exp.amount} />
                 </div>
                 <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${
                     exp.status === 'approved' || exp.status === 'accounting_posted'
                       ? 'bg-emerald-100 text-emerald-800'
                       : exp.status === 'rejected'

@@ -18,6 +18,7 @@ import {
   type ProjectFormInput,
 } from '../../store/views/masterData';
 import type { WorkflowResult } from '../../store/workflowKit';
+import { formatText } from '../../utils/formatters';
 
 interface ProjectFormModalProps {
   /** Omitted for a new project. */
@@ -27,7 +28,7 @@ interface ProjectFormModalProps {
   onUpdate: (id: string, changes: Partial<ProjectFormInput>) => WorkflowResult;
 }
 
-const INPUT = 'w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-amber-500 disabled:opacity-60';
+const INPUT = 'w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:outline-none focus:border-amber-500 disabled:opacity-60';
 
 const GROUP_TITLES: Record<ProjectFieldGroup, string> = {
   base: 'مشخصات پایه',
@@ -59,7 +60,7 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
 
   const text = (name: keyof ProjectFormInput, label: string, group: ProjectFieldGroup) => (
     <div className="space-y-1">
-      <label htmlFor={id(name)} className="text-[11px] text-slate-600">
+      <label htmlFor={id(name)} className="text-xs text-slate-600">
         {label}
       </label>
       <input id={id(name)} className={INPUT} disabled={!can(group)} value={form[name] as string} onChange={(e) => set(name, e.target.value as never)} />
@@ -67,7 +68,7 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
   );
   const money = (name: keyof ProjectFormInput, label: string, group: ProjectFieldGroup) => (
     <div className="space-y-1">
-      <label htmlFor={id(name)} className="text-[11px] text-slate-600">
+      <label htmlFor={id(name)} className="text-xs text-slate-600">
         {label}
       </label>
       <MoneyInput id={id(name)} showUnit className={INPUT} disabled={!can(group)} value={form[name] as number} onValueChange={(v) => set(name, v as never)} />
@@ -75,19 +76,19 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
   );
 
   return (
-    <Dialog as="form" onSubmit={submit} noValidate onClose={onClose} labelledBy={id('title')} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200">
+    <Dialog as="form" onSubmit={submit} noValidate onClose={onClose} labelledBy={id('title')} className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200">
       <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
-        <h3 id={id('title')} className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-amber-600" /> {project ? `ویرایش پروژه ${project.code}` : 'پروژه جدید'}
+        <h3 id={id('title')} className="text-base font-bold text-slate-900 flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-amber-700" /> {project ? `ویرایش پروژه ${project.code}` : 'پروژه جدید'}
         </h3>
-        <button type="button" onClick={onClose} aria-label="بستن" className="p-1.5 rounded-lg hover:bg-slate-200 cursor-pointer">
+        <button type="button" onClick={onClose} aria-label="بستن" className="p-2 rounded-lg hover:bg-slate-200 cursor-pointer">
           <X className="w-4 h-4" />
         </button>
       </div>
-      <div className="p-4 space-y-5 overflow-y-auto text-xs">
+      <div className="p-4 space-y-5 overflow-y-auto text-sm">
         {!groups.length && <p className="text-rose-700">اجازه ویرایش این پروژه را ندارید.</p>}
         <fieldset className="space-y-2">
-          <legend className="font-bold text-slate-800 mb-2">{GROUP_TITLES.base}</legend>
+          <legend className="font-bold text-slate-800 mb-2">{formatText(GROUP_TITLES.base)}</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {text('name', 'نام پروژه', 'base')}
             {text('clientName', 'کارفرما', 'base')}
@@ -95,20 +96,20 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
             {text('contractRef', 'شماره قرارداد', 'base')}
           </div>
           <div className="space-y-1">
-            <label htmlFor={id('description')} className="text-[11px] text-slate-600">
+            <label htmlFor={id('description')} className="text-xs text-slate-600">
               شرح
             </label>
             <textarea id={id('description')} rows={2} className={INPUT} disabled={!can('base')} value={form.description} onChange={(e) => set('description', e.target.value)} />
           </div>
         </fieldset>
         <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <legend className="font-bold text-slate-800 mb-2">{GROUP_TITLES.budget}</legend>
+          <legend className="font-bold text-slate-800 mb-2">{formatText(GROUP_TITLES.budget)}</legend>
           {money('budget', 'بودجه مصوب', 'budget')}
           {money('contractAmount', 'مبلغ قرارداد', 'budget')}
         </fieldset>
         <fieldset className="space-y-1">
-          <legend className="font-bold text-slate-800 mb-2">{GROUP_TITLES.assign}</legend>
-          <label htmlFor={id('manager')} className="text-[11px] text-slate-600">
+          <legend className="font-bold text-slate-800 mb-2">{formatText(GROUP_TITLES.assign)}</legend>
+          <label htmlFor={id('manager')} className="text-xs text-slate-600">
             مدیر پروژه (کاربر با نقش مدیر پروژه)
           </label>
           <select
@@ -122,18 +123,18 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
             }}
           >
             <option value="">— بدون مدیر —</option>
-            {form.managerUserId && !managers.some((m) => m.id === form.managerUserId) && <option value={form.managerUserId}>{form.managerName || form.managerUserId}</option>}
+            {form.managerUserId && !managers.some((m) => m.id === form.managerUserId) && <option value={form.managerUserId}>{formatText(form.managerName || form.managerUserId)}</option>}
             {managers.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name}
+                {formatText(m.name)}
               </option>
             ))}
           </select>
         </fieldset>
         <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <legend className="font-bold text-slate-800 mb-2">{GROUP_TITLES.exec}</legend>
+          <legend className="font-bold text-slate-800 mb-2">{formatText(GROUP_TITLES.exec)}</legend>
           <div className="space-y-1">
-            <label htmlFor={id('status')} className="text-[11px] text-slate-600">
+            <label htmlFor={id('status')} className="text-xs text-slate-600">
               وضعیت
             </label>
             <select id={id('status')} className={INPUT} disabled={!can('exec')} value={form.status} onChange={(e) => set('status', e.target.value as ProjectStatus)}>
@@ -145,7 +146,7 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
             </select>
           </div>
           <div className="space-y-1">
-            <label htmlFor={id('physical')} className="text-[11px] text-slate-600">
+            <label htmlFor={id('physical')} className="text-xs text-slate-600">
               پیشرفت فیزیکی (درصد)
             </label>
             <PercentInput id={id('physical')} className={INPUT} disabled={!can('exec')} value={form.physicalProgress} onValueChange={(v) => set('physicalProgress', v)} />
@@ -156,7 +157,7 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
           {text('endDate', 'تاریخ پایان', 'exec')}
         </fieldset>
         <fieldset className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <legend className="font-bold text-slate-800 mb-2">{GROUP_TITLES.financial}</legend>
+          <legend className="font-bold text-slate-800 mb-2">{formatText(GROUP_TITLES.financial)}</legend>
           {money('manualRevenue', 'درآمد', 'financial')}
           {money('manualCost', 'هزینه', 'financial')}
           {money('manualCash', 'نقد', 'financial')}
@@ -170,10 +171,10 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onC
         )}
       </div>
       <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-200 text-xs cursor-pointer">
+        <button type="button" onClick={onClose} className="btn btn-secondary">
           انصراف
         </button>
-        <button type="submit" disabled={!groups.length} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={!groups.length} className="btn btn-secondary">
           {project ? 'ذخیره تغییرات' : 'ثبت پروژه'}
         </button>
       </div>

@@ -1,10 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles, X } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { matchNav, navTrail, visibleNav, NavNode } from '../../navigation/navConfig';
-import { usePermission, useCompany } from '../../store/session';
+import { usePermission, useSession } from '../../store/session';
 import { companyLogo } from '../../assets/images';
+import { Dialog } from '../../ui/Dialog';
+import { toPersianDigits, formatText } from '../../utils/formatters';
+
+export const PRODUCT_NAME = 'سامانه پاک';
+export const PRODUCT_SUBTITLE = 'پورتال آریا کاوش';
+export const PRODUCT_TITLE = `${PRODUCT_NAME}: ${PRODUCT_SUBTITLE}`;
 
 interface SidebarProps {
   collapsed: boolean;
@@ -13,20 +19,29 @@ interface SidebarProps {
   /** DEV only: opens the role switcher. Omitted in production (sign-out belongs to WordPress). */
   onOpenLogout?: () => void;
   onOpenAiAgent: () => void;
+  /** Opens the signed-in user's account page. */
+  onOpenAccount?: () => void;
   counts?: Record<string, string>;
+  /** Mobile and tablet: the menu is a drawer opened from the header. */
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+/** Navigation panel: brand, assistant shortcut, the menu built from navConfig, and the signed-in user. */
+const NavPanel: React.FC<Omit<SidebarProps, 'mobileOpen'> & { drawer?: boolean }> = ({
   collapsed,
   onToggleCollapse,
   user,
   onOpenLogout,
   onOpenAiAgent,
+  onOpenAccount,
   counts = {},
+  onCloseMobile,
+  drawer = false,
 }) => {
-  const company = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isDemoData } = useSession();
   const activeTrail = navTrail(matchNav(location.pathname)).map((n) => n.id);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const { can } = usePermission();
@@ -38,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const first = navChildren(id)[0];
     return first ? navPath(first.id) : '/';
   };
+  const narrow = collapsed && !drawer;
 
   // Keep the group of the current page expanded, including after Back/Forward navigation.
   useEffect(() => {
@@ -47,6 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const go = (node: NavNode) => {
     navigate(navPath(node.id));
+    onCloseMobile();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -55,161 +72,170 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const children = navChildren(item.id).filter((c) => !c.hidden);
     const isGroup = children.length > 0;
     const inTrail = activeTrail.includes(item.id);
-    const isActive = inTrail && (!isGroup || collapsed);
+    const isActive = inTrail && (!isGroup || narrow);
     const count = item.countKey ? counts[item.countKey] : undefined;
-    const expanded = isGroup && !collapsed && (open[item.id] ?? false);
+    const expanded = isGroup && !narrow && (open[item.id] ?? false);
 
     return (
-      <div key={item.id}>
+      <li key={item.id}>
         <button
+          type="button"
           onClick={() => {
-            if (isGroup && !collapsed) {
+            if (isGroup && !narrow) {
               setOpen((o) => ({ ...o, [item.id]: !expanded }));
               if (!expanded && !inTrail) go(item);
             } else {
               go(item);
             }
           }}
-          title={collapsed ? item.label : undefined}
-          aria-expanded={isGroup ? expanded : undefined}
+          title={narrow ? item.label : undefined}
+          aria-label={narrow ? item.label : undefined}
+          aria-expanded={isGroup && !narrow ? expanded : undefined}
           aria-current={isActive ? 'page' : undefined}
-          className={`w-full flex items-center gap-3 px-3 ${depth ? 'py-2 pr-8 text-[11px]' : 'py-2.5 text-xs'} rounded-lg font-medium transition-colors cursor-pointer text-right group ${
-            isActive
-              ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-              : inTrail
-                ? 'text-white bg-slate-800/60'
-                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-          } ${collapsed ? 'justify-center px-0' : ''}`}
+          className={`w-full flex items-center gap-3 rounded-lg text-sm transition-colors cursor-pointer text-right ${depth ? 'py-2 pr-9 pl-3' : 'py-2 px-3'} ${
+            isActive ? 'bg-brand text-brand-ink font-bold' : inTrail ? 'text-white bg-white/10 font-medium' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+          } ${narrow ? 'justify-center px-0' : ''}`}
         >
-          <Icon
-            className={`${depth ? 'w-3.5 h-3.5' : 'w-4 h-4'} shrink-0 ${
-              isActive ? 'text-slate-950' : inTrail ? 'text-amber-400' : 'text-slate-400 group-hover:text-amber-400'
-            }`}
-          />
-
-          {!collapsed && (
-            <div className="flex items-center justify-between w-full truncate">
-              <span className="truncate">{item.label}</span>
-              <span className="flex items-center gap-1.5">
-                {item.badge && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-500/20 text-emerald-300">
-                    {item.badge}
-                  </span>
+          <Icon className={`${depth ? 'w-4 h-4' : 'w-5 h-5'} shrink-0 ${isActive ? 'text-brand-ink' : inTrail ? 'text-amber-400' : 'text-slate-400'}`} />
+          {!narrow && (
+            <span className="flex items-center justify-between gap-2 flex-1 min-w-0">
+              <span className="truncate">{formatText(item.label)}</span>
+              <span className="flex items-center gap-2 shrink-0">
+                {count && !isActive && (
+                  <span className="min-w-6 px-2 rounded-full bg-white/10 text-xs text-slate-200 text-center tabular-nums">{toPersianDigits(count)}</span>
                 )}
-                {count && !isActive && <span className="text-[11px] text-slate-400 font-mono">{count}</span>}
-                {isGroup && (
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-                )}
+                {isGroup && <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />}
               </span>
-            </div>
+            </span>
           )}
         </button>
-        {expanded && <div className="mt-1 space-y-1">{children.map((c) => renderItem(c, depth + 1))}</div>}
-      </div>
+        {expanded && <ul className="mt-1 space-y-1">{children.map((c) => renderItem(c, depth + 1))}</ul>}
+      </li>
     );
   };
 
   return (
-    <aside
-      className={`fixed top-0 right-0 z-30 h-screen bg-slate-900 text-slate-200 border-l border-slate-800 transition-all duration-300 flex flex-col justify-between select-none ${
-        collapsed ? 'w-20' : 'w-68'
-      }`}
-    >
-      {/* Top Brand Header */}
-      <div>
-        <div className="h-18 flex items-center justify-between px-4 border-b border-slate-800/80">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 overflow-hidden">
-              <img
-                src={companyLogo}
-                alt={`لوگوی ${company.name}`}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <h1 className="text-sm font-bold text-white tracking-tight truncate">
-                  {company.name}
-                </h1>
-                <p className="text-[11px] text-amber-400 font-medium truncate">
-                  سامانه جامع پیمانکاری EPC
-                </p>
-              </div>
-            )}
+    <div className="h-full flex flex-col bg-nav text-slate-200">
+      {/* Brand */}
+      <div className="h-16 flex items-center justify-between gap-2 px-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shrink-0 overflow-hidden">
+            <img
+              src={companyLogo}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
           </div>
-
+          {!narrow && (
+            <div className="min-w-0">
+              <p className="text-base font-bold text-white truncate" title={PRODUCT_TITLE}>
+                {PRODUCT_NAME}
+                <span className="sr-only">:</span>
+              </p>
+              <p className="text-xs text-amber-300 truncate">{PRODUCT_SUBTITLE}</p>
+            </div>
+          )}
+        </div>
+        {drawer ? (
+          <button type="button" onClick={onCloseMobile} aria-label="بستن منو" className="btn btn-icon text-slate-300 hover:text-white hover:bg-white/10">
+            <X className="w-5 h-5" />
+          </button>
+        ) : (
           <button
+            type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'گسترش منو' : 'جمع کردن منو'}
-            className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="btn btn-icon text-slate-300 hover:text-white hover:bg-white/10"
           >
-            {collapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {collapsed ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
           </button>
-        </div>
-
-        {/* AI Assistant Quick Pill Button in Sidebar */}
-        <div className="px-3 pt-3">
-          <button
-            onClick={onOpenAiAgent}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-all text-xs font-semibold cursor-pointer group shadow-xs ${
-              collapsed ? 'justify-center px-2' : ''
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
-            {!collapsed && (
-              <div className="flex items-center justify-between w-full">
-                <span className="truncate">دستیار مدیریت (نسخه نمایشی)</span>
-                <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">AI</span>
-              </div>
-            )}
-          </button>
-        </div>
-
-        {/* Navigation List (built from navConfig) */}
-        <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-270px)] scrollbar-thin">
-          {nodes.filter((n) => !n.parent && !n.hidden).map((n) => renderItem(n, 0))}
-        </nav>
+        )}
       </div>
 
-      {/* User Footer Profile & Logout */}
-      <div className="p-3 border-t border-slate-800/90 bg-slate-950/60">
-        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-700 border border-slate-600 shrink-0">
-              <img
-                src={user.avatar}
-                alt={user.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-white truncate">{user.name}</p>
-                <p className="text-[11px] text-slate-400 truncate">{user.role}</p>
-              </div>
-            )}
-          </div>
+      {/* Assistant */}
+      <div className="px-3 pt-3 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            onCloseMobile();
+            onOpenAiAgent();
+          }}
+          aria-label={narrow ? 'دستیار مدیریت' : undefined}
+          className={`w-full flex items-center gap-3 py-2 px-3 rounded-lg border border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 transition-colors text-sm font-medium cursor-pointer ${
+            narrow ? 'justify-center px-0' : ''
+          }`}
+        >
+          <Sparkles className="w-5 h-5 text-amber-300 shrink-0" />
+          {!narrow && (
+            <span className="flex items-center justify-between gap-2 flex-1">
+              <span className="truncate">دستیار مدیریت</span>
+              {isDemoData && <span className="px-2 rounded-full bg-amber-300/20 text-xs text-amber-200">نمایشی</span>}
+            </span>
+          )}
+        </button>
+      </div>
 
-          {onOpenLogout && (
-            <button
-              onClick={onOpenLogout}
-              title="تغییر کاربر (فقط محیط توسعه)"
-              aria-label="تغییر کاربر (فقط محیط توسعه)"
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
-            >
-              <LogOut className="w-4 h-4" />
+      {/* Menu (built from navConfig) */}
+      <nav aria-label="منوی اصلی" className="flex-1 min-h-0 overflow-y-auto p-3">
+        <ul className="space-y-1">{nodes.filter((n) => !n.parent && !n.hidden).map((n) => renderItem(n, 0))}</ul>
+      </nav>
+
+      {/* Signed-in user */}
+      <div className="p-3 border-t border-white/10 shrink-0">
+        <div className={`flex items-center gap-2 ${narrow ? 'justify-center' : 'justify-between'}`}>
+          <button
+            type="button"
+            onClick={() => {
+              onCloseMobile();
+              onOpenAccount?.();
+            }}
+            disabled={!onOpenAccount}
+            aria-label={narrow ? `حساب کاربری ${user.name}` : undefined}
+            className="flex items-center gap-3 min-w-0 flex-1 rounded-lg p-1 text-right hover:bg-white/10 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+          >
+            <span className="w-10 h-10 rounded-full overflow-hidden bg-slate-700 shrink-0">
+              {user.avatar && <img src={user.avatar} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" onError={(e) => ((e.target as HTMLElement).style.display = 'none')} />}
+            </span>
+            {!narrow && (
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-white truncate">{formatText(user.name)}</span>
+                <span className="block text-xs text-slate-400 truncate">{formatText(user.role)}</span>
+              </span>
+            )}
+          </button>
+          {onOpenLogout && !narrow && (
+            <button type="button" onClick={onOpenLogout} title="تغییر کاربر (فقط محیط توسعه)" aria-label="تغییر کاربر (فقط محیط توسعه)" className="btn btn-icon text-slate-300 hover:text-white hover:bg-white/10">
+              <LogOut className="w-5 h-5" />
             </button>
           )}
         </div>
       </div>
-    </aside>
+    </div>
+  );
+};
+
+export const Sidebar: React.FC<SidebarProps> = (props) => {
+  const { collapsed, mobileOpen, onCloseMobile } = props;
+  return (
+    <>
+      <aside className={`no-print hidden lg:block fixed top-0 right-0 z-30 h-screen border-l border-white/10 transition-[width] duration-200 ${collapsed ? 'w-20' : 'w-68'}`}>
+        <NavPanel {...props} />
+      </aside>
+      {mobileOpen && (
+        <Dialog
+          label="منوی اصلی"
+          onClose={onCloseMobile}
+          closeOnBackdrop
+          overlayClassName="fixed inset-0 z-50 bg-slate-950/60 lg:hidden"
+          className="fixed inset-y-0 right-0 w-72 shadow-xl outline-none"
+        >
+          <NavPanel {...props} collapsed={false} drawer />
+        </Dialog>
+      )}
+    </>
   );
 };

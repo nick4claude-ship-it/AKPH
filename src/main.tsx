@@ -6,17 +6,17 @@
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
-import { AlertCircle, RefreshCw } from 'lucide-react';
 import App from './App.tsx';
+import { BootError, BootLoading } from './components/layout/BootScreens';
 // Vazirmatn ships inside the bundle (app/assets in the plugin); no external font service is used.
 import '@fontsource-variable/vazirmatn';
 import './index.css';
 import { createDataSource, DataSource, PortalSession } from './api';
 import { AppStoreProvider } from './store/AppStore';
-import { SessionProvider } from './store/session';
+import { SessionProvider, type SessionPatch } from './store/session';
 import { emitToast } from './store/toast';
 import type { AppState } from './store/types';
-import { initCurrencyUnit } from './utils/money';
+import { changeCurrencyUnit, initCurrencyUnit } from './utils/money';
 
 type Boot =
   | { status: 'loading' }
@@ -49,33 +49,35 @@ function Root() {
     load();
   }, [load]);
 
-  if (boot.status === 'loading') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-slate-600" role="status">
-        <RefreshCw className="w-8 h-8 animate-spin text-amber-500" />
-        <p className="text-sm font-bold">در حال دریافت اطلاعات پرتال...</p>
-      </div>
+  /** The user's own saved name, avatar or preferences, applied without reloading the data. */
+  const updateSession = useCallback((patch: SessionPatch) => {
+    if (patch.currency) changeCurrencyUnit(patch.currency);
+    setBoot((b) =>
+      b.status === 'ready'
+        ? {
+            ...b,
+            session: {
+              ...b.session,
+              user: { ...b.session.user, ...patch.user },
+              preferences: patch.preferences ?? b.session.preferences,
+              currency: patch.currency ?? b.session.currency,
+            },
+          }
+        : b
     );
-  }
+  }, []);
+
+  if (boot.status === 'loading') return <BootLoading />;
 
   if (boot.status === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="p-8 rounded-2xl bg-white border border-rose-200 text-center max-w-lg space-y-3 shadow-sm" role="alert">
-          <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
-          <h1 className="text-sm font-bold text-slate-900">خطا در بارگذاری پرتال</h1>
-          <p className="text-xs text-slate-500 leading-relaxed">{boot.message}</p>
-          <button
-            onClick={() => {
-              setBoot({ status: 'loading' });
-              load();
-            }}
-            className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 cursor-pointer"
-          >
-            تلاش مجدد
-          </button>
-        </div>
-      </div>
+      <BootError
+        message={boot.message}
+        onRetry={() => {
+          setBoot({ status: 'loading' });
+          load();
+        }}
+      />
     );
   }
 
@@ -90,6 +92,9 @@ function Root() {
         isDemoData={boot.source.kind === 'mock'}
         writablePaths={boot.source.writablePaths}
         listManagers={boot.source.listManagers}
+        account={boot.source.account}
+        assistant={boot.source.assistant}
+        updateSession={updateSession}
         devUsers={devUsers}
         switchUser={devUsers ? (userId) => load(userId, { source: boot.source, epoch: boot.epoch }) : undefined}
       >

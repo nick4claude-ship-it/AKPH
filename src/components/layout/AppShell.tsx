@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { Sidebar, PRODUCT_TITLE } from './Sidebar';
 import { Header } from './Header';
 import { ProjectDashboardModal } from '../project/ProjectDashboardModal';
 import { PdfReportModal } from '../reports/PdfReportModal';
@@ -14,14 +14,18 @@ import { DocumentViewerModal } from '../common/DocumentViewerModal';
 import { LoginModal } from '../auth/LoginModal';
 import { AiAgentWidget } from '../dashboard/AiAgentWidget';
 import { useAppState } from '../../store/AppStore';
-import { useCompany, useCurrentUser, useDemoBanner, usePermission, useReadOnlyNotice, useSession } from '../../store/session';
+import { useApplyStartPage, useCompany, useCurrentUser, useDemoBanner, usePermission, useReadOnlyNotice, useSession } from '../../store/session';
 import { useToastListener } from '../../store/toast';
 import { useApprovalActions } from '../../store/useApprovalActions';
 import { selectProjects, selectKpiItems } from '../../store/selectors';
 import { selectApprovals, selectNotifications, selectPettyFunds, selectSidebarCounts } from '../../store/domainSelectors';
 import { matchNav, navTrail, NavNode } from '../../navigation/navConfig';
 import { ApprovalItem, Project, TimeRange } from '../../types';
-import { CheckCircle2, RefreshCw, Filter, X, Lock } from 'lucide-react';
+import { CheckCircle2, Filter, X, Lock } from 'lucide-react';
+import { PageSkeleton } from '../common/Skeleton';
+import { ErrorBoundary } from '../common/ErrorState';
+import { EmptyState } from '../common/EmptyState';
+import { formatText } from '../../utils/formatters';
 
 /** Lazily loaded module screens (one chunk per module). */
 function named<M, K extends keyof M>(loader: () => Promise<M>, key: K) {
@@ -45,14 +49,9 @@ const ApprovalCenterModule = named(() => import('../approvals/ApprovalCenterModu
 const NotificationCenterPage = named(() => import('../../pages/NotificationCenterPage'), 'NotificationCenterPage');
 const ReportsBIModule = named(() => import('../reports/ReportsBIModule'), 'ReportsBIModule');
 const SettingsPage = named(() => import('../../pages/SettingsPage'), 'SettingsPage');
+const AccountPage = lazy(() => import('../../pages/AccountPage'));
 
-const LoadingView = () => (
-  <div className="py-24 text-center space-y-3">
-    <RefreshCw className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
-    <p className="text-sm font-bold text-slate-700">در حال دریافت داده‌های برخط پروژه‌ها و مراکز هزینه...</p>
-    <p className="text-xs text-slate-400">همگام‌سازی دفاتر حسابداری، تنخواه‌ها و صورت‌وضعیت‌ها</p>
-  </div>
-);
+const LoadingView = () => <PageSkeleton label="در حال بارگذاری صفحه…" />;
 
 /** Route wrappers that pass URL parameters to the module screens. */
 const ProjectsRoute: React.FC<{ projects: Project[] }> = ({ projects }) => {
@@ -84,10 +83,8 @@ const PartnersRoute: React.FC<{ projects: Project[]; kind: 'clients' | 'subcontr
 
 /** Pages that need a permission render this instead when the signed-in role lacks it. */
 const NoAccess: React.FC = () => (
-  <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center max-w-lg mx-auto my-12 space-y-3 shadow-sm" role="alert">
-    <Lock className="w-10 h-10 text-slate-300 mx-auto" />
-    <h3 className="text-sm font-bold text-slate-900">دسترسی به این بخش برای نقش شما تعریف نشده است</h3>
-    <p className="text-xs text-slate-500">در صورت نیاز، مدیر سیستم نقش شما را در افزونه پرتال تغییر دهد.</p>
+  <div className="card max-w-lg mx-auto my-12" role="alert">
+    <EmptyState icon={Lock} title="دسترسی به این بخش برای نقش شما تعریف نشده است" description="در صورت نیاز، مدیر سیستم نقش شما را در افزونه پرتال تغییر دهد." />
   </div>
 );
 
@@ -96,12 +93,14 @@ export default function AppShell() {
   const user = useCurrentUser();
   const company = useCompany();
   const demoBanner = useDemoBanner();
-  const { session, switchUser, devUsers, sourceLabel, isDemoData } = useSession();
+  const { session, switchUser, devUsers, isDemoData } = useSession();
   const { can } = usePermission();
   const location = useLocation();
   const readOnlyNotice = useReadOnlyNotice(location.pathname);
   const navigate = useNavigate();
+  useApplyStartPage();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('current_year');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
@@ -136,17 +135,24 @@ export default function AppShell() {
 
   // Page title comes from navConfig (group › page).
   const trail = navTrail(matchNav(location.pathname));
-  const pageTitle =
-    trail.length === 0 || trail[0].id === 'dashboard' ? 'مرکز فرماندهی و پایش مالی پروژه‌ها' : trail.map((n) => n.label).join(' › ');
+  const pageTitle = trail.length === 0 ? 'داشبورد مدیریتی' : trail.map((n) => n.label).join(' › ');
+  useEffect(() => {
+    document.title = `${pageTitle} | ${PRODUCT_TITLE}`;
+  }, [pageTitle]);
+  // The navigation drawer closes when the page changes.
+  useEffect(() => setMobileNavOpen(false), [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800 flex text-right font-sans antialiased selection:bg-amber-100 selection:text-amber-900">
+    <div className="min-h-screen bg-canvas text-ink text-right">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 btn btn-primary">
+        پرش به محتوای اصلی
+      </a>
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div role="status" aria-live="polite" className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-2rem)] bg-ink text-white px-4 py-3 rounded-xl shadow-lg text-sm flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-300 shrink-0" />
           <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="p-1 text-slate-400 hover:text-white mr-1 cursor-pointer">
-            <X className="w-3.5 h-3.5" />
+          <button type="button" onClick={() => setToastMessage(null)} aria-label="بستن پیام" className="btn btn-icon text-slate-300 hover:text-white hover:bg-white/10 -my-2 -ml-2">
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -157,18 +163,20 @@ export default function AppShell() {
         user={user}
         onOpenLogout={switchUser ? () => setIsLoginOpen(true) : undefined}
         onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
+        onOpenAccount={() => navigate('/account')}
         counts={sidebarCounts}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
       />
 
-      <div className={`flex-1 transition-all duration-300 flex flex-col min-h-screen ${sidebarCollapsed ? 'mr-20' : 'mr-68'}`}>
+      <div className={`min-w-0 flex flex-col min-h-screen transition-[margin] duration-200 ${sidebarCollapsed ? 'lg:mr-20' : 'lg:mr-68'}`}>
         {demoBanner && (
-          <div className="bg-amber-400 text-slate-950 text-xs font-bold text-center py-1.5 px-4" role="status">
+          <div className="no-print bg-amber-300 text-slate-950 text-xs font-medium text-center py-1 px-4" role="status">
             {demoBanner}
           </div>
         )}
         <Header
           title={pageTitle}
-          subtitle={`سامانه مدیریت جامع پیمانکاری و ساخت‌وساز · ${company.name}`}
           projects={projects}
           selectedProjectId={selectedProjectId}
           onSelectProject={(id) => setSelectedProjectId(id)}
@@ -180,32 +188,36 @@ export default function AppShell() {
             setIsPdfOpen(true);
           }}
           onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
-          user={user}
+          onOpenMenu={() => setMobileNavOpen(true)}
+            user={user}
           alerts={notifications}
           onOpenAlertsModal={() => navigate('/notifications')}
           onSwitchUser={switchUser ? () => setIsLoginOpen(true) : undefined}
+          onOpenAccount={() => navigate('/account')}
+          demo={isDemoData}
         />
 
         {selectedProjectId !== 'all' && (
-          <div className="no-print bg-white/80 border-b border-slate-200/80 px-6 py-2 flex items-center justify-end text-[11px] text-slate-500">
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-2 py-0.5 rounded">
-              <Filter className="w-3 h-3 text-amber-600" />
-              <span>فیلتر فعال روی یک پروژه</span>
-              <button onClick={() => setSelectedProjectId('all')} className="font-bold underline text-amber-800 cursor-pointer">
-                نمایش تمام پروژه‌ها
+          <div className="no-print px-4 sm:px-6 lg:px-8 pt-4">
+            <div className="flex flex-wrap items-center gap-2 bg-brand-soft border border-amber-200 text-warning px-3 py-2 rounded-lg text-sm">
+              <Filter className="w-4 h-4" />
+              <span>فیلتر فعال: فقط یک پروژه نمایش داده می‌شود.</span>
+              <button type="button" onClick={() => setSelectedProjectId('all')} className="font-bold underline cursor-pointer">
+                نمایش همه پروژه‌ها
               </button>
             </div>
           </div>
         )}
 
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-[1600px] w-full mx-auto">
+        <main id="main-content" tabIndex={-1} className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 w-full max-w-screen-2xl mx-auto min-w-0 outline-none">
           {readOnlyNotice && (
-            <div className="px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50 text-sky-900 text-xs font-bold" role="status">
+            <div className="px-4 py-3 rounded-lg border border-sky-200 bg-info-soft text-info text-sm font-medium" role="status">
               {readOnlyNotice}
             </div>
           )}
+          <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={<LoadingView />}>
-              <Routes>
+              <Routes key={session.currency}>
                 <Route
                   path="/"
                   element={
@@ -252,22 +264,18 @@ export default function AppShell() {
                 <Route path="/reports" element={<ReportsBIModule projects={projects} />} />
                 <Route path="/ai" element={<AiAgentWidget isOpen={true} isFloating={false} />} />
                 <Route path="/settings" element={guarded('settings.manage', <SettingsPage onToast={showToast} />)} />
+                <Route path="/account" element={<AccountPage onToast={showToast} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
           </Suspense>
+          </ErrorBoundary>
         </main>
 
-        <footer className="no-print mt-auto py-4 px-6 border-t border-slate-200 bg-white/60 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div>
-            سامانه جامع مدیریت پروژه‌ها و حسابداری پیمانکاری · <strong className="text-slate-700">{company.name}</strong>
-          </div>
-          <div className="flex items-center gap-3 text-[11px] font-mono">
-            <span>عملیات ← تأیید ← رویداد مالی ← حسابداری</span>
-            <span>·</span>
-            <span className={isDemoData ? 'text-amber-700 font-bold' : 'text-emerald-700 font-bold'}>
-              {sourceLabel} · واحد پول: {session.currency === 'rial' ? 'ریال' : 'تومان'}
-            </span>
-          </div>
+        <footer className="no-print mt-auto py-4 px-4 sm:px-6 lg:px-8 border-t border-line bg-surface text-xs text-ink-subtle flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>
+            {PRODUCT_TITLE} · <strong className="font-medium text-ink-muted">{formatText(company.name)}</strong>
+          </span>
+          <span>واحد نمایش مبالغ: {session.currency === 'rial' ? 'ریال' : 'تومان'}</span>
         </footer>
       </div>
 

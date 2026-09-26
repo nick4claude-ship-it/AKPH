@@ -34,13 +34,16 @@ export class ApiError extends Error {
   farsiMessage: string;
   /** WordPress REST error code (e.g. akph_retry, akph_conflict); '' when the server sent none. */
   code: string;
+  /** Input field the server named in data.field (inline form errors); '' when none. */
+  field: string;
 
-  constructor(status: number, message: string, farsiMessage: string, code = '') {
+  constructor(status: number, message: string, farsiMessage: string, code = '', field = '') {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.farsiMessage = farsiMessage;
     this.code = code;
+    this.field = field;
   }
 
   /** No answer reached the browser: the command may or may not have run on the server. */
@@ -123,6 +126,10 @@ export async function apiRequest<T>(
   if (config.nonce) {
     headers['X-WP-Nonce'] = config.nonce;
   }
+  // A file upload: the browser sets multipart/form-data with its boundary.
+  if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+    delete headers['Content-Type'];
+  }
 
   try {
     const response = await fetch(url, {
@@ -135,15 +142,17 @@ export async function apiRequest<T>(
       // WordPress REST errors carry { code, message }; a Persian message from the server wins.
       let serverMessage = '';
       let code = '';
+      let field = '';
       try {
-        const body = (await response.json()) as { message?: unknown; code?: unknown };
+        const body = (await response.json()) as { message?: unknown; code?: unknown; data?: { field?: unknown } };
         if (typeof body?.message === 'string') serverMessage = body.message;
         if (typeof body?.code === 'string') code = body.code;
+        if (typeof body?.data?.field === 'string') field = body.data.field;
       } catch {
         /* not JSON */
       }
       const farsiMsg = /[\u0600-\u06FF]/.test(serverMessage) ? serverMessage : getFarsiErrorMessage(response.status);
-      throw new ApiError(response.status, serverMessage || `HTTP error ${response.status}`, farsiMsg, code);
+      throw new ApiError(response.status, serverMessage || `HTTP error ${response.status}`, farsiMsg, code, field);
     }
 
     return (await response.json()) as T;
@@ -179,7 +188,8 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint: string, body: unknown, options: CommandOptions): Promise<T> {
   const headers: Record<string, string> = { 'Idempotency-Key': options.idempotencyKey };
   if (options.version !== undefined) headers['If-Match'] = `"${options.version}"`;
-  const init: RequestInit = { method, headers, body: body === undefined ? undefined : JSON.stringify(body) };
+  const payload = body === undefined ? undefined : typeof FormData !== 'undefined' && body instanceof FormData ? body : JSON.stringify(body);
+  const init: RequestInit = { method, headers, body: payload };
   try {
     return await apiRequest<T>(endpoint, init);
   } catch (err) {
@@ -196,5 +206,7 @@ export async function sendCommand<T>(method: 'POST' | 'PUT' | 'DELETE', endpoint
 export const apiClient = {
   get: <T>(endpoint: string, params?: Record<string, string | number | boolean>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
+  /** A POST that is not a stored command (e.g. a question to the assistant): sent once, never repeated. */
+  post: <T>(endpoint: string, body: unknown) => apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   command: sendCommand,
 };

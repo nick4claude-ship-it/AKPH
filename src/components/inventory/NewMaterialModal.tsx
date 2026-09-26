@@ -60,7 +60,7 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="تعریف کدینگ متریال و مصالح جدید در انبار" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+    <Dialog onClose={onClose} label="تعریف کدینگ متریال و مصالح جدید در انبار" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col">
       
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
@@ -69,7 +69,7 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
               <Package className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900">
                 تعریف کدینگ متریال و مصالح جدید در انبار
               </h3>
               <p className="text-xs text-slate-500">
@@ -80,14 +80,14 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <label htmlFor="new-material-modal-1" className="font-bold text-slate-700 block mb-1">نام کامل مصالح و برند کالا *</label>
@@ -146,12 +146,12 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
                 value={standardGrade}
                 onChange={(e) => setStandardGrade(e.target.value)}
                 placeholder="A3 - FeSt 400"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 tabular-nums"
               />
             </div>
 
             <div>
-              <label htmlFor="new-material-modal-6" className="font-bold text-slate-700 block mb-1">محل استقرار / پالت (Bin)</label>
+              <label htmlFor="new-material-modal-6" className="font-bold text-slate-700 block mb-1">محل استقرار / پالت</label>
               <input id="new-material-modal-6"
                 type="text"
                 value={storageLocationBin}
@@ -163,33 +163,33 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
           </div>
 
           {/* Stock Levels */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
             <h4 className="font-bold text-slate-900">کنترل سطح موجودی و هشدارها</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label htmlFor="new-material-modal-7" className="text-[10px] text-slate-500 block mb-1">نقطه سفارش مجدد</label>
+                <label htmlFor="new-material-modal-7" className="text-xs text-slate-500 block mb-1">نقطه سفارش مجدد</label>
                 <IntegerInput id="new-material-modal-7"
                   value={reorderLevel}
                   onValueChange={(v) => setReorderLevel(v)}
-                  className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center"
+                  className="w-full px-2 py-2 rounded-lg border border-slate-200 bg-white tabular-nums text-center"
                 />
               </div>
 
               <div>
-                <label htmlFor="new-material-modal-8" className="text-[10px] text-slate-500 block mb-1">حداقل موجودی ایمن</label>
+                <label htmlFor="new-material-modal-8" className="text-xs text-slate-500 block mb-1">حداقل موجودی ایمن</label>
                 <IntegerInput id="new-material-modal-8"
                   value={minSafetyStock}
                   onValueChange={(v) => setMinSafetyStock(v)}
-                  className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-center text-rose-600"
+                  className="w-full px-2 py-2 rounded-lg border border-slate-200 bg-white tabular-nums text-center text-rose-700"
                 />
               </div>
 
-              <p className="col-span-full text-[10px] text-slate-500">موجودی و بهای کالا فقط از طریق رسید انبار (از سفارش خرید) وارد می‌شود.</p>
+              <p className="col-span-full text-xs text-slate-500">موجودی و بهای کالا فقط از طریق رسید انبار (از سفارش خرید) وارد می‌شود.</p>
             </div>
           </div>
 
           {formError && (
-            <p className="text-xs text-rose-700 font-bold" role="alert">
+            <p className="text-sm text-rose-700 font-bold" role="alert">
               {formError}
             </p>
           )}
@@ -206,7 +206,7 @@ export const NewMaterialModal: React.FC<NewMaterialModalProps> = ({
 
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
+              className="btn btn-primary"
             >
               <Plus className="w-4 h-4" />
               <span>ثبت کالا در کاتالوگ انبار</span>

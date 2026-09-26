@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { TimeRange } from '../../types';
 import { MonthlyTrendPoint } from '../../store/selectors';
-import { formatCurrencyCompact, formatPercent } from '../../utils/formatters';
+import { formatCurrencyCompact, formatPercent, formatText } from '../../utils/formatters';
 import { moneyUnitLabel } from '../../utils/money';
 import { BarChart3, TrendingUp, Info } from 'lucide-react';
 import { financialChart } from '../../store/views/dashboard';
+import { Money } from '../common/Money';
+import { EmptyState } from '../common/EmptyState';
 
 interface FinancialChartsProps {
   data: MonthlyTrendPoint[];
@@ -25,23 +27,32 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
   const displayData = chart.points;
   const best = chart.best;
 
+  if (data.length === 0 || data.every((p) => !p.revenue && !p.cost)) {
+    return (
+      <section className="card p-4">
+        <h3 className="text-base font-bold text-ink">روند مقایسه‌ای درآمد، هزینه و سود</h3>
+        <EmptyState description="روند ماهانه پس از ثبت نخستین سند قطعی درآمد یا هزینه نمایش داده می‌شود." />
+      </section>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
       {/* Header with Title and Timeframe Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
             <TrendingUp className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">روند مقایسه‌ای درآمد، هزینه و سود</h3>
-            <p className="text-[11px] text-slate-500">پایش ماهانه جریان نقدی تعهدی و سود عملیاتی پروژه‌ها</p>
+            <h3 className="text-base font-bold text-slate-900">روند مقایسه‌ای درآمد، هزینه و سود</h3>
+            <p className="text-xs text-slate-500">پایش ماهانه جریان نقدی تعهدی و سود عملیاتی پروژه‌ها</p>
           </div>
         </div>
 
         {/* Metric toggles and Timeframe */}
-        <div className="flex items-center flex-wrap gap-1.5">
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-[11px]">
+        <div className="flex items-center flex-wrap gap-2">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-sm">
             <button
               onClick={() => setActiveMetric('all')}
               className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
@@ -87,23 +98,23 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
       </div>
 
       {/* Chart Legend */}
-      <div className="flex items-center justify-between py-2 text-xs">
-        <div className="flex items-center gap-4 text-slate-600 text-[11px]">
-          <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between py-2 text-sm">
+        <div className="flex items-center gap-4 text-slate-600 text-sm">
+          <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-xs bg-emerald-600" />
             <span>درآمد ماهانه (کارکرد)</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-xs bg-slate-600" />
             <span>هزینه کل ماهانه</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-xs bg-amber-500" />
             <span>سود ناخالص عملیاتی</span>
           </div>
         </div>
 
-        <div className="text-[11px] text-slate-400 font-mono">واحد: {moneyUnitLabel()}</div>
+        <div className="text-xs text-slate-500 tabular-nums">واحد: {moneyUnitLabel()}</div>
       </div>
 
       {/* SVG Interactive Multi-Bar / Trend Display */}
@@ -124,27 +135,27 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
               >
                 {/* Tooltip on hover */}
                 {isHovered && (
-                  <div className="absolute -top-16 z-20 bg-slate-900 text-white rounded-lg p-2 text-right shadow-lg text-[11px] w-40 pointer-events-none transition-all">
-                    <p className="font-bold text-amber-400 mb-1">{d.month}</p>
-                    <div className="space-y-0.5 font-mono">
+                  <div className="absolute -top-16 z-20 bg-slate-900 text-white rounded-lg p-2 text-right shadow-lg text-sm w-40 pointer-events-none transition-all">
+                    <p className="font-bold text-amber-400 mb-1">{formatText(d.month)}</p>
+                    <div className="space-y-1 tabular-nums">
                       <div className="flex justify-between">
                         <span className="text-slate-300">درآمد:</span>
-                        <span className="text-emerald-400">{formatCurrencyCompact(d.revenue)}</span>
+                        <span className="text-emerald-400"><Money rial={d.revenue} compact /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-300">هزینه:</span>
-                        <span className="text-slate-200">{formatCurrencyCompact(d.cost)}</span>
+                        <span className="text-slate-200"><Money rial={d.cost} compact /></span>
                       </div>
-                      <div className="flex justify-between border-t border-slate-700 pt-0.5">
+                      <div className="flex justify-between border-t border-slate-700 pt-1">
                         <span className="text-slate-300">سود:</span>
-                        <span className="text-amber-400 font-bold">{formatCurrencyCompact(d.profit)}</span>
+                        <span className="text-amber-400 font-bold"><Money rial={d.profit} compact /></span>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {/* Bars Container */}
-                <div className="w-full flex items-end justify-center gap-1.5 h-48">
+                <div className="w-full flex items-end justify-center gap-2 h-48">
                   {/* Revenue Bar */}
                   {(activeMetric === 'all' || activeMetric === 'revenue') && (
                     <div
@@ -171,8 +182,8 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
                 </div>
 
                 {/* Month Label */}
-                <span className="mt-2 text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
-                  {d.month}
+                <span className="mt-2 text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
+                  {formatText(d.month)}
                 </span>
               </div>
             );
@@ -181,14 +192,14 @@ export const FinancialCharts: React.FC<FinancialChartsProps> = ({
       </div>
 
       {/* Analytical Summary Line below chart */}
-      <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+      <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <span className="flex items-center gap-1">
-          <Info className="w-3.5 h-3.5 text-amber-500" />
+          <Info className="w-3.5 h-3.5 text-amber-700" />
           {best
             ? `بالاترین سود در ماه ${best.month} با ${formatCurrencyCompact(best.profit)} ثبت شده است.`
             : 'در این بازه سود مثبتی در دفاتر ثبت نشده است.'}
         </span>
-        <span className="font-mono text-slate-700">
+        <span className="tabular-nums text-slate-700">
           حاشیه سود دوره: {formatPercent(chart.margin)}
         </span>
       </div>

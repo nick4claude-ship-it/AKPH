@@ -1,28 +1,12 @@
-import React, { useState } from 'react';
-import {
-  Search,
-  Bell,
-  Calendar,
-  Filter,
-  FileSpreadsheet,
-  CheckCircle2,
-  AlertTriangle,
-  ChevronDown,
-  Printer,
-  Sparkles,
-} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Search, Bell, Calendar, CheckCircle2, AlertTriangle, ChevronDown, Printer, Sparkles, Menu, UserRound } from 'lucide-react';
 import { Project, TimeRange, UserProfile, ManagementAlert } from '../../types';
-import {
-  getCurrentFiscalYear,
-  getFormattedCurrentPersianDate,
-  getCurrentPersianMonthName,
-} from '../../utils/date';
+import { getCurrentFiscalYear, getFormattedCurrentPersianDate, getCurrentPersianMonthName } from '../../utils/date';
 import { formatInt } from '../../utils/money';
-import { toPersianDigits } from '../../utils/formatters';
+import { formatCode, toPersianDigits, formatText } from '../../utils/formatters';
 
 interface HeaderProps {
   title: string;
-  subtitle?: string;
   projects: Project[];
   selectedProjectId: string;
   onSelectProject: (id: string) => void;
@@ -31,16 +15,38 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onOpenPdfReport: () => void;
   onOpenAiAgent: () => void;
+  /** Opens the navigation drawer (below the large breakpoint, where the sidebar is hidden). */
+  onOpenMenu: () => void;
+  /** Opens the signed-in user's account page. */
+  onOpenAccount?: () => void;
   user: UserProfile;
   alerts: ManagementAlert[];
   onOpenAlertsModal: () => void;
-  /** DEV only: opens the role switcher; without it the user badge is plain text. */
+  /** DEV only: opens the role switcher. */
   onSwitchUser?: () => void;
+  /** Shows «نمایشی» next to the assistant while sample data is loaded. */
+  demo?: boolean;
+}
+
+/** Closes a popover on Escape and on a click outside it. */
+function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    const onDown = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && close();
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [open, close]);
+  return ref;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   title,
-  subtitle,
   projects,
   selectedProjectId,
   onSelectProject,
@@ -49,192 +55,198 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onOpenPdfReport,
   onOpenAiAgent,
+  onOpenMenu,
+  onOpenAccount,
   user,
   alerts,
   onOpenAlertsModal,
   onSwitchUser,
+  demo = false,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
-
-  const currentFiscalYear = getCurrentFiscalYear();
-  const currentMonthName = getCurrentPersianMonthName();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const notificationsRef = useDismiss(showNotifications, () => setShowNotifications(false));
+  const userMenuRef = useDismiss(showUserMenu, () => setShowUserMenu(false));
 
   const timeRangeLabels: Record<TimeRange, string> = {
-    this_month: `این ماه (${currentMonthName})`,
+    this_month: `این ماه (${getCurrentPersianMonthName()})`,
     last_3_months: '۳ ماه اخیر',
     last_6_months: '۶ ماه اخیر',
-    current_year: `سال جاری (${toPersianDigits(currentFiscalYear)})`,
+    current_year: `سال جاری (${toPersianDigits(getCurrentFiscalYear())})`,
     custom: 'بازه سفارشی',
   };
-
   const criticalCount = alerts.filter((a) => a.priority === 'critical').length;
+  const selectClass = 'h-10 rounded-lg border border-slate-300 bg-surface px-3 text-sm text-ink cursor-pointer hover:border-slate-400 min-w-0';
 
   return (
-    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
-      {/* Zone 1: Title, Subtitle, & Persian Date */}
-      <div className="flex flex-col">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-slate-900 tracking-tight">{title}</h2>
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded font-medium border border-slate-200/80">
-            <Calendar className="w-3 h-3 text-slate-400" />
+    <header className="no-print sticky top-0 z-20 bg-surface/95 backdrop-blur border-b border-line">
+      <div className="flex items-center gap-3 px-4 sm:px-6 h-16">
+        <button type="button" onClick={onOpenMenu} aria-label="باز کردن منو" className="btn btn-ghost btn-icon lg:hidden -mr-2">
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <h1 className="text-lg font-bold text-ink truncate">{title}</h1>
+          <span className="hidden md:inline-flex items-center gap-1 text-xs text-ink-subtle bg-canvas px-2 py-1 rounded-md whitespace-nowrap">
+            <Calendar className="w-4 h-4" />
             {getFormattedCurrentPersianDate()}
           </span>
         </div>
-        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
-      </div>
 
-      {/* Zone 2: Filters & Global Search */}
-      <div className="flex items-center flex-wrap gap-2.5">
-        {/* Project Selector Filter */}
-        <div className="relative">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-700 transition-colors">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={selectedProjectId}
-              onChange={(e) => onSelectProject(e.target.value)}
-              className="bg-transparent border-none text-xs text-slate-800 font-medium focus:outline-none cursor-pointer pr-1 pl-4"
-            >
-              <option value="all">تمام پروژه‌ها ({formatInt(projects.length)} پروژه)</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} - {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Timeframe Selector */}
-        <div className="relative">
-          <select
-            value={timeRange}
-            onChange={(e) => onChangeTimeRange(e.target.value as TimeRange)}
-            className="bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-medium focus:outline-none cursor-pointer"
-          >
-            <option value="this_month">{timeRangeLabels.this_month}</option>
-            <option value="last_3_months">{timeRangeLabels.last_3_months}</option>
-            <option value="last_6_months">{timeRangeLabels.last_6_months}</option>
-            <option value="current_year">{timeRangeLabels.current_year}</option>
-            <option value="custom">{timeRangeLabels.custom}</option>
-          </select>
-        </div>
-
-        {/* Global Search Button */}
-        <button
-          onClick={onOpenSearch}
-          className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-400 hover:text-slate-700 px-3.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer"
-          title="جستجوی پروژه، فاکتور، سند، تأمین‌کننده، صورت‌وضعیت"
-        >
-          <Search className="w-3.5 h-3.5 text-slate-400" />
-          <span className="hidden md:inline text-slate-600 font-normal">جستجوی سراسری...</span>
-          <kbd className="hidden lg:inline text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-400 font-mono shadow-2xs">
-            ⌘K
-          </kbd>
-        </button>
-      </div>
-
-      {/* Zone 3: Actions & Notifications */}
-      <div className="flex items-center gap-2.5">
-        {/* AI Agent Quick Icon Button */}
-        <button
-          onClick={onOpenAiAgent}
-          className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-          <span className="hidden sm:inline">دستیار (نمایشی)</span>
-        </button>
-
-        {/* Export PDF Button */}
-        <button
-          onClick={onOpenPdfReport}
-          className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-xs"
-        >
-          <Printer className="w-3.5 h-3.5 text-amber-400" />
-          <span>چاپ / PDF</span>
-        </button>
-
-        {/* Notifications Popover */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="اعلان‌ها و هشدارهای سیستم"
-          >
-            <Bell className="w-4 h-4" />
-            {criticalCount > 0 && (
-              <span className="absolute top-1 left-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse" />
-            )}
+        <div className="flex items-center gap-1 sm:gap-2">
+          <button type="button" onClick={onOpenSearch} className="btn btn-ghost max-md:btn-icon" aria-label="جستجوی سراسری" title="جستجوی پروژه، فاکتور، سند، تأمین‌کننده و صورت‌وضعیت">
+            <Search className="w-5 h-5" />
+            <span className="hidden md:inline">جستجو</span>
           </button>
 
-          {showNotifications && (
-            <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
-                <span className="text-xs font-bold text-slate-800">هشدارهای مدیریتی</span>
-                <span className="text-[11px] text-amber-600 font-medium">
-                  {formatInt(alerts.length)} مورد فعال
-                </span>
-              </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {alerts.slice(0, 4).map((alert) => (
-                  <div
-                    key={alert.id}
-                    onClick={() => {
-                      setShowNotifications(false);
-                      onOpenAlertsModal();
-                    }}
-                    className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer text-right border border-slate-100"
-                  >
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                      {alert.priority === 'critical' ? (
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      )}
-                      <span className="truncate">{alert.title}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">
-                      {alert.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  setShowNotifications(false);
-                  onOpenAlertsModal();
-                }}
-                className="w-full text-center text-xs font-medium text-amber-600 hover:text-amber-700 pt-2 border-t border-slate-100 mt-2 block cursor-pointer"
-              >
-                مشاهده همه هشدارها
-              </button>
-            </div>
-          )}
-        </div>
+          <button type="button" onClick={onOpenAiAgent} className="btn btn-ghost max-sm:btn-icon text-brand-strong" aria-label="دستیار مدیریت">
+            <Sparkles className="w-5 h-5" />
+            <span className="hidden sm:inline">دستیار</span>
+            {demo && <span className="hidden sm:inline px-2 rounded-full bg-brand-soft text-xs text-warning">نمایشی</span>}
+          </button>
 
-        {/* User badge (role switcher in DEV only) */}
-        {(() => {
-          const badge = (
-            <>
-              <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200" />
-              <div className="text-right hidden xl:block">
-                <p className="text-xs font-bold text-slate-800 leading-tight">{user.name}</p>
-                <p className="text-[10px] text-slate-500">{user.role}</p>
-              </div>
-            </>
-          );
-          return onSwitchUser ? (
+          <button type="button" onClick={onOpenPdfReport} className="btn btn-secondary max-sm:hidden">
+            <Printer className="w-5 h-5" />
+            <span>چاپ گزارش</span>
+          </button>
+
+          {/* Notifications */}
+          <div className="relative" ref={notificationsRef}>
             <button
-              onClick={onSwitchUser}
-              className="flex items-center gap-2 p-1 pl-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-dashed border-amber-300"
-              title="تغییر نقش کاربری (فقط محیط توسعه)"
+              type="button"
+              onClick={() => setShowNotifications(!showNotifications)}
+              aria-label={criticalCount ? `اعلان‌ها — ${formatInt(criticalCount)} مورد بحرانی` : 'اعلان‌ها'}
+              aria-expanded={showNotifications}
+              className="btn btn-ghost btn-icon relative"
             >
-              {badge}
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <Bell className="w-5 h-5" />
+              {criticalCount > 0 && <span className="absolute top-2 left-2 w-2 h-2 bg-danger rounded-full ring-2 ring-surface" aria-hidden="true" />}
             </button>
-          ) : (
-            <div className="flex items-center gap-2 p-1 pl-2">{badge}</div>
-          );
-        })()}
+            {showNotifications && (
+              <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-2rem)] card shadow-lg p-3 z-50">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-line">
+                  <span className="text-sm font-bold text-ink">هشدارهای مدیریتی</span>
+                  <span className="text-xs text-ink-subtle">{formatInt(alerts.length)} مورد فعال</span>
+                </div>
+                {alerts.length === 0 ? (
+                  <p className="text-sm text-ink-subtle py-4 text-center">هشدار فعالی وجود ندارد.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-72 overflow-y-auto">
+                    {alerts.slice(0, 4).map((alert) => (
+                      <li key={alert.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNotifications(false);
+                            onOpenAlertsModal();
+                          }}
+                          className="w-full p-2 rounded-lg bg-surface-muted hover:bg-canvas text-right cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                            {alert.priority === 'critical' ? <AlertTriangle className="w-4 h-4 text-danger shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-warning shrink-0" />}
+                            <span className="truncate">{formatCode(alert.title)}</span>
+                          </span>
+                          <span className="block text-xs text-ink-subtle line-clamp-1 mt-1">{formatCode(alert.description)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNotifications(false);
+                    onOpenAlertsModal();
+                  }}
+                  className="w-full mt-2 pt-2 border-t border-line text-sm font-medium text-brand-strong hover:underline cursor-pointer"
+                >
+                  مشاهده همه هشدارها
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* User menu */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              aria-expanded={showUserMenu}
+              aria-haspopup="menu"
+              aria-label={`حساب کاربری ${user.name}`}
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-canvas cursor-pointer"
+            >
+              <span className="w-9 h-9 rounded-full overflow-hidden bg-canvas border border-line shrink-0 flex items-center justify-center">
+                {user.avatar ? <img src={user.avatar} alt="" className="w-full h-full object-cover" /> : <UserRound className="w-5 h-5 text-ink-subtle" />}
+              </span>
+              <span className="hidden xl:block text-right leading-tight">
+                <span className="block text-sm font-bold text-ink">{formatText(user.name)}</span>
+                <span className="block text-xs text-ink-subtle">{formatText(user.role)}</span>
+              </span>
+              <ChevronDown className="w-4 h-4 text-ink-subtle hidden sm:block" />
+            </button>
+            {showUserMenu && (
+              <div role="menu" className="absolute left-0 mt-2 w-60 card shadow-lg p-2 z-50">
+                <div className="px-2 py-2 border-b border-line mb-1">
+                  <p className="text-sm font-bold text-ink truncate">{formatText(user.name)}</p>
+                  <p className="text-xs text-ink-subtle truncate">{formatText(user.role)}</p>
+                </div>
+                {onOpenAccount && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onOpenAccount();
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm text-ink hover:bg-canvas text-right cursor-pointer"
+                  >
+                    <UserRound className="w-4 h-4 text-ink-subtle" />
+                    حساب کاربری من
+                  </button>
+                )}
+                {onSwitchUser && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onSwitchUser();
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm text-ink hover:bg-canvas text-right cursor-pointer"
+                  >
+                    تغییر نقش (فقط محیط توسعه)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Global filters */}
+      <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 pb-3">
+        <label className="sr-only" htmlFor="header-project-filter">
+          پروژه
+        </label>
+        <select id="header-project-filter" value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} className={`${selectClass} flex-1 sm:flex-none sm:w-72`}>
+          <option value="all">همه پروژه‌ها ({formatInt(projects.length)} پروژه)</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {formatCode(p.code)} - {formatText(p.name)}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="header-time-range">
+          بازه زمانی
+        </label>
+        <select id="header-time-range" value={timeRange} onChange={(e) => onChangeTimeRange(e.target.value as TimeRange)} className={`${selectClass} flex-1 sm:flex-none sm:w-48`}>
+          {(Object.keys(timeRangeLabels) as TimeRange[]).map((r) => (
+            <option key={r} value={r}>
+              {timeRangeLabels[r]}
+            </option>
+          ))}
+        </select>
       </div>
     </header>
   );

@@ -26,7 +26,7 @@ import { Dialog } from '../../ui/Dialog';
 import { formatInt, formatMoney, moneyUnitLabel } from '../../utils/money';
 import { IntegerInput } from '../../ui/NumberInput';
 import { useSelector } from '../../store/AppStore';
-import { formatDecimal, toPersianDigits } from '../../utils/formatters';
+import { formatDecimal, toPersianDigits, formatText } from '../../utils/formatters';
 import {
   MATERIALS_COST_ACCOUNT,
   computeStoreIssueDraft,
@@ -34,6 +34,7 @@ import {
   type IssueLineInput,
   type StoreIssueFormInput,
 } from '../../store/views/inventory';
+import { Money } from '../common/Money';
 
 interface NewStoreIssueModalProps {
   isOpen: boolean;
@@ -108,17 +109,17 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="صدور حواله خروج مصالح و مصرف کارگاهی (SIV)" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+    <Dialog onClose={onClose} label="صدور حواله خروج مصالح و مصرف کارگاهی (SIV)" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
       
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold">
               <ArrowUpRight className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                صدور حواله خروج مصالح و مصرف کارگاهی (SIV)
+              <h3 className="text-base font-bold text-slate-900">
+                صدور حواله خروج مصالح و مصرف کارگاهی
               </h3>
               <p className="text-xs text-slate-500">
                 تخصیص به WBS، تهاتر با صورت‌وضعیت پیمانکار جزء و ثبت در بهای تمام‌شده پروژه
@@ -128,17 +129,17 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-sm flex-1">
           {formError && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200 text-xs">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200 text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-700" />
               <span>{formError}</span>
             </div>
           )}
@@ -153,7 +154,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
               >
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name} ({w.projectName})
+                    {formatText(w.name)} ({w.projectName})
                   </option>
                 ))}
               </select>
@@ -177,7 +178,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="new-store-issue-modal-3" className="font-bold text-slate-700 block mb-1">محل دقیق مصرف در کارگاه (WBS) *</label>
+              <label htmlFor="new-store-issue-modal-3" className="font-bold text-slate-700 block mb-1">محل دقیق مصرف در کارگاه *</label>
               <input id="new-store-issue-modal-3"
                 type="text"
                 required
@@ -191,42 +192,42 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
 
           {/* Subcontractor Assignment & Contra */}
           <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200 space-y-3">
-            <h4 className="font-bold text-amber-950 flex items-center gap-1.5">
-              <User className="w-4 h-4 text-amber-600" />
+            <h4 className="font-bold text-amber-950 flex items-center gap-2">
+              <User className="w-4 h-4 text-amber-700" />
               تخصیص به پیمانکار جزء و تهاتر مصالح
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="new-store-issue-modal-4" className="text-[11px] text-slate-600 block mb-1">نام اکیپ پیمانکار جزء (اختیاری)</label>
+                <label htmlFor="new-store-issue-modal-4" className="text-xs text-slate-600 block mb-1">نام اکیپ پیمانکار جزء (اختیاری)</label>
                 <input id="new-store-issue-modal-4"
                   type="text"
                   value={subcontractorName}
                   onChange={(e) => setSubcontractorName(e.target.value)}
                   placeholder="مثلاً: اکیپ آرماتوربندی کریم صفری"
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
                 />
               </div>
 
               <div>
-                <label htmlFor="new-store-issue-modal-5" className="text-[11px] text-slate-600 block mb-1">رشته کاری پیمانکار</label>
+                <label htmlFor="new-store-issue-modal-5" className="text-xs text-slate-600 block mb-1">رشته کاری پیمانکار</label>
                 <input id="new-store-issue-modal-5"
                   type="text"
                   value={tradeType}
                   onChange={(e) => setTradeType(e.target.value)}
                   placeholder="آرماتوربندی، لوله‌کشی، جوشکاری..."
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
                 />
               </div>
 
               <div>
-                <label htmlFor="new-store-issue-modal-6" className="text-[11px] text-slate-600 block mb-1">نام سرپرست تحویل‌گیرنده</label>
+                <label htmlFor="new-store-issue-modal-6" className="text-xs text-slate-600 block mb-1">نام سرپرست تحویل‌گیرنده</label>
                 <input id="new-store-issue-modal-6"
                   type="text"
                   value={receivedByCrewLeaderName}
                   onChange={(e) => setReceivedByCrewLeaderName(e.target.value)}
                   placeholder="نام استادکار یا فورمن"
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
                 />
               </div>
             </div>
@@ -239,10 +240,10 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
                     type="checkbox"
                     checked={isSubcontractorContra}
                     onChange={(e) => setIsSubcontractorContra(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    className="w-4 h-4 rounded text-amber-700 focus:ring-amber-500 cursor-pointer"
                   />
-                  <span className="font-bold text-amber-950 text-xs">
-                    تهاتر و کسر مبلغ این مصالح از صورت‌وضعیت پیمانکار جزء (Contra Deductions)
+                  <span className="font-bold text-amber-950 text-sm">
+                    تهاتر و کسر مبلغ این مصالح از صورت‌وضعیت پیمانکار جزء
                   </span>
                 </label>
 
@@ -253,7 +254,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
                       value={subcontractorDeductionRef}
                       onChange={(e) => setSubcontractorDeductionRef(e.target.value)}
                       placeholder="عنوان ردیف کسورات در صورت‌وضعیت پیمانکار"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-[11px]"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm"
                     />
                   </div>
                 )}
@@ -268,68 +269,68 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
               <button
                 type="button"
                 onClick={addItemRow}
-                className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg hover:bg-amber-100 cursor-pointer"
+                className="btn btn-primary btn-sm"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>افزودن ردیف کالا</span>
               </button>
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-slate-100 text-slate-600 text-[11px]">
+            <div className="border border-slate-200 rounded-xl table-scroll">
+              <table className="w-full text-right text-sm">
+                <thead className="bg-slate-100 text-slate-600 text-sm">
                   <tr>
-                    <th className="p-2.5">عنوان مصالح</th>
-                    <th className="p-2.5">واحد</th>
-                    <th className="p-2.5">مقدار حواله</th>
-                    <th className="p-2.5">بهای تمام‌شده واحد ({moneyUnitLabel()})</th>
-                    <th className="p-2.5 text-left">هزینه کل مصرف</th>
-                    <th className="p-2.5 text-center">حذف</th>
+                    <th className="p-2">عنوان مصالح</th>
+                    <th className="p-2">واحد</th>
+                    <th className="p-2">مقدار حواله</th>
+                    <th className="p-2">بهای تمام‌شده واحد ({moneyUnitLabel()})</th>
+                    <th className="p-2 text-left">هزینه کل مصرف</th>
+                    <th className="p-2 text-center">حذف</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {items.map((item, idx) => (
                     <tr key={item.rowKey}>
-                      <td className="p-2.5">
+                      <td className="p-2">
                         <select
                           value={item.materialId}
                           onChange={(e) => handleMaterialChange(idx, e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
+                          className="w-full px-2 py-2 rounded-lg border border-slate-200 text-xs bg-white"
                         >
                           {materials.map((m) => (
                             <option key={m.id} value={m.id}>
-                              {m.name} (موجودی: {formatDecimal(m.currentStock)})
+                              {formatText(m.name)} (موجودی: {formatDecimal(m.currentStock)})
                             </option>
                           ))}
                         </select>
                       </td>
 
-                      <td className="p-2.5 font-medium text-slate-600">{item.unit}</td>
+                      <td className="p-2 font-medium text-slate-600">{formatText(item.unit)}</td>
 
-                      <td className="p-2.5">
+                      <td className="p-2">
                         <IntegerInput
                           aria-label={`مقدار ${item.materialName}`}
                           value={item.qty}
                           onValueChange={(v) => handleQuantityChange(idx, v)}
-                          className="w-24 px-2 py-1 rounded-lg border border-slate-200 font-mono text-center"
+                          className="w-24 px-2 py-1 rounded-lg border border-slate-200 tabular-nums text-center"
                         />
-                        <span className="block text-[10px] text-slate-400 mt-0.5">آزاد: {formatInt(item.freeQty)}</span>
+                        <span className="block text-xs text-slate-500 mt-1">آزاد: {formatInt(item.freeQty)}</span>
                       </td>
 
-                      <td className="p-2.5 font-mono text-slate-700">
+                      <td className="p-2 tabular-nums text-slate-700">
                         {formatMoney(item.unitCost, false)}
                       </td>
 
-                      <td className="p-2.5 text-left font-mono font-bold text-slate-900">
+                      <td className="p-2 text-left tabular-nums font-bold text-slate-900">
                         {formatMoney(item.totalCost, false)}
                       </td>
 
-                      <td className="p-2.5 text-center">
+                      <td className="p-2 text-center">
                         <button
                           type="button"
                           onClick={() => removeItemRow(idx)}
                           disabled={items.length <= 1}
-                          className="p-1 text-slate-400 hover:text-rose-600 disabled:opacity-30 cursor-pointer"
+                          className="p-1 text-slate-500 hover:text-rose-600 disabled:opacity-30 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -342,13 +343,13 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
           </div>
 
           {/* Total Cost Bar */}
-          <div className="p-3.5 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+          <div className="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between">
             <div>
-              <span className="font-bold text-xs block">مجموع بهای تمام‌شده مصالح مصرفی حواله:</span>
-              <span className="text-[10px] text-slate-400">سند اتوماتیک هزینه مستقیم پروژه (کد {toPersianDigits(MATERIALS_COST_ACCOUNT)})</span>
+              <span className="font-bold text-sm block">مجموع بهای تمام‌شده مصالح مصرفی حواله:</span>
+              <span className="text-xs text-slate-500">سند اتوماتیک هزینه مستقیم پروژه (کد {toPersianDigits(MATERIALS_COST_ACCOUNT)})</span>
             </div>
-            <span className="font-black text-amber-400 font-mono text-base">
-              {formatMoney(totalCost)}
+            <span className="font-bold text-amber-400 tabular-nums text-base">
+              <Money rial={totalCost} />
             </span>
           </div>
 
@@ -362,13 +363,13 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
               انصراف
             </button>
 
-            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
               <input type="checkbox" checked={reserveOnly} onChange={(e) => setReserveOnly(e.target.checked)} />
               فقط رزرو کالا (خروج پس از تأیید)
             </label>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
+              className="btn btn-primary"
             >
               <ArrowUpRight className="w-4 h-4" />
               <span>{reserveOnly ? 'ثبت درخواست و رزرو کالا' : 'تأیید حواله و ثبت خروج از انبار'}</span>

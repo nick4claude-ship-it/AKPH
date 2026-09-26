@@ -1,9 +1,10 @@
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Project } from '../../types';
-import { barWidth, formatMoney, formatPercent, moneyUnitLabel } from '../../utils/formatters';
+import { barWidth, formatMoney, formatPercent, moneyUnitLabel, formatText } from '../../utils/formatters';
 import { useSelector } from '../../store/AppStore';
 import { selectExpenseRows, selectRevenueRows } from '../../store/views/accounting';
+import { Money } from '../common/Money';
 
 interface RevenuesAndExpensesViewProps {
   type: 'revenues' | 'expenses';
@@ -24,53 +25,53 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
     const { totalContract, totalOther } = revenue;
     return (
       <div className="space-y-4 animate-in fade-in duration-150">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-900">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-sm text-emerald-900">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
             <span className="font-medium">
               درآمد از اسناد قطعی صورت‌وضعیت‌های تأییدشده کارفرما (گروه ۴ کدینگ) محاسبه می‌شود و از وصول نقدی جداست.
             </span>
           </div>
-          <span className="font-mono text-[11px] text-emerald-700 font-bold shrink-0">Revenue ≠ Receipt</span>
+          <span className="tabular-nums text-sm text-emerald-700 font-bold shrink-0">Revenue ≠ Receipt</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 tabular-nums">
           <div className="bg-white p-4 rounded-xl border border-slate-200">
-            <span className="text-[11px] font-sans text-slate-500 block mb-1">درآمد کارکرد پیمان (۴۱۱۰۱)</span>
-            <strong className="text-base text-slate-900">{formatMoney(totalContract)}</strong>
+            <span className="text-xs font-sans text-slate-500 block mb-1">درآمد کارکرد پیمان (۴۱۱۰۱)</span>
+            <strong className="text-base text-slate-900"><Money rial={totalContract} /></strong>
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200">
-            <span className="text-[11px] font-sans text-slate-500 block mb-1">سایر درآمدهای پروژه (تعدیل، متفرقه)</span>
-            <strong className="text-base text-blue-700">{formatMoney(totalOther)}</strong>
+            <span className="text-xs font-sans text-slate-500 block mb-1">سایر درآمدهای پروژه (تعدیل، متفرقه)</span>
+            <strong className="text-base text-blue-700"><Money rial={totalOther} /></strong>
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200">
-            <span className="text-[11px] font-sans text-slate-500 block mb-1">جمع درآمد شناسایی‌شده</span>
-            <strong className="text-base text-emerald-700">{formatMoney(totalContract + totalOther)}</strong>
+            <span className="text-xs font-sans text-slate-500 block mb-1">جمع درآمد شناسایی‌شده</span>
+            <strong className="text-base text-emerald-700"><Money rial={totalContract + totalOther} /></strong>
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-3.5 bg-slate-50 border-b border-slate-200">
-            <h4 className="text-xs font-bold text-slate-800">درآمد، وصولی و مانده مطالبات هر پروژه (از دفاتر):</h4>
+          <div className="p-3 bg-slate-50 border-b border-slate-200">
+            <h4 className="text-sm font-bold text-slate-800">درآمد، وصولی و مانده مطالبات هر پروژه (از دفاتر):</h4>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+          <div className="table-scroll">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
                   <th className="py-3 px-4">پروژه</th>
                   <th className="py-3 px-3">کارفرما</th>
-                  <th className="py-3 px-3 font-mono text-left">کارکرد پیمان ({unit})</th>
-                  <th className="py-3 px-3 font-mono text-left">سایر درآمد</th>
-                  <th className="py-3 px-3 font-mono text-left text-emerald-800">کل درآمد</th>
-                  <th className="py-3 px-3 font-mono text-left text-blue-800">وصول نقدی</th>
-                  <th className="py-3 px-4 font-mono text-left text-rose-800">مانده مطالبات</th>
+                  <th className="py-3 px-3 tabular-nums text-left">کارکرد پیمان ({unit})</th>
+                  <th className="py-3 px-3 tabular-nums text-left">سایر درآمد</th>
+                  <th className="py-3 px-3 tabular-nums text-left text-emerald-800">کل درآمد</th>
+                  <th className="py-3 px-3 tabular-nums text-left text-blue-800">وصول نقدی</th>
+                  <th className="py-3 px-4 tabular-nums text-left text-rose-800">مانده مطالبات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
+              <tbody className="divide-y divide-slate-100 tabular-nums">
                 {revenueRows.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-sans font-bold text-slate-900">{item.project}</td>
-                    <td className="py-3 px-3 font-sans text-slate-600">{item.client}</td>
+                    <td className="py-3 px-4 font-sans font-bold text-slate-900">{formatText(item.project)}</td>
+                    <td className="py-3 px-3 font-sans text-slate-600">{formatText(item.client)}</td>
                     <td className="py-3 px-3 text-left tabular-nums">{formatMoney(item.contractRevenue, false)}</td>
                     <td className="py-3 px-3 text-left tabular-nums text-slate-600">{formatMoney(item.otherRevenue, false)}</td>
                     <td className="py-3 px-3 text-left tabular-nums font-bold text-emerald-700">{formatMoney(item.totalRevenue, false)}</td>
@@ -81,7 +82,7 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
               </tbody>
             </table>
           </div>
-          {revenueRows.length === 0 && <p className="py-10 text-center text-xs text-slate-400">پروژه‌ای ثبت نشده است.</p>}
+          {revenueRows.length === 0 && <p className="py-10 text-center text-xs text-slate-500">پروژه‌ای ثبت نشده است.</p>}
         </div>
       </div>
     );
@@ -91,65 +92,65 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
 
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-amber-900">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between text-sm text-amber-900">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
           <span className="font-medium">هزینه‌های مستقیم پروژه (گروه ۵) و سربار دفتر مرکزی (گروه ۶) از مانده اسناد قطعی محاسبه می‌شوند.</span>
         </div>
         {onOpenNewDocForExpense && (
-          <button onClick={onOpenNewDocForExpense} className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs cursor-pointer shrink-0">
+          <button onClick={onOpenNewDocForExpense} className="btn btn-primary btn-sm shrink-0">
             ثبت سند هزینه
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 tabular-nums">
         <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <span className="text-[11px] font-sans text-slate-500 block mb-1">هزینه‌های مستقیم پروژه</span>
-          <strong className="text-base text-slate-900">{formatMoney(totalDirect)}</strong>
-          <span className="text-[10px] font-sans text-slate-400 block mt-1">{formatPercent(expenses.directShare)} از کل</span>
+          <span className="text-xs font-sans text-slate-500 block mb-1">هزینه‌های مستقیم پروژه</span>
+          <strong className="text-base text-slate-900"><Money rial={totalDirect} /></strong>
+          <span className="text-xs font-sans text-slate-500 block mt-1">{formatPercent(expenses.directShare)} از کل</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <span className="text-[11px] font-sans text-slate-500 block mb-1">سربار، عمومی و اداری</span>
-          <strong className="text-base text-slate-800">{formatMoney(totalOverhead)}</strong>
-          <span className="text-[10px] font-sans text-slate-400 block mt-1">{formatPercent(expenses.overheadShare)} از کل</span>
+          <span className="text-xs font-sans text-slate-500 block mb-1">سربار، عمومی و اداری</span>
+          <strong className="text-base text-slate-800"><Money rial={totalOverhead} /></strong>
+          <span className="text-xs font-sans text-slate-500 block mt-1">{formatPercent(expenses.overheadShare)} از کل</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <span className="text-[11px] font-sans text-slate-500 block mb-1">جمع هزینه‌های ثبت‌شده</span>
-          <strong className="text-base text-rose-700">{formatMoney(total)}</strong>
+          <span className="text-xs font-sans text-slate-500 block mb-1">جمع هزینه‌های ثبت‌شده</span>
+          <strong className="text-base text-rose-700"><Money rial={total} /></strong>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-3.5 bg-slate-50 border-b border-slate-200">
-          <h4 className="text-xs font-bold text-slate-800">مانده هر حساب هزینه و سهم آن:</h4>
+        <div className="p-3 bg-slate-50 border-b border-slate-200">
+          <h4 className="text-sm font-bold text-slate-800">مانده هر حساب هزینه و سهم آن:</h4>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+        <div className="table-scroll">
+          <table className="w-full text-right text-sm">
+            <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
               <tr>
-                <th className="py-2.5 px-4">حساب</th>
-                <th className="py-2.5 px-3">طبقه‌بندی</th>
-                <th className="py-2.5 px-3 font-mono text-left">مبلغ ({unit})</th>
-                <th className="py-2.5 px-3 font-mono text-left">سهم از کل</th>
-                <th className="py-2.5 px-4" aria-hidden="true"></th>
+                <th className="py-2 px-4">حساب</th>
+                <th className="py-2 px-3">طبقه‌بندی</th>
+                <th className="py-2 px-3 tabular-nums text-left">مبلغ ({unit})</th>
+                <th className="py-2 px-3 tabular-nums text-left">سهم از کل</th>
+                <th className="py-2 px-4" aria-hidden="true"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-mono">
+            <tbody className="divide-y divide-slate-100 tabular-nums">
               {expenseRows.map((row) => (
                 <tr key={row.code} className="hover:bg-slate-50">
-                  <td className="py-2.5 px-4 font-sans font-medium text-slate-900">
-                    <span className="font-mono text-[10px] text-slate-400 ml-1">{row.code}</span>
-                    {row.name}
+                  <td className="py-2 px-4 font-sans font-medium text-slate-900">
+                    <span className="tabular-nums text-xs text-slate-500 ml-1">{formatText(row.code)}</span>
+                    {formatText(row.name)}
                   </td>
-                  <td className="py-2.5 px-3 font-sans">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${row.direct ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                  <td className="py-2 px-3 font-sans">
+                    <span className={`text-xs font-medium px-2 py-1 rounded ${row.direct ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
                       {row.direct ? 'مستقیم پروژه' : 'سربار دفتر مرکزی'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 text-left tabular-nums font-bold text-slate-900">{formatMoney(row.amount, false)}</td>
-                  <td className="py-2.5 px-3 text-left tabular-nums text-slate-600">{formatPercent(row.share)}</td>
-                  <td className="py-2.5 px-4">
+                  <td className="py-2 px-3 text-left tabular-nums font-bold text-slate-900">{formatMoney(row.amount, false)}</td>
+                  <td className="py-2 px-3 text-left tabular-nums text-slate-600">{formatPercent(row.share)}</td>
+                  <td className="py-2 px-4">
                     <div className="w-32 bg-slate-100 h-1.5 rounded-full overflow-hidden">
                       <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: barWidth(row.share) }} />
                     </div>
@@ -159,7 +160,7 @@ export const RevenuesAndExpensesView: React.FC<RevenuesAndExpensesViewProps> = (
             </tbody>
           </table>
         </div>
-        {expenseRows.length === 0 && <p className="py-10 text-center text-xs text-slate-400">هنوز هزینه‌ای در دفاتر ثبت نشده است.</p>}
+        {expenseRows.length === 0 && <p className="py-10 text-center text-xs text-slate-500">هنوز هزینه‌ای در دفاتر ثبت نشده است.</p>}
       </div>
     </div>
   );

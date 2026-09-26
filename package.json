@@ -24,7 +24,8 @@
     "test:boundary": "node scripts/check-design-boundary.mjs",
     "test": "npm run test:save && npm run test:money && npm run test:numbering && npm run test:duties && npm run test:rules && npm run test:posting && npm run test:workflows && npm run test:api && npm run test:master && npm run test:chart && npm run test:boundary",
     "check:design": "node scripts/check-design.mjs",
-    "design:pack": "node scripts/design-pack.mjs"
+    "design:pack": "node scripts/design-pack.mjs",
+    "test:ui": "node scripts/ui-screens.mjs"
   },
   "dependencies": {
     "@fontsource-variable/vazirmatn": "^5.3.0",
@@ -41,6 +42,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "esbuild": "^0.28.2",
+    "playwright": "1.56.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   }

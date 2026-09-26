@@ -6,6 +6,8 @@ import { formatMoney, moneyUnitLabel, formatInt } from '../../utils/money';
 import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
 import { useCurrentUser } from '../../store/session';
 import { blankRequisitionLine, requisitionEstimate, type RequisitionFormInput, type RequisitionLineInput } from '../../store/views/procurement';
+import { Money } from '../common/Money';
+import { formatText } from '../../utils/formatters';
 
 interface NewRequisitionModalProps {
   isOpen: boolean;
@@ -67,7 +69,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
   };
 
   return (
-    <Dialog onClose={onClose} label="ثبت تقاضای خرید مصالح و تجهیزات (PR)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <Dialog onClose={onClose} label="ثبت تقاضای خرید مصالح و تجهیزات (PR)" overlayClassName="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
       
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
@@ -76,20 +78,20 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               <ShoppingCart className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">ثبت تقاضای خرید مصالح و تجهیزات (PR)</h3>
+              <h3 className="text-base font-bold text-slate-800">ثبت تقاضای خرید مصالح و تجهیزات</h3>
               <p className="text-xs text-slate-500">ارسال مستقیم از کارگاه به واحد تدارکات و دفتر فنی مرکزی</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-6 text-sm">
           {/* Project & Priority Meta */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -97,10 +99,10 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               <select id="new-requisition-modal-1"
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
               >
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                  <option key={p.id} value={p.id}>{formatText(p.name)} ({p.code})</option>
                 ))}
               </select>
             </div>
@@ -110,7 +112,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               <select id="new-requisition-modal-2"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as RequisitionPriority)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden font-bold"
               >
                 <option value="فوری کارگاهی (حیاتی)">🚨 فوری کارگاهی (حیاتی - توقف کارگاه)</option>
                 <option value="بالا">⚡ بالا (اولویت اول تدارکات)</option>
@@ -120,13 +122,13 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
             </div>
 
             <div>
-              <label htmlFor="new-requisition-modal-3" className="block font-bold text-slate-700 mb-1">کد ساختار شکست (WBS) / مرکز هزینه:</label>
+              <label htmlFor="new-requisition-modal-3" className="block font-bold text-slate-700 mb-1">کد ساختار شکست / مرکز هزینه:</label>
               <input id="new-requisition-modal-3"
                 type="text"
                 value={costCenter}
                 onChange={(e) => setCostCenter(e.target.value)}
                 placeholder="مثلاً سازه و بتن‌ریزی فاز ۲"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                 required
               />
             </div>
@@ -139,7 +141,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                 type="text"
                 value={currentUser.name}
                 readOnly
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
               />
             </div>
             <div>
@@ -148,7 +150,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                 type="text"
                 value={currentUser.role}
                 readOnly
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
               />
             </div>
           </div>
@@ -160,7 +162,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg font-bold hover:bg-indigo-100 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold hover:bg-indigo-100 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>افزودن ردیف کالا</span>
@@ -176,7 +178,7 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(item.id)}
-                        className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                        className="text-rose-700 hover:text-rose-700 p-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -185,22 +187,22 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div className="md:col-span-2">
-                      <label htmlFor="new-requisition-modal-6" className="block text-[11px] text-slate-600 mb-1">نام دقیق کالا / متریال:</label>
+                      <label htmlFor="new-requisition-modal-6" className="block text-xs text-slate-600 mb-1">نام دقیق کالا / متریال:</label>
                       <input id="new-requisition-modal-6"
                         type="text"
                         value={item.materialName}
                         onChange={(e) => handleUpdateItem(item.id, 'materialName', e.target.value)}
                         placeholder="مثلاً لوله مانیسمان رده ۴۰ سایز ۴ اینچ"
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-requisition-modal-7" className="block text-[11px] text-slate-600 mb-1">رسته کالا:</label>
+                      <label htmlFor="new-requisition-modal-7" className="block text-xs text-slate-600 mb-1">رسته کالا:</label>
                       <select id="new-requisition-modal-7"
                         value={item.category}
                         onChange={(e) => handleUpdateItem(item.id, 'category', e.target.value as ProcurementCategory)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       >
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>{c}</option>
@@ -211,55 +213,55 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
-                      <label htmlFor="new-requisition-modal-8" className="block text-[11px] text-slate-600 mb-1">مقدار درخواستی:</label>
+                      <label htmlFor="new-requisition-modal-8" className="block text-xs text-slate-600 mb-1">مقدار درخواستی:</label>
                       <IntegerInput id="new-requisition-modal-8"
                         value={item.requestedQty}
                         onValueChange={(v) => handleUpdateItem(item.id, 'requestedQty', v)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono font-bold focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums font-bold focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-requisition-modal-9" className="block text-[11px] text-slate-600 mb-1">واحد سنجش:</label>
+                      <label htmlFor="new-requisition-modal-9" className="block text-xs text-slate-600 mb-1">واحد سنجش:</label>
                       <input id="new-requisition-modal-9"
                         type="text"
                         value={item.unit}
                         onChange={(e) => handleUpdateItem(item.id, 'unit', e.target.value)}
                         placeholder="کیلوگرم، شاخه، متر"
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-requisition-modal-10" className="block text-[11px] text-slate-600 mb-1">برآورد نرخ فی ({moneyUnitLabel()}):</label>
+                      <label htmlFor="new-requisition-modal-10" className="block text-xs text-slate-600 mb-1">برآورد نرخ فی ({moneyUnitLabel()}):</label>
                       <MoneyInput id="new-requisition-modal-10"
                         value={item.estimatedUnitPrice}
                         onValueChange={(v) => handleUpdateItem(item.id, 'estimatedUnitPrice', v)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="new-requisition-modal-11" className="block text-[11px] text-slate-600 mb-1">تاریخ نیاز پای کار:</label>
+                      <label htmlFor="new-requisition-modal-11" className="block text-xs text-slate-600 mb-1">تاریخ نیاز پای کار:</label>
                       <input id="new-requisition-modal-11"
                         type="text"
                         value={item.requiredDeliveryDate}
                         onChange={(e) => handleUpdateItem(item.id, 'requiredDeliveryDate', e.target.value)}
                         placeholder="۱۴۰۳/۰۷/۱۵"
-                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="new-requisition-modal-12" className="block text-[11px] text-slate-600 mb-1">مشخصات فنی و استاندارد مورد نیاز:</label>
+                    <label htmlFor="new-requisition-modal-12" className="block text-xs text-slate-600 mb-1">مشخصات فنی و استاندارد مورد نیاز:</label>
                     <input id="new-requisition-modal-12"
                       type="text"
                       value={item.specification}
                       onChange={(e) => handleUpdateItem(item.id, 'specification', e.target.value)}
                       placeholder="برند، آلیاژ، رده ضخامت، تاییدیه مهندس ناظر"
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
                 </div>
@@ -275,12 +277,12 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
               value={justification}
               onChange={(e) => setJustification(e.target.value)}
               placeholder="توضیح دهید چرا این اقلام در این مقطع زمانی ضروری است و پیامد عدم خرید آن چیست..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
             />
           </div>
 
           {formError && (
-            <p className="text-xs text-rose-700 font-bold" role="alert">
+            <p className="text-sm text-rose-700 font-bold" role="alert">
               {formError}
             </p>
           )}
@@ -288,8 +290,8 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
           {/* Total Bar */}
           <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
             <span className="font-bold text-indigo-900">مجموع برآورد تقریبی تقاضای خرید:</span>
-            <span className="font-black text-indigo-800 text-sm font-mono">
-              {formatMoney(totalAmount)}
+            <span className="font-bold text-indigo-800 text-sm tabular-nums">
+              <Money rial={totalAmount} />
             </span>
           </div>
 
@@ -298,13 +300,13 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+              className="btn btn-secondary"
             >
               انصراف
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-sm cursor-pointer"
+              className="btn btn-primary"
             >
               <Check className="w-4 h-4" />
               <span>ثبت و ارسال به واحد تدارکات</span>

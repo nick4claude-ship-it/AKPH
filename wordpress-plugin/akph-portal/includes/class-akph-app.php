@@ -173,7 +173,7 @@ final class Akph_App {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title><?php echo esc_html(get_bloginfo('name') . ' — پرتال'); ?></title>
+    <title>سامانه پاک: پورتال آریا کاوش</title>
     <?php if ($assets) : ?>
         <?php foreach ($assets['css'] as $css) : ?>
             <link rel="stylesheet" href="<?php echo esc_url($base . $css); ?>">
