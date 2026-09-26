@@ -27,6 +27,8 @@ import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { useCurrentUser } from '../../store/session';
 import { toPersianDate } from '../../utils/date';
+import { usePagination } from '../../store/pagination';
+import { TablePager } from '../common/TablePager';
 import { Dialog } from '../../ui/Dialog';
 import { formatInt, formatText } from '../../utils/formatters';
 
@@ -149,6 +151,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
     }
     return true;
   });
+  const docsPage = usePagination(filteredDocs, filteredDocs.length);
 
   const handleUploadDoc = (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +277,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDocs.map((doc) => (
+              {docsPage.rows.map((doc) => (
                 <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-3">
                     <strong className="block text-slate-900 font-medium leading-snug">{formatText(doc.title)}</strong>
@@ -335,6 +338,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
             </tbody>
           </table>
         </div>
+        <TablePager pager={docsPage} label="صفحه‌بندی اسناد" />
       </div>
 
       {/* Modal: Document Preview */}

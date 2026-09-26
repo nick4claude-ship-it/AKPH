@@ -24,8 +24,10 @@ final class Akph_Command {
     /**
      * @param callable $handler function (array $body, WP_REST_Request $request): array
      *        returns ['message' => string, 'records' => [...], 'id' => ?, 'doc_number' => ?, 'status' => ?int]
+     * @param array $options 'secret' => body keys (passwords) that enter the stored request hash only as an
+     *        HMAC with the site's salt; 'fingerprint' => extra request content for the hash (an uploaded file).
      */
-    public static function run(WP_REST_Request $request, callable $handler) {
+    public static function run(WP_REST_Request $request, callable $handler, array $options = array()) {
         global $wpdb;
         $user_id = get_current_user_id();
         $key = $request->get_header('Idempotency-Key');
@@ -44,7 +46,15 @@ final class Akph_Command {
             return new WP_Error('akph_invalid_json', 'بدنه درخواست باید یک شیء JSON باشد.', array('status' => 400));
         }
         $route = substr($request->get_method() . ' ' . $request->get_route(), 0, 191);
-        $hash = hash('sha256', $route . "\n" . wp_json_encode(self::canonical($body)));
+        $hashed = self::canonical($body);
+        foreach (isset($options['secret']) ? (array) $options['secret'] : array() as $field) {
+            if (array_key_exists($field, $hashed)) {
+                $value = is_string($hashed[$field]) ? $hashed[$field] : wp_json_encode($hashed[$field]);
+                $hashed[$field] = hash_hmac('sha256', $value, wp_salt('auth'));
+            }
+        }
+        $fingerprint = isset($options['fingerprint']) ? "\n" . (string) $options['fingerprint'] : '';
+        $hash = hash('sha256', $route . "\n" . wp_json_encode($hashed) . $fingerprint);
 
         $keys = Akph_Schema::table('idempotency_keys');
         $suppress = $wpdb->suppress_errors(true);

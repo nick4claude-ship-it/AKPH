@@ -3,10 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useCallback, useContext } from 'react';
+import React, { createContext, useCallback, useContext, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CompanyProfile, UserProfile } from '../types';
 import type { PortalSession } from '../api/types';
+import { DEFAULT_PREFERENCES, type AccountApi, type AccountPreferences } from '../api/account';
+import type { CurrencyUnit } from '../utils/money';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
+import { matchNav } from '../navigation/navConfig';
+
+/** A change of the signed-in user's own data, applied to the running app without reloading it. */
+export interface SessionPatch {
+  user?: Partial<Pick<UserProfile, 'name' | 'avatar'>>;
+  preferences?: AccountPreferences;
+  /** New display unit (the screens are drawn again with it). */
+  currency?: CurrencyUnit;
+}
 
 interface SessionValue {
   session: PortalSession;
@@ -20,6 +32,9 @@ interface SessionValue {
   writablePaths?: readonly string[];
   /** Users who may be assigned as project manager. */
   listManagers?: () => Promise<{ id: string; name: string }[]>;
+  /** «حساب کاربری من» API of the data source. */
+  account?: AccountApi;
+  updateSession?: (patch: SessionPatch) => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -90,4 +105,38 @@ export function usePermission(): {
     can: useCallback((action: UserAction, context?: ActionContext) => can(user, action, context), [user]),
     check: useCallback((action: UserAction, context?: ActionContext) => checkPermission(user, action, context), [user]),
   };
+}
+
+/** The user's own settings (defaults until they choose). */
+export function usePreferences(): AccountPreferences {
+  return useSession().session.preferences ?? DEFAULT_PREFERENCES;
+}
+
+/** Whether the signed-in user may open an app path (its menu node's permission). */
+export function useCanOpenPath(): (path: string) => boolean {
+  const user = useCurrentUser();
+  return useCallback(
+    (path: string) => {
+      const node = matchNav(path);
+      return !!node && (!node.requires || can(user, node.requires));
+    },
+    [user]
+  );
+}
+
+let startPageApplied = false;
+
+/** Opens the user's start page once, right after sign-in, when the app starts on the dashboard. */
+export function useApplyStartPage(): void {
+  const target = usePreferences().startPage;
+  const canOpen = useCanOpenPath();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (startPageApplied) return;
+    startPageApplied = true;
+    if (target !== '/' && pathname === '/' && canOpen(target)) navigate(target, { replace: true });
+    // Only the first render of the session counts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

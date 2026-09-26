@@ -9,6 +9,7 @@ import { emptyState } from '../../store/state';
 import { buildManualEntry, type ManualEntryFormInput } from '../../store/views/accounting';
 import type { AccountFormInput, CostCenterFormInput, CounterpartyFormInput, ProjectFormInput } from '../../store/views/masterData';
 import { apiClient, ApiError } from '../client';
+import { createAkphAccountApi } from './account';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
   arr,
@@ -39,7 +40,7 @@ import {
  */
 
 /** Sections whose writes the server executes; the others show the read-only notice. */
-const WRITABLE_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications'];
+const WRITABLE_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications', '/account'];
 
 const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
   try {
@@ -214,13 +215,14 @@ export function createAkphDataSource(): DataSource {
 
   return {
     kind: 'akph',
-    label: 'دفاتر رسمی (سرور akph/v1)',
+    label: 'دفاتر رسمی',
     commands,
     writablePaths: WRITABLE_PATHS,
+    account: createAkphAccountApi(),
 
     async loadSession(): Promise<PortalSession> {
       const me = parseMe(await apiClient.get<unknown>('me'));
-      return { user: me.user, currency: me.currency, fiscalYear: me.fiscalYear, company: siteCompany(), closedFiscalYears: me.closedFiscalYears };
+      return { user: me.user, currency: me.currency, fiscalYear: me.fiscalYear, company: siteCompany(), closedFiscalYears: me.closedFiscalYears, preferences: me.preferences };
     },
 
     async loadState(session: PortalSession): Promise<AppState> {

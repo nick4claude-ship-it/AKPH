@@ -14,7 +14,7 @@ import { DocumentViewerModal } from '../common/DocumentViewerModal';
 import { LoginModal } from '../auth/LoginModal';
 import { AiAgentWidget } from '../dashboard/AiAgentWidget';
 import { useAppState } from '../../store/AppStore';
-import { useCompany, useCurrentUser, useDemoBanner, usePermission, useReadOnlyNotice, useSession } from '../../store/session';
+import { useApplyStartPage, useCompany, useCurrentUser, useDemoBanner, usePermission, useReadOnlyNotice, useSession } from '../../store/session';
 import { useToastListener } from '../../store/toast';
 import { useApprovalActions } from '../../store/useApprovalActions';
 import { selectProjects, selectKpiItems } from '../../store/selectors';
@@ -49,6 +49,7 @@ const ApprovalCenterModule = named(() => import('../approvals/ApprovalCenterModu
 const NotificationCenterPage = named(() => import('../../pages/NotificationCenterPage'), 'NotificationCenterPage');
 const ReportsBIModule = named(() => import('../reports/ReportsBIModule'), 'ReportsBIModule');
 const SettingsPage = named(() => import('../../pages/SettingsPage'), 'SettingsPage');
+const AccountPage = lazy(() => import('../../pages/AccountPage'));
 
 const LoadingView = () => <PageSkeleton label="در حال بارگذاری صفحه…" />;
 
@@ -97,6 +98,7 @@ export default function AppShell() {
   const location = useLocation();
   const readOnlyNotice = useReadOnlyNotice(location.pathname);
   const navigate = useNavigate();
+  useApplyStartPage();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('current_year');
@@ -161,6 +163,7 @@ export default function AppShell() {
         user={user}
         onOpenLogout={switchUser ? () => setIsLoginOpen(true) : undefined}
         onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
+        onOpenAccount={() => navigate('/account')}
         counts={sidebarCounts}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}
@@ -190,6 +193,7 @@ export default function AppShell() {
           alerts={notifications}
           onOpenAlertsModal={() => navigate('/notifications')}
           onSwitchUser={switchUser ? () => setIsLoginOpen(true) : undefined}
+          onOpenAccount={() => navigate('/account')}
           demo={isDemoData}
         />
 
@@ -213,7 +217,7 @@ export default function AppShell() {
           )}
           <ErrorBoundary resetKey={location.pathname}>
           <Suspense fallback={<LoadingView />}>
-              <Routes>
+              <Routes key={session.currency}>
                 <Route
                   path="/"
                   element={
@@ -260,6 +264,7 @@ export default function AppShell() {
                 <Route path="/reports" element={<ReportsBIModule projects={projects} />} />
                 <Route path="/ai" element={<AiAgentWidget isOpen={true} isFloating={false} />} />
                 <Route path="/settings" element={guarded('settings.manage', <SettingsPage onToast={showToast} />)} />
+                <Route path="/account" element={<AccountPage onToast={showToast} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
           </Suspense>

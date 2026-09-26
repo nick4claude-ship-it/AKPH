@@ -91,7 +91,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: mysqli, mbstring, intl
+          extensions: mysqli, mbstring, intl, gd, sodium
           coverage: none
           tools: composer
       - name: Install PHPUnit

@@ -27,6 +27,8 @@ import {
 } from '../../types';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { toPersianDate } from '../../utils/date';
+import { usePagination } from '../../store/pagination';
+import { TablePager } from '../common/TablePager';
 import { useCurrentUser, usePermission } from '../../store/session';
 import type { WorkflowResult } from '../../store/workflowKit';
 import {
@@ -118,6 +120,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
     const matchesProject = projectFilter === 'all' || entry.projectId === projectFilter;
     return matchesSearch && matchesStatus && matchesProject;
   });
+  const entriesPage = usePagination(filteredEntries, filteredEntries.length);
 
   const newDocForm: ManualEntryFormInput = {
     date: newDocDate,
@@ -285,7 +288,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredEntries.map((entry) => (
+              {entriesPage.rows.map((entry) => (
                 <tr key={entry.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-4 tabular-nums font-bold text-slate-900">{formatText(entry.docNumber)}</td>
                   <td className="py-3 px-3 text-slate-600 tabular-nums text-sm">{formatText(entry.date)}</td>
@@ -319,6 +322,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
             </tbody>
           </table>
         </div>
+        <TablePager pager={entriesPage} label="صفحه‌بندی اسناد حسابداری" />
         {filteredEntries.length === 0 && <div className="py-12 text-center text-slate-500 text-xs">سند حسابداری با مشخصات جستجوشده یافت نشد.</div>}
       </div>
 

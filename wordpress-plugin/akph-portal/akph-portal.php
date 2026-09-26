@@ -35,6 +35,7 @@ require_once AKPH_PORTAL_DIR . 'includes/class-akph-master-data.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-accounts.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-ledger.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-reports.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-account.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-rest.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-migration.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-admin.php';
@@ -58,6 +59,7 @@ final class Akph_Plugin {
         if (!wp_next_scheduled('akph_portal_daily')) {
             wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'akph_portal_daily');
         }
+        Akph_Account::boot();
         Akph_Admin::boot();
         Akph_App::boot();
     }

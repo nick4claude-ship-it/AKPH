@@ -35,6 +35,8 @@ import { useWorkflows } from '../../store/useWorkflows';
 import { usePermission } from '../../store/session';
 import { selectPaymentSchedule } from '../../store/domainSelectors';
 import { toPersianDate } from '../../utils/date';
+import { usePagination } from '../../store/pagination';
+import { TablePager } from '../common/TablePager';
 import { MoneyInput } from '../../ui/NumberInput';
 import { TreasuryReceiptsTab } from './TreasuryReceiptsTab';
 import { PaymentScheduleTab } from './PaymentScheduleTab';
@@ -170,6 +172,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
     }
     return true;
   });
+  const requestsPage = usePagination(filteredRequests, filteredRequests.length);
 
   return (
     <div className="space-y-6">
@@ -422,7 +425,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredRequests.map((req) => {
+                  {requestsPage.rows.map((req) => {
                     const isFullyPaid = req.status === 'پرداخت شده';
                     return (
                       <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
@@ -519,6 +522,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 </tbody>
               </table>
             </div>
+            <TablePager pager={requestsPage} label="صفحه‌بندی درخواست‌های پرداخت" />
           </div>
         </div>
       )}

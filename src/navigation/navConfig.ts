@@ -28,6 +28,7 @@ import {
   Truck,
   FileSignature,
   Bell,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserAction } from '../utils/permissions';
@@ -87,6 +88,7 @@ export const navConfig: NavNode[] = [
   { id: 'reports', label: 'گزارش‌ها', icon: BarChart3, path: '/reports' },
   { id: 'ai', label: 'دستیار مدیریت', icon: Sparkles, path: '/ai' },
   { id: 'settings', label: 'تنظیمات', icon: Settings, path: '/settings', requires: 'settings.manage' },
+  { id: 'account', label: 'حساب کاربری من', icon: UserRound, path: '/account', hidden: true },
 ];
 
 export const navById = (id: string) => navConfig.find((n) => n.id === id);

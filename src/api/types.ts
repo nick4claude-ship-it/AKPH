@@ -6,6 +6,7 @@
 import type { CompanyProfile, JournalEntry, UserProfile } from '../types';
 import type { AppState, SliceKey } from '../store/types';
 import type { CurrencyUnit } from '../utils/money';
+import type { AccountApi, AccountPreferences } from './account';
 
 /** Who is signed in and the ledger conventions of this installation. */
 export interface PortalSession {
@@ -17,6 +18,8 @@ export interface PortalSession {
   company: CompanyProfile;
   /** Jalali fiscal years closed on the server (akph/v1 GET /me). */
   closedFiscalYears?: number[];
+  /** The user's own settings («حساب کاربری من»): rows per table page, start page, currency choice. */
+  preferences?: AccountPreferences;
 }
 
 /** Records changed in one slice since the last save (demo data source only). */
@@ -74,6 +77,8 @@ export interface DataSource {
   writablePaths?: readonly string[];
   /** Users who may be assigned as project manager. */
   listManagers?(): Promise<{ id: string; name: string }[]>;
+  /** «حساب کاربری من»: the signed-in user's own account. */
+  account?: AccountApi;
   /** DEV only: users the role switcher can sign in as. */
   devUsers?(): UserProfile[];
 }

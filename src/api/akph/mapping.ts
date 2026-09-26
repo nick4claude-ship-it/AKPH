@@ -29,6 +29,8 @@ import type {
 import { PORTAL_ROLES } from '../../utils/permissions';
 import { isoToJalali, jalaliToIso } from '../../utils/jalali';
 import { ApiError } from '../client';
+import type { AccountPreferences } from '../account';
+import { parsePreferences } from './account';
 
 export class ShapeError extends ApiError {
   constructor(route: string, field: string, detail: string) {
@@ -96,6 +98,7 @@ export interface Me {
   currency: 'rial' | 'toman';
   fiscalYear: number;
   closedFiscalYears: number[];
+  preferences: AccountPreferences;
 }
 
 export function parseMe(raw: unknown): Me {
@@ -115,12 +118,13 @@ export function parseMe(raw: unknown): Me {
       name: str(route, o, 'display_name', true) || 'کاربر',
       role: role as UserProfile['role'],
       email: '',
-      avatar: '',
+      avatar: typeof o.avatar_url === 'string' ? o.avatar_url : '',
       projectIds: viewAll ? undefined : projectIds,
     },
     currency,
     fiscalYear: int(route, o, 'fiscal_year'),
     closedFiscalYears: arr(route, o, 'closed_fiscal_years').map((y) => Number(y)).filter((y) => Number.isInteger(y)),
+    preferences: parsePreferences(o.preferences),
   };
 }
 

@@ -13,10 +13,10 @@ import '@fontsource-variable/vazirmatn';
 import './index.css';
 import { createDataSource, DataSource, PortalSession } from './api';
 import { AppStoreProvider } from './store/AppStore';
-import { SessionProvider } from './store/session';
+import { SessionProvider, type SessionPatch } from './store/session';
 import { emitToast } from './store/toast';
 import type { AppState } from './store/types';
-import { initCurrencyUnit } from './utils/money';
+import { changeCurrencyUnit, initCurrencyUnit } from './utils/money';
 
 type Boot =
   | { status: 'loading' }
@@ -49,6 +49,24 @@ function Root() {
     load();
   }, [load]);
 
+  /** The user's own saved name, avatar or preferences, applied without reloading the data. */
+  const updateSession = useCallback((patch: SessionPatch) => {
+    if (patch.currency) changeCurrencyUnit(patch.currency);
+    setBoot((b) =>
+      b.status === 'ready'
+        ? {
+            ...b,
+            session: {
+              ...b.session,
+              user: { ...b.session.user, ...patch.user },
+              preferences: patch.preferences ?? b.session.preferences,
+              currency: patch.currency ?? b.session.currency,
+            },
+          }
+        : b
+    );
+  }, []);
+
   if (boot.status === 'loading') return <BootLoading />;
 
   if (boot.status === 'error') {
@@ -74,6 +92,8 @@ function Root() {
         isDemoData={boot.source.kind === 'mock'}
         writablePaths={boot.source.writablePaths}
         listManagers={boot.source.listManagers}
+        account={boot.source.account}
+        updateSession={updateSession}
         devUsers={devUsers}
         switchUser={devUsers ? (userId) => load(userId, { source: boot.source, epoch: boot.epoch }) : undefined}
       >
