@@ -10,8 +10,8 @@ import { normalizeMobile, passwordError, PASSWORD_MIN_LENGTH, AVATAR_MAX_BYTES }
 
 /**
  * Account of the demo: kept in this browser tab only (nothing reaches a server). There is no real password,
- * so the current password is only required, not checked. Addresses use example.com and 192.0.2.x (reserved
- * for documentation).
+ * so the current password is only required, not checked. The sample sessions use 192.0.2.x (reserved for
+ * documentation); the email is the demo user's own (none in the plugin build).
  */
 export function createMockAccountApi(user: () => UserProfile): AccountApi {
   const accounts = new Map<string, Account>();
@@ -28,7 +28,7 @@ export function createMockAccountApi(user: () => UserProfile): AccountApi {
         displayName: u.name,
         firstName: '',
         lastName: '',
-        email: u.email || 'demo@example.com',
+        email: u.email,
         mobile: '',
         role: u.role,
         avatarUrl: null,
