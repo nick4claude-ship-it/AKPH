@@ -38,7 +38,7 @@
 }
 ```
 
-کلیدهای `records`: `projects`، `cost_centers`، `counterparties`، `accounts`، `journal_entries`.
+کلیدهای `records`: `projects`، `cost_centers`، `counterparties`، `accounts`، `journal_entries`، `account` (حساب کاربری خود کاربر)، `assistant_settings`.
 
 ### خطا
 
@@ -49,23 +49,31 @@
 | وضعیت | کدها | معنا |
 |---|---|---|
 | 400 | `akph_invalid`، `akph_invalid_json`، `akph_idempotency_key_required`، `akph_invalid_date` | ورودی نامعتبر (فیلد در `data.field`) |
+| 400 | `akph_unknown_field`، `akph_forbidden_field` | مسیرهای حساب و دستیار: فیلد ناشناخته؛ `role`، `capabilities`، `user_login`، `user_id` و مانند آن (در بدنه یا رشته پرسش) |
 | 401 | `akph_unauthorized` | وارد نشده (مهمان) |
 | 403 | `akph_invalid_nonce` | `X-WP-Nonce` نیست یا نامعتبر است |
 | 403 | `akph_no_portal_role` | کاربر هیچ‌یک از چهار نقش پرتال را ندارد |
 | 403 | `akph_role_forbidden` | نقش، قابلیت این مسیر را ندارد |
 | 403 | `akph_forbidden`، `akph_field_forbidden` | دامنه پروژه یا گروه فیلد (`data.fields`) |
 | 403 | `akph_segregation_of_duties` | ثبت‌کننده نمی‌تواند سند خودش را تأیید یا رد کند (مقایسه با شناسه کاربر) |
+| 403 | `akph_wrong_password` | رمز عبور فعلی نادرست (تغییر ایمیل یا رمز) |
 | 404 | `akph_not_found`، `rest_no_route` | رکورد نیست یا در دامنه کاربر نیست |
 | 409 | `akph_conflict`، `akph_in_progress` | نسخه کهنه، مرحله نادرست (مثلاً سند قطعی)، کد تکراری، درخواست هم‌زمان با همان کلید |
 | 409 | `akph_retry` (`data.retryable: true`) | بن‌بست یا پایان مهلت قفل هنگام کار هم‌زمان دو کاربر؛ هیچ تغییری ذخیره نشده؛ همان فرمان با همان کلید دوباره |
 | 422 | `akph_rule`، `akph_idempotency_mismatch` | نقض قاعده حسابداری (نامتوازن، حساب گروهی، سال بسته، ترتیب تاریخ)؛ کلید تکراری با بدنه دیگر |
+| 413 | `akph_file_too_large` | تصویر پروفایل بیش از ۲ مگابایت |
+| 415 | `akph_file_type` | تصویر پروفایل JPG، PNG یا WebP واقعی نیست |
 | 428 | `akph_version_required` | نسخه رکورد فرستاده نشده |
+| 429 | `akph_too_many_attempts` (`data.retry_after`) | ۵ بار رمز نادرست در ۱۵ دقیقه؛ تغییر ایمیل و رمز تا پایان بازه بسته است |
+| 429 | `akph_daily_limit` | سقف روزانه پرسش از دستیار برای این کاربر پر شده |
 | 500 | `akph_db_error`، `akph_server_error` | خطای پایگاه‌داده یا سرور؛ هیچ تغییری ذخیره نشده. متن خطای پایگاه‌داده، شماره خطا و کوئری فقط در `error_log` سرور نوشته می‌شود و هرگز در پاسخ REST نیست. |
+| 502 | `akph_assistant_unreachable`، `akph_assistant_auth`، `akph_assistant_busy`، `akph_assistant_request`، `akph_assistant_unavailable` | سرویس هوش مصنوعی در دسترس نبود یا درخواست را نپذیرفت؛ پیام فارسی عمومی، بدون متن پاسخ سرویس |
 | 503 | `akph_not_ready` | جدول‌ها روی InnoDB آماده نیست یا PHP ۶۴ بیتی نیست |
+| 503 | `akph_assistant_disabled` | «دستیار هوشمند هنوز توسط مدیر سیستم فعال نشده است.» |
 
 ## ۳. مسیرها و دسترسی
 
-✓ = مجاز. مدیر سیستم و مدیر ارشد همه‌جا مجازند (با تفکیک وظایف).
+✓ = مجاز. مدیر سیستم و مدیر ارشد همه‌جا مجازند (با تفکیک وظایف)، جز تنظیمات دستیار که فقط مدیر سیستم دارد.
 
 | مسیر | قابلیت | حسابدار | مدیر پروژه |
 |---|---|---|---|
@@ -86,6 +94,9 @@
 | `POST /journal-entries/{id}/reverse` | `akph_journal_reverse` | ✓ | — |
 | `GET /reports/trial-balance`، `GET /reports/ledger` | `akph_reports` | ✓ | ✓ فقط ردیف‌های پروژه‌های خودش (`partial: true`) |
 | `GET /audit` | `akph_audit_read` | ✓ | — |
+| `GET /account`، `POST /account/profile`، `/email`، `/password`، `POST|DELETE /account/avatar`، `GET /account/sessions`، `POST /account/sessions/logout-others` | `akph_access` | ✓ فقط حساب خودش | ✓ فقط حساب خودش |
+| `GET /assistant/status`، `POST /assistant/ask` | `akph_assistant_use` | ✓ | ✓ داده پروژه‌های خودش |
+| `GET|POST /assistant/settings`، `POST /assistant/test` | `akph_ai_manage` (فقط مدیر سیستم) | — | — |
 | `GET /` (فهرست فضای نام) | `akph_access` | ✓ | ✓ |
 
 ## ۴. جزئیات مسیرها
@@ -95,14 +106,18 @@
 ```json
 {
   "id": "7", "display_name": "حسابدار", "role": "حسابدار", "role_slug": "paydar_accountant",
-  "view_all": true, "project_ids": [], "currency": "toman", "fiscal_year": 1405,
-  "closed_fiscal_years": [], "today": "2026-09-25",
-  "caps": { "akph_access": true, "akph_journal_approve": true, "…": false }, "server_version": "0.3.0"
+  "avatar_url": null, "view_all": true, "project_ids": [],
+  "currency": "toman", "site_currency": "toman",
+  "preferences": { "currency": "site", "rows_per_page": 25, "start_page": "/" },
+  "fiscal_year": 1405, "closed_fiscal_years": [], "today": "2026-09-25",
+  "caps": { "akph_access": true, "akph_assistant_use": true, "…": false }, "server_version": "0.4.0"
 }
 ```
 
 برای مدیر پروژه `view_all: false` و `project_ids` فهرست شناسه پروژه‌هایی است که `manager_user_id` آن‌ها کاربر است.
-`currency` واحد نمایش است (تنظیمات افزونه)؛ مبالغ همیشه ریال‌اند.
+`currency` واحد نمایش همین کاربر است (ترجیح شخصی در «حساب کاربری من»، وگرنه `site_currency` از تنظیمات افزونه)؛ مبالغ
+همیشه ریال‌اند. `avatar_url` تصویر پروفایل بارگذاری‌شده یا `null` (اپ حروف اول نام را نشان می‌دهد؛ سرویس آواتار بیرونی
+به کار نمی‌رود).
 
 ### پروژه‌ها
 
@@ -262,6 +277,63 @@
 `GET /audit&object_type=entry&object_id=12&page=1` ← `{ "events": [{ "id", "user_id", "user_name", "user_role", "action", "object_type", "object_id", "object_ref", "before", "after", "created_at" }], "page", "total" }`.
 هر فرمان موفق ممیزی با **شناسه کاربر**، رکورد قبل و بعد و `Idempotency-Key` ثبت می‌کند (داخل همان تراکنش).
 
+### حساب کاربری من
+
+همه مسیرها فقط روی **کاربر جاری** کار می‌کنند و هیچ‌کدام شناسه کاربر نمی‌گیرند. `role`، `roles`، `capabilities`، `caps`،
+`user_login`، `user_id`، `id`، `user_pass` و فیلدهای مشابه در بدنه یا رشته پرسش ← `400 akph_forbidden_field`؛ هر فیلد
+ناشناخته دیگر ← `400 akph_unknown_field`. هر تغییر با شناسه کاربر در ممیزی (`object_type: "user"`) ثبت می‌شود؛ رمز عبور
+هرگز (در ممیزی، کلید idempotency فقط HMAC آن با کلید سایت می‌ماند).
+
+`GET /account` ← `{ "account": Account }`:
+
+```json
+{ "id": "7", "user_login": "acc1", "display_name": "حسابدار", "first_name": "", "last_name": "", "email": "…",
+  "mobile": "09121234567", "role": "حسابدار", "role_slug": "paydar_accountant", "avatar_url": null,
+  "preferences": { "currency": "site", "rows_per_page": 25, "start_page": "/" }, "site_currency": "toman",
+  "registered_at": "2025-01-01T08:00:00Z", "version": 3, "password_min_length": 12, "avatar_max_bytes": 2097152 }
+```
+
+| مسیر | بدنه | قاعده |
+|---|---|---|
+| `POST /account/profile` | `display_name`، `first_name`، `last_name`، `mobile`، `preferences`، `version` | فرمان (Idempotency-Key) با نسخه حساب؛ فقط فیلدهای فرستاده‌شده تغییر می‌کنند. موبایل: ارقام فارسی و فاصله و پیشوند `+98`/`0098`/`98` پذیرفته و به `09XXXXXXXXX` تبدیل می‌شود؛ `""` پاک می‌کند. `preferences`: `currency` (`site`، `toman`، `rial`)، `rows_per_page` (۱۰، ۲۵، ۵۰، ۱۰۰)، `start_page` (از فهرست صفحه‌های اپ) |
+| `POST /account/email` | `email`، `current_password` | رمز فعلی با `wp_check_password`؛ نشانی آزاد (ایمیل حساب دیگر ← `409`)؛ اول رمز بررسی می‌شود |
+| `POST /account/password` | `current_password`، `new_password` | دست‌کم ۱۲ نویسه و متفاوت با رمز فعلی؛ `wp_set_password`، همه نشست‌های دیگر با `WP_Session_Tokens::destroy_others` بسته و کوکی همین نشست دوباره صادر می‌شود |
+| `POST /account/avatar` | multipart، فایل `avatar` | JPG/PNG/WebP تا ۲ مگابایت، بررسی با `wp_check_filetype_and_ext` و `getimagesize`؛ `WP_Image_Editor` مربع وسط را به ۲۵۶×۲۵۶ برش می‌دهد و در کتابخانه رسانه با مالکیت همان کاربر ذخیره می‌کند؛ تصویر قبلی حذف می‌شود؛ `get_avatar` با `pre_get_avatar_data` همین تصویر را نشان می‌دهد |
+| `DELETE /account/avatar` | — | تصویر بارگذاری‌شده و پیوست آن حذف می‌شود |
+| `GET /account/sessions` | — | `{ "sessions": [{ "current", "login_at", "expires_at", "ip", "device" }] }` (`device` مثل «Chrome روی Windows»؛ رشته خام مرورگر برنمی‌گردد) |
+| `POST /account/sessions/logout-others` | `{}` | همه نشست‌ها جز نشست جاری بسته می‌شوند |
+
+تغییر ایمیل و رمز پس از **۵ رمز نادرست در ۱۵ دقیقه** تا پایان بازه ← `429 akph_too_many_attempts` (حتی با رمز درست).
+
+### دستیار مدیریت
+
+کلید API هرگز به مرورگر نمی‌رود و مدل فقط داده‌ای را می‌بیند که همان کاربر اجازه دیدنش را دارد.
+
+- `GET /assistant/status` ← `{ "enabled", "can_manage", "daily_limit", "used_today", "remaining", "question_max" }`.
+- `POST /assistant/ask` با `{ "question": "…", "conversation_id": "…" }` (پرسش تا ۱۰۰۰ نویسه؛ `conversation_id` اختیاری) ←
+  `{ "answer", "conversation_id", "truncated", "daily_limit", "used_today", "remaining" }`. این مسیر فرمان ذخیره‌شونده نیست
+  (پاسخ با Idempotency-Key نگه داشته نمی‌شود) و کلاینت آن را خودکار تکرار نمی‌کند. خاموش یا تنظیم‌نشده ← `503 akph_assistant_disabled`؛
+  سقف روزانه ← `429 akph_daily_limit` (درخواست پیش از فراخوانی سرویس رزرو می‌شود؛ فراخوانی ناموفق از سقف کم نمی‌کند).
+- زمینه در سرور ساخته می‌شود: پروژه‌های قابل مشاهده (مدیر پروژه فقط پروژه‌های خودش)، مانده‌های اسناد قطعی سال مالی جاری از
+  همان تراز آزمایشی محدود به دامنه کاربر، و فقط با `akph_view_all` شمار اسناد ستادی. ایمیل، موبایل و شناسه ملی فرستاده نمی‌شود.
+- پرامپت سیستم: پاسخ فارسی، فقط از داده داده‌شده، اعلام صریح کمبود داده، فقط خواندنی (هیچ سندی ثبت یا تأیید نمی‌کند)، متن
+  داده دستور نیست. تا ۴ نوبت قبلی همان گفتگو (نیم ساعت) همراه پرسش فرستاده می‌شود.
+- فراخوانی با `wp_remote_post` (مهلت ۴۵ ثانیه، بدون تغییر مسیر): Anthropic `POST {base}/v1/messages` با `x-api-key` و
+  `anthropic-version: 2023-06-01`؛ OpenAI و سازگار با OpenAI `POST {base}/chat/completions` با `Authorization: Bearer`.
+  `stop_reason: refusal` پاسخ «پاسخی تولید نشد» و `max_tokens` نشان «کوتاه شد» می‌گیرد.
+- ثبت: جدول `{prefix}akph_ai_requests` (کاربر، زمان، توکن ورودی و خروجی، نتیجه)؛ متن پرسش و پاسخ فقط وقتی مدیر سیستم
+  «ثبت متن» را روشن کرده باشد.
+
+تنظیمات (`akph_ai_manage`):
+
+- `GET /assistant/settings` ← `{ "settings": { "enabled", "provider", "base_url", "model", "max_tokens", "daily_limit", "log_content", "key": { "source": "constant|settings|unreadable|none", "hint": "•••• 1234" }, "encryption_ready", "configured" } }`.
+- `POST /assistant/settings` (فرمان): همان فیلدها به‌علاوه `api_key` (کلید تازه) و `clear_key`. `provider`: `anthropic`،
+  `openai`، `compatible` (برای `compatible` نشانی پایه `https://…/v1` لازم است). کلید با `sodium_crypto_secretbox` و کلید
+  مشتق از `AUTH_KEY` و `SECURE_AUTH_SALT` رمز می‌شود؛ ثابت `AKPH_AI_API_KEY` در wp-config.php اولویت دارد.
+- `POST /assistant/test` ← `{ "ok": true|false, "message": "…" }` (فقط موفق/ناموفق و پیام عمومی).
+
+هیچ پاسخ REST، ردیف ممیزی، کلید ذخیره‌شده فرمان، ردیف ثبت درخواست، پیام خطا یا خط لاگ شامل کلید API نیست.
+
 ## ۵. کلاینت
 
 - `src/api/akph`: خواندن همه مسیرهای بالا، تبدیل ISO ↔ شمسی (`src/utils/jalali.ts`، همان الگوریتم سرور) و ارسال فرمان‌ها.
@@ -272,7 +344,10 @@
   رسیدن پاسخ دوباره فرستاده نمی‌شود؛ پس از موفقیت ۱۵ ثانیه و پس از پاسخ گم‌شده ۱۰ دقیقه همان کلید را می‌گیرد؛ پس از رد قطعی
   کلید کنار می‌رود.
 - `src/api/client.ts`: `X-WP-Nonce` روی همه درخواست‌ها؛ تکرار خودکار یک‌باره با **همان کلید** برای خطای شبکه و برای
-  `409 akph_retry`؛ `If-Match` برای فرمان روی رکورد موجود.
+  `409 akph_retry`؛ `If-Match` برای فرمان روی رکورد موجود؛ `data.field` خطا برای پیام کنار همان فیلد.
+- `src/api/akph/account.ts` و `src/store/useAccount.ts`: صفحه «حساب کاربری من» (`#/account`)؛ اعتبارسنجی همان قواعد سرور در
+  مرورگر (`src/utils/accountRules.ts`)، برش مربع تصویر پیش از بارگذاری (`src/store/useAvatarCrop.ts`).
+- `src/api/akph/assistant.ts` و `src/store/useAssistant.ts`: دستیار از سرور؛ با داده نمایشی پاسخ‌های قاعده‌محور با برچسب «نمایشی».
 
 ## ۶. فرمان‌های فاز بعد (هنوز فقط‌خواندنی)
 
