@@ -54,10 +54,12 @@
 | `src/components/**`، `src/pages/**`، `src/assets/**` | همه | |
 | `src/store/views/*` | همه | view modelهای هر ماژول: `contracts`، `procurement`، `inventory`، `pettyCash`، `accounting`، `treasury`، `dashboard`، `reports`، `people`، `approvals`، `exports`، `masterData` |
 | `src/store/AppStore` | `useAppState`، `useSelector` | خواندن وضعیت؛ `useSelector(select, deps)` نتیجه را memo می‌کند |
-| `src/store/session` | همه | `useSession`، `useCurrentUser`، `useCompany`، `usePermission`، `useDemoBanner`، `useReadOnlyNotice`، `useProjectManagers`، `usePreferences`، `useApplyStartPage` |
+| `src/store/session` | همه | `useSession`، `useCurrentUser`، `useCompany`، `usePermission`، `useDemoBanner`، `useReadOnlyNotice`، `useProjectManagers`، `usePreferences`، `useApplyStartPage`، `useLogout` |
 | `src/store/useWorkflows` | همه | **تنها راه نوشتن**: `const wf = useWorkflows(); const r = wf.createPurchaseOrder(input); onToast(r.message)` |
 | `src/store/useApprovalActions` | همه | تأیید/رد از کارتابل مرکزی |
-| `src/store/useAssistant` | همه | دستیار هوشمند (`useAssistant`: وضعیت، پیام‌ها، ارسال؛ `useAssistantSettings` و `PROVIDER_OPTIONS` برای کارت تنظیمات مدیر سیستم) |
+| `src/store/useAssistant` | همه | دستیار هوشمند (`useAssistant`: وضعیت، پیام‌ها، ارسال؛ `useAssistantSettings`، `PROVIDER_OPTIONS` و `modelForProvider` برای کارت تنظیمات مدیر سیستم) |
+| `src/store/useDocuments` | همه | مرکز اسناد و پیوست‌ها: `useUploadQueue` (فایل‌های انتخاب‌شده، پیشرفت هر فایل، `start`)، `useDocumentActions` (دانلود، بایگانی، پیوند)، `useDocumentPreview` (نشانی موقت پیش‌نمایش PDF/تصویر)، `useAttachments(type, id)`، `useDocumentLimit` |
+| `src/store/documents` | `DOCUMENT_CATEGORIES`، `ACCEPT_ATTRIBUTE`، `defaultCategoryFor`، `sameEntity` | فهرست نوع سند، پسوندهای input فایل، نوع پیش‌فرض پیوست هر رکورد |
 | `src/store/useAccount` | همه | «حساب کاربری من»: فرم‌ها، اعتبارسنجی، نشست‌ها، `checkAvatarFile` |
 | `src/store/useAvatarCrop` | همه | برش مربع تصویر پروفایل (جابه‌جایی، بزرگ‌نمایی، خروجی) |
 | `src/store/pagination` | همه | `usePagination(rows, resetKey)` با تعداد ردیف ترجیحی کاربر؛ نمایش با `<TablePager>` |
@@ -95,14 +97,15 @@
 | `/finance/payments`، `/finance/receipts`، `/finance/banks`، `/finance/cash` | `finance/PaymentsTreasuryModule` | `tab`، `projects`، `currentUser`، `onToast` | `useAppState`، `usePermission`، `useWorkflows`؛ `views/treasury` |
 | `/partners/{clients,subcontractors,suppliers}[/:id]` | `partners/PartnersModule` | `projects`، `kind`، `counterpartyId?`، `onOpenProfile(id \| null)`، `onNavigate(path)` | `useAppState`؛ `domainSelectors` |
 | `/payroll` | `hr_payroll/PayrollModule` | `projects`، `currentUser`، `onToast` | `useAppState`، `useCompany`، `usePermission`، `useWorkflows`؛ `views/people` |
-| `/documents` | `documents/DocumentCenterModule` | `projects` | `useAppState`، `useCurrentUser`، `useWorkflows` |
+| `/documents` | `documents/DocumentCenterModule` (+ `DocumentUploadDialog`، `DocumentFilePreview`) | `projects` | `useAppState`، `useCurrentUser`، `useWorkflows`، `useDocumentActions`؛ در دیالوگ `useUploadQueue` |
+| پیوست‌ها | `documents/AttachmentsPanel` (+ `UploadDropzone`، `DocumentPreviewDialog`) داخل جزئیات فاکتور خرید، صورت‌وضعیت کارفرما و پیمانکار جزء، هزینه تنخواه، قرارداد، سند حسابداری، پرداخت و پروژه | `entityType`، `entityId`، `projectId?`، `counterpartyId?` | `useAttachments`، `useDocumentActions`، `useUploadQueue` |
 | `/approvals` | `approvals/ApprovalCenterModule` | `onToast` | `useAppState`، `useCurrentUser`، `usePermission`، `useApprovalActions`؛ `selectApprovals`، `views/approvals` |
 | `/notifications` | `pages/NotificationCenterPage` | — | `useAppState`، `useDismissedNotifications`؛ `selectNotifications` |
 | `/reports` | `reports/ReportsBIModule` | `projects` | `useSelector`؛ `views/reports` |
 | `/ai` | `dashboard/AiAgentWidget` | `isOpen?`، `onClose?`، `isFloating?` | `useAssistant` |
 | `/settings` | `pages/SettingsPage` (+ `settings/AssistantSettingsCard`) | `onToast` | `useAppState`، `usePermission`، `useWorkflows`، `useAssistantSettings` |
 | `/account` | `pages/AccountPage` (+ `account/AvatarEditor`) | `onToast` | `useAccount`، `useAvatarCrop` |
-| پوسته | `layout/AppShell` (+ `Sidebar`، `Header`) | — | `useSession`، `useCompany`، `useDemoBanner`، `useReadOnlyNotice`، `usePermission`، `useApprovalActions`، `useToastListener`، `selectSidebarCounts`، `navConfig` |
+| پوسته | `layout/AppShell` (+ `Sidebar`، `Header`) | `Sidebar` و `Header`: `onLogout` («خروج از حساب» پایین منو و در منوی آواتار؛ تأیید در `AppShell`) | `useSession`، `useCompany`، `useDemoBanner`، `useReadOnlyNotice`، `usePermission`، `useApprovalActions`، `useToastListener`، `useLogout`، `selectSidebarCounts`، `navConfig` |
 
 صفحه‌هایی که مجوز لازم دارند (حسابداری، خزانه، حقوق، تنظیمات) در پوسته با `guarded(...)` بسته می‌شوند؛
 داخل صفحه، دکمه‌ها با `usePermission().can(action, context)` یا با فیلدهای view model (مثل
@@ -117,9 +120,15 @@
 `text-[10px]` و فونت `mono` ممنوع است. اجزای مشترک در `src/components/common`: `Button` (primary/secondary/danger/ghost،
 disabled و loading)، `Card`/`CardHeader`، `PageHeader`، `EmptyState`، `ErrorState`/`ErrorBoundary`، `Skeleton`/`PageSkeleton`،
 `Money`/`Num`/`Percent` (عدد با `dir="ltr"` و واحد کوچک و کم‌رنگ یک بار)، `Field`/`FormStatus` (برچسب، راهنما و خطای کنار
-فیلد)، `TablePager`، `StepStrip`؛ کلاس‌های `.btn`، `.card`، `.input`، `.table-scroll` (اسکرول افقی داخل کارت و سرستون چسبان)،
+فیلد)، `TablePager`، `StepStrip`؛ برای فایل: `documents/UploadDropzone` (کشیدن و رها کردن، چند فایل، `role="progressbar"` برای
+هر فایل) و `documents/AttachmentsPanel`؛ کلاس‌های `.btn`، `.card`، `.input`، `.table-scroll` (اسکرول افقی داخل کارت و سرستون چسبان)،
 `.skeleton`. `npm run test:ui` همه مسیرهای منو را در ۱۴۴۰ و ۳۹۰ پیکسل می‌سنجد و با متن زیر ۱۲ پیکسل، فونت غیر Vazirmatn،
-رقم لاتین، کنتراست کمتر از ۴٫۵:۱، دکمه بی‌نام، کنترل بی‌برچسب یا اسکرول افقی صفحه شکست می‌خورد.
+رقم لاتین، کنتراست کمتر از ۴٫۵:۱، دکمه بی‌نام، کنترل بی‌برچسب یا اسکرول افقی صفحه شکست می‌خورد؛ همچنین «خروج از حساب» را در
+هر دو عرض (سایدبار یا کشوی منو و منوی آواتار، با تأیید) و دیالوگ «بارگذاری سند» (رد فایل غیرمجاز، نوار پیشرفت، پیش‌نمایش PDF) می‌آزماید.
+
+**صفحه ورود پرتال** خارج از اپ React است (`wordpress-plugin/akph-portal/includes/class-akph-login.php`): همان فایل CSS اپ
+(Vazirmatn و توکن‌ها) و چند قاعده درون‌خطی بر پایه همان توکن‌ها؛ نام فیلدها (`log`، `pwd`، `rememberme`، `_akph_nonce`) و پیام‌ها
+را تغییر ندهید.
 
 1. **RTL و فارسی.** `index.html` دارای `dir="rtl"` و `lang="fa"` است. چیدمان با کلاس‌های منطقی
    (`ms-*`/`me-*`، `start`/`end`) یا با در نظر گرفتن RTL؛ آیکون‌های جهت‌دار (فلش «بعدی») به چپ اشاره کنند.

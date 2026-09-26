@@ -38,7 +38,7 @@
 }
 ```
 
-کلیدهای `records`: `projects`، `cost_centers`، `counterparties`، `accounts`، `journal_entries`، `account` (حساب کاربری خود کاربر)، `assistant_settings`.
+کلیدهای `records`: `projects`، `cost_centers`، `counterparties`، `accounts`، `journal_entries`، `account` (حساب کاربری خود کاربر)، `assistant_settings`، `documents`.
 
 ### خطا
 
@@ -49,7 +49,8 @@
 | وضعیت | کدها | معنا |
 |---|---|---|
 | 400 | `akph_invalid`، `akph_invalid_json`، `akph_idempotency_key_required`، `akph_invalid_date` | ورودی نامعتبر (فیلد در `data.field`) |
-| 400 | `akph_unknown_field`، `akph_forbidden_field` | مسیرهای حساب و دستیار: فیلد ناشناخته؛ `role`، `capabilities`، `user_login`، `user_id` و مانند آن (در بدنه یا رشته پرسش) |
+| 400 | `akph_unknown_field`، `akph_forbidden_field` | مسیرهای حساب، دستیار و اسناد: فیلد ناشناخته؛ `role`، `capabilities`، `user_login`، `user_id` و مانند آن (در بدنه یا رشته پرسش) |
+| 400 | `akph_file_name` | نام فایل سند پسوند دوگانه دارد (مثل `report.php.pdf`) |
 | 401 | `akph_unauthorized` | وارد نشده (مهمان) |
 | 403 | `akph_invalid_nonce` | `X-WP-Nonce` نیست یا نامعتبر است |
 | 403 | `akph_no_portal_role` | کاربر هیچ‌یک از چهار نقش پرتال را ندارد |
@@ -61,11 +62,12 @@
 | 409 | `akph_conflict`، `akph_in_progress` | نسخه کهنه، مرحله نادرست (مثلاً سند قطعی)، کد تکراری، درخواست هم‌زمان با همان کلید |
 | 409 | `akph_retry` (`data.retryable: true`) | بن‌بست یا پایان مهلت قفل هنگام کار هم‌زمان دو کاربر؛ هیچ تغییری ذخیره نشده؛ همان فرمان با همان کلید دوباره |
 | 422 | `akph_rule`، `akph_idempotency_mismatch` | نقض قاعده حسابداری (نامتوازن، حساب گروهی، سال بسته، ترتیب تاریخ)؛ کلید تکراری با بدنه دیگر |
-| 413 | `akph_file_too_large` | تصویر پروفایل بیش از ۲ مگابایت |
-| 415 | `akph_file_type` | تصویر پروفایل JPG، PNG یا WebP واقعی نیست |
+| 413 | `akph_file_too_large` | تصویر پروفایل بیش از ۲ مگابایت؛ سند بیش از سقف تنظیم‌شده (پیش‌فرض ۲۰، بیشینه ۵۰ مگابایت) |
+| 415 | `akph_file_type` | تصویر پروفایل JPG، PNG یا WebP واقعی نیست؛ سند با پسوند یا محتوای غیرمجاز (کد، HTML، SVG، اجرایی) |
 | 428 | `akph_version_required` | نسخه رکورد فرستاده نشده |
 | 429 | `akph_too_many_attempts` (`data.retry_after`) | ۵ بار رمز نادرست در ۱۵ دقیقه؛ تغییر ایمیل و رمز تا پایان بازه بسته است |
 | 429 | `akph_daily_limit` | سقف روزانه پرسش از دستیار برای این کاربر پر شده |
+| 500 | `akph_storage` | پوشه خصوصی اسناد ساخته یا فایل ذخیره نشد (دسترسی نوشتن `uploads`)؛ هیچ ردیفی ذخیره نشده |
 | 500 | `akph_db_error`، `akph_server_error` | خطای پایگاه‌داده یا سرور؛ هیچ تغییری ذخیره نشده. متن خطای پایگاه‌داده، شماره خطا و کوئری فقط در `error_log` سرور نوشته می‌شود و هرگز در پاسخ REST نیست. |
 | 502 | `akph_assistant_unreachable`، `akph_assistant_auth`، `akph_assistant_busy`، `akph_assistant_request`، `akph_assistant_unavailable`، و برای Gemini `akph_assistant_region`، `akph_assistant_quota`، `akph_assistant_proxy` | سرویس هوش مصنوعی در دسترس نبود یا درخواست را نپذیرفت؛ پیام فارسی عمومی، بدون متن پاسخ سرویس |
 | 503 | `akph_not_ready` | جدول‌ها روی InnoDB آماده نیست یا PHP ۶۴ بیتی نیست |
@@ -95,6 +97,9 @@
 | `GET /reports/trial-balance`، `GET /reports/ledger` | `akph_reports` | ✓ | ✓ فقط ردیف‌های پروژه‌های خودش (`partial: true`) |
 | `GET /audit` | `akph_audit_read` | ✓ | — |
 | `GET /account`، `POST /account/profile`، `/email`، `/password`، `POST|DELETE /account/avatar`، `GET /account/sessions`، `POST /account/sessions/logout-others` | `akph_access` | ✓ فقط حساب خودش | ✓ فقط حساب خودش |
+| `GET /documents`، `GET /documents/{id}`، `GET /documents/{id}/download` | `akph_access` | ✓ همه | ✓ فقط اسناد پروژه‌های خودش (سند ستادی هرگز) |
+| `POST /documents`، `POST /documents/{id}/links` | `akph_access` | ✓ | ✓ فقط پروژه‌های خودش |
+| `POST /documents/{id}/archive` | `akph_access` + بارگذارکننده، مدیر سیستم یا مدیر ارشد | ✓ سند خودش | ✓ سند خودش در پروژه خودش |
 | `GET /assistant/status`، `POST /assistant/ask` | `akph_assistant_use` | ✓ | ✓ داده پروژه‌های خودش |
 | `GET|POST /assistant/settings`، `POST /assistant/test` | `akph_ai_manage` (فقط مدیر سیستم) | — | — |
 | `GET /` (فهرست فضای نام) | `akph_access` | ✓ | ✓ |
@@ -110,7 +115,7 @@
   "currency": "toman", "site_currency": "toman",
   "preferences": { "currency": "site", "rows_per_page": 25, "start_page": "/" },
   "fiscal_year": 1405, "closed_fiscal_years": [], "today": "2026-09-25",
-  "caps": { "akph_access": true, "akph_assistant_use": true, "…": false }, "server_version": "0.4.0"
+  "caps": { "akph_access": true, "akph_assistant_use": true, "…": false }, "server_version": "0.5.0"
 }
 ```
 
@@ -305,6 +310,47 @@
 
 تغییر ایمیل و رمز پس از **۵ رمز نادرست در ۱۵ دقیقه** تا پایان بازه ← `429 akph_too_many_attempts` (حتی با رمز درست).
 
+### ورود و خروج (صفحه پرتال، نه REST)
+
+- مهمانی که `/?akph_portal=1` را باز کند صفحه ورود پرتال را می‌گیرد (HTML، بدون کش، `X-Frame-Options: SAMEORIGIN` و
+  `frame-ancestors 'self'`). فرم با `POST` به همان نشانی و فیلدهای `log`، `pwd`، `rememberme`، `_akph_nonce` و `akph_login`
+  فرستاده و روی `init` پردازش می‌شود: بررسی nonce ← قفل IP (transient، ۵ شکست در ۹۰۰ ثانیه) ← `wp_signon(…, is_ssl())` ← کاربر بدون
+  نقش پرتال: نشست تازه‌اش نابود و خارج می‌شود. نتیجه با `wp_safe_redirect` به اپ (صفحه شروع کاربر، `#/…`) یا به صفحه ورود با
+  پارامتر `login=failed|empty|locked|expired|noaccess` که پیام فارسی ثابت نشان می‌دهد (پیام شکست برای کاربر ناموجود و رمز نادرست یکی است).
+- `wp-login.php`: برای مدیر سیستم بدون تغییر؛ مدیر ارشد، مدیر پروژه و حسابدار (یا مرورگری با کوکی `akph_portal_member`) در
+  `action=login` به صفحه ورود پرتال هدایت می‌شوند؛ `logout`، `lostpassword`، `rp` و `resetpass` دست‌نخورده‌اند. `login_redirect`
+  این نقش‌ها را به اپ می‌برد.
+- خروج: اپ به `logoutUrl` (همان `wp_logout_url()` با nonce، از `window.AkphPortal`) می‌رود؛ `logout_redirect` با اولویت ۹۹ (بعد از
+  paydar-portal) درخواستی را که از پرتال آمده به صفحه ورود پرتال با `login=out` برمی‌گرداند (بازنشانی رمز: `login=checkemail` و `login=reset`).
+
+### اسناد و پیوست‌ها
+
+فایل‌ها در `wp-content/uploads/akph-private/{سال}/{ماه}/` با نام تصادفی ۳۲ نویسه هگز (بدون پسوند) ذخیره می‌شوند؛ پوشه
+`.htaccess` (`Require all denied` / `Deny from all`)، `web.config` و `index.php` خالی دارد و هرگز مستقیم سرو نمی‌شود.
+
+- `POST /documents` (فرمان، `multipart/form-data`، `Idempotency-Key`): فایل `file` و فیلدهای `title`، `doc_type`، `description`،
+  `project_id`، `cost_center_id`، `counterparty_id`، `entity_type` و `entity_id` (فیلد دیگر ← `400`). پسوندهای مجاز: pdf، jpg، jpeg،
+  png، webp، heic، xlsx، xls، docx، doc، csv، txt، zip، dwg، dxf؛ نوع واقعی با finfo و `wp_check_filetype_and_ext`؛ پسوند دوگانه
+  ← `400 akph_file_name`؛ سقف حجم ← `413`؛ نوع غیرمجاز ← `415`. شماره `DOC-{سال مالی}-00001` در سرور. SHA-256 نگه داشته می‌شود و
+  اگر همان فایل قبلاً برای همان رکورد بارگذاری شده باشد، سند باز هم ذخیره می‌شود و پاسخ `duplicate_of` (شماره‌های قبلی) و هشدار
+  در `message` دارد. اثر انگشت Idempotency شامل SHA-256 فایل و فیلدهاست. پاسخ `201` با `records.documents`.
+  `doc_type`: `client_contract`، `subcontract`، `amendment`، `client_statement`، `subcontractor_statement`، `measurement`،
+  `supplier_invoice`، `petty_invoice`، `letter`، `minutes`، `drawing`، `qc_report`، `guarantee`، `financial`، `photo`، `other`.
+  `entity_type`: `project`، `contract`، `counterparty`، `journal_entry`، `invoice`، `statement`، `petty_expense`، `payment`،
+  `payroll`، `inventory_doc`، `other`. پروژه و طرف حساب هم خودکار پیوند می‌شوند.
+- `GET /documents` با `status=active|archived|all` (پیش‌فرض active)، `project_id`، `doc_type`، `entity_type` + `entity_id`، `q`
+  (جستجوی عنوان، شماره یا نام فایل)، `page`، `per_page` (تا ۲۰۰) ← `{ "documents": [...], "page", "total" }`.
+- `GET /documents/{id}` ← `{ "document": { "id", "doc_number", "title", "doc_type", "description", "project_id", "cost_center_id",
+  "counterparty_id", "file_name", "mime", "size", "sha256", "version", "uploaded_by", "uploaded_by_name", "uploaded_at", "status",
+  "archived_at", "links": [{ "entity_type", "entity_id" }], "preview", "can_archive" } }`.
+- `GET /documents/{id}/download` (با `inline=1` برای پیش‌نمایش): فایل از طریق PHP با `Content-Disposition: attachment`،
+  `X-Content-Type-Options: nosniff`، `Content-Security-Policy` محدود و `Cache-Control: no-store`؛ `inline` فقط برای PDF و تصویر
+  (JPG، PNG، WebP)، بقیه همیشه `application/octet-stream` پیوست. هر دانلود در ممیزی ثبت می‌شود.
+- `POST /documents/{id}/links` (فرمان) با `{ "entity_type", "entity_id" }`؛ پیوند تکراری بی‌اثر است.
+- `POST /documents/{id}/archive` (فرمان، `version`): بایگانی به‌جای حذف؛ فقط بارگذارکننده، مدیر سیستم یا مدیر ارشد؛ اگر سند پیوست
+  سند حسابداری قطعی باشد ← `422 akph_rule`. هیچ مسیر حذفی وجود ندارد و فایل روی دیسک می‌ماند.
+- دامنه: مدیر پروژه فقط اسناد پروژه‌های خودش را می‌بیند، دانلود می‌کند یا پیوند می‌دهد (دیگران ← `404`)؛ سند بدون پروژه برای او ممنوع.
+
 ### دستیار مدیریت
 
 کلید API هرگز به مرورگر نمی‌رود و مدل فقط داده‌ای را می‌بیند که همان کاربر اجازه دیدنش را دارد.
@@ -362,6 +408,11 @@
 - `src/api/akph/account.ts` و `src/store/useAccount.ts`: صفحه «حساب کاربری من» (`#/account`)؛ اعتبارسنجی همان قواعد سرور در
   مرورگر (`src/utils/accountRules.ts`)، برش مربع تصویر پیش از بارگذاری (`src/store/useAvatarCrop.ts`).
 - `src/api/akph/assistant.ts` و `src/store/useAssistant.ts`: دستیار از سرور؛ با داده نمایشی پاسخ‌های قاعده‌محور با برچسب «نمایشی».
+- `src/api/akph/documents.ts`، `src/store/documents.ts` و `src/store/useDocuments.ts`: بارگذاری multipart با `XMLHttpRequest` برای
+  نوار پیشرفت (یک `Idempotency-Key` برای هر فایل در هر ارسال)، دریافت فایل به‌صورت Blob با `X-WP-Nonce` برای دانلود و پیش‌نمایش،
+  پیوند و بایگانی با فرمان؛ نگاشت دسته‌های اپ به `doc_type` و نوع رکوردهای اپ به `entity_type`. با داده نمایشی فایل فقط در همان
+  برگه مرورگر می‌ماند (`src/api/mock/documents.ts`).
+- `logoutUrl` در `window.AkphPortal` و `useLogout()` در `src/store/session.tsx` برای «خروج از حساب».
 
 ## ۶. فرمان‌های فاز بعد (هنوز فقط‌خواندنی)
 
