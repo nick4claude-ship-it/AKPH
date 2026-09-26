@@ -332,9 +332,9 @@ final class Akph_Rest {
 
     public static function assistant_update_settings(WP_REST_Request $request) {
         return Akph_Command::run($request, function ($body) use ($request) {
-            Akph_Account::assert_fields($request, $body, array('enabled', 'provider', 'base_url', 'model', 'max_tokens', 'daily_limit', 'log_content', 'api_key', 'clear_key'));
+            Akph_Account::assert_fields($request, $body, array('enabled', 'provider', 'base_url', 'model', 'max_tokens', 'daily_limit', 'log_content', 'api_key', 'clear_key', 'proxy_token', 'clear_proxy_token'));
             return array('message' => 'تنظیمات دستیار ذخیره شد.', 'records' => array('assistant_settings' => array(Akph_Assistant::update_settings($body))));
-        }, array('secret' => array('api_key')));
+        }, array('secret' => array('api_key', 'proxy_token')));
     }
 
     public static function assistant_test(WP_REST_Request $request) {

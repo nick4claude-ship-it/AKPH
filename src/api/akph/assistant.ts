@@ -32,15 +32,17 @@ export function parseAssistantSettings(raw: unknown): AssistantSettings {
   const o = obj('/assistant/settings', raw, 'settings');
   const key = obj('/assistant/settings', o.key ?? {}, 'key');
   const source = key.source === 'constant' || key.source === 'settings' || key.source === 'unreadable' ? key.source : 'none';
+  const proxy = obj('/assistant/settings', o.proxy_token ?? {}, 'proxy_token');
   return {
     enabled: o.enabled === true,
-    provider: o.provider === 'openai' || o.provider === 'compatible' ? o.provider : 'anthropic',
+    provider: o.provider === 'anthropic' || o.provider === 'openai' || o.provider === 'compatible' ? o.provider : 'gemini',
     baseUrl: text(o.base_url),
     model: text(o.model),
     maxTokens: num(o.max_tokens, 4096),
     dailyLimit: num(o.daily_limit, 30),
     logContent: o.log_content === true,
     key: { source, hint: text(key.hint) },
+    proxyToken: { source: proxy.source === 'settings' || proxy.source === 'unreadable' ? proxy.source : 'none', hint: text(proxy.hint) },
     encryptionReady: o.encryption_ready === true,
     configured: o.configured === true,
   };
@@ -58,6 +60,8 @@ function settingsBody(input: AssistantSettingsInput) {
   };
   if (input.apiKey.trim()) body.api_key = input.apiKey.trim();
   if (input.clearKey) body.clear_key = true;
+  if (input.proxyToken.trim()) body.proxy_token = input.proxyToken.trim();
+  if (input.clearProxyToken) body.clear_proxy_token = true;
   return body;
 }
 

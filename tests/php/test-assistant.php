@@ -296,4 +296,201 @@ class Test_Akph_Assistant extends Akph_Test_Case {
         $this->assertSame('https://api.openai.com/v1/chat/completions', $this->sent[1]['url']);
         $this->assertSame(2048, $this->sent[1]['body']['max_completion_tokens']);
     }
+
+    // ------------------------------------------------------------------ Google Gemini
+
+    const PROXY_TOKEN = 'proxy-SECRET-token-9876';
+
+    private static function gemini($text = 'پاسخ Gemini', $finish = 'STOP', array $extra = array()) {
+        return self::http(200, array_merge(array(
+            'candidates' => array(array('content' => array('role' => 'model', 'parts' => array(array('text' => 'در حال فکر کردن', 'thought' => true), array('text' => $text))), 'finishReason' => $finish)),
+            'usageMetadata' => array('promptTokenCount' => 321, 'candidatesTokenCount' => 12, 'thoughtsTokenCount' => 30, 'totalTokenCount' => 363),
+        ), $extra));
+    }
+
+    private static function google_error($code, $status, $message, array $reasons = array()) {
+        $details = array();
+        foreach ($reasons as $reason) {
+            $details[] = array('@type' => 'type.googleapis.com/google.rpc.ErrorInfo', 'reason' => $reason, 'domain' => 'googleapis.com');
+        }
+        return self::http($code, array('error' => array('code' => $code, 'message' => $message, 'status' => $status, 'details' => $details)));
+    }
+
+    private function configure_gemini(array $extra = array()) {
+        return $this->configure(array_merge(array('provider' => 'gemini', 'model' => 'gemini-3.8-flash', 'base_url' => '', 'daily_limit' => 50), $extra));
+    }
+
+    public function test_gemini_is_the_default_provider() {
+        $settings = Akph_Assistant::public_settings();
+        $this->assertSame('gemini', $settings['provider']);
+        $this->assertSame('gemini-3.8-flash', $settings['model']);
+        $this->assertSame('', $settings['base_url']);
+        $this->assertSame(array('source' => 'none', 'hint' => ''), $settings['proxy_token']);
+        // A site that chose another provider keeps it.
+        update_option(Akph_Assistant::OPTION, array('provider' => 'anthropic'));
+        $this->assertSame('anthropic', Akph_Assistant::public_settings()['provider']);
+        $this->assertSame('claude-opus-5', Akph_Assistant::public_settings()['model']);
+    }
+
+    public function test_gemini_request_uses_the_key_header_and_generate_content() {
+        $this->configure_gemini(array('model' => 'models/gemini-3.8-flash'));
+        $this->reply = self::gemini();
+        $this->login('senior');
+        $first = $this->ask('پرسش نخست');
+        $this->assertStatus(200, $first);
+        $this->assertSame('پاسخ Gemini', $first->get_data()['answer'], 'thought parts are left out');
+
+        $sent = $this->sent[0];
+        $this->assertSame('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent', $sent['url']);
+        $this->assertStringNotContainsString(self::KEY, $sent['url'], 'the key is never in the URL');
+        $this->assertStringNotContainsString('key=', $sent['url']);
+        $this->assertSame(self::KEY, $sent['args']['headers']['x-goog-api-key']);
+        $this->assertArrayNotHasKey('Authorization', $sent['args']['headers']);
+        $this->assertArrayNotHasKey(Akph_Assistant::PROXY_HEADER, $sent['args']['headers']);
+        $this->assertStringNotContainsString(self::KEY, $sent['args']['body'], 'nor in the body');
+        $this->assertSame(0, $sent['args']['redirection'], 'no redirect can carry the key elsewhere');
+        $this->assertSame(Akph_Assistant::TIMEOUT, $sent['args']['timeout']);
+
+        $body = $sent['body'];
+        $this->assertSame(array('systemInstruction', 'contents', 'generationConfig'), array_keys($body));
+        $this->assertStringContainsString('فقط از داده‌های داخل <data>', $body['systemInstruction']['parts'][0]['text']);
+        $this->assertStringContainsString('فقط خواندنی هستی', $body['systemInstruction']['parts'][0]['text']);
+        $this->assertSame(array(array('role' => 'user', 'parts' => array(array('text' => 'پرسش نخست')))), $body['contents']);
+        $this->assertSame(array('maxOutputTokens' => 2048), $body['generationConfig']);
+
+        // Earlier turns go back with the Gemini roles user / model.
+        $this->assertStatus(200, $this->ask('پرسش دوم', array('conversation_id' => $first->get_data()['conversation_id'])));
+        $this->assertSame(array('user', 'model', 'user'), wp_list_pluck($this->sent[1]['body']['contents'], 'role'));
+        $this->assertSame('پاسخ Gemini', $this->sent[1]['body']['contents'][1]['parts'][0]['text']);
+
+        // Token use from usageMetadata (thinking counts as output).
+        global $wpdb;
+        $row = $wpdb->get_row('SELECT * FROM ' . Akph_Schema::table('ai_requests') . ' ORDER BY id ASC LIMIT 1');
+        $this->assertSame('gemini', $row->provider);
+        $this->assertSame(321, (int) $row->input_tokens);
+        $this->assertSame(42, (int) $row->output_tokens);
+        $this->assertSame('ok', $row->status);
+
+        // The connection test goes the same way.
+        $this->login('admin');
+        $test = $this->request('POST', '/assistant/test', array());
+        $this->assertTrue($test->get_data()['ok']);
+        $this->assertSame(64, end($this->sent)['body']['generationConfig']['maxOutputTokens']);
+        $this->assertSame(self::KEY, end($this->sent)['args']['headers']['x-goog-api-key']);
+    }
+
+    public function test_gemini_errors_and_blocks_are_translated() {
+        $this->configure_gemini();
+        $this->login('accountant');
+        $cases = array(
+            array(self::google_error(400, 'INVALID_ARGUMENT', 'API key not valid. Please pass a valid API key. ' . self::KEY, array('API_KEY_INVALID')), 'akph_assistant_auth', 'Google AI Studio'),
+            array(self::google_error(403, 'PERMISSION_DENIED', 'Permission denied', array('API_KEY_INVALID')), 'akph_assistant_auth', 'Google AI Studio'),
+            array(self::google_error(400, 'FAILED_PRECONDITION', 'User location is not supported for the API use.'), 'akph_assistant_region', Akph_Assistant::REGION_MESSAGE),
+            array(self::google_error(429, 'RESOURCE_EXHAUSTED', 'Quota exceeded'), 'akph_assistant_quota', 'سهمیه'),
+            array(self::google_error(404, 'NOT_FOUND', 'models/x is not found'), 'akph_assistant_request', 'مدل'),
+            array(self::google_error(403, 'PERMISSION_DENIED', 'The caller does not have permission'), 'akph_assistant_auth', 'Gemini'),
+            array(self::google_error(503, 'UNAVAILABLE', 'The model is overloaded'), 'akph_assistant_unavailable', 'Gemini'),
+            array(new WP_Error('http_request_failed', 'cURL error 28'), 'akph_assistant_unreachable', 'واسط'),
+        );
+        foreach ($cases as $i => $case) {
+            $this->reply = $case[0];
+            $response = $this->ask('پرسش ' . $i);
+            $this->assertStatus(502, $response, $case[1]);
+            $this->assertSame($case[1], $this->errorCode($response));
+            $this->assertStringContainsString($case[2], $response->get_data()['message']);
+            $this->assertStringNotContainsString(self::KEY, wp_json_encode($response->get_data()));
+            $this->assertStringNotContainsString('API key not valid', wp_json_encode($response->get_data()), 'the provider text is not passed on');
+        }
+        $this->assertSame(Akph_Assistant::REGION_MESSAGE, 'سرور سایت از منطقه‌ای درخواست می‌دهد که Gemini پشتیبانی نمی‌کند؛ نشانی پایه یک واسط خارج از ایران را وارد کنید.');
+
+        // The connection test reports the same message.
+        $this->login('admin');
+        $this->reply = self::google_error(400, 'FAILED_PRECONDITION', 'User location is not supported for the API use.');
+        $test = $this->request('POST', '/assistant/test', array())->get_data();
+        $this->assertFalse($test['ok']);
+        $this->assertSame(Akph_Assistant::REGION_MESSAGE, $test['message']);
+
+        // Safety blocks of the prompt or of the answer: a refusal with its own message.
+        $this->login('accountant');
+        $blocked = array(
+            self::http(200, array('promptFeedback' => array('blockReason' => 'SAFETY'), 'usageMetadata' => array('promptTokenCount' => 10))),
+            self::gemini('', 'SAFETY'),
+            self::gemini('متن ناتمام', 'PROHIBITED_CONTENT'),
+        );
+        foreach ($blocked as $reply) {
+            $this->reply = $reply;
+            $response = $this->ask('پرسش مسدود');
+            $this->assertStatus(200, $response);
+            $this->assertStringContainsString('سیاست‌های ایمنی', $response->get_data()['answer']);
+            $this->assertStringNotContainsString('متن ناتمام', $response->get_data()['answer']);
+        }
+        global $wpdb;
+        $this->assertSame(3, (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . Akph_Schema::table('ai_requests') . " WHERE status = 'refused'"));
+        $this->assertSame(count($cases), (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . Akph_Schema::table('ai_requests') . " WHERE status = 'error'"));
+
+        // Cut at the token limit: with text it is marked, with thinking only the limit is named.
+        $this->reply = self::gemini('پاسخ نیمه', 'MAX_TOKENS');
+        $cut = $this->ask('پرسش طولانی')->get_data();
+        $this->assertTrue($cut['truncated']);
+        $this->assertStringStartsWith('پاسخ نیمه', $cut['answer']);
+        $this->reply = self::gemini('', 'MAX_TOKENS');
+        $this->assertStringContainsString('حداکثر توکن پاسخ', $this->ask('پرسش سنگین')->get_data()['answer']);
+    }
+
+    public function test_gemini_through_a_proxy_with_an_encrypted_proxy_token() {
+        $saved = $this->configure_gemini(array('base_url' => 'https://proxy.example.test/', 'proxy_token' => self::PROXY_TOKEN));
+        $stored = get_option(Akph_Assistant::OPTION);
+        $this->assertStringStartsWith('v1:', $stored['proxy_cipher']);
+        $this->assertStringNotContainsString(self::PROXY_TOKEN, wp_json_encode($stored));
+        $this->login('admin');
+        $settings = $this->request('GET', '/assistant/settings');
+        $this->assertSame(array('source' => 'settings', 'hint' => '•••• 9876'), $settings->get_data()['settings']['proxy_token']);
+
+        $this->reply = self::gemini();
+        $this->login('pm');
+        $answer = $this->ask();
+        $this->assertStatus(200, $answer);
+        $sent = $this->sent[0];
+        $this->assertSame('https://proxy.example.test/v1beta/models/gemini-3.8-flash:generateContent', $sent['url']);
+        $this->assertSame(self::PROXY_TOKEN, $sent['args']['headers'][Akph_Assistant::PROXY_HEADER], 'its own header');
+        $this->assertSame(self::KEY, $sent['args']['headers']['x-goog-api-key']);
+        $this->assertStringNotContainsString(self::PROXY_TOKEN, $sent['url']);
+
+        // The proxy refusing the token.
+        $this->reply = self::http(401, 'unauthorized');
+        $refused = $this->ask('پرسش دوم');
+        $this->assertStatus(502, $refused);
+        $this->assertSame('akph_assistant_proxy', $this->errorCode($refused));
+
+        // Neither the token nor the key in any response or stored row.
+        $this->login('admin');
+        $responses = array($saved, $settings, $answer, $refused, $this->request('GET', '/assistant/status'), $this->request('GET', '/audit'), $this->request('POST', '/assistant/test', array()));
+        foreach ($responses as $response) {
+            $json = wp_json_encode($response->get_data());
+            $this->assertStringNotContainsString(self::PROXY_TOKEN, $json);
+            $this->assertStringNotContainsString(self::KEY, $json);
+        }
+        global $wpdb;
+        foreach (array('audit_log', 'idempotency_keys', 'ai_requests') as $table) {
+            foreach ((array) $wpdb->get_results('SELECT * FROM ' . Akph_Schema::table($table), ARRAY_A) as $row) {
+                $this->assertStringNotContainsString(self::PROXY_TOKEN, wp_json_encode($row), $table);
+            }
+        }
+
+        // The official address never receives the proxy token.
+        $this->configure_gemini(array('base_url' => ''));
+        $this->reply = self::gemini();
+        $this->login('pm');
+        $this->assertStatus(200, $this->ask('پرسش سوم'));
+        $this->assertArrayNotHasKey(Akph_Assistant::PROXY_HEADER, end($this->sent)['args']['headers']);
+
+        // Validation and removal.
+        $this->login('admin');
+        $short = $this->request('POST', '/assistant/settings', array('proxy_token' => 'short'));
+        $this->assertStatus(400, $short);
+        $this->assertSame('proxy_token', $short->get_data()['data']['field']);
+        $this->assertStatus(400, $this->request('POST', '/assistant/settings', array('proxy_token' => "token-with-new-line\r\nX: y")));
+        $cleared = $this->request('POST', '/assistant/settings', array('clear_proxy_token' => true));
+        $this->assertSame('none', $cleared->get_data()['records']['assistant_settings'][0]['proxy_token']['source']);
+    }
 }

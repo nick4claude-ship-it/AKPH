@@ -107,7 +107,7 @@ final class Akph_Admin {
         echo '</div>';
     }
 
-    /** «دستیار هوشمند»: provider, model, key (encrypted; shown as its last four characters), limits. */
+    /** «دستیار هوشمند»: provider, model, key and proxy token (encrypted; shown as their last four characters), limits. */
     private static function assistant_section() {
         echo '<h2 id="akph-ai">دستیار هوشمند</h2>';
         $action = isset($_POST['akph_ai_action']) ? sanitize_key(wp_unslash($_POST['akph_ai_action'])) : '';
@@ -121,16 +121,20 @@ final class Akph_Admin {
                 $post = wp_unslash($_POST);
                 $changes = array(
                     'enabled' => !empty($post['ai_enabled']),
-                    'provider' => isset($post['ai_provider']) ? sanitize_key($post['ai_provider']) : 'anthropic',
+                    'provider' => isset($post['ai_provider']) ? sanitize_key($post['ai_provider']) : 'gemini',
                     'base_url' => isset($post['ai_base_url']) ? trim((string) $post['ai_base_url']) : '',
                     'model' => isset($post['ai_model']) ? trim((string) $post['ai_model']) : '',
                     'max_tokens' => isset($post['ai_max_tokens']) ? (string) absint($post['ai_max_tokens']) : '0',
                     'daily_limit' => isset($post['ai_daily_limit']) ? (string) absint($post['ai_daily_limit']) : '0',
                     'log_content' => !empty($post['ai_log_content']),
                     'clear_key' => !empty($post['ai_clear_key']),
+                    'clear_proxy_token' => !empty($post['ai_clear_proxy_token']),
                 );
                 if (isset($post['ai_api_key']) && trim((string) $post['ai_api_key']) !== '') {
                     $changes['api_key'] = trim((string) $post['ai_api_key']);
+                }
+                if (isset($post['ai_proxy_token']) && trim((string) $post['ai_proxy_token']) !== '') {
+                    $changes['proxy_token'] = trim((string) $post['ai_proxy_token']);
                 }
                 try {
                     Akph_Db::transaction(function () use ($changes) {
@@ -144,18 +148,18 @@ final class Akph_Admin {
         }
         $s = Akph_Assistant::public_settings();
         $key = $s['key'];
-        echo '<p>پاسخ‌ها را سرور از مدل زبانی می‌گیرد؛ کلید API هرگز به مرورگر فرستاده نمی‌شود و دستیار فقط داده‌هایی را می‌بیند که همان کاربر اجازه دیدنشان را دارد. اگر میزبان سایت در ایران است و نشانی‌های api.anthropic.com یا api.openai.com در دسترس نیستند، «سازگار با OpenAI» را با نشانی یک سرویس در دسترس انتخاب کنید (راهنما: docs/INSTALL-FA.md).</p>';
+        echo '<p>پاسخ‌ها را سرور از مدل زبانی می‌گیرد؛ کلید API هرگز به مرورگر فرستاده نمی‌شود و دستیار فقط داده‌هایی را می‌بیند که همان کاربر اجازه دیدنشان را دارد. سرویس پیش‌فرض Google Gemini است (کلید از Google AI Studio). Google درخواست‌های سرورهای داخل ایران را نمی‌پذیرد؛ در این حالت نشانی پایه یک واسط خارج از ایران (مثلاً Cloudflare Worker) و «توکن واسط» را وارد کنید (راهنما: docs/INSTALL-FA.md).</p>';
         echo '<form method="post" action="#akph-ai">';
         wp_nonce_field('akph_ai', 'akph_ai_nonce');
         echo '<table class="form-table" role="presentation">';
         echo '<tr><th scope="row">وضعیت</th><td><label><input type="checkbox" name="ai_enabled" value="1" ' . checked($s['enabled'], true, false) . '> دستیار فعال باشد</label></td></tr>';
         echo '<tr><th scope="row"><label for="akph-ai-provider">سرویس‌دهنده</label></th><td><select id="akph-ai-provider" name="ai_provider">';
-        foreach (array('anthropic' => 'Anthropic (Claude)', 'openai' => 'OpenAI', 'compatible' => 'سازگار با OpenAI (نشانی دلخواه)') as $value => $label) {
+        foreach (array('gemini' => 'Google Gemini', 'anthropic' => 'Anthropic (Claude)', 'openai' => 'OpenAI', 'compatible' => 'سازگار با OpenAI (نشانی دلخواه)') as $value => $label) {
             echo '<option value="' . esc_attr($value) . '" ' . selected($s['provider'], $value, false) . '>' . esc_html($label) . '</option>';
         }
         echo '</select></td></tr>';
-        echo '<tr><th scope="row"><label for="akph-ai-base">نشانی پایه (Base URL)</label></th><td><input id="akph-ai-base" class="regular-text" dir="ltr" name="ai_base_url" value="' . esc_attr($s['base_url']) . '" placeholder="https://…"><p class="description">برای Anthropic و OpenAI خالی بگذارید (نشانی رسمی). برای سرویس سازگار با OpenAI نشانی تا /v1 را وارد کنید؛ مسیر /chat/completions خودکار اضافه می‌شود.</p></td></tr>';
-        echo '<tr><th scope="row"><label for="akph-ai-model">مدل</label></th><td><input id="akph-ai-model" class="regular-text" dir="ltr" name="ai_model" value="' . esc_attr($s['model']) . '"></td></tr>';
+        echo '<tr><th scope="row"><label for="akph-ai-base">نشانی پایه (Base URL)</label></th><td><input id="akph-ai-base" class="regular-text" dir="ltr" name="ai_base_url" value="' . esc_attr($s['base_url']) . '" placeholder="https://…"><p class="description">خالی = نشانی رسمی سرویس. برای Gemini از طریق واسط، نشانی واسط را بدون مسیر وارد کنید (مسیر /v1beta/models/…:generateContent خودکار اضافه می‌شود). برای سرویس سازگار با OpenAI نشانی تا /v1 را وارد کنید؛ مسیر /chat/completions خودکار اضافه می‌شود.</p></td></tr>';
+        echo '<tr><th scope="row"><label for="akph-ai-model">مدل</label></th><td><input id="akph-ai-model" class="regular-text" dir="ltr" name="ai_model" value="' . esc_attr($s['model']) . '"><p class="description">برای Gemini نام دقیق مدل را از فهرست مدل‌های Google بردارید (پیش‌فرض: <code>' . esc_html(Akph_Assistant::DEFAULT_MODELS['gemini']) . '</code>).</p></td></tr>';
         echo '<tr><th scope="row"><label for="akph-ai-key">کلید API</label></th><td>';
         if ($key['source'] === 'constant') {
             echo '<p>کلید از ثابت <code>AKPH_AI_API_KEY</code> در wp-config.php خوانده می‌شود: <code>' . esc_html($key['hint']) . '</code></p>';
@@ -171,6 +175,17 @@ final class Akph_Admin {
             if (!$s['encryption_ready']) {
                 echo '<p class="description" style="color:#b32d2e">AUTH_KEY و SECURE_AUTH_SALT در wp-config.php تنظیم نشده‌اند؛ برای ذخیره کلید آن‌ها را تنظیم کنید یا کلید را در ثابت AKPH_AI_API_KEY قرار دهید.</p>';
             }
+        }
+        echo '</td></tr>';
+        $proxy = $s['proxy_token'];
+        echo '<tr><th scope="row"><label for="akph-ai-proxy">توکن واسط (اختیاری)</label></th><td>';
+        echo '<input id="akph-ai-proxy" type="password" class="regular-text" dir="ltr" name="ai_proxy_token" value="" autocomplete="new-password" placeholder="' . esc_attr($proxy['source'] === 'settings' ? 'ذخیره‌شده: ' . $proxy['hint'] : 'فقط اگر نشانی پایه یک واسط است') . '">';
+        echo '<p class="description">رمز مشترک سایت و واسط؛ فقط به نشانی پایه دلخواه و در سربرگ جداگانه <code>' . esc_html(Akph_Assistant::PROXY_HEADER) . '</code> فرستاده می‌شود. رمزنگاری‌شده ذخیره می‌شود و دوباره نمایش داده نمی‌شود.</p>';
+        if ($proxy['source'] === 'settings') {
+            echo '<p><label><input type="checkbox" name="ai_clear_proxy_token" value="1"> حذف توکن واسط</label></p>';
+        }
+        if ($proxy['source'] === 'unreadable') {
+            echo '<p class="description" style="color:#b32d2e">توکن واسط ذخیره‌شده خوانده نمی‌شود (کلیدهای امنیتی وردپرس تغییر کرده‌اند)؛ دوباره وارد کنید.</p>';
         }
         echo '</td></tr>';
         echo '<tr><th scope="row"><label for="akph-ai-max">حداکثر توکن پاسخ</label></th><td><input id="akph-ai-max" type="number" min="64" max="32000" name="ai_max_tokens" value="' . esc_attr($s['max_tokens']) . '"></td></tr>';

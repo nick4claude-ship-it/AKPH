@@ -67,7 +67,7 @@
 | 429 | `akph_too_many_attempts` (`data.retry_after`) | ۵ بار رمز نادرست در ۱۵ دقیقه؛ تغییر ایمیل و رمز تا پایان بازه بسته است |
 | 429 | `akph_daily_limit` | سقف روزانه پرسش از دستیار برای این کاربر پر شده |
 | 500 | `akph_db_error`، `akph_server_error` | خطای پایگاه‌داده یا سرور؛ هیچ تغییری ذخیره نشده. متن خطای پایگاه‌داده، شماره خطا و کوئری فقط در `error_log` سرور نوشته می‌شود و هرگز در پاسخ REST نیست. |
-| 502 | `akph_assistant_unreachable`، `akph_assistant_auth`، `akph_assistant_busy`، `akph_assistant_request`، `akph_assistant_unavailable` | سرویس هوش مصنوعی در دسترس نبود یا درخواست را نپذیرفت؛ پیام فارسی عمومی، بدون متن پاسخ سرویس |
+| 502 | `akph_assistant_unreachable`، `akph_assistant_auth`، `akph_assistant_busy`، `akph_assistant_request`، `akph_assistant_unavailable`، و برای Gemini `akph_assistant_region`، `akph_assistant_quota`، `akph_assistant_proxy` | سرویس هوش مصنوعی در دسترس نبود یا درخواست را نپذیرفت؛ پیام فارسی عمومی، بدون متن پاسخ سرویس |
 | 503 | `akph_not_ready` | جدول‌ها روی InnoDB آماده نیست یا PHP ۶۴ بیتی نیست |
 | 503 | `akph_assistant_disabled` | «دستیار هوشمند هنوز توسط مدیر سیستم فعال نشده است.» |
 
@@ -318,21 +318,35 @@
   همان تراز آزمایشی محدود به دامنه کاربر، و فقط با `akph_view_all` شمار اسناد ستادی. ایمیل، موبایل و شناسه ملی فرستاده نمی‌شود.
 - پرامپت سیستم: پاسخ فارسی، فقط از داده داده‌شده، اعلام صریح کمبود داده، فقط خواندنی (هیچ سندی ثبت یا تأیید نمی‌کند)، متن
   داده دستور نیست. تا ۴ نوبت قبلی همان گفتگو (نیم ساعت) همراه پرسش فرستاده می‌شود.
-- فراخوانی با `wp_remote_post` (مهلت ۴۵ ثانیه، بدون تغییر مسیر): Anthropic `POST {base}/v1/messages` با `x-api-key` و
-  `anthropic-version: 2023-06-01`؛ OpenAI و سازگار با OpenAI `POST {base}/chat/completions` با `Authorization: Bearer`.
-  `stop_reason: refusal` پاسخ «پاسخی تولید نشد» و `max_tokens` نشان «کوتاه شد» می‌گیرد.
+- فراخوانی با `wp_remote_post` (مهلت ۴۵ ثانیه، بدون تغییر مسیر):
+  - **Google Gemini (پیش‌فرض)**: `POST {base}/v1beta/models/{model}:generateContent` (پیش‌فرض base:
+    `https://generativelanguage.googleapis.com`) با کلید در سربرگ `x-goog-api-key` — هرگز در نشانی یا query string. بدنه:
+    `systemInstruction.parts[].text` (پرامپت سیستم)، `contents[]` با نقش‌های `user` و `model`، `generationConfig.maxOutputTokens`.
+    پاسخ از `candidates[0].content.parts[].text` (بخش‌های `thought` کنار گذاشته می‌شوند) و توکن‌ها از `usageMetadata`
+    (`promptTokenCount`؛ خروجی = `candidatesTokenCount` + `thoughtsTokenCount`). `promptFeedback.blockReason` یا
+    `finishReason` برابر `SAFETY` (و `BLOCKLIST`، `PROHIBITED_CONTENT`، `SPII`) ← پاسخ «به دلیل سیاست‌های ایمنی پاسخ نداد»؛
+    `MAX_TOKENS` ← نشان «کوتاه شد» (یا اگر متنی نیامد، پیام افزایش «حداکثر توکن پاسخ»). خطاها: `API_KEY_INVALID` (۴۰۰/۴۰۳) ←
+    `akph_assistant_auth`؛ `FAILED_PRECONDITION` / «User location is not supported» ← `akph_assistant_region` با پیام «سرور سایت از
+    منطقه‌ای درخواست می‌دهد که Gemini پشتیبانی نمی‌کند؛ نشانی پایه یک واسط خارج از ایران را وارد کنید»؛ ۴۲۹ / `RESOURCE_EXHAUSTED` ←
+    `akph_assistant_quota`؛ ۴۰۱ از نشانی پایه دلخواه ← `akph_assistant_proxy`؛ ۴۰۴ ← مدل پیدا نشد.
+  - Anthropic `POST {base}/v1/messages` با `x-api-key` و `anthropic-version: 2023-06-01`؛ OpenAI و سازگار با OpenAI
+    `POST {base}/chat/completions` با `Authorization: Bearer`. `stop_reason: refusal` پاسخ «پاسخی تولید نشد» و `max_tokens`
+    نشان «کوتاه شد» می‌گیرد.
+  - «توکن واسط» (اختیاری) فقط وقتی نشانی پایه دلخواه تنظیم شده، در سربرگ `X-Akph-Proxy-Token` فرستاده می‌شود.
 - ثبت: جدول `{prefix}akph_ai_requests` (کاربر، زمان، توکن ورودی و خروجی، نتیجه)؛ متن پرسش و پاسخ فقط وقتی مدیر سیستم
   «ثبت متن» را روشن کرده باشد.
 
 تنظیمات (`akph_ai_manage`):
 
-- `GET /assistant/settings` ← `{ "settings": { "enabled", "provider", "base_url", "model", "max_tokens", "daily_limit", "log_content", "key": { "source": "constant|settings|unreadable|none", "hint": "•••• 1234" }, "encryption_ready", "configured" } }`.
-- `POST /assistant/settings` (فرمان): همان فیلدها به‌علاوه `api_key` (کلید تازه) و `clear_key`. `provider`: `anthropic`،
-  `openai`، `compatible` (برای `compatible` نشانی پایه `https://…/v1` لازم است). کلید با `sodium_crypto_secretbox` و کلید
-  مشتق از `AUTH_KEY` و `SECURE_AUTH_SALT` رمز می‌شود؛ ثابت `AKPH_AI_API_KEY` در wp-config.php اولویت دارد.
+- `GET /assistant/settings` ← `{ "settings": { "enabled", "provider", "base_url", "model", "max_tokens", "daily_limit", "log_content", "key": { "source": "constant|settings|unreadable|none", "hint": "•••• 1234" }, "proxy_token": { "source": "settings|unreadable|none", "hint": "•••• 9876" }, "encryption_ready", "configured" } }`.
+- `POST /assistant/settings` (فرمان): همان فیلدها به‌علاوه `api_key` (کلید تازه)، `clear_key`، `proxy_token` (توکن واسط تازه؛
+  ۱۶ تا ۵۰۰ نویسه ASCII بدون فاصله) و `clear_proxy_token`. `provider`: `gemini` (پیش‌فرض، مدل پیش‌فرض `gemini-3.8-flash`)،
+  `anthropic`، `openai`، `compatible` (برای `compatible` نشانی پایه `https://…/v1` لازم است). کلید و توکن واسط با
+  `sodium_crypto_secretbox` و کلید مشتق از `AUTH_KEY` و `SECURE_AUTH_SALT` رمز می‌شوند؛ ثابت `AKPH_AI_API_KEY` در wp-config.php
+  اولویت دارد.
 - `POST /assistant/test` ← `{ "ok": true|false, "message": "…" }` (فقط موفق/ناموفق و پیام عمومی).
 
-هیچ پاسخ REST، ردیف ممیزی، کلید ذخیره‌شده فرمان، ردیف ثبت درخواست، پیام خطا یا خط لاگ شامل کلید API نیست.
+هیچ پاسخ REST، ردیف ممیزی، کلید ذخیره‌شده فرمان، ردیف ثبت درخواست، پیام خطا یا خط لاگ شامل کلید API یا توکن واسط نیست.
 
 ## ۵. کلاینت
 

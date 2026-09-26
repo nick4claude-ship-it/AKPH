@@ -74,10 +74,11 @@
 
 | فیلد | توضیح |
 |---|---|
-| سرویس‌دهنده | Anthropic (Claude)، OpenAI یا «سازگار با OpenAI» |
-| نشانی پایه | برای Anthropic و OpenAI خالی (نشانی رسمی). برای سازگار با OpenAI نشانی کامل تا `/v1` با `https://`؛ مسیر `/chat/completions` خودکار اضافه می‌شود |
-| مدل | نام مدل در همان سرویس (پیش‌فرض Anthropic: `claude-opus-5`) |
+| سرویس‌دهنده | **Google Gemini (پیش‌فرض)**، Anthropic (Claude)، OpenAI یا «سازگار با OpenAI» |
+| نشانی پایه | خالی = نشانی رسمی سرویس. برای Gemini از طریق واسط: نشانی واسط بدون مسیر (مسیر `/v1beta/models/{مدل}:generateContent` خودکار اضافه می‌شود). برای سازگار با OpenAI نشانی کامل تا `/v1` با `https://`؛ مسیر `/chat/completions` خودکار اضافه می‌شود |
+| مدل | نام دقیق مدل در همان سرویس (پیش‌فرض Gemini: `gemini-3.8-flash`؛ Anthropic: `claude-opus-5`) |
 | کلید API | رمزنگاری‌شده ذخیره می‌شود و فقط «•••• چهار نویسه آخر» نمایش داده می‌شود؛ برای نگه‌داشتن کلید فعلی خالی بگذارید |
+| توکن واسط (اختیاری) | رمز مشترک سایت و واسط؛ مثل کلید رمزنگاری‌شده ذخیره می‌شود و فقط به نشانی پایه دلخواه، در سربرگ جداگانه `X-Akph-Proxy-Token`، فرستاده می‌شود (هرگز به نشانی رسمی Google) |
 | حداکثر توکن پاسخ | ۶۴ تا ۳۲۰۰۰ (پیش‌فرض ۴۰۹۶) |
 | سقف روزانه درخواست هر کاربر | ۱ تا ۱۰۰۰ (پیش‌فرض ۳۰)؛ درخواست ناموفق شمرده نمی‌شود |
 | ثبت متن | اگر روشن باشد متن کامل پرسش و پاسخ هم در `akph_ai_requests` ذخیره می‌شود؛ در حالت عادی فقط کاربر، زمان، توکن و نتیجه |
@@ -96,12 +97,109 @@
   و ایمیل، موبایل یا شناسه ملی نمی‌فرستد. فقط خواندنی است و هیچ سندی ثبت یا تأیید نمی‌کند.
 
 **نکته شبکه (میزبان در ایران):** ممکن است سرور سایت به `api.anthropic.com` یا `api.openai.com` دسترسی نداشته باشد (یا سرویس
-درخواست از ایران را نپذیرد). در این حالت خطای «اتصال به سرویس هوش مصنوعی برقرار نشد» نمایش داده می‌شود. راه‌حل: سرویس‌دهنده را
+درخواست از ایران را نپذیرد). برای Gemini بخش «Google Gemini» پایین را ببینید. برای سرویس‌های دیگر، خطای «اتصال به سرویس هوش مصنوعی
+برقرار نشد» نمایش داده می‌شود. راه‌حل: سرویس‌دهنده را
 «سازگار با OpenAI» بگذارید و نشانی پایه یک سرویس یا واسط (gateway) در دسترس از سرور شما را وارد کنید که API سازگار با
 `POST /v1/chat/completions` دارد (برای نمونه یک واسط شرکتی خارج از ایران یا یک سرویس داخلی سازگار)، سپس مدل و کلید همان سرویس را
 وارد و «آزمون اتصال» را بزنید. نشانی باید `https` باشد؛ کلید فقط به همان نشانی فرستاده می‌شود و تغییر مسیر (redirect) دنبال
 نمی‌شود. با این کار داده خلاصه پروژه‌ها به آن سرویس می‌رود؛ سرویسی را انتخاب کنید که به آن اعتماد دارید و قرارداد نگه‌داری
 داده آن را بررسی کرده‌اید.
+
+#### Google Gemini
+
+**۱. گرفتن کلید:** با حساب Google شرکت به [Google AI Studio](https://aistudio.google.com/apikey) بروید، «Create API key» را بزنید
+و کلید را برای یک پروژه Google Cloud بسازید. کلید را فقط در تنظیمات دستیار (یا ثابت `AKPH_AI_API_KEY` در wp-config.php) وارد کنید
+و جای دیگری نگه ندارید. سقف تعداد درخواست (quota) و هزینه در همان پروژه تعیین می‌شود؛ خطای «سهمیه یا سقف تعداد درخواست Gemini پر
+شده است» یعنی باید صبر کنید یا سهمیه/Billing پروژه را بررسی کنید. طبق شرایط Google، در سطح رایگان ممکن است محتوای درخواست‌ها برای
+بهبود محصولات Google به کار رود؛ برای داده مالی واقعی شرایط را بخوانید و در صورت لزوم Billing را فعال کنید.
+
+**۲. انتخاب مدل:** پیش‌فرض `gemini-3.8-flash` (مدل Flash پایدار در فهرست مدل‌های Google هنگام انتشار این نسخه) است. نام دقیق را
+همیشه از [فهرست مدل‌های Gemini API](https://ai.google.dev/gemini-api/docs/models) بردارید و از مدل‌های پایدار (نه preview یا
+experimental) استفاده کنید؛ برای هزینه کمتر مدل Flash-Lite پایدار را بگذارید. مدل‌های «فکرکننده» توکن فکر کردن را هم از «حداکثر توکن
+پاسخ» کم می‌کنند؛ اگر پیام «پاسخ پیش از نوشته شدن به سقف توکن رسید» دیدید، این عدد را بیشتر کنید (۴۰۹۶ یا ۸۱۹۲).
+
+**۳. درخواست به Gemini:** افزونه `POST {نشانی پایه}/v1beta/models/{مدل}:generateContent` را با کلید در سربرگ `x-goog-api-key`
+می‌فرستد (کلید هرگز در نشانی یا query string نیست و redirect دنبال نمی‌شود). پیام‌های خطا فارسی‌اند: کلید نامعتبر، منطقه
+پشتیبانی‌نشده، پر شدن سهمیه، و مسدود شدن پرسش یا پاسخ به دلیل سیاست‌های ایمنی.
+
+**۴. میزبان در ایران و واسط:** Google درخواست‌هایی را که از منطقه پشتیبانی‌نشده می‌آیند نمی‌پذیرد (`FAILED_PRECONDITION` / «User
+location is not supported»). در این حالت پیام «سرور سایت از منطقه‌ای درخواست می‌دهد که Gemini پشتیبانی نمی‌کند؛ نشانی پایه یک واسط
+خارج از ایران را وارد کنید» نمایش داده می‌شود. پیش از راه‌اندازی واسط، شرایط استفاده Google (از جمله فهرست مناطق پشتیبانی‌شده) و
+مقررات مربوط را بررسی کنید؛ مسئولیت انطباق با مدیر سامانه است.
+
+نمونه واسط امن با Cloudflare Workers — فقط `generateContent` را به `generativelanguage.googleapis.com` می‌رساند، بدون «توکن واسط»
+درست چیزی را عبور نمی‌دهد، متن درخواست یا پاسخ را ذخیره یا لاگ نمی‌کند و کلید را فقط به Google می‌فرستد:
+
+`worker.js`:
+
+```js
+// واسط Gemini برای پرتال AKPH: فقط POST /v1beta/models/{model}:generateContent
+const UPSTREAM = 'https://generativelanguage.googleapis.com';
+const ALLOWED_PATH = /^\/v1beta\/models\/[A-Za-z0-9._-]{1,100}:generateContent$/;
+const MAX_BODY = 1024 * 1024; // ۱ مگابایت
+
+// مقایسه در زمان ثابت
+function sameSecret(given, expected) {
+  if (!given || !expected) return false;
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(expected);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (request.method !== 'POST' || !ALLOWED_PATH.test(url.pathname) || url.search !== '') {
+      return new Response('Not found', { status: 404 });
+    }
+    if (!sameSecret(request.headers.get('X-Akph-Proxy-Token'), env.PROXY_TOKEN)) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    const key = request.headers.get('x-goog-api-key');
+    const length = Number(request.headers.get('content-length') || '0');
+    if (!key || length > MAX_BODY) {
+      return new Response('Bad request', { status: 400 });
+    }
+    // فقط کلید و نوع محتوا به Google می‌رود؛ توکن واسط و سربرگ‌های دیگر نه. هیچ console.log یا ذخیره‌ای نیست.
+    const upstream = await fetch(UPSTREAM + url.pathname, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+      body: request.body,
+      redirect: 'manual',
+    });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { 'content-type': upstream.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' },
+    });
+  },
+};
+```
+
+`wrangler.toml` (لاگ‌ها خاموش):
+
+```toml
+name = "akph-gemini-proxy"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+[observability]
+enabled = false
+```
+
+راه‌اندازی:
+
+1. یک توکن تصادفی بسازید: `openssl rand -hex 32` (همین مقدار در Worker و در تنظیمات دستیار).
+2. `npx wrangler secret put PROXY_TOKEN` و توکن را وارد کنید (به صورت Secret، نه متغیر معمولی)، سپس `npx wrangler deploy`.
+3. در داشبورد Cloudflare برای این Worker، Logpush و Workers Logs را خاموش نگه دارید تا متن پرسش‌ها جایی ثبت نشود.
+4. اگر نشانی `*.workers.dev` از سرور سایت در دسترس نیست، Worker را به یک زیردامنه خودتان (Custom Domain) وصل کنید.
+5. در تنظیمات دستیار: سرویس‌دهنده «Google Gemini»، نشانی پایه `https://gemini-proxy.example.com` (بدون مسیر)، مدل، کلید API و
+   «توکن واسط» همان مقدار مرحله ۱؛ سپس «آزمون اتصال».
+
+اگر «آزمون اتصال» پیام «واسط درخواست را نپذیرفت» داد، توکن دو طرف یکسان نیست. اگر باز هم پیام منطقه پشتیبانی‌نشده آمد، Worker در
+مرکز داده‌ای اجرا شده که Gemini آن را نمی‌پذیرد؛ واسط را در منطقه‌ای پشتیبانی‌شده (مثلاً اروپا) اجرا کنید.
 
 ## ۵. کدینگ حساب‌ها
 

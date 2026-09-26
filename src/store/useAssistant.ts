@@ -147,8 +147,9 @@ export function useAssistantSettings(enabled: boolean) {
       if (input.provider === 'compatible' && !input.baseUrl.trim()) return { ok: false, message: 'برای سرویس سازگار با OpenAI نشانی پایه لازم است.', field: 'baseUrl' };
       if (input.baseUrl.trim() && !/^https:\/\/[^\s/?#]+/i.test(input.baseUrl.trim())) return { ok: false, message: 'نشانی پایه باید با https:// شروع شود.', field: 'baseUrl' };
       if (!input.model.trim()) return { ok: false, message: 'نام مدل را وارد کنید.', field: 'model' };
-      // The key is not part of the fingerprint kept in memory; its presence is.
-      const { key, inFlight } = commandKeys.acquire('assistant.settings', [{ ...input, apiKey: input.apiKey ? generateUUID() : '' }]);
+      if (input.proxyToken.trim() && !/^[\x21-\x7E]{16,500}$/.test(input.proxyToken.trim())) return { ok: false, message: 'توکن واسط باید دست‌کم ۱۶ نویسه لاتین بدون فاصله باشد.', field: 'proxyToken' };
+      // The key and the proxy token are not part of the fingerprint kept in memory; their presence is.
+      const { key, inFlight } = commandKeys.acquire('assistant.settings', [{ ...input, apiKey: input.apiKey ? generateUUID() : '', proxyToken: input.proxyToken ? generateUUID() : '' }]);
       if (inFlight) return { ok: false, message: 'درخواست قبلی هنوز در حال ارسال است.' };
       setBusy('save');
       try {
@@ -158,7 +159,7 @@ export function useAssistantSettings(enabled: boolean) {
         return { ok: true, message: result.message };
       } catch (err) {
         commandKeys.settle(key, err instanceof ApiError && err.outcomeUnknown ? 'unknown' : 'rejected');
-        const field = err instanceof ApiError ? ({ base_url: 'baseUrl', model: 'model', api_key: 'apiKey', max_tokens: 'maxTokens', daily_limit: 'dailyLimit' } as Record<string, string>)[err.field] : undefined;
+        const field = err instanceof ApiError ? ({ base_url: 'baseUrl', model: 'model', api_key: 'apiKey', proxy_token: 'proxyToken', max_tokens: 'maxTokens', daily_limit: 'dailyLimit' } as Record<string, string>)[err.field] : undefined;
         return { ok: false, message: err instanceof ApiError ? err.farsiMessage : 'ذخیره انجام نشد.', field };
       } finally {
         setBusy(null);
@@ -182,8 +183,23 @@ export function useAssistantSettings(enabled: boolean) {
   return { available: !!api, status, loadError, reload: load, settings, busy, save, test };
 }
 
-export const PROVIDER_OPTIONS: { value: AssistantProvider; label: string; hint: string }[] = [
-  { value: 'anthropic', label: 'Anthropic (Claude)', hint: 'نشانی پایه را خالی بگذارید (https://api.anthropic.com).' },
-  { value: 'openai', label: 'OpenAI', hint: 'نشانی پایه را خالی بگذارید (https://api.openai.com/v1).' },
-  { value: 'compatible', label: 'سازگار با OpenAI', hint: 'نشانی سرویس تا /v1 را وارد کنید؛ مسیر /chat/completions خودکار اضافه می‌شود.' },
+export const PROVIDER_OPTIONS: { value: AssistantProvider; label: string; hint: string; baseUrlHint: string; defaultModel: string }[] = [
+  {
+    value: 'gemini',
+    label: 'Google Gemini',
+    hint: 'کلید را از Google AI Studio بگیرید. سرور داخل ایران: نشانی یک واسط خارج از ایران را در «نشانی پایه» وارد کنید.',
+    baseUrlHint: 'اختیاری؛ خالی = https://generativelanguage.googleapis.com — یا نشانی واسط بدون مسیر',
+    defaultModel: 'gemini-3.8-flash',
+  },
+  { value: 'anthropic', label: 'Anthropic (Claude)', hint: 'نشانی پایه را خالی بگذارید (https://api.anthropic.com).', baseUrlHint: 'اختیاری', defaultModel: 'claude-opus-5' },
+  { value: 'openai', label: 'OpenAI', hint: 'نشانی پایه را خالی بگذارید (https://api.openai.com/v1).', baseUrlHint: 'اختیاری', defaultModel: '' },
+  { value: 'compatible', label: 'سازگار با OpenAI', hint: 'نشانی سرویس تا /v1 را وارد کنید؛ مسیر /chat/completions خودکار اضافه می‌شود.', baseUrlHint: 'الزامی؛ مثل https://example.com/v1', defaultModel: '' },
 ];
+
+/** Model after a provider change: the new provider's default when the model was empty or another provider's default. */
+export function modelForProvider(provider: AssistantProvider, currentModel: string): string {
+  const current = currentModel.trim();
+  const isDefault = current === '' || PROVIDER_OPTIONS.some((p) => p.defaultModel !== '' && p.defaultModel === current);
+  const next = PROVIDER_OPTIONS.find((p) => p.value === provider)?.defaultModel ?? '';
+  return isDefault ? next : currentModel;
+}
