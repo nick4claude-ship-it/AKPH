@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, Bell, Calendar, CheckCircle2, AlertTriangle, ChevronDown, Printer, Sparkles, Menu, UserRound } from 'lucide-react';
+import { Search, Bell, Calendar, CheckCircle2, AlertTriangle, ChevronDown, Printer, Sparkles, Menu, UserRound, LogOut } from 'lucide-react';
 import { Project, TimeRange, UserProfile, ManagementAlert } from '../../types';
 import { getCurrentFiscalYear, getFormattedCurrentPersianDate, getCurrentPersianMonthName } from '../../utils/date';
 import { formatInt } from '../../utils/money';
@@ -19,6 +19,8 @@ interface HeaderProps {
   onOpenMenu: () => void;
   /** Opens the signed-in user's account page. */
   onOpenAccount?: () => void;
+  /** «خروج از حساب» (asks for confirmation). */
+  onLogout?: () => void;
   user: UserProfile;
   alerts: ManagementAlert[];
   onOpenAlertsModal: () => void;
@@ -57,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAiAgent,
   onOpenMenu,
   onOpenAccount,
+  onLogout,
   user,
   alerts,
   onOpenAlertsModal,
@@ -216,6 +219,20 @@ export const Header: React.FC<HeaderProps> = ({
                     className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm text-ink hover:bg-canvas text-right cursor-pointer"
                   >
                     تغییر نقش (فقط محیط توسعه)
+                  </button>
+                )}
+                {onLogout && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-2 mt-1 border-t border-line rounded-md text-sm text-danger hover:bg-danger-soft text-right cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" aria-hidden />
+                    خروج از حساب
                   </button>
                 )}
               </div>

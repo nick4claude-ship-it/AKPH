@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, LogOut, Sparkles, UsersRound, X } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { matchNav, navTrail, visibleNav, NavNode } from '../../navigation/navConfig';
 import { usePermission, useSession } from '../../store/session';
@@ -21,6 +21,8 @@ interface SidebarProps {
   onOpenAiAgent: () => void;
   /** Opens the signed-in user's account page. */
   onOpenAccount?: () => void;
+  /** «خروج از حساب» (asks for confirmation). */
+  onLogout?: () => void;
   counts?: Record<string, string>;
   /** Mobile and tablet: the menu is a drawer opened from the header. */
   mobileOpen: boolean;
@@ -35,6 +37,7 @@ const NavPanel: React.FC<Omit<SidebarProps, 'mobileOpen'> & { drawer?: boolean }
   onOpenLogout,
   onOpenAiAgent,
   onOpenAccount,
+  onLogout,
   counts = {},
   onCloseMobile,
   drawer = false,
@@ -209,10 +212,25 @@ const NavPanel: React.FC<Omit<SidebarProps, 'mobileOpen'> & { drawer?: boolean }
           </button>
           {onOpenLogout && !narrow && (
             <button type="button" onClick={onOpenLogout} title="تغییر کاربر (فقط محیط توسعه)" aria-label="تغییر کاربر (فقط محیط توسعه)" className="btn btn-icon text-slate-300 hover:text-white hover:bg-white/10">
-              <LogOut className="w-5 h-5" />
+              <UsersRound className="w-5 h-5" />
             </button>
           )}
         </div>
+        {onLogout && (
+          <button
+            type="button"
+            onClick={() => {
+              onCloseMobile();
+              onLogout();
+            }}
+            aria-label={narrow ? 'خروج از حساب' : undefined}
+            title={narrow ? 'خروج از حساب' : undefined}
+            className={`mt-2 w-full flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer ${narrow ? 'justify-center' : ''}`}
+          >
+            <LogOut className="w-5 h-5 shrink-0" aria-hidden />
+            {!narrow && <span>خروج از حساب</span>}
+          </button>
+        )}
       </div>
     </div>
   );

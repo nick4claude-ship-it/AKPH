@@ -12,6 +12,7 @@ import type { AssistantApi } from '../api/assistant';
 import type { CurrencyUnit } from '../utils/money';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
 import { matchNav } from '../navigation/navConfig';
+import { emitToast } from './toast';
 
 /** A change of the signed-in user's own data, applied to the running app without reloading it. */
 export interface SessionPatch {
@@ -37,6 +38,8 @@ interface SessionValue {
   account?: AccountApi;
   /** Server assistant (akph); absent with demo data. */
   assistant?: AssistantApi;
+  /** WordPress logout address (wp_logout_url with a nonce, back to the portal login); absent on the public demo. */
+  logoutUrl?: string;
   updateSession?: (patch: SessionPatch) => void;
 }
 
@@ -142,4 +145,19 @@ export function useApplyStartPage(): void {
     // Only the first render of the session counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+}
+
+/**
+ * «خروج از حساب»: leaves through WordPress (wp_logout_url, nonce included), which returns to the portal's login
+ * page. On the public demo there is no account: `available` is false and `logout` only explains that.
+ */
+export function useLogout(): { available: boolean; logout: () => void } {
+  const { logoutUrl } = useSession();
+  return {
+    available: !!logoutUrl,
+    logout: useCallback(() => {
+      if (logoutUrl) window.location.assign(logoutUrl);
+      else emitToast('در نسخه نمایشی حسابی برای خروج وجود ندارد.');
+    }, [logoutUrl]),
+  };
 }

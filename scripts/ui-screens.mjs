@@ -80,7 +80,7 @@ function serve(dir) {
  * plus buttons without an accessible name, form controls without a label, and horizontal page overflow.
  */
 function auditPage(minPx) {
-  const out = { small: [], font: [], digits: [], contrast: [], names: [], labels: [], overflow: [], checked: 0 };
+  const out = { logout: [], small: [], font: [], digits: [], contrast: [], names: [], labels: [], overflow: [], checked: 0 };
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -191,8 +191,38 @@ function auditPage(minPx) {
 }
 
 /** Violation kinds. The first two are the typography test; all of them fail the run unless --report. */
-const KINDS = ['small', 'font', 'digits', 'contrast', 'names', 'labels', 'overflow'];
-const KIND_LABELS = { small: `زیر ${MIN_FONT_PX}px`, font: 'فونت غیر Vazirmatn', digits: 'رقم لاتین', contrast: 'کنتراست کم', names: 'دکمه بی‌نام', labels: 'کنترل بی‌برچسب', overflow: 'اسکرول افقی صفحه' };
+const KINDS = ['small', 'font', 'digits', 'contrast', 'names', 'labels', 'overflow', 'logout'];
+const KIND_LABELS = { small: `زیر ${MIN_FONT_PX}px`, font: 'فونت غیر Vazirmatn', digits: 'رقم لاتین', contrast: 'کنتراست کم', names: 'دکمه بی‌نام', labels: 'کنترل بی‌برچسب', overflow: 'اسکرول افقی صفحه', logout: 'دکمه خروج' };
+const LOGOUT = 'خروج از حساب';
+
+/**
+ * «خروج از حساب» with that accessible name: at the bottom of the menu (the sidebar at 1440px, the drawer at
+ * 390px) and in the avatar menu, and it asks for confirmation before leaving.
+ */
+async function checkLogout(page, vp) {
+  const problems = [];
+  const visible = async (locator, what) => {
+    if (!(await locator.first().isVisible().catch(() => false))) problems.push(`${what}: no visible «${LOGOUT}»`);
+  };
+  if (vp.isMobile) {
+    await page.getByRole('button', { name: 'باز کردن منو' }).click();
+    const drawer = page.getByRole('dialog', { name: 'منوی اصلی' });
+    await visible(drawer.getByRole('button', { name: LOGOUT, exact: true }), 'menu drawer');
+    await page.keyboard.press('Escape');
+  } else {
+    await visible(page.locator('aside').getByRole('button', { name: LOGOUT, exact: true }), 'sidebar');
+  }
+  await page.getByRole('button', { name: /^حساب کاربری / }).click();
+  const item = page.getByRole('menuitem', { name: LOGOUT, exact: true });
+  await visible(item, 'avatar menu');
+  if (await item.first().isVisible().catch(() => false)) {
+    await item.first().click();
+    const confirm = page.getByRole('dialog', { name: LOGOUT });
+    if (!(await confirm.isVisible().catch(() => false))) problems.push('no confirmation dialog');
+    else await confirm.getByRole('button', { name: 'انصراف' }).click();
+  }
+  return problems;
+}
 const skipKinds = (args.find((a) => a.startsWith('--skip=')) || '--skip=').slice('--skip='.length).split(',').filter(Boolean);
 
 async function main() {
@@ -225,6 +255,15 @@ async function main() {
         const flag = KINDS.some((k) => !skipKinds.includes(k) && audit[k].length) ? '✘' : '✔';
         console.log(`  ${flag} ${vp.name.padStart(4)} ${route.path.padEnd(26)} texts ${String(audit.checked).padStart(4)}  ${counts.join('  ')}`);
       }
+      if (!skipKinds.includes('logout')) {
+        await page.goto('about:blank');
+        await page.goto(`${base}#/`, { waitUntil: 'networkidle' });
+        await page.waitForSelector('main', { timeout: 20000 });
+        const logout = await checkLogout(page, vp);
+        const empty = Object.fromEntries(KINDS.map((k) => [k, []]));
+        results.push({ viewport: vp.name, route: 'logout', path: '/', ...empty, logout, checked: 0, loadedFonts: [] });
+        console.log(`  ${logout.length ? '✘' : '✔'} ${vp.name.padStart(4)} «${LOGOUT}»${' '.repeat(12)}${logout.join('؛ ') || 'در منو و منوی آواتار، با تأیید'}`);
+      }
       await context.close();
     }
   } finally {
@@ -248,7 +287,7 @@ async function main() {
     console.log('\n✘ آزمون ظاهر رد شد.');
     process.exit(1);
   }
-  console.log(failed ? '\n(حالت گزارش: رد نمی‌شود)' : `\n✔ همه متن‌ها ${MIN_FONT_PX}px یا بزرگ‌تر، با فونت Vazirmatn، ارقام فارسی و کنتراست کافی؛ دکمه‌ها و کنترل‌ها نام دارند؛ صفحه اسکرول افقی ندارد.`);
+  console.log(failed ? '\n(حالت گزارش: رد نمی‌شود)' : `\n✔ همه متن‌ها ${MIN_FONT_PX}px یا بزرگ‌تر، با فونت Vazirmatn، ارقام فارسی و کنتراست کافی؛ دکمه‌ها و کنترل‌ها نام دارند؛ صفحه اسکرول افقی ندارد؛ «${LOGOUT}» در هر دو عرض هست.`);
 }
 
 await main();
