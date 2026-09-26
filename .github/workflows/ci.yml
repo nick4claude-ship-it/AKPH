@@ -96,6 +96,28 @@ jobs:
           WP_TESTS_PHPUNIT_POLYFILLS_PATH: ${{ github.workspace }}/tests/php/vendor/yoast/phpunit-polyfills
         run: vendor/bin/phpunit -c phpunit.xml.dist
 
+  ui:
+    name: UI screenshots (demo, 1440px and 390px) and typography audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+      # Baseline: the audit only reports here; the redesign makes it strict.
+      - name: Screenshots of every menu route and typography audit
+        run: npm run test:ui -- --report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: ui-screenshots/
+          if-no-files-found: error
+
   plugin:
     name: plugin ZIP (package check)
     runs-on: ubuntu-latest

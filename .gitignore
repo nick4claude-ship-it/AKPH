@@ -11,3 +11,5 @@ design-handoff.zip
 tests/php/vendor/
 tests/php/composer.lock
 tests/php/.phpunit.result.cache
+.ui-build/
+ui-screenshots/
