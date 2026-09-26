@@ -41,6 +41,7 @@ require_once AKPH_PORTAL_DIR . 'includes/class-akph-rest.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-migration.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-admin.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-app.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-login.php';
 
 register_activation_hook(__FILE__, array('Akph_Plugin', 'activate'));
 // Deactivation only stops the daily cleanup; tables, options and capabilities stay (no uninstall.php either).
@@ -63,6 +64,7 @@ final class Akph_Plugin {
         Akph_Account::boot();
         Akph_Admin::boot();
         Akph_App::boot();
+        Akph_Login::boot();
     }
 
     public static function activate() {
