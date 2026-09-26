@@ -62,7 +62,9 @@ export const NON_MONEY_NUMERIC_FIELDS: ReadonlySet<string> = new Set([
   'durationMonths', 'extendedDays', 'holidayWorkHours', 'itemsCount', 'missionDays', 'nightWorkHours', 'overdueDays',
   'overtimeHours', 'paidLeaveDays', 'standardWorkDays', 'totalOrdersCount', 'warrantyMonths',
   // technical / derived display values (KpiItem.value is formatted by its own unit; version is a server token)
-  'value', 'version',
+  'value', 'version', 'recordVersion',
+  // file sizes (bytes)
+  'sizeBytes',
 ]);
 
 /** Objects whose every numeric value is money (e.g. a project's expense breakdown). */

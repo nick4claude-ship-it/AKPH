@@ -31,6 +31,7 @@ import { formatPercent, formatDecimal, formatText } from '../../utils/formatters
 import { useCompany } from '../../store/session';
 import { clientStatementActions, statementVatPercent } from '../../store/views/contracts';
 import { Money } from '../common/Money';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 interface StatementDetailAndPrintModalProps {
   statement: DetailedProgressStatement;
@@ -379,6 +380,10 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                     </tfoot>
                   </table>
                 </div>
+              </div>
+
+              <div className="no-print">
+                <AttachmentsPanel entityType="client_statement" entityId={statement.id} projectId={statement.projectId} counterpartyId={statement.counterpartyId} />
               </div>
             </div>
           ) : (

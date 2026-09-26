@@ -99,6 +99,7 @@ export interface Me {
   fiscalYear: number;
   closedFiscalYears: number[];
   preferences: AccountPreferences;
+  documentMaxBytes: number;
 }
 
 export function parseMe(raw: unknown): Me {
@@ -125,6 +126,7 @@ export function parseMe(raw: unknown): Me {
     fiscalYear: int(route, o, 'fiscal_year'),
     closedFiscalYears: arr(route, o, 'closed_fiscal_years').map((y) => Number(y)).filter((y) => Number.isInteger(y)),
     preferences: parsePreferences(o.preferences),
+    documentMaxBytes: typeof o.document_max_bytes === 'number' && o.document_max_bytes > 0 ? o.document_max_bytes : 20 * 1024 * 1024,
   };
 }
 

@@ -53,6 +53,7 @@ import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { paymentRequestActions, selectTreasuryKpis } from '../../store/views/treasury';
 import { Money } from '../common/Money';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 interface PaymentsTreasuryModuleProps {
   /** Initial tab from the route (payments, receipts, banks, cash). */
@@ -714,7 +715,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
       {/* Modal: Execute Payment to Beneficiary */}
       {selectedRequestForPay && (
-        <Dialog onClose={() => setSelectedRequestForPay(null)} label="دستور پرداخت و خروج نقدینگی از حساب" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog onClose={() => setSelectedRequestForPay(null)} label="دستور پرداخت و خروج نقدینگی از حساب" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
           
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
@@ -753,6 +754,10 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                   <Money rial={selectedRequestForPay.remainingAmount} />
                 </strong>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <AttachmentsPanel entityType="payment_request" entityId={selectedRequestForPay.id} projectId={selectedRequestForPay.projectId} counterpartyId={selectedRequestForPay.counterpartyId} />
             </div>
 
             <form onSubmit={handleExecutePayment} className="space-y-4 text-sm">

@@ -4,6 +4,7 @@
  *   mode      'live' (akph/v1 server) or 'demo' (sample data in the browser, system administrator only)
  *   currency  display unit 'toman' or 'rial' (amounts are always stored in Rials)
  *   closed_fiscal_years  Jalali years that no longer accept entries
+ *   document_max_mb  upload limit of the document center (1 to 50 MB, default 20)
  */
 if (!defined('ABSPATH')) {
     exit;
@@ -13,7 +14,7 @@ final class Akph_Settings {
     const OPTION = 'akph_portal_settings';
 
     public static function defaults() {
-        return array('mode' => 'live', 'currency' => 'toman', 'closed_fiscal_years' => array());
+        return array('mode' => 'live', 'currency' => 'toman', 'closed_fiscal_years' => array(), 'document_max_mb' => 20);
     }
 
     public static function all() {
@@ -38,7 +39,13 @@ final class Akph_Settings {
             }
         }
         sort($closed);
-        return array('mode' => $mode, 'currency' => $currency, 'closed_fiscal_years' => array_values(array_unique($closed)));
+        $max_mb = isset($value['document_max_mb']) && is_numeric($value['document_max_mb']) ? (int) $value['document_max_mb'] : $d['document_max_mb'];
+        return array(
+            'mode' => $mode,
+            'currency' => $currency,
+            'closed_fiscal_years' => array_values(array_unique($closed)),
+            'document_max_mb' => max(1, min(50, $max_mb)),
+        );
     }
 
     public static function update(array $changes) {

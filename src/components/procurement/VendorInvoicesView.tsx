@@ -19,6 +19,7 @@ import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 import { formatPercent, formatText } from '../../utils/formatters';
 import { Money } from '../common/Money';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 interface VendorInvoicesViewProps {
   invoices: VendorInvoice[];
@@ -316,6 +317,8 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
                   {formatText(activeInvoiceForDetail.threeWayMatching.notes)}
                 </p>
               </div>
+
+              <AttachmentsPanel entityType="vendor_invoice" entityId={activeInvoiceForDetail.id} projectId={activeInvoiceForDetail.projectId} counterpartyId={activeInvoiceForDetail.counterpartyId} />
             </div>
 
             <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex justify-between items-center">

@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Akph_Schema {
-    const DB_VERSION = '3';
+    const DB_VERSION = '4';
     const OPTION_VERSION = 'akph_portal_db_version';
     /** Tables that are not InnoDB (transactions and row locks would silently not work). */
     const OPTION_ENGINE_PROBLEMS = 'akph_portal_engine_problems';
@@ -197,6 +197,39 @@ final class Akph_Schema {
  PRIMARY KEY  (id),
  KEY user_day (user_id,day),
  KEY created_at (created_at)",
+            'documents' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+ doc_number varchar(40) NOT NULL,
+ title varchar(190) NOT NULL,
+ doc_type varchar(40) NOT NULL DEFAULT 'other',
+ description varchar(1000) NOT NULL DEFAULT '',
+ project_id bigint(20) unsigned NULL DEFAULT NULL,
+ cost_center_id bigint(20) unsigned NULL DEFAULT NULL,
+ counterparty_id bigint(20) unsigned NULL DEFAULT NULL,
+ file_name varchar(255) NOT NULL,
+ stored_name varchar(100) NOT NULL,
+ mime varchar(100) NOT NULL,
+ size bigint(20) unsigned NOT NULL DEFAULT 0,
+ sha256 char(64) NOT NULL,
+ version int(10) unsigned NOT NULL DEFAULT 1,
+ uploaded_by bigint(20) unsigned NOT NULL,
+ uploaded_at datetime NOT NULL,
+ status varchar(12) NOT NULL DEFAULT 'active',
+ archived_by bigint(20) unsigned NULL DEFAULT NULL,
+ archived_at datetime NULL DEFAULT NULL,
+ PRIMARY KEY  (id),
+ UNIQUE KEY doc_number (doc_number),
+ KEY project_id (project_id),
+ KEY sha256 (sha256),
+ KEY status (status)",
+            'document_links' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+ document_id bigint(20) unsigned NOT NULL,
+ entity_type varchar(24) NOT NULL,
+ entity_id varchar(64) NOT NULL,
+ created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+ created_at datetime NOT NULL,
+ PRIMARY KEY  (id),
+ UNIQUE KEY link (document_id,entity_type,entity_id),
+ KEY entity (entity_type,entity_id)",
             'doc_sequences' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
  prefix varchar(8) NOT NULL,
  fiscal_year smallint(5) unsigned NOT NULL,
@@ -226,7 +259,8 @@ final class Akph_Schema {
      * the automatic retry waits for the backoff transient to expire.
      *
      * Versions: 1 — tables of 0.3.0; 2 — ledger_entries.reversal_target (the entry a reversal reverses, kept
-     * after a rejected reversal releases reversal_of); 3 — ai_requests (assistant requests: audit and daily limit).
+     * after a rejected reversal releases reversal_of); 3 — ai_requests (assistant requests: audit and daily limit); 4 — documents and document_links (document
+     * center and attachments; files in wp-content/uploads/akph-private).
      */
     public static function migrate() {
         global $wpdb;

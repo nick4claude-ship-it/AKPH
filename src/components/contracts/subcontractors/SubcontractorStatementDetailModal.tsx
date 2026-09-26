@@ -35,6 +35,7 @@ import {
 } from '../../../store/views/contracts';
 import { formatDecimal, formatText } from '../../../utils/formatters';
 import { Money } from '../../common/Money';
+import { AttachmentsPanel } from '../../documents/AttachmentsPanel';
 
 interface SubcontractorStatementDetailModalProps {
   isOpen: boolean;
@@ -325,6 +326,8 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
                   </div>
                 </div>
               )}
+
+              <AttachmentsPanel entityType="subcontractor_statement" entityId={statement.id} projectId={statement.projectId} counterpartyId={statement.counterpartyId} />
             </>
           )}
 

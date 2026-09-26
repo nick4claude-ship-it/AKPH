@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   ArrowRight,
   Plus,
-  Paperclip,
   Download,
   Share2,
   ExternalLink,
@@ -33,6 +32,7 @@ import {
 import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 import { barWidth, formatDecimal, formatPercent, formatInt, formatText } from '../../utils/formatters';
 import { Money } from '../common/Money';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 interface ContractDetailViewProps {
   contract: Contract;
@@ -709,10 +709,6 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                   <h3 className="text-base font-bold text-slate-900">اسناد فنی و مدارک قرارداد</h3>
                   <p className="text-xs text-slate-500">آرشیو نقشه‌ها، پیمان‌های اولیه، صورتجلسات و اکسل‌های متره</p>
                 </div>
-                <button className="btn btn-secondary">
-                  <Paperclip className="w-3.5 h-3.5" />
-                  <span>بارگذاری سند جدید</span>
-                </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -737,6 +733,8 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                   </div>
                 ))}
               </div>
+
+              <AttachmentsPanel entityType="contract" entityId={contract.id} projectId={contract.projectId} counterpartyId={contract.counterpartyId} />
             </div>
           )}
 

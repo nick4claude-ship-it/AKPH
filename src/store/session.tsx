@@ -9,6 +9,7 @@ import { CompanyProfile, UserProfile } from '../types';
 import type { PortalSession } from '../api/types';
 import { DEFAULT_PREFERENCES, type AccountApi, type AccountPreferences } from '../api/account';
 import type { AssistantApi } from '../api/assistant';
+import type { DocumentApi } from '../api/documents';
 import type { CurrencyUnit } from '../utils/money';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
 import { matchNav } from '../navigation/navConfig';
@@ -40,6 +41,8 @@ interface SessionValue {
   assistant?: AssistantApi;
   /** WordPress logout address (wp_logout_url with a nonce, back to the portal login); absent on the public demo. */
   logoutUrl?: string;
+  /** Document center API of the data source. */
+  documents?: DocumentApi;
   updateSession?: (patch: SessionPatch) => void;
 }
 

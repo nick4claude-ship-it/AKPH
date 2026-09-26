@@ -66,6 +66,7 @@ final class Akph_Admin {
             Akph_Settings::update(array(
                 'mode' => isset($_POST['mode']) ? sanitize_key(wp_unslash($_POST['mode'])) : 'live',
                 'currency' => isset($_POST['currency']) ? sanitize_key(wp_unslash($_POST['currency'])) : 'toman',
+                'document_max_mb' => isset($_POST['document_max_mb']) ? absint($_POST['document_max_mb']) : Akph_Documents::DEFAULT_MAX_MB,
             ));
             $saved = true;
         }
@@ -86,7 +87,10 @@ final class Akph_Admin {
         echo '<p><label><input type="radio" name="mode" value="demo" ' . checked($s['mode'], 'demo', false) . '> نمایشی — داده نمونه فقط در مرورگر، فقط برای مدیر سیستم؛ چیزی در پایگاه‌داده ذخیره نمی‌شود.</label></p>';
         echo '</td></tr><tr><th scope="row"><label for="akph-currency">واحد نمایش مبالغ</label></th><td>';
         echo '<select id="akph-currency" name="currency"><option value="toman" ' . selected($s['currency'], 'toman', false) . '>تومان</option><option value="rial" ' . selected($s['currency'], 'rial', false) . '>ریال</option></select>';
-        echo '<p class="description">مبالغ همیشه به ریال صحیح ذخیره می‌شوند؛ این فقط واحد نمایش است.</p></td></tr></table>';
+        echo '<p class="description">مبالغ همیشه به ریال صحیح ذخیره می‌شوند؛ این فقط واحد نمایش است.</p></td></tr>';
+        echo '<tr><th scope="row"><label for="akph-doc-max">حداکثر حجم هر سند</label></th><td>';
+        echo '<input id="akph-doc-max" type="number" min="1" max="' . esc_attr(Akph_Documents::LIMIT_MAX_MB) . '" name="document_max_mb" value="' . esc_attr($s['document_max_mb']) . '"> مگابایت';
+        echo '<p class="description">۱ تا ۵۰ مگابایت (پیش‌فرض ۲۰). محدودیت‌های upload_max_filesize و post_max_size در PHP هم باید دست‌کم همین مقدار باشند؛ اکنون: ' . esc_html(ini_get('upload_max_filesize')) . ' / ' . esc_html(ini_get('post_max_size')) . '.</p></td></tr></table>';
         submit_button('ذخیره');
         echo '</form><h2>وضعیت</h2><table class="widefat striped" style="max-width:900px"><tbody>';
         foreach (self::status_rows() as $row) {

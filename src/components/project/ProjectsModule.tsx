@@ -17,7 +17,6 @@ import {
   BarChart3,
   Coins,
   LayoutDashboard,
-  FileText,
 } from 'lucide-react';
 import { Project, PETTY_CASH_FUND_LABELS } from '../../types';
 import { useAppState } from '../../store/AppStore';
@@ -39,6 +38,7 @@ import { barWidth, formatNumber, formatCurrencyCompact, formatDecimal, formatPer
 import { projectBudgetFigures } from '../../store/views/reports';
 import { formatMoney } from '../../utils/money';
 import { Money } from '../common/Money';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 type ProjectTab = 'overview' | 'contract' | 'cost_centers' | 'statements' | 'suppliers' | 'inventory' | 'petty_cash' | 'documents' | 'budget';
 
@@ -477,18 +477,8 @@ export const ProjectsModule: React.FC<ProjectsModuleProps> = ({ projects, projec
 
         {tab === 'documents' && (
           <div className="space-y-1 text-sm">
-            {documents.length === 0 && <Empty text="سندی به این پروژه متصل نیست." />}
-            {documents.map((d) => (
-              <div key={d.id} className="flex items-center justify-between border-b border-slate-50 py-2">
-                <span className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-slate-500" />
-                  {formatText(d.title)}
-                </span>
-                <span className="text-xs text-slate-500">
-                  {formatText(d.type)} · {formatText(d.date)}
-                </span>
-              </div>
-            ))}
+            {/* The project's documents with preview and download; files dropped here are linked to the project. */}
+            <AttachmentsPanel entityType="project" entityId={project.id} projectId={project.id} />
             <button onClick={() => onNavigate('/documents')} className="mt-2 text-amber-700 font-bold cursor-pointer">
               مرکز اسناد ←
             </button>

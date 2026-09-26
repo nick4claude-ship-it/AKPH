@@ -74,6 +74,20 @@ function getFarsiErrorMessage(status: number): string {
   }
 }
 
+/** Authentication headers of every request (the WordPress REST nonce). */
+export function authHeaders(): Record<string, string> {
+  const nonce = window.AkphPortal?.nonce;
+  return nonce ? { 'X-WP-Nonce': nonce } : {};
+}
+
+/** ApiError from a failed response body (WordPress REST error: code, message, data.field). */
+export function apiErrorFrom(status: number, body: unknown): ApiError {
+  const o = (body && typeof body === 'object' ? body : {}) as { message?: unknown; code?: unknown; data?: { field?: unknown } };
+  const message = typeof o.message === 'string' ? o.message : '';
+  const farsi = /[\u0600-\u06FF]/.test(message) ? message : getFarsiErrorMessage(status);
+  return new ApiError(status, message || `HTTP error ${status}`, farsi, typeof o.code === 'string' ? o.code : '', typeof o.data?.field === 'string' ? o.data.field : '');
+}
+
 /**
  * Build URL taking into account plain permalinks with '?rest_route='
  */

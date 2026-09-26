@@ -80,7 +80,7 @@ function serve(dir) {
  * plus buttons without an accessible name, form controls without a label, and horizontal page overflow.
  */
 function auditPage(minPx) {
-  const out = { logout: [], small: [], font: [], digits: [], contrast: [], names: [], labels: [], overflow: [], checked: 0 };
+  const out = { logout: [], upload: [], small: [], font: [], digits: [], contrast: [], names: [], labels: [], overflow: [], checked: 0 };
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -191,8 +191,8 @@ function auditPage(minPx) {
 }
 
 /** Violation kinds. The first two are the typography test; all of them fail the run unless --report. */
-const KINDS = ['small', 'font', 'digits', 'contrast', 'names', 'labels', 'overflow', 'logout'];
-const KIND_LABELS = { small: `زیر ${MIN_FONT_PX}px`, font: 'فونت غیر Vazirmatn', digits: 'رقم لاتین', contrast: 'کنتراست کم', names: 'دکمه بی‌نام', labels: 'کنترل بی‌برچسب', overflow: 'اسکرول افقی صفحه', logout: 'دکمه خروج' };
+const KINDS = ['small', 'font', 'digits', 'contrast', 'names', 'labels', 'overflow', 'logout', 'upload'];
+const KIND_LABELS = { small: `زیر ${MIN_FONT_PX}px`, font: 'فونت غیر Vazirmatn', digits: 'رقم لاتین', contrast: 'کنتراست کم', names: 'دکمه بی‌نام', labels: 'کنترل بی‌برچسب', overflow: 'اسکرول افقی صفحه', logout: 'دکمه خروج', upload: 'بارگذاری سند' };
 const LOGOUT = 'خروج از حساب';
 
 /**
@@ -222,6 +222,50 @@ async function checkLogout(page, vp) {
     else await confirm.getByRole('button', { name: 'انصراف' }).click();
   }
   return problems;
+}
+
+/**
+ * Document center upload in the demo: «بارگذاری سند» opens the dialog, a refused file is flagged before
+ * sending, a PDF goes through with a progress bar and then opens in the preview. The open dialog is audited
+ * like a page (labels, names, contrast, overflow).
+ */
+async function checkUpload(page, vp, base) {
+  const problems = [];
+  await page.goto('about:blank');
+  await page.goto(`${base}#/documents`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('main', { timeout: 20000 });
+  await page.getByRole('button', { name: 'بارگذاری سند', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'بارگذاری سند' });
+  if (!(await dialog.isVisible().catch(() => false))) return { problems: ['no upload dialog'], audit: null };
+  await dialog.locator('input[type=file]').setInputFiles([
+    { name: 'نمونه-صورتجلسه.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n') },
+    { name: 'setup.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') },
+  ]);
+  if (!(await dialog.getByText('این نوع فایل پذیرفته نمی‌شود', { exact: false }).isVisible().catch(() => false))) problems.push('refused file not flagged');
+  const audit = await page.evaluate(auditPage, MIN_FONT_PX);
+  await page.screenshot({ path: join(outDir, vp.name, 'upload.png') });
+  await dialog.getByRole('button', { name: 'شروع بارگذاری' }).click();
+  const bar = dialog.getByRole('progressbar', { name: /نمونه-صورتجلسه\.pdf/ });
+  try {
+    await bar.and(page.locator('[aria-valuenow="100"]')).waitFor({ timeout: 10000 });
+  } catch {
+    problems.push('upload did not reach 100%');
+  }
+  if (!(await dialog.getByRole('status').getByText('بارگذاری شد', { exact: false }).isVisible().catch(() => false))) problems.push('no upload summary');
+  await dialog.getByRole('button', { name: 'بستن', exact: true }).click();
+  const view = page.getByRole('button', { name: 'مشاهده نمونه صورتجلسه' }).first();
+  if (!(await view.isVisible().catch(() => false))) problems.push('uploaded document not listed');
+  else {
+    await view.click();
+    const frame = page.locator('iframe[title="پیش‌نمایش نمونه صورتجلسه"]');
+    try {
+      await frame.waitFor({ timeout: 10000 });
+    } catch {
+      problems.push('no PDF preview');
+    }
+    await page.keyboard.press('Escape');
+  }
+  return { problems, audit };
 }
 const skipKinds = (args.find((a) => a.startsWith('--skip=')) || '--skip=').slice('--skip='.length).split(',').filter(Boolean);
 
@@ -264,6 +308,13 @@ async function main() {
         results.push({ viewport: vp.name, route: 'logout', path: '/', ...empty, logout, checked: 0, loadedFonts: [] });
         console.log(`  ${logout.length ? '✘' : '✔'} ${vp.name.padStart(4)} «${LOGOUT}»${' '.repeat(12)}${logout.join('؛ ') || 'در منو و منوی آواتار، با تأیید'}`);
       }
+      if (!skipKinds.includes('upload') && (!only || only.includes('documents'))) {
+        const { problems, audit } = await checkUpload(page, vp, base);
+        const empty = Object.fromEntries(KINDS.map((k) => [k, []]));
+        results.push({ viewport: vp.name, route: 'upload', path: '/documents', ...empty, ...(audit || {}), upload: problems, checked: audit?.checked ?? 0, loadedFonts: audit?.loadedFonts ?? [] });
+        const bad = KINDS.some((k) => !skipKinds.includes(k) && k !== 'upload' && audit?.[k]?.length);
+        console.log(`  ${problems.length || bad ? '✘' : '✔'} ${vp.name.padStart(4)} «بارگذاری سند»${' '.repeat(12)}${problems.join('؛ ') || 'چند فایل، نوار پیشرفت، رد فایل غیرمجاز، پیش‌نمایش PDF'}`);
+      }
       await context.close();
     }
   } finally {
@@ -287,7 +338,7 @@ async function main() {
     console.log('\n✘ آزمون ظاهر رد شد.');
     process.exit(1);
   }
-  console.log(failed ? '\n(حالت گزارش: رد نمی‌شود)' : `\n✔ همه متن‌ها ${MIN_FONT_PX}px یا بزرگ‌تر، با فونت Vazirmatn، ارقام فارسی و کنتراست کافی؛ دکمه‌ها و کنترل‌ها نام دارند؛ صفحه اسکرول افقی ندارد؛ «${LOGOUT}» در هر دو عرض هست.`);
+  console.log(failed ? '\n(حالت گزارش: رد نمی‌شود)' : `\n✔ همه متن‌ها ${MIN_FONT_PX}px یا بزرگ‌تر، با فونت Vazirmatn، ارقام فارسی و کنتراست کافی؛ دکمه‌ها و کنترل‌ها نام دارند؛ صفحه اسکرول افقی ندارد؛ «${LOGOUT}» در هر دو عرض هست؛ بارگذاری سند کار می‌کند.`);
 }
 
 await main();

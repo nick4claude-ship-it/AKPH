@@ -95,6 +95,7 @@ function Root() {
         account={boot.source.account}
         logoutUrl={typeof window !== 'undefined' ? window.AkphPortal?.logoutUrl : undefined}
         assistant={boot.source.assistant}
+        documents={boot.source.documents}
         updateSession={updateSession}
         devUsers={devUsers}
         switchUser={devUsers ? (userId) => load(userId, { source: boot.source, epoch: boot.epoch }) : undefined}

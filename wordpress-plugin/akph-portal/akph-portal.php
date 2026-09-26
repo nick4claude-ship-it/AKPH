@@ -37,6 +37,7 @@ require_once AKPH_PORTAL_DIR . 'includes/class-akph-ledger.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-reports.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-account.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-assistant.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-documents.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-rest.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-migration.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-admin.php';
