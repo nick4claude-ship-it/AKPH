@@ -309,7 +309,11 @@ console.log('\n۵-الف) خزانه و تنخواه: حساب جدید، انت
   ok('ورود صورت‌حساب بانک', rw.importBankStatement(env(ACC), bank.id, 'تاریخ,شرح,واریز,برداشت,پیگیری\n1405/07/01,کارمزد,,25000,B2'));
   assert.equal(state.bankReconciliations.length, lines + 1);
   const busy = state.pettyCashAccounts.find((a) => state.pettyCashExpenses.some((e) => e.pettyCashId === a.id && e.status === 'pending_approval'));
-  if (busy) denied('بستن دوره تنخواه با هزینه باز', rw.closePettyCashPeriod(env(ACC), busy.id), /در انتظار تأیید/);
+  if (busy) {
+    const refused = rw.closePettyCashPeriod(env(ACC), busy.id);
+    denied('بستن دوره تنخواه با هزینه باز', refused);
+    assert.match(refused.message, /در انتظار تأیید/);
+  }
   const idle = state.pettyCashAccounts.find((a) => !state.pettyCashExpenses.some((e) => e.pettyCashId === a.id && (e.status === 'pending_approval' || e.status === 'submitted')));
   if (idle) ok('بستن دوره تنخواه', rw.closePettyCashPeriod(env(ACC), idle.id));
   denied('اقدام روی مورد کارتابل سرور در نسخه نمایشی', rw.decideServerApproval(env(ACC), selectApprovals(state)[0], 'approve', ''));
