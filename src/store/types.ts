@@ -55,6 +55,7 @@ import {
   PettyCashReconciliation,
   PettyCashCategoryItem,
   FinanceSettings,
+  ApprovalItem,
 } from '../types';
 
 /**
@@ -112,6 +113,11 @@ export interface AppState {
   pettyCashReconciliations: PettyCashReconciliation[];
   pettyCashCategories: PettyCashCategoryItem[];
   financeSettings: FinanceSettings;
+  /**
+   * akph/v1: the approval center as the server computes it for the signed-in user (GET /approvals);
+   * null in the demo, where selectApprovals gathers the items from the local records.
+   */
+  serverApprovals: ApprovalItem[] | null;
   /** Only dismissals are stored; notifications themselves are computed from data. */
   /** Notifications each user has dismissed (per user id). */
   dismissedNotificationIds: Record<string, string[]>;

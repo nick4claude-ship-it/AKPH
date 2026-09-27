@@ -12,6 +12,7 @@ import * as wf from '../src/store/workflows';
 import { AppState, SliceKey } from '../src/store/types';
 import { UserProfile, StoreIssueVoucher } from '../src/types';
 import { toPersianDate } from '../src/utils/date';
+import { PAYMENT_SENIOR_THRESHOLD } from '../src/utils/permissions';
 
 let state: AppState = buildMockState();
 const env = (u: UserProfile): wf.WorkflowEnv => ({
@@ -104,6 +105,15 @@ denied('تأیید درخواست توسط درخواست‌کننده', wf.appr
 ok('تأیید درخواست توسط مدیر ارشد', wf.approvePaymentRequest(env(CEO), pr.id!));
 denied('پرداخت توسط تأییدکننده', wf.executePayment(env(CEO), pr.id!, { bankAccountId: state.bankAccounts[0].id, amount: 1_000_000 }), /تأییدکننده/);
 ok('پرداخت توسط حسابدار دیگر', wf.executePayment(env(ACC2), pr.id!, { bankAccountId: state.bankAccounts[0].id, amount: 1_000_000 }));
+
+// Payment approval: the accountant up to the threshold, the senior manager above it (server: same default).
+{
+  const small = wf.createPaymentRequest(env(ACC), { sourceType: 'سایر هزینه‌های عمومی', sourceRefId: 'd-pr-s', sourceRefNumber: 'd', projectId: '', projectName: '', costCenterId: '', beneficiaryName: 'خدمات', beneficiaryType: 'تأمین‌کننده', totalAmount: PAYMENT_SENIOR_THRESHOLD });
+  ok('تأیید درخواست تا آستانه توسط حسابدار دیگر', wf.approvePaymentRequest(env(ACC2), small.id!));
+  const big = wf.createPaymentRequest(env(ACC), { sourceType: 'سایر هزینه‌های عمومی', sourceRefId: 'd-pr-b', sourceRefNumber: 'd', projectId: '', projectName: '', costCenterId: '', beneficiaryName: 'خدمات', beneficiaryType: 'تأمین‌کننده', totalAmount: PAYMENT_SENIOR_THRESHOLD + 1 });
+  denied('تأیید درخواست بالای آستانه توسط حسابدار', wf.approvePaymentRequest(env(ACC2), big.id!), /آستانه/);
+  ok('تأیید درخواست بالای آستانه توسط مدیر ارشد', wf.approvePaymentRequest(env(CEO), big.id!));
+}
 
 console.log('\n۳) رکورد بدون پروژه برای مدیر پروژه، مغایرت بانکی، موتور ثبت');
 const hqWh = state.warehouses.find((w) => !w.projectId);

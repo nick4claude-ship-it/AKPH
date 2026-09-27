@@ -49,6 +49,11 @@ export interface CommandGateway {
   /** Workflow actions the installed server can execute. Everything else is read-only in the UI. */
   supports(action: string): boolean;
   /**
+   * Actions the server validates alone (no local dry run first): approval steps, thresholds and balances of
+   * petty cash and treasury are decided by the server, which answers with a clear message.
+   */
+  serverValidated?(action: string): boolean;
+  /**
    * Sends the command. `idempotencyKey` belongs to the form submission (src/store/commandKeys.ts): the same
    * submission sent again carries the same key.
    */

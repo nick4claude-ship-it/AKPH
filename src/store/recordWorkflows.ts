@@ -18,6 +18,10 @@ import type {
   AppDocument,
   DocumentLink,
   AuditLog,
+  ApprovalItem,
+  BankAccount,
+  BankReconciliationItem,
+  ProjectCashDesk,
   PettyCashAccount,
   PettyCashCategoryItem,
   PettyCashExpense,
@@ -1012,6 +1016,149 @@ export function createManualPaymentRequest(env: WorkflowEnv, input: ManualPaymen
     totalAmount: input.amount,
     dueDate: input.dueDate,
   });
+}
+
+/** A bank account or a cash desk of the company (its balance comes only from postings). */
+export interface TreasuryAccountInput {
+  kind: 'bank' | 'cash';
+  title: string;
+  bankName: string;
+  branch: string;
+  accountNumber: string;
+  sheba: string;
+  holderName: string;
+  location: string;
+  projectId: string;
+}
+
+export function createTreasuryAccount(env: WorkflowEnv, input: TreasuryAccountInput): WorkflowResult {
+  const deny = guard(env, 'payment.execute');
+  if (deny) return fail('تعریف حساب بانکی و صندوق مجاز نیست.');
+  if (!input.title.trim()) return fail('عنوان حساب را وارد کنید.');
+  if (input.kind === 'bank' && !input.bankName.trim()) return fail('نام بانک الزامی است.');
+  const state = env.getState();
+  const id = generateUUID();
+  if (input.kind === 'bank') {
+    const bank: BankAccount = {
+      id,
+      bankName: input.bankName.trim(),
+      accountNumber: input.accountNumber || input.title.trim(),
+      shebaNumber: input.sheba,
+      branch: input.branch,
+      holderName: input.holderName,
+      balance: 0,
+      openingBalance: 0,
+      totalReceipts: 0,
+      totalPayments: 0,
+      closingBalance: 0,
+      status: 'فعال',
+    };
+    env.set('bankAccounts', (prev) => [...prev, bank]);
+  } else {
+    const project = state.projects.find((p) => p.id === input.projectId);
+    const desk: ProjectCashDesk = {
+      id,
+      title: input.title.trim(),
+      code: nextDocNumber(state.cashDesks.map((c) => c.code), 'TRA'),
+      keeperName: input.holderName,
+      balance: 0,
+      location: input.location,
+      lastCountDate: '',
+      projectId: input.projectId,
+      projectName: project?.name || 'ستاد مرکزی',
+      ceilingLimit: 0,
+      lastAuditDate: '',
+    };
+    env.set('cashDesks', (prev) => [...prev, desk]);
+  }
+  return ok(`${input.kind === 'cash' ? 'صندوق' : 'حساب بانکی'} ${input.title.trim()} تعریف شد.`, { id });
+}
+
+export interface TreasuryTransferInput {
+  /** 'bank:ID' or 'cash:ID', like the payment form. */
+  fromId: string;
+  toId: string;
+  /** Integer Rials. */
+  amount: number;
+  trackingNumber: string;
+  description: string;
+}
+
+const accountBalance = (state: ReturnType<WorkflowEnv['getState']>, ref: string) => {
+  const [kind, id] = ref.split(':');
+  return kind === 'cash' ? state.cashDesks.find((c) => c.id === id)?.balance : state.bankAccounts.find((b) => b.id === id)?.balance;
+};
+
+/** Money between two of the company's accounts; never below zero. */
+export function transferBetweenAccounts(env: WorkflowEnv, input: TreasuryTransferInput): WorkflowResult {
+  const deny = guard(env, 'payment.execute');
+  if (deny) return fail('انتقال وجه بین حساب‌ها مجاز نیست.');
+  if (!input.fromId || !input.toId) return fail('حساب مبدأ و مقصد را انتخاب کنید.');
+  if (input.fromId === input.toId) return fail('حساب مبدأ و مقصد یکی است.');
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) return fail('مبلغ انتقال باید عدد صحیح مثبت باشد.');
+  const state = env.getState();
+  const available = accountBalance(state, input.fromId);
+  if (available === undefined || accountBalance(state, input.toId) === undefined) return fail('حساب پیدا نشد.');
+  if (available < input.amount) return fail(`موجودی حساب مبدأ (${formatMoney(available)}) کافی نیست؛ موجودی منفی مجاز نیست.`);
+  const move = (ref: string, delta: number) => {
+    const [kind, id] = ref.split(':');
+    if (kind === 'cash') env.set('cashDesks', (prev) => prev.map((c) => (c.id === id ? { ...c, balance: c.balance + delta } : c)));
+    else env.set('bankAccounts', (prev) => prev.map((b) => (b.id === id ? { ...b, balance: b.balance + delta, closingBalance: b.closingBalance + delta } : b)));
+  };
+  move(input.fromId, -input.amount);
+  move(input.toId, input.amount);
+  return ok('انتقال وجه ثبت شد.');
+}
+
+/** A cheque in progress becomes cleared or bounced (a bounced cheque needs a reason). */
+export function changeChequeStatus(env: WorkflowEnv, chequeId: string, status: 'cleared' | 'bounced', note: string): WorkflowResult {
+  const deny = guard(env, 'payment.execute');
+  if (deny) return fail('تغییر وضعیت چک مجاز نیست.');
+  const cheque = env.getState().treasuryChecks.find((c) => c.id === chequeId);
+  if (!cheque || cheque.status !== 'در جریان وصول/سررسید') return fail('وضعیت این چک قبلاً تعیین شده است.');
+  if (status === 'bounced' && !note.trim()) return fail('علت برگشت چک را وارد کنید.');
+  env.set('treasuryChecks', (prev) => prev.map((c) => (c.id === chequeId ? { ...c, status: status === 'cleared' ? 'پاس شده و تسویه' : 'برگشت خورده', clearedDate: today() } : c)));
+  return ok(status === 'cleared' ? `چک ${cheque.checkNumber} وصول/پاس شد.` : `چک ${cheque.checkNumber} برگشتی ثبت شد.`);
+}
+
+/** Bank statement rows from CSV text: date, description, deposit, withdrawal, reference. */
+export function importBankStatement(env: WorkflowEnv, bankAccountId: string, csv: string): WorkflowResult {
+  const deny = guard(env, 'payment.execute');
+  if (deny) return fail('ورود صورت‌حساب بانکی مجاز نیست.');
+  if (!env.getState().bankAccounts.some((b) => b.id === bankAccountId)) return fail('حساب بانکی را انتخاب کنید.');
+  const rows: BankReconciliationItem[] = [];
+  for (const [i, line] of csv.split(/\r?\n/).entries()) {
+    const cols = line.split(',').map((c) => c.trim());
+    if (!line.trim() || (i === 0 && !/[0-9]/.test(cols[0] || ''))) continue;
+    const deposit = Number((cols[2] || '').replace(/[^0-9]/g, '')) || 0;
+    const withdrawal = Number((cols[3] || '').replace(/[^0-9]/g, '')) || 0;
+    if ((deposit > 0) === (withdrawal > 0)) return fail(`ردیف ${toPersianDigits(String(i + 1))}: فقط یکی از واریز یا برداشت مقدار دارد.`);
+    rows.push({ id: generateUUID(), bankAccountId, date: cols[0], description: cols[1] || '', amount: deposit || withdrawal, type: deposit ? 'واریز' : 'برداشت', matched: false, discrepancyType: 'تراکنش بانکی فاقد سند دفتری' });
+  }
+  if (!rows.length) return fail('ردیفی برای ورود نیست (تاریخ، شرح، واریز، برداشت، شماره پیگیری).');
+  env.set('bankReconciliations', (prev) => [...rows, ...prev]);
+  return ok(`${toPersianDigits(String(rows.length))} ردیف صورت‌حساب بانک ثبت شد.`);
+}
+
+/** Closes the period of a fund when none of its expenses waits for approval. */
+export function closePettyCashPeriod(env: WorkflowEnv, fundId: string): WorkflowResult {
+  const state = env.getState();
+  const fund = state.pettyCashAccounts.find((a) => a.id === fundId);
+  if (!fund) return fail('تنخواه یافت نشد.');
+  const deny = guard(env, 'petty.reconcile', { projectId: fund.projectId || null });
+  if (deny) return deny;
+  const open = state.pettyCashExpenses.filter((e) => e.pettyCashId === fundId && (e.status === 'pending_approval' || e.status === 'submitted')).length;
+  if (open) return fail(`دوره تنخواه بسته نمی‌شود: ${toPersianDigits(String(open))} هزینه هنوز در انتظار تأیید است.`);
+  env.set('pettyCashAccounts', (prev) => prev.map((a) => (a.id === fundId ? { ...a, startDate: today(), monthlySpent: 0 } : a)));
+  return ok(`دوره تنخواه ${fund.title} بسته شد.`);
+}
+
+/**
+ * Approve or reject an item of the server's approval center (GET /approvals) through the command its own
+ * module names. The demo gathers approvals from local records and never has such items.
+ */
+export function decideServerApproval(_env: WorkflowEnv, _item: ApprovalItem, _decision: 'approve' | 'reject', _text: string): WorkflowResult {
+  return fail('این مورد فقط در اتصال به سرور قابل اقدام است.');
 }
 
 // =============================================================================

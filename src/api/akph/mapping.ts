@@ -53,7 +53,7 @@ export function arr(route: string, o: Obj, field: string): unknown[] {
   return v;
 }
 
-function str(route: string, o: Obj, field: string, optional = false): string {
+export function str(route: string, o: Obj, field: string, optional = false): string {
   const v = o[field];
   if (v === undefined || v === null || v === '') {
     if (optional) return '';
@@ -63,20 +63,20 @@ function str(route: string, o: Obj, field: string, optional = false): string {
   return String(v);
 }
 
-function rial(route: string, o: Obj, field: string): number {
+export function rial(route: string, o: Obj, field: string): number {
   const v = o[field];
   if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw new ShapeError(route, field, 'مبلغ صحیح به ریال نیست');
   return v;
 }
 
-function int(route: string, o: Obj, field: string): number {
+export function int(route: string, o: Obj, field: string): number {
   const v = o[field];
   if (typeof v !== 'number' || !Number.isInteger(v)) throw new ShapeError(route, field, 'عدد صحیح نیست');
   return v;
 }
 
 /** ISO date of the wire → Jalali of the app ('' when absent). */
-function jdate(route: string, o: Obj, field: string, optional = false): string {
+export function jdate(route: string, o: Obj, field: string, optional = false): string {
   const v = o[field];
   if ((v === null || v === undefined || v === '') && optional) return '';
   const j = isoToJalali(typeof v === 'string' ? v : '');

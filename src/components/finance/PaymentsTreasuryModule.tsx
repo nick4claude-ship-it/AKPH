@@ -40,6 +40,7 @@ import { TablePager } from '../common/TablePager';
 import { MoneyInput } from '../../ui/NumberInput';
 import { TreasuryReceiptsTab } from './TreasuryReceiptsTab';
 import { PaymentScheduleTab } from './PaymentScheduleTab';
+import { ChequeStatusActions, NewTreasuryAccountButton, StatementImportButton, TransferButton } from './TreasuryActions';
 
 export type TreasuryTab = 'payment_requests' | 'receipts' | 'bank_accounts' | 'checks' | 'cash_desks' | 'liquidity_calendar';
 const TAB_PATHS: Partial<Record<TreasuryTab, string>> = {
@@ -538,6 +539,11 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
       {/* Tab 2: Bank Accounts & Reconciliation */}
       {activeTab === 'bank_accounts' && (
         <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <NewTreasuryAccountButton kind="bank" onToast={onToast} />
+            <TransferButton onToast={onToast} />
+            <StatementImportButton onToast={onToast} />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {bankAccounts.map((b) => (
               <div key={b.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs relative overflow-hidden">
@@ -661,6 +667,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                       >
                         {formatText(chk.status)}
                       </span>
+                      <ChequeStatusActions cheque={chk} onToast={onToast} />
                     </td>
                   </tr>
                 ))}
@@ -672,6 +679,11 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
 
       {/* Tab 4: Cash Desks */}
       {activeTab === 'cash_desks' && (
+        <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <NewTreasuryAccountButton kind="cash" onToast={onToast} />
+          <TransferButton onToast={onToast} />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {cashDesks.map((c) => (
             <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
@@ -710,6 +722,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
               </div>
             </div>
           ))}
+        </div>
         </div>
       )}
 

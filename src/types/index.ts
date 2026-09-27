@@ -106,7 +106,13 @@ export type ApprovalModule =
   | 'purchase_requisition'
   | 'payment_request'
   | 'payroll'
-  | 'journal_entry';
+  | 'journal_entry'
+  // akph/v1 only (GET /approvals)
+  | 'journal_reversal'
+  | 'petty_replenishment'
+  | 'petty_adjustment'
+  | 'bank_voucher'
+  | 'receipt';
 
 /** A pending approval, gathered by a selector from the owning module's records. */
 export interface ApprovalItem {
@@ -133,6 +139,8 @@ export interface ApprovalItem {
   context: import('../utils/permissions').ActionContext;
   classification: 'مستقیم پروژه' | 'سربار و ستادی' | 'مالی';
   documentCount: number;
+  /** akph/v1: the owning module's commands for this item (GET /approvals). */
+  server?: { approvePath: string; rejectPath: string; version: number };
 }
 
 // ==================== NOTIFICATION CENTER ====================
@@ -350,6 +358,10 @@ export interface BankAccount {
   totalPayments: number;
   closingBalance: number;
   status: 'فعال' | 'مسدود';
+  /** Chart account the bank is linked to (akph/v1). */
+  accountCode?: string;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface CashDesk {
@@ -364,6 +376,10 @@ export interface CashDesk {
   projectName?: string;
   ceilingLimit?: number;
   lastAuditDate?: string;
+  /** Chart account the cash desk is linked to (akph/v1). */
+  accountCode?: string;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface ReceiptRecord {
@@ -388,6 +404,10 @@ export interface ReceiptRecord {
   statementId?: string;
   contractId?: string;
   bankAccountId?: string;
+  /** Receipt waiting for approval by another user (akph/v1). */
+  pendingApproval?: boolean;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface PaymentRecord {
@@ -454,6 +474,8 @@ export interface BankReconciliationItem {
   matched: boolean;
   matchedDocNumber?: string;
   discrepancyType?: 'تطبیق شده' | 'تراکنش بانکی فاقد سند دفتری' | 'سند حسابداری بدون گردش بانکی' | 'مغایرت مبلغ';
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface AuditLog {
@@ -530,6 +552,8 @@ export interface PettyCashAccount {
   lastReplenishmentDate: string;
   lastReplenishmentAmount: number;
   notes?: string;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export type PettyCashExpenseStatus =
@@ -602,6 +626,8 @@ export interface PettyCashExpense {
   accountingAccountName?: string;
   isReversed?: boolean;
   reverseReason?: string;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface PettyCashReplenishment {
@@ -1770,6 +1796,8 @@ export interface PaymentRequest {
   /** User who created the request (the approver must be someone else). */
   requestedBy?: string;
   requestedById?: string;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface TreasuryCheck {
@@ -1789,6 +1817,8 @@ export interface TreasuryCheck {
   relatedDocNumber?: string;
   status: 'در جریان وصول/سررسید' | 'پاس شده و تسویه' | 'برگشت خورده' | 'ابطال شده' | 'واگذار شده';
   clearedDate?: string;
+  /** Server concurrency token (akph/v1). */
+  version?: number;
 }
 
 export interface ProjectCashDesk extends CashDesk {

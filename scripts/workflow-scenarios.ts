@@ -285,6 +285,37 @@ denied('ثبت سند در سال بسته', wf.createManualJournalEntry(env(ACC
 denied('بستن دوباره همان سال', wf.closeFiscalYear(env(CEO), lastYear));
 
 // ---------------------------------------------------------------------------
+console.log('\n۵-الف) خزانه و تنخواه: حساب جدید، انتقال، چک، صورت‌حساب بانک، بستن دوره');
+{
+  const rw = await import('../src/store/recordWorkflows');
+  denied('تعریف حساب بانکی توسط مدیر پروژه', rw.createTreasuryAccount(env(PM), { kind: 'bank', title: 'x', bankName: 'x', branch: '', accountNumber: '', sheba: '', holderName: '', location: '', projectId: '' }));
+  ok('تعریف صندوق', rw.createTreasuryAccount(env(ACC), { kind: 'cash', title: 'صندوق آزمون', bankName: '', branch: '', accountNumber: '', sheba: '', holderName: 'تحویلدار', location: 'کارگاه', projectId: '' }));
+  const desk = state.cashDesks.find((c) => c.title === 'صندوق آزمون')!;
+  assert.equal(desk.balance, 0, 'a new account starts at zero');
+  const bank = state.bankAccounts[0];
+  denied('انتقال بیش از موجودی', rw.transferBetweenAccounts(env(ACC), { fromId: `bank:${bank.id}`, toId: `cash:${desk.id}`, amount: bank.balance + 1, trackingNumber: '', description: '' }));
+  const before = bank.balance;
+  ok('انتقال بانک ← صندوق', rw.transferBetweenAccounts(env(ACC), { fromId: `bank:${bank.id}`, toId: `cash:${desk.id}`, amount: 1_000_000, trackingNumber: 'T', description: '' }));
+  assert.equal(state.bankAccounts[0].balance, before - 1_000_000);
+  assert.equal(state.cashDesks.find((c) => c.id === desk.id)!.balance, 1_000_000);
+  const cheque = state.treasuryChecks.find((c) => c.status === 'در جریان وصول/سررسید');
+  if (cheque) {
+    denied('برگشت چک بدون علت', rw.changeChequeStatus(env(ACC), cheque.id, 'bounced', ''));
+    ok('وصول چک', rw.changeChequeStatus(env(ACC), cheque.id, 'cleared', ''));
+    denied('تغییر دوباره وضعیت چک', rw.changeChequeStatus(env(ACC), cheque.id, 'bounced', 'x'));
+  }
+  const lines = state.bankReconciliations.length;
+  denied('صورت‌حساب با ردیف دوطرفه', rw.importBankStatement(env(ACC), bank.id, '1405/07/01,x,10,20,'));
+  ok('ورود صورت‌حساب بانک', rw.importBankStatement(env(ACC), bank.id, 'تاریخ,شرح,واریز,برداشت,پیگیری\n1405/07/01,کارمزد,,25000,B2'));
+  assert.equal(state.bankReconciliations.length, lines + 1);
+  const busy = state.pettyCashAccounts.find((a) => state.pettyCashExpenses.some((e) => e.pettyCashId === a.id && e.status === 'pending_approval'));
+  if (busy) denied('بستن دوره تنخواه با هزینه باز', rw.closePettyCashPeriod(env(ACC), busy.id), /در انتظار تأیید/);
+  const idle = state.pettyCashAccounts.find((a) => !state.pettyCashExpenses.some((e) => e.pettyCashId === a.id && (e.status === 'pending_approval' || e.status === 'submitted')));
+  if (idle) ok('بستن دوره تنخواه', rw.closePettyCashPeriod(env(ACC), idle.id));
+  denied('اقدام روی مورد کارتابل سرور در نسخه نمایشی', rw.decideServerApproval(env(ACC), selectApprovals(state)[0], 'approve', ''));
+}
+
+// ---------------------------------------------------------------------------
 console.log('\n۶) توازن کل دفاتر');
 const debit = state.journalEntries.reduce((a, e) => a + e.totalDebit, 0);
 const credit = state.journalEntries.reduce((a, e) => a + e.totalCredit, 0);

@@ -61,7 +61,7 @@ export function requisitionContext(r: PurchaseRequisition): ActionContext {
   return { projectId: r.projectId, createdBy: r.requesterId, lastApprovedBy: last };
 }
 
-export const paymentApprovalContext = (p: PaymentRequest): ActionContext => ({ projectId: p.projectId || null, createdBy: p.requestedById });
+export const paymentApprovalContext = (p: PaymentRequest): ActionContext => ({ projectId: p.projectId || null, createdBy: p.requestedById, amount: p.totalAmount });
 export const paymentExecutionContext = (p: PaymentRequest): ActionContext => ({ projectId: p.projectId || null, approvedBy: p.approvedById });
 export const journalContext = (j: JournalEntry): ActionContext => ({ projectId: j.projectId || null, createdBy: j.submitterId });
 export const storeIssueContext = (v: StoreIssueVoucher): ActionContext => ({ projectId: v.projectId || null, createdBy: v.requestedById });

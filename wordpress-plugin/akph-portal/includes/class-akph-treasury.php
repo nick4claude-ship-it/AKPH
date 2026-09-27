@@ -85,7 +85,12 @@ final class Akph_Treasury {
 
     // ------------------------------------------------------------------ bank accounts and cash desks
 
-    public static function account_shape($row, $balance = null) {
+    public static function account_shape($row) {
+        global $wpdb;
+        $totals = Akph_Db::row($wpdb->prepare(
+            'SELECT COALESCE(SUM(l.debit), 0) AS total_in, COALESCE(SUM(l.credit), 0) AS total_out FROM ' . Akph_Ledger::lines_table() . ' l JOIN ' . Akph_Ledger::entries_table() . " e ON e.id = l.entry_id WHERE l.cash_ref = %s AND e.status = 'posted'",
+            self::cash_ref($row->id)
+        ));
         return array(
             'id' => (string) $row->id,
             'kind' => $row->kind,
@@ -101,22 +106,16 @@ final class Akph_Treasury {
             'project_id' => $row->project_id ? (string) $row->project_id : null,
             'account_code' => $row->account_code,
             'active' => (bool) (int) $row->active,
-            'balance' => $balance === null ? Akph_Posting::balance(self::cash_ref($row->id)) : (int) $balance,
+            'balance' => (int) $totals->total_in - (int) $totals->total_out,
+            'total_in' => (int) $totals->total_in,
+            'total_out' => (int) $totals->total_out,
             'version' => (int) $row->version,
         );
     }
 
     public static function list_accounts() {
         $rows = (array) Akph_Db::results('SELECT * FROM ' . self::t('treasury_accounts') . ' ORDER BY kind, id');
-        $refs = array_map(function ($r) {
-            return self::cash_ref($r->id);
-        }, $rows);
-        $balances = Akph_Posting::balances($refs);
-        $out = array();
-        foreach ($rows as $r) {
-            $out[] = self::account_shape($r, $balances[self::cash_ref($r->id)]);
-        }
-        return $out;
+        return array_map(array(__CLASS__, 'account_shape'), $rows);
     }
 
     private static function account_columns(array $body, $existing = null) {
