@@ -47,6 +47,43 @@ final class Akph_Rest {
             '/documents/' . self::ID . '/download' => array(array('GET', 'download_document', $r::ACCESS)),
             '/documents/' . self::ID . '/links' => array(array('POST', 'link_document', $r::ACCESS)),
             '/documents/' . self::ID . '/archive' => array(array('POST', 'archive_document', $r::ACCESS)),
+            // Petty cash (funds, categories, settings, expenses, replenishment, count, period close).
+            '/petty-cash' => array(array('GET', 'petty_overview', $r::PETTY_SUBMIT)),
+            '/petty-cash/settings' => array(array('GET', 'petty_settings', $r::PETTY_SUBMIT), array('POST', 'petty_update_settings', $r::SETTINGS)),
+            '/petty-cash/categories' => array(array('GET', 'petty_categories', $r::PETTY_SUBMIT), array('POST', 'petty_replace_categories', $r::PETTY_MANAGE)),
+            '/petty-cash/funds' => array(array('POST', 'petty_create_fund', $r::PETTY_MANAGE)),
+            '/petty-cash/funds/' . self::ID => array(array('GET', 'petty_statement', $r::PETTY_SUBMIT), array('POST, PUT, PATCH', 'petty_update_fund', $r::PETTY_MANAGE)),
+            '/petty-cash/funds/' . self::ID . '/count' => array(array('POST', 'petty_count', $r::PETTY_MANAGE)),
+            '/petty-cash/funds/' . self::ID . '/close-period' => array(array('POST', 'petty_close_period', $r::PETTY_MANAGE)),
+            '/petty-cash/expenses' => array(array('POST', 'petty_submit_expense', $r::PETTY_SUBMIT)),
+            '/petty-cash/expenses/' . self::ID . '/approve' => array(array('POST', 'petty_approve_expense', $r::PETTY_APPROVE)),
+            '/petty-cash/expenses/' . self::ID . '/reject' => array(array('POST', 'petty_reject_expense', $r::PETTY_APPROVE)),
+            '/petty-cash/requests' => array(array('POST', 'petty_create_request', $r::PETTY_SUBMIT)),
+            '/petty-cash/requests/' . self::ID . '/approve' => array(array('POST', 'petty_approve_request', $r::PETTY_APPROVE)),
+            '/petty-cash/requests/' . self::ID . '/reject' => array(array('POST', 'petty_reject_request', $r::PETTY_APPROVE)),
+            // Treasury (bank accounts and cash desks, payment requests, payments, receipts, transfers, cheques,
+            // bank reconciliation, payment schedule). Balances always come from the ledger.
+            '/treasury' => array(array('GET', 'treasury_overview', $r::VIEW_ALL)),
+            '/treasury/settings' => array(array('GET', 'treasury_settings', $r::VIEW_ALL), array('POST', 'treasury_update_settings', $r::SETTINGS)),
+            '/treasury/schedule' => array(array('GET', 'treasury_schedule', $r::VIEW_ALL)),
+            '/treasury/accounts' => array(array('GET', 'treasury_accounts', $r::VIEW_ALL), array('POST', 'treasury_create_account', $r::TREASURY_MANAGE)),
+            '/treasury/accounts/' . self::ID => array(array('POST, PUT, PATCH', 'treasury_update_account', $r::TREASURY_MANAGE)),
+            '/treasury/accounts/' . self::ID . '/movements' => array(array('GET', 'treasury_movements', $r::VIEW_ALL)),
+            '/treasury/accounts/' . self::ID . '/reconciliation' => array(array('GET', 'treasury_reconciliation', $r::VIEW_ALL)),
+            '/treasury/accounts/' . self::ID . '/statement' => array(array('POST', 'treasury_import_statement', $r::TREASURY_MANAGE)),
+            '/treasury/transfers' => array(array('POST', 'treasury_transfer', $r::TREASURY_MANAGE)),
+            '/payment-requests' => array(array('GET', 'payment_requests', $r::VIEW_ALL), array('POST', 'payment_request_create', $r::PAYMENT_REQUEST)),
+            '/payment-requests/' . self::ID . '/approve' => array(array('POST', 'payment_request_approve', $r::PAYMENT_APPROVE)),
+            '/payment-requests/' . self::ID . '/reject' => array(array('POST', 'payment_request_reject', $r::PAYMENT_APPROVE)),
+            '/payment-requests/' . self::ID . '/pay' => array(array('POST', 'payment_request_pay', $r::TREASURY_MANAGE)),
+            '/receipts' => array(array('POST', 'receipt_create', $r::TREASURY_MANAGE)),
+            '/receipts/' . self::ID . '/approve' => array(array('POST', 'receipt_approve', $r::PAYMENT_APPROVE)),
+            '/receipts/' . self::ID . '/reject' => array(array('POST', 'receipt_reject', $r::PAYMENT_APPROVE)),
+            '/cheques/' . self::ID . '/status' => array(array('POST', 'cheque_status', $r::TREASURY_MANAGE)),
+            '/bank-statement-lines/' . self::ID . '/match' => array(array('POST', 'bank_line_match', $r::TREASURY_MANAGE)),
+            '/bank-statement-lines/' . self::ID . '/voucher' => array(array('POST', 'bank_line_voucher', $r::TREASURY_MANAGE)),
+            // Approval center: everything waiting for the signed-in user, from every server module.
+            '/approvals' => array(array('GET', 'approvals', $r::ACCESS)),
             // «دستیار مدیریت»: the language model is called by the server only; settings for the system administrator.
             '/assistant/status' => array(array('GET', 'assistant_status', $r::ASSISTANT_USE)),
             '/assistant/ask' => array(array('POST', 'assistant_ask', $r::ASSISTANT_USE)),
@@ -301,6 +338,269 @@ final class Akph_Rest {
         return Akph_Command::run($request, function ($body) use ($request) {
             Akph_Account::assert_fields($request, $body, array('version'));
             return Akph_Documents::archive(self::id($request), Akph_Input::version($request, $body));
+        });
+    }
+
+    // ------------------------------------------------------------------ petty cash
+
+    /** Stored command with an allowlist of body fields (unknown or forbidden fields → 400/403). */
+    private static function command(WP_REST_Request $request, array $fields, callable $fn) {
+        return Akph_Command::run($request, function ($body) use ($request, $fields, $fn) {
+            Akph_Account::assert_fields($request, $body, $fields);
+            return $fn($body);
+        });
+    }
+
+    private static function query_read(WP_REST_Request $request, callable $fn) {
+        return self::read(function () use ($request, $fn) {
+            Akph_Account::assert_query($request);
+            return $fn();
+        });
+    }
+
+    const FUND_FIELDS = array('title', 'fund_type', 'project_id', 'cost_center_id', 'holder_user_id', 'holder_name', 'holder_phone', 'account_code', 'ceiling', 'max_single_expense', 'min_balance_warning', 'source_account_id', 'active', 'notes');
+
+    public static function petty_overview(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return Akph_Petty_Cash::overview();
+        });
+    }
+
+    public static function petty_settings(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('settings' => Akph_Petty_Cash::settings());
+        });
+    }
+
+    public static function petty_update_settings(WP_REST_Request $request) {
+        return self::command($request, array('site_level_max', 'project_level_max', 'replenishment_senior_threshold', 'low_balance_percent', 'default_expense_account', 'fund_limits', 'approval_chains'), function ($body) {
+            return Akph_Petty_Cash::update_settings($body);
+        });
+    }
+
+    public static function petty_categories(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('categories' => Akph_Petty_Cash::list_categories());
+        });
+    }
+
+    public static function petty_replace_categories(WP_REST_Request $request) {
+        return self::command($request, array('categories'), function ($body) {
+            return Akph_Petty_Cash::replace_categories($body);
+        });
+    }
+
+    public static function petty_create_fund(WP_REST_Request $request) {
+        return self::command($request, self::FUND_FIELDS, function ($body) {
+            return Akph_Petty_Cash::create_fund($body);
+        });
+    }
+
+    public static function petty_update_fund(WP_REST_Request $request) {
+        return self::command($request, array_merge(self::FUND_FIELDS, array('version')), function ($body) use ($request) {
+            $version = Akph_Input::version($request, $body);
+            unset($body['version']);
+            return Akph_Petty_Cash::update_fund(self::id($request), $body, $version);
+        });
+    }
+
+    public static function petty_statement(WP_REST_Request $request) {
+        return self::query_read($request, function () use ($request) {
+            return Akph_Petty_Cash::statement(self::id($request));
+        });
+    }
+
+    public static function petty_count(WP_REST_Request $request) {
+        return self::command($request, array('counted_cash', 'reason', 'notes', 'period_start', 'period_end'), function ($body) use ($request) {
+            return Akph_Petty_Cash::count_fund(self::id($request), $body);
+        });
+    }
+
+    public static function petty_close_period(WP_REST_Request $request) {
+        return self::command($request, array('period_end', 'version'), function ($body) use ($request) {
+            return Akph_Petty_Cash::close_period(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function petty_submit_expense(WP_REST_Request $request) {
+        return self::command($request, array('fund_id', 'amount', 'date', 'category_id', 'category_name', 'sub_category', 'vendor', 'vendor_national_id', 'counterparty_id', 'invoice_number', 'invoice_date', 'description', 'payment_method'), function ($body) {
+            return Akph_Petty_Cash::submit_expense($body);
+        });
+    }
+
+    public static function petty_approve_expense(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'version'), function ($body) use ($request) {
+            return Akph_Petty_Cash::approve_expense(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function petty_reject_expense(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'return_to_user', 'version'), function ($body) use ($request) {
+            return Akph_Petty_Cash::reject_expense(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function petty_create_request(WP_REST_Request $request) {
+        return self::command($request, array('fund_id', 'amount', 'reason'), function ($body) {
+            return Akph_Petty_Cash::create_request($body);
+        });
+    }
+
+    public static function petty_approve_request(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'version'), function ($body) use ($request) {
+            return Akph_Petty_Cash::approve_request(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function petty_reject_request(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Petty_Cash::reject_request(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    // ------------------------------------------------------------------ treasury
+
+    const TREASURY_ACCOUNT_FIELDS = array('kind', 'title', 'bank_name', 'branch', 'account_number', 'sheba', 'holder_name', 'keeper_user_id', 'location', 'project_id', 'account_code', 'active');
+
+    public static function treasury_overview(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return Akph_Treasury::overview();
+        });
+    }
+
+    public static function treasury_settings(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('settings' => Akph_Treasury::settings());
+        });
+    }
+
+    public static function treasury_update_settings(WP_REST_Request $request) {
+        return self::command($request, array('payment_senior_threshold'), function ($body) {
+            return Akph_Treasury::update_settings($body);
+        });
+    }
+
+    public static function treasury_schedule(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return Akph_Treasury::schedule();
+        });
+    }
+
+    public static function treasury_accounts(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('accounts' => Akph_Treasury::list_accounts());
+        });
+    }
+
+    public static function treasury_create_account(WP_REST_Request $request) {
+        return self::command($request, self::TREASURY_ACCOUNT_FIELDS, function ($body) {
+            return Akph_Treasury::create_account($body);
+        });
+    }
+
+    public static function treasury_update_account(WP_REST_Request $request) {
+        return self::command($request, array_merge(self::TREASURY_ACCOUNT_FIELDS, array('version')), function ($body) use ($request) {
+            $version = Akph_Input::version($request, $body);
+            unset($body['version'], $body['kind']);
+            return Akph_Treasury::update_account(self::id($request), $body, $version);
+        });
+    }
+
+    public static function treasury_movements(WP_REST_Request $request) {
+        return self::query_read($request, function () use ($request) {
+            return Akph_Treasury::account_movements(self::id($request));
+        });
+    }
+
+    public static function treasury_reconciliation(WP_REST_Request $request) {
+        return self::query_read($request, function () use ($request) {
+            return Akph_Treasury::reconciliation(self::id($request));
+        });
+    }
+
+    public static function treasury_import_statement(WP_REST_Request $request) {
+        return self::command($request, array('lines', 'csv'), function ($body) use ($request) {
+            return Akph_Treasury::import_statement(self::id($request), $body);
+        });
+    }
+
+    public static function treasury_transfer(WP_REST_Request $request) {
+        return self::command($request, array('from_account_id', 'to_account_id', 'amount', 'date', 'tracking', 'description'), function ($body) {
+            return Akph_Treasury::create_transfer($body);
+        });
+    }
+
+    public static function payment_requests(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('payment_requests' => Akph_Treasury::list_requests());
+        });
+    }
+
+    public static function payment_request_create(WP_REST_Request $request) {
+        return self::command($request, array('amount', 'beneficiary_name', 'beneficiary_type', 'beneficiary_sheba', 'project_id', 'cost_center_id', 'counterparty_id', 'payable_type', 'debit_account_code', 'due_date', 'priority', 'description'), function ($body) {
+            return Akph_Treasury::create_request($body);
+        });
+    }
+
+    public static function payment_request_approve(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::approve_request(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function payment_request_reject(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::reject_request(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function payment_request_pay(WP_REST_Request $request) {
+        return self::command($request, array('amount', 'account_id', 'method', 'tracking', 'date', 'cheque_number', 'cheque_due_date', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::pay_request(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function receipt_create(WP_REST_Request $request) {
+        return self::command($request, array('amount', 'receipt_type', 'credit_account_code', 'date', 'counterparty_id', 'payer_name', 'project_id', 'account_id', 'method', 'tracking', 'cheque_number', 'cheque_bank', 'cheque_due_date', 'description'), function ($body) {
+            return Akph_Treasury::create_receipt($body);
+        });
+    }
+
+    public static function receipt_approve(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::approve_receipt(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function receipt_reject(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::reject_receipt(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function cheque_status(WP_REST_Request $request) {
+        return self::command($request, array('status', 'date', 'note', 'account_id', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::change_cheque(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function bank_line_match(WP_REST_Request $request) {
+        return self::command($request, array('ledger_line_id', 'version'), function ($body) use ($request) {
+            return Akph_Treasury::match_line(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function bank_line_voucher(WP_REST_Request $request) {
+        return self::command($request, array('version'), function ($body) use ($request) {
+            return Akph_Treasury::voucher_for_line(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    // ------------------------------------------------------------------ approval center
+
+    public static function approvals(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return Akph_Approvals::for_current_user();
         });
     }
 

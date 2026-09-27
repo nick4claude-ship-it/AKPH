@@ -34,7 +34,8 @@ final class Akph_Documents {
     );
     const ENTITY_TYPES = array(
         'project', 'contract', 'counterparty', 'journal_entry', 'invoice', 'statement', 'petty_expense', 'payment',
-        'payroll', 'inventory_doc', 'other',
+        'payroll', 'inventory_doc', 'other', 'petty_request', 'petty_count', 'payment_request', 'receipt', 'transfer',
+        'cheque', 'bank_statement',
     );
 
     /** Allowed extension => MIME type stored and sent. */
