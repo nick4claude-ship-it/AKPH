@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       پرتال مدیریت پیمانکاری AKPH
- * Description:       اپلیکیشن مدیریت پروژه، قرارداد، خزانه، تنخواه، انبار و حسابداری با سرور akph/v1 (پروژه‌ها، مراکز هزینه، طرف‌های حساب، کدینگ و اسناد حسابداری).
- * Version:           0.5.0
+ * Description:       اپلیکیشن مدیریت پروژه، قرارداد، خزانه، تنخواه، انبار و حسابداری با سرور akph/v1 (پروژه‌ها، مراکز هزینه، طرف‌های حساب، کدینگ، اسناد حسابداری، تنخواه، خزانه و کارتابل تأییدات).
+ * Version:           0.6.0
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            AKPH
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AKPH_PORTAL_VERSION', '0.5.0');
+define('AKPH_PORTAL_VERSION', '0.6.0');
 define('AKPH_PORTAL_FILE', __FILE__);
 define('AKPH_PORTAL_DIR', plugin_dir_path(__FILE__));
 define('AKPH_PORTAL_URL', plugin_dir_url(__FILE__));
@@ -35,6 +35,11 @@ require_once AKPH_PORTAL_DIR . 'includes/class-akph-master-data.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-accounts.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-ledger.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-reports.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-posting.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-flow.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-petty-cash.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-treasury.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-approvals.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-account.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-assistant.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-documents.php';

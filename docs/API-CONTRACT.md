@@ -102,6 +102,17 @@
 | `POST /documents/{id}/archive` | `akph_access` + بارگذارکننده، مدیر سیستم یا مدیر ارشد | ✓ سند خودش | ✓ سند خودش در پروژه خودش |
 | `GET /assistant/status`، `POST /assistant/ask` | `akph_assistant_use` | ✓ | ✓ داده پروژه‌های خودش |
 | `GET|POST /assistant/settings`، `POST /assistant/test` | `akph_ai_manage` (فقط مدیر سیستم) | — | — |
+| `GET /petty-cash`، `GET /petty-cash/settings`، `GET /petty-cash/categories`، `GET /petty-cash/funds/{id}` | `akph_petty_submit` | ✓ همه | ✓ صندوق‌های پروژه‌های خودش (صندوق ستاد هرگز) |
+| `POST /petty-cash/settings` | `akph_settings` | — | — |
+| `POST /petty-cash/categories`، `POST /petty-cash/funds`، `POST|PUT|PATCH /petty-cash/funds/{id}`، `POST /petty-cash/funds/{id}/count`، `/close-period` | `akph_petty_manage` | ✓ | — |
+| `POST /petty-cash/expenses`، `POST /petty-cash/requests` | `akph_petty_submit` | ✓ | ✓ صندوق پروژه خودش (متصدی یا مدیر پروژه) |
+| `POST /petty-cash/expenses/{id}/approve`، `/reject`، `POST /petty-cash/requests/{id}/approve`، `/reject` | `akph_petty_approve` + نقش مرحله | ✓ مرحله «حسابدار» | ✓ مرحله «مدیر پروژه» پروژه خودش |
+| `GET /treasury`، `GET /treasury/settings`، `GET /treasury/schedule`، `GET /treasury/accounts`، `GET /treasury/accounts/{id}/movements`، `/reconciliation`، `GET /payment-requests` | `akph_view_all` | ✓ | — |
+| `POST /treasury/settings` | `akph_settings` | — | — |
+| `POST /treasury/accounts`، `POST|PUT|PATCH /treasury/accounts/{id}`، `POST /treasury/accounts/{id}/statement`، `POST /treasury/transfers`، `POST /payment-requests/{id}/pay`، `POST /receipts`، `POST /cheques/{id}/status`، `POST /bank-statement-lines/{id}/match`، `/voucher` | `akph_treasury_manage` | ✓ | — |
+| `POST /payment-requests` | `akph_payment_request` | ✓ | — |
+| `POST /payment-requests/{id}/approve`، `/reject`، `POST /receipts/{id}/approve`، `/reject` | `akph_payment_approve` | ✓ تا آستانه (نه درخواست خودش) | — |
+| `GET /approvals` | `akph_access` | ✓ موارد مرحله خودش | ✓ موارد مرحله خودش در پروژه‌های خودش |
 | `GET /` (فهرست فضای نام) | `akph_access` | ✓ | ✓ |
 
 ## ۴. جزئیات مسیرها
@@ -115,7 +126,7 @@
   "currency": "toman", "site_currency": "toman",
   "preferences": { "currency": "site", "rows_per_page": 25, "start_page": "/" },
   "fiscal_year": 1405, "closed_fiscal_years": [], "today": "2026-09-25",
-  "caps": { "akph_access": true, "akph_assistant_use": true, "…": false }, "server_version": "0.5.0"
+  "caps": { "akph_access": true, "akph_assistant_use": true, "…": false }, "server_version": "0.6.0"
 }
 ```
 
@@ -394,6 +405,85 @@
 
 هیچ پاسخ REST، ردیف ممیزی، کلید ذخیره‌شده فرمان، ردیف ثبت درخواست، پیام خطا یا خط لاگ شامل کلید API یا توکن واسط نیست.
 
+### موتور ثبت رویدادها (مشترک تنخواه و خزانه)
+
+- هر رویداد مالی (تأیید نهایی هزینه تنخواه، پرداخت، تأیید دریافت، انتقال، وصول/برگشت چک، تعدیل شمارش، سند مغایرت بانکی)
+  **یک** سند در همان جدول‌های `akph_ledger_*` می‌سازد؛ کلید `(source, source_id, event_type)` در `akph_ledger_events` یکتاست و
+  تکرار همان رویداد سند دوم نمی‌سازد (همان سند اول برمی‌گردد).
+- حساب‌ها با کد از کدینگ خوانده می‌شوند؛ حساب تعریف‌نشده یا گروهی/غیرفعال: `422 akph_rule` با پیام «حساب «کد - عنوان» در کدینگ
+  تعریف نشده است…هیچ سندی ثبت نشد.» و هیچ چیزی نوشته نمی‌شود.
+- سند قطعی همان لحظه شماره `ACC` می‌گیرد (ترتیب تاریخ حفظ می‌شود)؛ سند تعدیل شمارش تنخواه و سند مغایرت بانکی «در انتظار» با شماره
+  `DRF` ثبت می‌شوند و کاربر دیگری آن را از `POST /journal-entries/{id}/post` قطعی یا از `/reject` رد می‌کند. رد آن رویداد را آزاد
+  می‌کند (ردیف صورت‌حساب دوباره «تطبیق‌نشده» می‌شود).
+- سند خودکار (`source_type: event`) از دفتر ویرایش یا معکوس نمی‌شود؛ اصلاح از ماژول مبدأ است.
+- موجودی بانک، صندوق و تنخواه هرگز ذخیره نمی‌شود: Σ(بدهکار − بستانکار) ردیف‌های قطعی با `cash_ref` همان حساب (`tre:ID` بانک/صندوق،
+  `pcf:ID` تنخواه). هیچ برداشتی موجودی را منفی نمی‌کند («موجودی منفی مجاز نیست»).
+- ترتیب قفل: لنگر شماره‌گذاری سال (`ACC`، و `DRF` برای سند در انتظار) ← لنگر شماره رکورد (`EXP`، `PCR`، `PAY`، `REC`، `TRF`، `RCN`، …) ← ردیف‌ها.
+
+### تنخواه
+
+`GET /petty-cash` → `{ "funds": [...], "categories": [...], "settings": {...}, "expenses": [...], "requests": [...], "counts": [...], "replenishments": [...] }`
+(در محدوده پروژه‌های کاربر).
+
+```json
+{ "id": "41", "code": "PCF-1405-00001", "title": "تنخواه کارگاه", "fund_type": "site_supervisor", "project_id": "5", "cost_center_id": "8",
+  "holder_user_id": "21", "holder_name": "…", "account_code": "11103", "ceiling": 3000000000, "max_single_expense": 1000000000,
+  "min_balance_warning": 500000000, "source_account_id": "61", "active": true, "period_start": "2026-09-01",
+  "balance": 1850000000, "pending_expenses": 600000000, "usable_balance": 1250000000, "open_requests": 0, "period_spent": 150000000,
+  "last_replenishment_amount": 2000000000, "last_replenishment_date": "2026-09-10", "version": 4 }
+```
+
+| فرمان | بدنه | قاعده |
+|---|---|---|
+| `POST /petty-cash/funds` | `title`، `fund_type` (`project_manager`\|`site_supervisor`\|`procurement`\|`headquarters`)، `project_id` (خالی = ستاد)، `cost_center_id`، `holder_user_id`، `holder_name`، `holder_phone`، `account_code` (پیش‌فرض `11103`)، `ceiling`، `max_single_expense`، `min_balance_warning`، `source_account_id`، `notes` | سقف‌ها پیش‌فرض از تنظیمات؛ حساب باید قابل ثبت باشد |
+| `PATCH /petty-cash/funds/{id}` | همان فیلدها + `active` + `version` | حساب وجه صندوقی که مانده دارد تغییر نمی‌کند |
+| `POST /petty-cash/expenses` | `fund_id`، `amount`، `date`، `category_id` یا `category_name`، `sub_category`، `vendor`، `vendor_national_id`، `counterparty_id`، `invoice_number`، `invoice_date`، `description`، `payment_method` (`card`\|`cash`\|`transfer`\|`other`) | متصدی یا مدیر پروژه؛ سقف هر هزینه؛ مبلغ ≤ موجودی قابل مصرف (موجودی − هزینه‌های در انتظار)؛ سطح و زنجیره از تنظیمات |
+| `POST /petty-cash/expenses/{id}/approve` | `comment`، `version` | کاربر مرحله جاری، نه ثبت‌کننده و نه تأییدکننده مرحله قبل؛ مرحله آخر سند «بدهکار هزینه سرفصل (پروژه، مرکز هزینه) / بستانکار تنخواه» |
+| `POST /petty-cash/expenses/{id}/reject` | `reason` (الزامی)، `return_to_user`، `version` | در هر مرحله |
+| `POST /petty-cash/requests` | `fund_id`، `amount`، `reason` | یک درخواست باز برای هر صندوق؛ موجودی + درخواست‌های باز + مبلغ ≤ سقف |
+| `POST /petty-cash/requests/{id}/approve`، `/reject` | `comment` یا `reason`، `version` | مدیر پروژه ← حسابدار ← مدیر ارشد (بالای آستانه)؛ مرحله آخر درخواست پرداخت تأییدشده در خزانه می‌سازد |
+| `POST /petty-cash/funds/{id}/count` | `counted_cash`، `reason` (با مغایرت الزامی)، `notes`، `period_start`، `period_end` | مانده دفتری، هزینه‌های در انتظار، مانده مورد انتظار؛ مغایرت → سند تعدیل در انتظار (کسری ۶۲۴۰۲، مازاد ۴۱۳۰۲) |
+| `POST /petty-cash/funds/{id}/close-period` | `period_end`، `version` | فقط وقتی هیچ هزینه یا سند تعدیل صندوق باز نیست |
+| `POST /petty-cash/settings` | `site_level_max`، `project_level_max`، `approval_chains`، `fund_limits`، `low_balance_percent`، `replenishment_senior_threshold`، `default_expense_account` | فقط مجوز تنظیمات |
+| `POST /petty-cash/categories` | `categories: [{ id?, name, subcategories, account_code? }]` | حساب هزینه قابل ثبت گروه ۵ یا ۶ (پیش‌فرض ۵۱۱۰۱)؛ سرفصل حذف‌شده غیرفعال می‌شود |
+
+`GET /petty-cash/funds/{id}` → `{ fund, movements (با مانده جاری از دفتر), expenses, requests, counts, history }`.
+
+### خزانه
+
+`GET /treasury` → `{ accounts, payment_requests (با payments), receipts, cheques, transfers, statement_lines, settings }`.
+حساب: `{ id, kind: bank|cash, code, title, bank_name, branch, account_number, sheba, holder_name, location, project_id, account_code, active, balance, total_in, total_out, version }`.
+
+| فرمان | بدنه | قاعده |
+|---|---|---|
+| `POST /treasury/accounts`، `PATCH /treasury/accounts/{id}` | `kind`، `title`، `bank_name`، `branch`، `account_number`، `sheba`، `holder_name`، `keeper_user_id`، `location`، `project_id`، `account_code` (پیش‌فرض بانک `11101`، صندوق `11102`)، `active` | حسابِ کدینگِ حسابی که مانده دارد تغییر نمی‌کند |
+| `POST /payment-requests` | `amount`، `beneficiary_name`، `payable_type` (`supplier`، `subcontractor`، `payroll`، `insurance`، `tax_vat`، `tax_payroll`، `tax_withholding`، `advance`، `subcontractor_advance`، `general_expense`) یا `debit_account_code`، `project_id`، `cost_center_id`، `counterparty_id`، `due_date`، `priority`، `description` | ثبت دستی؛ درخواست‌های منبع‌دار (شارژ تنخواه) را ماژول مبدأ می‌سازد |
+| `POST /payment-requests/{id}/approve`، `/reject` | `version`؛ رد: `reason` | نه درخواست‌کننده؛ حسابدار تا آستانه `payment_senior_threshold` (پیش‌فرض ۱٬۰۰۰٬۰۰۰٬۰۰۰ ریال)، بالاتر مدیر ارشد |
+| `POST /payment-requests/{id}/pay` | `amount`، `account_id`، `method` (`satna`\|`paya`\|`transfer`\|`card`\|`cash`\|`cheque`)، `tracking`، `date`، `cheque_number`، `cheque_due_date`، `version` | پرداخت‌کننده ≠ تأییدکننده؛ پرداخت جزئی مجاز و مانده به‌روز می‌شود؛ مبدأ منفی نمی‌شود؛ چک: بستانکار اسناد پرداختنی ۲۱۱۰۳ |
+| `POST /receipts`، `/{id}/approve`، `/{id}/reject` | `amount`، `receipt_type` (`statement` ۱۱۲۰۱، `advance` ۲۱۳۰۱، `other_income` ۴۱۳۰۲، `custom` + `credit_account_code`)، `account_id`، `counterparty_id` یا `payer_name`، `project_id`، `method`، `tracking`، `cheque_number`، `cheque_bank`، `cheque_due_date`، `date`، `description` | تأیید با کاربر دیگر؛ چک دریافتی: بدهکار اسناد دریافتنی ۱۱۲۰۲ |
+| `POST /treasury/transfers` | `from_account_id`، `to_account_id`، `amount`، `date`، `tracking`، `description` | سند همان لحظه؛ مبدأ منفی نمی‌شود |
+| `POST /cheques/{id}/status` | `status` (`cleared`\|`bounced`)، `note` (برگشت: الزامی)، `date`، `account_id`، `version` | هر تغییر یک سند؛ برگشت چک پرداختنی درخواست پرداخت را دوباره باز می‌کند |
+| `POST /treasury/accounts/{id}/statement` | `lines: [{ date, description, deposit, withdrawal, reference }]` یا `csv` (همان ستون‌ها؛ تاریخ شمسی یا میلادی) | حداکثر ۱۰۰۰ ردیف |
+| `POST /bank-statement-lines/{id}/match` | `ledger_line_id`، `version` | ردیف قطعی همان حساب، همان جهت و مبلغ؛ هر ردیف فقط یک بار |
+| `POST /bank-statement-lines/{id}/voucher` | `version` | سند در انتظار (واریز: بانک/۲۱۷۰۱، برداشت: کارمزد ۶۲۱۰۱/بانک) برای تأیید کاربر دوم |
+
+`GET /treasury/schedule` → درخواست‌های تأییدشده با مانده و چک‌های در جریان به ترتیب سررسید، با `cumulative_out` و `covered` نسبت به نقدینگی.
+
+### کارتابل تأییدات
+
+`GET /approvals` → `{ "items": [...], "total": 2 }`؛ فقط مواردی که مرحله جاری‌شان با نقش (و پروژه) همین کاربر است و کاربر ثبت‌کننده یا
+تأییدکننده مرحله قبل نیست و مبلغ در آستانه اوست: سند دستی، سند معکوس، سند تعدیل شمارش، سند مغایرت بانکی، هزینه تنخواه، درخواست شارژ،
+درخواست پرداخت و دریافت.
+
+```json
+{ "id": "petty_cash_expense:51", "module": "petty_cash_expense", "module_label": "هزینه تنخواه", "record_id": "51", "doc_number": "EXP-1405-00002",
+  "title": "…", "amount": 600000000, "requester_id": "1", "requester": "…", "previous_approver_id": "21", "project_id": "5", "project_name": "…",
+  "date": "2026-09-20", "stage": "تأیید حسابدار", "approver_role": "حسابدار", "version": 2,
+  "approve_path": "/petty-cash/expenses/51/approve", "reject_path": "/petty-cash/expenses/51/reject", "entity_type": "petty_expense" }
+```
+
+تأیید و رد همیشه فرمان ماژول مالک (`approve_path` / `reject_path`) است؛ کپی رکوردی در کارتابل نیست.
+
 ## ۵. کلاینت
 
 - `src/api/akph`: خواندن همه مسیرهای بالا، تبدیل ISO ↔ شمسی (`src/utils/jalali.ts`، همان الگوریتم سرور) و ارسال فرمان‌ها.
@@ -413,8 +503,11 @@
   پیوند و بایگانی با فرمان؛ نگاشت دسته‌های اپ به `doc_type` و نوع رکوردهای اپ به `entity_type`. با داده نمایشی فایل فقط در همان
   برگه مرورگر می‌ماند (`src/api/mock/documents.ts`).
 - `logoutUrl` در `window.AkphPortal` و `useLogout()` در `src/store/session.tsx` برای «خروج از حساب».
+- `src/api/akph/finance.ts`: نگاشت تنخواه، خزانه و کارتابل. این فرمان‌ها بدون اجرای آزمایشی محلی مستقیم به سرور می‌روند
+  (`serverValidated`)، چون مرحله، آستانه و موجودی را سرور تعیین می‌کند. پس از هر فرمان `GET /approvals` دوباره خوانده می‌شود
+  (کارتابل، شمارنده منو و اعلان‌ها). بخش‌های تنخواه، خزانه و کارتابل در حالت واقعی فقط‌خواندنی نیستند (`WRITABLE_PATHS`).
 
 ## ۶. فرمان‌های فاز بعد (هنوز فقط‌خواندنی)
 
-صورت‌وضعیت‌ها، خزانه و پرداخت، تنخواه، خرید، انبار، حقوق، قراردادها، مغایرت بانکی و بستن سال. قواعد آن‌ها در
+صورت‌وضعیت‌ها، خرید، انبار، حقوق، قراردادها و بستن سال. قواعد آن‌ها در
 [SERVER-RULES.md](./SERVER-RULES.md) آمده و با همین چارچوب (Idempotency-Key، version، تراکنش، ممیزی) ساخته می‌شوند.

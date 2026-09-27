@@ -22,7 +22,95 @@ const entry = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+// Petty cash, treasury and approvals as akph/v1 shapes them (class-akph-petty-cash.php, class-akph-treasury.php).
+const fund = (over: Record<string, unknown> = {}) => ({
+  id: '41', code: 'PCF-1405-00001', title: 'تنخواه کارگاه', fund_type: 'site_supervisor', project_id: '5', cost_center_id: '8', holder_user_id: '21',
+  holder_name: 'متصدی', holder_phone: '', account_code: '11103', ceiling: 3_000_000_000, max_single_expense: 1_000_000_000, min_balance_warning: 500_000_000,
+  source_account_id: '61', active: true, notes: '', period_start: '2026-09-01', balance: 1_850_000_000, pending_expenses: 600_000_000, usable_balance: 1_250_000_000,
+  open_requests: 0, period_spent: 150_000_000, last_replenishment_amount: 2_000_000_000, last_replenishment_date: '2026-09-10', created_at: '2026-09-01T08:00:00Z', version: 4,
+  ...over,
+});
+const expense = (over: Record<string, unknown> = {}) => ({
+  id: '51', number: 'EXP-1405-00002', fund_id: '41', fund_title: 'تنخواه کارگاه', project_id: '5', cost_center_id: '8', category_id: null, category_name: 'مصالح جزئی',
+  sub_category: '', account_code: '51101', date: '2026-09-20', amount: 600_000_000, vendor: 'فروشگاه', vendor_national_id: '', counterparty_id: null, invoice_number: 'F-1',
+  invoice_date: null, description: 'اجاره ماشین‌آلات', payment_method: 'cash', status: 'pending', approval_level: 'project_and_finance', chain: ['مدیر پروژه', 'حسابدار'],
+  step_index: 1, current_step: 'حسابدار',
+  history: [
+    { action: 'submitted', step: 'ثبت هزینه', user_id: '1', user_name: 'مدیر ارشد', role: 'مدیر ارشد', at: '2026-09-20T07:00:00Z', comment: '' },
+    { action: 'approved', step: 'مدیر پروژه', user_id: '21', user_name: 'مدیر پروژه', role: 'مدیر پروژه', at: '2026-09-20T08:30:00Z', comment: 'تأیید' },
+  ],
+  submitted_by: '1', submitted_by_name: 'مدیر ارشد', last_approved_by: '21', reject_reason: '', entry: null, version: 2, created_at: '2026-09-20T07:00:00Z',
+  ...over,
+});
+const payReq = (over: Record<string, unknown> = {}) => ({
+  id: '71', number: 'PAY-1405-00001', source_type: 'manual', source_id: null, payable_type: 'supplier', debit_account_code: '21101', project_id: '5', cost_center_id: null,
+  counterparty_id: '3', fund_id: null, beneficiary_name: 'تأمین‌کننده', beneficiary_type: '', beneficiary_sheba: '', amount: 300_000_000, paid_amount: 100_000_000,
+  remaining_amount: 200_000_000, date: '2026-09-21', due_date: '2026-09-30', priority: 'normal', status: 'approved', description: '', requested_by: '7',
+  requested_by_name: 'حسابدار یک', approved_by: '9', approved_by_name: 'حسابدار دو', approved_at: '2026-09-21T09:00:00Z', reject_reason: '', needs_senior: false,
+  payments: [{ id: '81', account_id: '61', account_title: 'بانک نمونه', amount: 100_000_000, method: 'paya', tracking: 'P-1', date: '2026-09-22', cheque_id: null, entry: { id: '90', number: 'ACC-1405-00009', status: 'posted' }, paid_by: '7', paid_by_name: 'حسابدار یک' }],
+  version: 3,
+  ...over,
+});
+const approvalsBody = { items: [
+  { id: 'petty_cash_expense:51', module: 'petty_cash_expense', module_label: 'هزینه تنخواه', record_id: '51', doc_number: 'EXP-1405-00002', title: 'اجاره ماشین‌آلات', amount: 600_000_000,
+    requester_id: '1', requester: 'مدیر ارشد', previous_approver_id: '21', project_id: '5', project_name: 'پروژه آزمون', date: '2026-09-20', stage: 'تأیید حسابدار', approver_role: 'حسابدار',
+    version: 2, approve_path: '/petty-cash/expenses/51/approve', reject_path: '/petty-cash/expenses/51/reject', entity_type: 'petty_expense' },
+  { id: 'receipt:95', module: 'receipt', module_label: 'دریافت', record_id: '95', doc_number: 'REC-1405-00001', title: 'دریافت از کارفرما', amount: 50_000_000,
+    requester_id: '9', requester: 'حسابدار دو', previous_approver_id: null, project_id: null, project_name: '', date: '2026-09-22', stage: 'تأیید دریافت', approver_role: 'حسابدار',
+    version: 1, approve_path: '/receipts/95/approve', reject_path: '/receipts/95/reject', entity_type: 'receipt' },
+], total: 2 };
+
 const responses: Record<string, unknown> = {
+  'GET petty-cash': {
+    funds: [fund()], categories: [{ id: '1', name: 'مصالح جزئی', subcategories: ['پیچ و مهره'], account_code: '51101', active: true, version: 1 }],
+    settings: {
+      fund_limits: {
+        project_manager: { ceiling: 3_000_000_000, min_balance_warning: 600_000_000, max_single_expense: 1_000_000_000 },
+        site_supervisor: { ceiling: 2_500_000_000, min_balance_warning: 500_000_000, max_single_expense: 500_000_000 },
+        procurement: { ceiling: 1_500_000_000, min_balance_warning: 400_000_000, max_single_expense: 800_000_000 },
+        headquarters: { ceiling: 1_200_000_000, min_balance_warning: 300_000_000, max_single_expense: 400_000_000 },
+      },
+      site_level_max: 200_000_000, project_level_max: 1_000_000_000,
+      approval_chains: { site_manager_and_finance: ['حسابدار'], project_and_finance: ['مدیر پروژه', 'حسابدار'], ceo_full: ['مدیر پروژه', 'حسابدار', 'مدیر ارشد'] },
+      replenishment_senior_threshold: 1_000_000_000, low_balance_percent: 25, default_expense_account: '51101',
+    },
+    expenses: [expense()],
+    requests: [{ id: '45', number: 'PCR-1405-00001', fund_id: '41', fund_title: 'تنخواه کارگاه', project_id: '5', amount: 2_000_000_000, reason: 'شارژ اول', date: '2026-09-09', status: 'paid',
+      chain: ['مدیر پروژه', 'حسابدار', 'مدیر ارشد'], step_index: 3, current_step: null, history: [], requested_by: '7', requested_by_name: 'حسابدار یک', last_approved_by: '1',
+      reject_reason: '', payment_request_id: '70', balance_at_request: 0, version: 4 }],
+    counts: [{ id: '47', number: 'RCN-1405-00001', fund_id: '41', fund_title: 'تنخواه کارگاه', holder_name: 'متصدی', period_start: '2026-09-01', period_end: '2026-09-25',
+      book_balance: 1_250_000_000, pending_expenses: 0, expected_balance: 1_250_000_000, counted_cash: 1_240_000_000, discrepancy: -10_000_000, reason: 'رسید گمشده', notes: '',
+      entry: { id: '91', number: 'DRF-1405-00004', status: 'pending' }, closes_period: false, counted_by: '7', counted_by_name: 'حسابدار یک', created_at: '2026-09-25T10:00:00Z' }],
+    replenishments: [{ id: '80', fund_id: '41', payment_request_number: 'PAY-1405-00000', amount: 2_000_000_000, account_id: '61', account_title: 'بانک نمونه', method: 'satna',
+      tracking: 'S-1', date: '2026-09-10', description: 'شارژ تنخواه', entry_number: 'ACC-1405-00003', paid_by_name: 'حسابدار یک' }],
+  },
+  'GET treasury': {
+    accounts: [
+      { id: '61', kind: 'bank', code: 'TRA-1405-00001', title: 'بانک نمونه', bank_name: 'بانک نمونه', branch: 'مرکزی', account_number: '0100', sheba: '', holder_name: 'شرکت',
+        keeper_user_id: null, location: '', project_id: null, account_code: '11101', active: true, balance: 2_900_000_000, total_in: 5_000_000_000, total_out: 2_100_000_000, version: 1 },
+      { id: '62', kind: 'cash', code: 'TRA-1405-00002', title: 'صندوق کارگاه', bank_name: '', branch: '', account_number: '', sheba: '', holder_name: 'تحویلدار',
+        keeper_user_id: null, location: 'کارگاه', project_id: '5', account_code: '11102', active: true, balance: 30_000_000, total_in: 30_000_000, total_out: 0, version: 1 },
+    ],
+    payment_requests: [payReq(), payReq({ id: '72', number: 'PAY-1405-00002', status: 'pending', paid_amount: 0, remaining_amount: 300_000_000, approved_by: null, approved_by_name: '', approved_at: null, payments: [], version: 1 })],
+    receipts: [{ id: '95', number: 'REC-1405-00001', receipt_type: 'statement', credit_account_code: '11201', counterparty_id: null, payer_name: 'کارفرما', project_id: null, account_id: '61',
+      account_title: 'بانک نمونه', amount: 50_000_000, date: '2026-09-22', method: 'transfer', tracking: 'T-5', cheque_number: '', cheque_due_date: null, cheque_id: null, description: '',
+      status: 'pending', created_by: '9', created_by_name: 'حسابدار دو', approved_by: null, reject_reason: '', entry: null, version: 1 }],
+    cheques: [{ id: '97', direction: 'payable', serial: '123456', bank_name: 'بانک نمونه', amount: 200_000_000, issue_date: '2026-09-22', due_date: '2026-10-01', counterparty_id: '3',
+      party_name: 'تأمین‌کننده', project_id: '5', account_id: '61', account_title: 'بانک نمونه', source_type: 'payment', source_id: '82', status: 'pending', status_date: null, status_note: '', version: 1 }],
+    transfers: [],
+    statement_lines: [{ id: '99', account_id: '61', date: '2026-09-23', description: 'کارمزد', reference: 'B2', direction: 'withdrawal', amount: 25_000, status: 'unmatched',
+      matched_line_id: null, voucher: null, matched_entry: null, version: 1 }],
+    settings: { payment_senior_threshold: 1_000_000_000 },
+  },
+  'GET approvals': approvalsBody,
+  'GET treasury/accounts/61/reconciliation': { account: {}, statement_lines: [], unmatched_ledger_lines: [{ line_id: '501', doc_number: 'ACC-1405-00010', date: '2026-09-23', description: 'x', direction: 'withdrawal', amount: 25_000 }] },
+  'POST petty-cash/expenses/51/approve': { message: 'هزینه EXP-1405-00002 تأیید نهایی شد و سند ACC-1405-00011 صادر شد.', id: '51', doc_number: 'ACC-1405-00011', records: {
+    petty_expenses: [expense({ status: 'approved', current_step: null, step_index: 2, entry: { id: '92', number: 'ACC-1405-00011', status: 'posted' }, version: 3 })],
+    petty_funds: [fund({ balance: 1_250_000_000, pending_expenses: 0, version: 4 })],
+  } },
+  'POST payment-requests/71/pay': { message: 'پرداخت ثبت شد.', id: '82', doc_number: 'ACC-1405-00012', records: { payment_requests: [payReq({ status: 'paid', paid_amount: 300_000_000, remaining_amount: 0, version: 4 })] } },
+  'POST receipts/95/approve': { message: 'دریافت REC-1405-00001 تأیید شد.', id: '95', doc_number: 'ACC-1405-00013', records: {} },
+  'POST bank-statement-lines/99/match': { message: 'تطبیق شد.', id: '99', records: { bank_statement_lines: [{ id: '99', account_id: '61', date: '2026-09-23', description: 'کارمزد', reference: 'B2', direction: 'withdrawal', amount: 25_000, status: 'matched', matched_line_id: '501', voucher: null, matched_entry: { id: '93', number: 'ACC-1405-00010', status: 'posted' }, version: 2 }] } },
   'GET me': { id: '7', display_name: 'حسابدار یک', role: 'حسابدار', role_slug: 'paydar_accountant', view_all: true, project_ids: [], currency: 'rial', fiscal_year: 1405, closed_fiscal_years: [1403], today: '2026-09-25' },
   'GET projects': { projects: [{
     id: '5', code: 'PRJ-1405-00001', name: 'پروژه آزمون', client_id: null, client_name: 'کارفرما', consultant_name: '', manager_user_id: '21', manager_name: 'مدیر پروژه',
@@ -147,7 +235,7 @@ const commands = source.commands!;
 for (const a of ['createManualJournalEntry', 'submitManualJournalEntryForm', 'approveJournalEntryLogged', 'rejectJournalEntryLogged', 'reverseJournalEntryLogged', 'createProject', 'updateProject', 'createCostCenter', 'createCounterparty', 'createAccount']) {
   assert.equal(commands.supports(a), true, a);
 }
-for (const a of ['approveVendorInvoice', 'executePayment', 'closeFiscalYearLogged', 'createClientContract']) assert.equal(commands.supports(a), false, a);
+for (const a of ['approveVendorInvoice', 'closeFiscalYearLogged', 'createClientContract']) assert.equal(commands.supports(a), false, a);
 console.log('  ✔ فرمان‌های این مرحله پشتیبانی می‌شوند؛ بقیه «فقط خواندنی — به‌زودی»');
 
 const draftKey = 'submission-key-0001';
@@ -186,6 +274,88 @@ await commands.run('updateProject', ['5', { physicalProgress: 40, startDate: '۱
 const upd = calls.find((c) => c.url === 'projects/5')!;
 assert.deepEqual(upd.body, { physical_progress: 40, start_date: '2026-04-21', manual_revenue: 7, version: 3 }, 'only the changed fields, with the version');
 console.log('  ✔ ویرایش پروژه فقط فیلدهای تغییرکرده را با نسخه رکورد می‌فرستد');
+
+// ---------------------------------------------------------------- petty cash, treasury, approval center (0.6.0)
+{
+  const { readOnlyNoticeFor } = await import('../src/store/readOnly');
+  const { selectApprovals } = await import('../src/store/domainSelectors');
+  for (const path of ['/petty-cash', '/finance/payments', '/finance/receipts', '/finance/banks', '/finance/cash', '/approvals']) {
+    assert.equal(readOnlyNoticeFor(source.writablePaths, path), null, `${path} is not read-only with the server`);
+  }
+  assert.match(readOnlyNoticeFor(source.writablePaths, '/procurement') || '', /فقط خواندنی/, 'sections without server commands stay read-only');
+
+  const [f] = state.pettyCashAccounts;
+  assert.equal(f.actualBalance, 1_850_000_000, 'fund balance from the server (ledger)');
+  assert.equal(f.usableBalance, 1_250_000_000);
+  assert.equal(f.projectName, 'پروژه آزمون');
+  assert.equal(f.sourceBankAccountTitle, 'بانک نمونه - 0100');
+  const [e] = state.pettyCashExpenses;
+  assert.equal(e.status, 'pending_approval');
+  assert.equal(e.currentApprovalStep, 'حسابدار', 'the current step comes from the server');
+  assert.equal(e.submitterId, '1');
+  assert.equal(e.approvalHistory[0].level, 'ثبت اولیه');
+  assert.equal(e.approvalHistory[1].approverId, '21');
+  assert.equal(e.date, '۱۴۰۵/۰۶/۲۹');
+  assert.equal(state.pettyCashRequests[0].status, 'تأیید شده');
+  assert.equal(state.pettyCashReconciliations[0].status, 'دارای کسری');
+  assert.equal(state.pettyCashReconciliations[0].adjustmentDocNumber, 'DRF-1405-00004');
+  assert.equal(state.pettyCashReplenishments[0].pettyCashTitle, 'تنخواه کارگاه');
+  assert.equal(state.pettyCashSettings.projectLevelMax, 1_000_000_000);
+  assert.deepEqual(state.pettyCashSettings.approvalChains.ceo_full, ['مدیر پروژه', 'حسابدار', 'مدیر ارشد']);
+  assert.equal(state.bankAccounts[0].balance, 2_900_000_000, 'bank balance from the ledger');
+  assert.equal(state.bankAccounts[0].totalReceipts, 5_000_000_000);
+  assert.equal(state.cashDesks[0].title, 'صندوق کارگاه');
+  const [queued, waiting] = state.paymentRequests;
+  assert.equal(queued.status, 'در صف پرداخت خزانه');
+  assert.equal(queued.remainingAmount, 200_000_000, 'partial payment: remaining from the server');
+  assert.equal(queued.approvedById, '9');
+  assert.equal(waiting.status, 'در انتظار تأیید مالی');
+  assert.equal(state.payments[0].docNumber, 'ACC-1405-00009');
+  assert.equal(state.receipts[0].pendingApproval, true);
+  assert.equal(state.receipts[0].status, 'در جریان وصول');
+  assert.equal(state.treasuryChecks[0].status, 'در جریان وصول/سررسید');
+  assert.equal(state.bankReconciliations[0].matched, false);
+  const approvals = selectApprovals(state);
+  assert.deepEqual(approvals.map((a) => a.id), ['petty_cash_expense:51', 'receipt:95'], 'the approval center lists what the server says');
+  assert.equal(approvals[0].server?.approvePath, 'petty-cash/expenses/51/approve');
+  assert.equal(approvals[0].context.lastApprovedBy, '21');
+  console.log('  ✔ تنخواه، خزانه و کارتابل از سرور خوانده شد؛ موجودی‌ها و مرحله‌ها از سرور است');
+
+  for (const a of ['approvePettyCashExpense', 'payRequestForm', 'recordReceipt', 'decideServerApproval', 'transferBetweenAccounts', 'changeChequeStatus', 'importBankStatement', 'closePettyCashPeriod']) {
+    assert.equal(commands.supports(a), true, a);
+    assert.equal(commands.serverValidated?.(a), true, `${a}: the server decides`);
+  }
+  calls.length = 0;
+  const approved = await commands.run('approvePettyCashExpense', ['51', 'بررسی شد'], state, 'petty-approve-key');
+  const approveCall = calls.find((c) => c.url === 'petty-cash/expenses/51/approve')!;
+  assert.deepEqual(approveCall.body, { comment: 'بررسی شد', version: 2 }, 'only the comment and the version');
+  assert.equal(approveCall.headers['Idempotency-Key'], 'petty-approve-key');
+  assert.ok(calls.some((c) => c.method === 'GET' && c.url === 'approvals'), 'the approval center is refreshed after a command');
+  const afterApprove = appReducer(state, { type: 'MERGE_SERVER_RECORDS', records: approved.records });
+  assert.equal(afterApprove.pettyCashExpenses[0].status, 'approved');
+  assert.equal(afterApprove.pettyCashExpenses[0].journalEntryId, 'ACC-1405-00011');
+  assert.equal(afterApprove.pettyCashAccounts[0].actualBalance, 1_250_000_000);
+  assert.ok(Array.isArray(afterApprove.serverApprovals));
+
+  calls.length = 0;
+  await commands.run('payRequestForm', [{ requestId: '71', sourceId: 'bank:61', amount: 200_000_000, trackingNumber: 'P-2' }], state, 'pay-key');
+  const payCall = calls.find((c) => c.url === 'payment-requests/71/pay')!;
+  assert.deepEqual(payCall.body, { amount: 200_000_000, account_id: '61', method: 'transfer', tracking: 'P-2', version: 3 }, 'no balance, entry or status from the browser');
+
+  calls.length = 0;
+  await commands.run('decideServerApproval', [approvals[1], 'approve', ''], state, 'approval-key');
+  assert.deepEqual(calls.find((c) => c.url === 'receipts/95/approve')!.body, { comment: '', version: 1 }, 'approval runs the owning module\'s command');
+
+  calls.length = 0;
+  await commands.run('reconcileBankItemLogged', ['99'], state, 'recon-key');
+  assert.deepEqual(calls.find((c) => c.url === 'bank-statement-lines/99/match')!.body, { ledger_line_id: '501', version: 1 }, 'matched with the ledger line of the same amount');
+
+  await assert.rejects(
+    commands.run('recordReceipt', [{ sourceType: 'سایر درآمدها', amount: 1, bankAccountId: '61', method: 'تهاتر', trackingNumber: '-' }], state, 'receipt-key'),
+    (err: unknown) => err instanceof ApiError && /تهاتر/.test(err.farsiMessage)
+  );
+  console.log('  ✔ فرمان‌های تنخواه، خزانه و کارتابل فقط ورودی کاربر و نسخه رکورد را می‌فرستند و کارتابل پس از هر فرمان تازه می‌شود');
+}
 
 // ---------------------------------------------------------------- documents
 {

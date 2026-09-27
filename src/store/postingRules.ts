@@ -62,6 +62,8 @@ export const ACCOUNTS = {
   inventory: '11501',
   supplierPayables: '21101',
   subcontractorPayables: '21102',
+  notesPayable: '21103',
+  notesReceivable: '11202',
   insurancePayable: '21201',
   salesVatPayable: '21202',
   payrollTaxPayable: '21203',

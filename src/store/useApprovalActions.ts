@@ -17,6 +17,8 @@ export function useApprovalActions() {
 
   const approve = useCallback(
     (item: ApprovalItem, comment?: string): WorkflowResult => {
+      // akph/v1: the item names its own module's command (GET /approvals).
+      if (item.server) return wf.decideServerApproval(item, 'approve', comment || '');
       switch (item.module) {
         case 'client_statement':
           return wf.advanceClientStatement(item.recordId, comment);
@@ -34,6 +36,8 @@ export function useApprovalActions() {
           return wf.approvePayrollPeriod(item.recordId);
         case 'journal_entry':
           return wf.approveJournalEntry(item.recordId);
+        default:
+          return wf.decideServerApproval(item, 'approve', comment || '');
       }
     },
     [wf]
@@ -41,6 +45,7 @@ export function useApprovalActions() {
 
   const reject = useCallback(
     (item: ApprovalItem, reason: string): WorkflowResult => {
+      if (item.server) return wf.decideServerApproval(item, 'reject', reason);
       switch (item.module) {
         case 'client_statement':
           return wf.returnClientStatement(item.recordId, reason);
@@ -58,6 +63,8 @@ export function useApprovalActions() {
           return { ok: false, message: 'فیش‌های حقوق باید در ماژول حقوق اصلاح و مجدد محاسبه شوند.' };
         case 'journal_entry':
           return wf.rejectJournalEntry(item.recordId, reason);
+        default:
+          return wf.decideServerApproval(item, 'reject', reason);
       }
     },
     [wf]
@@ -76,4 +83,9 @@ export const APPROVAL_MODULE_PATHS: Record<ApprovalItem['module'], string> = {
   payment_request: '/finance/payments',
   payroll: '/payroll',
   journal_entry: '/finance/accounting',
+  journal_reversal: '/finance/accounting',
+  petty_adjustment: '/finance/accounting',
+  bank_voucher: '/finance/accounting',
+  petty_replenishment: '/petty-cash',
+  receipt: '/finance/receipts',
 };

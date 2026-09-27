@@ -88,6 +88,13 @@ const WORKFLOW_ACTIONS = [
   'payRequestForm',
   'createManualPaymentRequest',
   'uploadDocument',
+  // Treasury and petty cash (0.6.0)
+  'createTreasuryAccount',
+  'transferBetweenAccounts',
+  'changeChequeStatus',
+  'importBankStatement',
+  'closePettyCashPeriod',
+  'decideServerApproval',
   // Base records (server: akph/v1)
   'createProject',
   'updateProject',
@@ -150,7 +157,8 @@ export function useWorkflows(): WorkflowApi {
       api[name] = (...args: unknown[]): WorkflowResult => {
         if (!commands.supports(name)) return { ok: false, message: SERVER_REQUIRED_MESSAGE };
         const state = getState();
-        const check = dryRun(state, user, fn, args);
+        // Actions whose rules live on the server only (approval steps, thresholds) are checked there.
+        const check = commands.serverValidated?.(name) ? { ok: true, message: '' } : dryRun(state, user, fn, args);
         if (!check.ok) return check;
         // One Idempotency-Key per form submission: the same submission sent again reuses it.
         const { key, inFlight } = commandKeys.acquire(name, args);

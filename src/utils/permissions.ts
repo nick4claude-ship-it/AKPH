@@ -146,6 +146,7 @@ const ROLE_PERMISSIONS: Record<PortalRole, typeof ALL | ReadonlySet<UserAction>>
     'supplier.manage',
     'vendor_invoice.approve',
     'payment_request.create',
+    'payment_request.approve',
     'payment.execute',
     'payroll.approve',
     'journal.create',
@@ -185,6 +186,12 @@ const ROLE_PERMISSIONS: Record<PortalRole, typeof ALL | ReadonlySet<UserAction>>
     'reports.financial',
   ]),
 };
+
+/**
+ * Payment requests above this amount (Rials) are approved by the senior manager; up to it the accountant
+ * approves (server: akph_portal_treasury.payment_senior_threshold, same default).
+ */
+export const PAYMENT_SENIOR_THRESHOLD = 1_000_000_000;
 
 /** Which approval action a configurable approval-chain role (e.g. petty-cash chain) performs. */
 export const PETTY_STEP_ACTION: Record<PortalRole, UserAction> = {
@@ -262,6 +269,9 @@ export function checkPermission(user: UserProfile | undefined | null, action: Us
   const granted = ROLE_PERMISSIONS[user.role];
   if (!(granted === ALL || (granted && granted.has(action)))) {
     return { ok: false, reason: `نقش «${user.role}» مجاز به این عملیات نیست.` };
+  }
+  if (action === 'payment_request.approve' && user.role === 'حسابدار' && context.amount !== undefined && context.amount > PAYMENT_SENIOR_THRESHOLD) {
+    return { ok: false, reason: 'مبلغ این درخواست بیش از آستانه تأیید حسابدار است؛ تأیید با مدیر ارشد است.' };
   }
 
   const portal = typeof window !== 'undefined' ? window.AkphPortal : undefined;

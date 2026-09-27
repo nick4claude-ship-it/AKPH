@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PettyCashAccount, PettyCashExpense, User } from '../../types';
 import { useAppState } from '../../store/AppStore';
+import { useWorkflows } from '../../store/useWorkflows';
 import { documentCount } from '../../store/domainSelectors';
 import { formatCurrency, formatNumber, formatDecimal, formatText } from '../../utils/formatters';
 import { Money } from '../common/Money';
@@ -29,6 +30,7 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
   currentUser,
 }) => {
   const appState = useAppState();
+  const wf = useWorkflows();
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
   const [closingPeriod, setClosingPeriod] = useState('شهریور ۱۴۰۳');
@@ -55,6 +57,9 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
       setClosingError('خطا: تا زمانی که اسناد بلاتکلیف یا دارای نقص مدرک وجود دارند، امکان بستن دوره وجود ندارد.');
       return;
     }
+    // The period closes in the store's workflow (server: only when nothing of the fund is open).
+    const result = wf.closePettyCashPeriod(selectedAccount.id);
+    if (!result.ok) return setClosingError(result.message);
     setClosingError(null);
     setIsLocked(true);
   };

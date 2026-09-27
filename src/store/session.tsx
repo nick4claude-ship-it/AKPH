@@ -14,6 +14,7 @@ import type { CurrencyUnit } from '../utils/money';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
 import { matchNav } from '../navigation/navConfig';
 import { emitToast } from './toast';
+import { readOnlyNoticeFor } from './readOnly';
 
 /** A change of the signed-in user's own data, applied to the running app without reloading it. */
 export interface SessionPatch {
@@ -82,10 +83,7 @@ export function useDemoBanner(): string | null {
 
 /** Notice for a section that is read-only with the current data source (null when writes work there). */
 export function useReadOnlyNotice(pathname: string): string | null {
-  const { writablePaths } = useSession();
-  if (!writablePaths) return null;
-  const backed = writablePaths.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
-  return backed ? null : 'فقط خواندنی — به‌زودی: ثبت و تأیید این بخش هنوز در سرور پیاده نشده است.';
+  return readOnlyNoticeFor(useSession().writablePaths, pathname);
 }
 
 /** Users who may be assigned as project manager (empty while loading or when unavailable). */

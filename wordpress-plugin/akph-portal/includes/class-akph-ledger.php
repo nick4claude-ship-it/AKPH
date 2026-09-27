@@ -351,6 +351,9 @@ final class Akph_Ledger {
         if (self::is_reversal($row)) {
             throw Akph_Error::conflict('سند معکوس قابل ویرایش نیست؛ آن را رد کنید و درخواست تازه بدهید.', array('status' => $row->status));
         }
+        if ($row->source_type === 'event') {
+            throw Akph_Error::conflict('سند خودکار (تنخواه، خزانه، مغایرت) قابل ویرایش نیست؛ آن را رد کنید.', array('status' => $row->status));
+        }
         self::assert_pending($row, 'فقط سند در انتظار تأیید قابل ویرایش است.');
         Akph_Input::assert_version($row, $version);
         if ((int) $row->created_by !== get_current_user_id()) {
@@ -386,7 +389,7 @@ final class Akph_Ledger {
     }
 
     /** Numbers follow dates: a final entry cannot be dated before the last final entry of its year, nor after today. */
-    private static function check_posting_date($iso, $fiscal_year) {
+    public static function check_posting_date($iso, $fiscal_year) {
         global $wpdb;
         if ($iso > Akph_Jalali::today_iso()) {
             throw Akph_Error::rule('تاریخ سند (' . Akph_Jalali::format($iso) . ') نمی‌تواند بعد از امروز باشد.');
@@ -410,6 +413,10 @@ final class Akph_Ledger {
         self::assert_pending($row, 'سند در انتظار تأیید نیست.');
         Akph_Input::assert_version($row, $version);
         self::assert_other_user($row);
+        if ($row->source_type === 'event') {
+            // Count adjustments and bank vouchers: a fund, bank or cash desk may not go below zero.
+            Akph_Posting::assert_pending_cash($id);
+        }
         $reversal = self::is_reversal($row);
         if (!$reversal) {
             // Accounts may have changed since the draft (a new child, deactivation): validate again.
@@ -475,6 +482,9 @@ final class Akph_Ledger {
             $data['reversal_target'] = $target;
         }
         Akph_Db::update(self::entries_table(), $data, array('id' => $id));
+        if ($row->source_type === 'event') {
+            Akph_Posting::release_event($id);
+        }
         Akph_Audit::log('entry_rejected', 'entry', $id, $before, self::snapshot($id), $row->draft_number);
         $after = Akph_Db::find(self::entries_table(), $id);
         $records = array(self::shape($after));
@@ -507,6 +517,10 @@ final class Akph_Ledger {
         }
         if (self::is_reversal($row)) {
             throw Akph_Error::conflict('سند معکوس را نمی‌توان دوباره معکوس کرد.');
+        }
+        if ($row->source_type === 'event') {
+            // Reference: an automatic entry is reversed only together with its source event (src/store/workflows.ts).
+            throw Akph_Error::conflict('سند خودکار ماژول‌ها (تنخواه، خزانه) از دفتر معکوس نمی‌شود؛ اصلاح باید از ماژول مبدأ انجام شود.');
         }
         $live = Akph_Db::row($wpdb->prepare('SELECT id, status, draft_number, doc_number FROM ' . self::entries_table() . ' WHERE reversal_of = %d FOR UPDATE', $id));
         if ($live) {

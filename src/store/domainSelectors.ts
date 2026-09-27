@@ -34,7 +34,7 @@ import {
   statementContext,
   vendorInvoiceContext,
 } from './approvalContext';
-import { PETTY_STEP_ACTION } from '../utils/permissions';
+import { PAYMENT_SENIOR_THRESHOLD, PETTY_STEP_ACTION } from '../utils/permissions';
 import { CLIENT_APPROVED_STATUSES, VENDOR_INVOICE_APPROVED_STATUSES } from './state';
 import { dayIndex, toPersianDate } from '../utils/date';
 import { formatInt, formatMoney } from '../utils/money';
@@ -136,6 +136,8 @@ export function selectStatementPayments(state: AppState): StatementPayment[] {
 // =============================================================================
 
 export function selectApprovals(state: AppState): ApprovalItem[] {
+  // akph/v1: the server lists exactly what waits for this user (GET /approvals).
+  if (state.serverApprovals) return state.serverApprovals;
   const items: ApprovalItem[] = [];
   const projectName = (id?: string) => state.projects.find((p) => p.id === id)?.name || '-';
   const ccName = (id?: string) => state.costCenters.find((c) => c.id === id)?.name;
@@ -209,7 +211,7 @@ export function selectApprovals(state: AppState): ApprovalItem[] {
       id: `payment_request:${p.id}`, module: 'payment_request', moduleLabel: 'درخواست پرداخت', recordId: p.id,
       docNumber: p.requestNumber, title: `${p.sourceType} - ${p.beneficiaryName}`, amount: p.remainingAmount,
       requester: p.requestedBy || 'خزانه‌داری', projectId: p.projectId, projectName: p.projectName || projectName(p.projectId),
-      counterpartyName: p.beneficiaryName || partyName(p.counterpartyId), date: p.date, stage: 'تأیید پرداخت', approverRole: 'مدیر ارشد',
+      counterpartyName: p.beneficiaryName || partyName(p.counterpartyId), date: p.date, stage: 'تأیید پرداخت', approverRole: p.totalAmount > PAYMENT_SENIOR_THRESHOLD ? 'مدیر ارشد' : 'حسابدار',
       action: 'payment_request.approve', context: paymentApprovalContext(p),
       classification: 'مالی', documentCount: documentCount(state, 'payment_request', p.id),
     });
