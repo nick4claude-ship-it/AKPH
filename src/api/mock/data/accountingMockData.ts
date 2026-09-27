@@ -153,6 +153,7 @@ export const mockChartOfAccounts: AccountNode[] = [
             children: [
               { code: '21101', title: 'بستانکاران تأمین‌کننده مصالح و آهن‌آلات', level: 'تفصیلی', nature: 'بستانکار', balance: 38_500_000_000, turnoverDebit: 75_000_000_000, turnoverCredit: 113_500_000_000 },
               { code: '21102', title: 'بستانکاران پیمانکاران جزء و اکیپ‌های اجرایی', level: 'تفصیلی', nature: 'بستانکار', balance: 16_300_000_000, turnoverDebit: 35_000_000_000, turnoverCredit: 51_300_000_000 },
+              { code: '21103', title: 'اسناد پرداختنی (چک‌های صادره سررسیدنشده)', level: 'تفصیلی', nature: 'بستانکار', balance: 0, turnoverDebit: 0, turnoverCredit: 0 },
             ],
           },
           {
