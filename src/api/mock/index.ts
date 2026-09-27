@@ -12,6 +12,7 @@ import { buildMockState } from './buildState';
 import { registerDocNumbers } from '../../utils/ids';
 import { demoCompany, mockUsers } from './seeds';
 import { createMockAccountApi } from './account';
+import { createMockDocumentApi } from './documents';
 
 /** Project ids a project manager may see; undefined for roles that see every project. */
 function projectScope(user: UserProfile, state: AppState): string[] | undefined {
@@ -89,6 +90,8 @@ export function createMockDataSource(): DataSource {
     devUsers: () => mockUsers,
 
     account: createMockAccountApi(() => signedIn),
+
+    documents: createMockDocumentApi(() => signedIn.name),
 
     async listManagers() {
       return mockUsers.filter((u) => u.role === 'مدیر پروژه').map((u) => ({ id: u.id, name: u.name }));

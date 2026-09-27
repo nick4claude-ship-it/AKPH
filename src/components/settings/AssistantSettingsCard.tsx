@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PlugZap, Save, Sparkles } from 'lucide-react';
-import { PROVIDER_OPTIONS, useAssistant, useAssistantSettings } from '../../store/useAssistant';
+import { modelForProvider, PROVIDER_OPTIONS, useAssistant, useAssistantSettings } from '../../store/useAssistant';
 import type { AssistantSettings, AssistantSettingsInput } from '../../api/assistant';
 import { IntegerInput } from '../../ui/NumberInput';
 import { Button } from '../common/Button';
@@ -23,6 +23,8 @@ const toInput = (s: AssistantSettings): AssistantSettingsInput => ({
   logContent: s.logContent,
   apiKey: '',
   clearKey: false,
+  proxyToken: '',
+  clearProxyToken: false,
 });
 
 const KEY_SOURCE: Record<AssistantSettings['key']['source'], string> = {
@@ -84,7 +86,15 @@ export const AssistantSettingsCard: React.FC<{ onToast: (msg: string) => void }>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field id="ai-provider" label="سرویس‌دهنده" hint={provider?.hint}>
             {(p) => (
-              <select {...p} className="input" value={form.provider} onChange={(e) => set('provider', e.target.value as AssistantSettingsInput['provider'])}>
+              <select
+                {...p}
+                className="input"
+                value={form.provider}
+                onChange={(e) => {
+                  const next = e.target.value as AssistantSettingsInput['provider'];
+                  setForm((f) => (f ? { ...f, provider: next, model: modelForProvider(next, f.model) } : f));
+                }}
+              >
                 {PROVIDER_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -93,7 +103,7 @@ export const AssistantSettingsCard: React.FC<{ onToast: (msg: string) => void }>
               </select>
             )}
           </Field>
-          <Field id="ai-base-url" label="نشانی پایه (Base URL)" error={error('baseUrl')} hint={form.provider === 'compatible' ? 'الزامی؛ مثل https://example.com/v1' : 'اختیاری'}>
+          <Field id="ai-base-url" label="نشانی پایه (Base URL)" error={error('baseUrl')} hint={provider?.baseUrlHint}>
             {(p) => <input {...p} className="input text-left" dir="ltr" value={form.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder="https://" />}
           </Field>
           <Field id="ai-model" label="مدل" required error={error('model')}>
@@ -125,6 +135,31 @@ export const AssistantSettingsCard: React.FC<{ onToast: (msg: string) => void }>
               />
             )}
           </Field>
+          <Field
+            id="ai-proxy-token"
+            label="توکن واسط (اختیاری)"
+            error={error('proxyToken')}
+            hint={
+              s.proxyToken.source === 'settings'
+                ? `ذخیره‌شده (رمزنگاری‌شده): ${s.proxyToken.hint} — برای نگه‌داشتن، خالی بگذارید.`
+                : s.proxyToken.source === 'unreadable'
+                  ? 'ذخیره‌شده ولی خوانده نمی‌شود؛ دوباره وارد کنید'
+                  : 'فقط وقتی نشانی پایه یک واسط است؛ در سربرگ جداگانه به واسط فرستاده می‌شود.'
+            }
+          >
+            {(p) => (
+              <input
+                {...p}
+                type="password"
+                className="input text-left"
+                dir="ltr"
+                autoComplete="new-password"
+                value={form.proxyToken}
+                onChange={(e) => set('proxyToken', e.target.value)}
+                placeholder={s.proxyToken.hint || ''}
+              />
+            )}
+          </Field>
           <Field id="ai-max-tokens" label="حداکثر توکن پاسخ" error={error('maxTokens')}>
             {(p) => <IntegerInput {...p} max={32000} className="input" value={form.maxTokens} onValueChange={(v) => set('maxTokens', v)} />}
           </Field>
@@ -144,6 +179,12 @@ export const AssistantSettingsCard: React.FC<{ onToast: (msg: string) => void }>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={form.clearKey} onChange={(e) => set('clearKey', e.target.checked)} className="w-4 h-4 accent-amber-600" />
               حذف کلید ذخیره‌شده
+            </label>
+          )}
+          {s.proxyToken.source !== 'none' && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={form.clearProxyToken} onChange={(e) => set('clearProxyToken', e.target.checked)} className="w-4 h-4 accent-amber-600" />
+              حذف توکن واسط
             </label>
           )}
         </div>

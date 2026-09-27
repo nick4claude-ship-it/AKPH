@@ -28,7 +28,7 @@ export interface AssistantAnswer {
   remaining: number;
 }
 
-export type AssistantProvider = 'anthropic' | 'openai' | 'compatible';
+export type AssistantProvider = 'gemini' | 'anthropic' | 'openai' | 'compatible';
 
 export interface AssistantSettings {
   enabled: boolean;
@@ -39,6 +39,8 @@ export interface AssistantSettings {
   dailyLimit: number;
   logContent: boolean;
   key: { source: 'constant' | 'settings' | 'unreadable' | 'none'; hint: string };
+  /** Shared secret with a proxy at the base URL (sent in its own header); described like the key. */
+  proxyToken: { source: 'settings' | 'unreadable' | 'none'; hint: string };
   encryptionReady: boolean;
   configured: boolean;
 }
@@ -54,6 +56,9 @@ export interface AssistantSettingsInput {
   /** A new key; '' keeps the stored one. */
   apiKey: string;
   clearKey: boolean;
+  /** A new proxy token; '' keeps the stored one. */
+  proxyToken: string;
+  clearProxyToken: boolean;
 }
 
 export interface AssistantApi {

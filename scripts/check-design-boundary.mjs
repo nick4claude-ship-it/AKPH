@@ -23,6 +23,8 @@ const ALLOWED_MODULES = {
   'src/store/useAccount': {},
   'src/store/useAvatarCrop': {},
   'src/store/pagination': {},
+  'src/store/useDocuments': {},
+  'src/store/documents': { names: ['DOCUMENT_CATEGORIES', 'ACCEPT_ATTRIBUTE', 'defaultCategoryFor', 'sameEntity'] },
   'src/store/notifications': { names: ['useDismissedNotifications'] },
   'src/store/toast': {},
   'src/store/selectors': {},

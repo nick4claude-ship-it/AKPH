@@ -14,14 +14,16 @@ import { DocumentViewerModal } from '../common/DocumentViewerModal';
 import { LoginModal } from '../auth/LoginModal';
 import { AiAgentWidget } from '../dashboard/AiAgentWidget';
 import { useAppState } from '../../store/AppStore';
-import { useApplyStartPage, useCompany, useCurrentUser, useDemoBanner, usePermission, useReadOnlyNotice, useSession } from '../../store/session';
+import { useApplyStartPage, useCompany, useCurrentUser, useDemoBanner, useLogout, usePermission, useReadOnlyNotice, useSession } from '../../store/session';
 import { useToastListener } from '../../store/toast';
 import { useApprovalActions } from '../../store/useApprovalActions';
 import { selectProjects, selectKpiItems } from '../../store/selectors';
 import { selectApprovals, selectNotifications, selectPettyFunds, selectSidebarCounts } from '../../store/domainSelectors';
 import { matchNav, navTrail, NavNode } from '../../navigation/navConfig';
 import { ApprovalItem, Project, TimeRange } from '../../types';
-import { CheckCircle2, Filter, X, Lock } from 'lucide-react';
+import { CheckCircle2, Filter, X, Lock, LogOut } from 'lucide-react';
+import { Dialog } from '../../ui/Dialog';
+import { Button } from '../common/Button';
 import { PageSkeleton } from '../common/Skeleton';
 import { ErrorBoundary } from '../common/ErrorState';
 import { EmptyState } from '../common/EmptyState';
@@ -99,6 +101,8 @@ export default function AppShell() {
   const readOnlyNotice = useReadOnlyNotice(location.pathname);
   const navigate = useNavigate();
   useApplyStartPage();
+  const { logout } = useLogout();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('current_year');
@@ -164,6 +168,7 @@ export default function AppShell() {
         onOpenLogout={switchUser ? () => setIsLoginOpen(true) : undefined}
         onOpenAiAgent={() => setIsAiAgentFloatingOpen(true)}
         onOpenAccount={() => navigate('/account')}
+        onLogout={() => setConfirmLogout(true)}
         counts={sidebarCounts}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}
@@ -194,6 +199,7 @@ export default function AppShell() {
           onOpenAlertsModal={() => navigate('/notifications')}
           onSwitchUser={switchUser ? () => setIsLoginOpen(true) : undefined}
           onOpenAccount={() => navigate('/account')}
+          onLogout={() => setConfirmLogout(true)}
           demo={isDemoData}
         />
 
@@ -331,6 +337,26 @@ export default function AppShell() {
             switchUser(u.id);
           }}
         />
+      )}
+
+      {confirmLogout && (
+        <Dialog label="خروج از حساب" onClose={() => setConfirmLogout(false)} closeOnBackdrop className="card w-full max-w-sm p-6 space-y-4 text-right">
+          <h2 className="text-base font-bold text-ink">خروج از حساب</h2>
+          <p className="text-sm text-ink-muted">از پرتال خارج می‌شوید و برای ادامه باید دوباره وارد شوید.</p>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setConfirmLogout(false)}>انصراف</Button>
+            <Button
+              variant="danger"
+              icon={LogOut}
+              onClick={() => {
+                setConfirmLogout(false);
+                logout();
+              }}
+            >
+              خروج
+            </Button>
+          </div>
+        </Dialog>
       )}
 
       {isAiAgentFloatingOpen && (

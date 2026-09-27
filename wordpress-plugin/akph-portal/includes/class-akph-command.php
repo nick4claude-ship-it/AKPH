@@ -137,6 +137,10 @@ final class Akph_Command {
                 $out[$k] = (string) $result[$k];
             }
         }
+        if (!empty($result['duplicate_of'])) {
+            // Upload of a file already on the same record: stored, with the earlier document numbers.
+            $out['duplicate_of'] = array_values(array_map('strval', (array) $result['duplicate_of']));
+        }
         return $out;
     }
 

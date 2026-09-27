@@ -21,6 +21,7 @@ import {
   FileCode,
   FileSpreadsheet,
   X,
+  Archive,
 } from 'lucide-react';
 import { AppDocument, DocumentCategory, DocumentEntityType, DocumentLink, Project } from '../../types';
 import { useAppState } from '../../store/AppStore';
@@ -31,6 +32,10 @@ import { usePagination } from '../../store/pagination';
 import { TablePager } from '../common/TablePager';
 import { Dialog } from '../../ui/Dialog';
 import { formatInt, formatText } from '../../utils/formatters';
+import { useDocumentActions } from '../../store/useDocuments';
+import { sameEntity } from '../../store/documents';
+import { DocumentUploadDialog } from './DocumentUploadDialog';
+import { DocumentFilePreview } from './DocumentFilePreview';
 
 /** Labels for what a document can be linked to. */
 const ENTITY_LABELS: Record<DocumentEntityType, string> = {
@@ -47,6 +52,8 @@ const ENTITY_LABELS: Record<DocumentEntityType, string> = {
   payment_request: 'درخواست پرداخت',
   receipt: 'دریافت',
   journal_entry: 'سند حسابداری',
+  payroll: 'حقوق و دستمزد',
+  other: 'سایر',
 };
 
 type DocRow = AppDocument & { category: DocumentCategory; projectId: string; projectName: string; partnerName?: string };
@@ -90,6 +97,9 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
         return state.receipts.map((r) => ({ id: r.id, label: `${r.docNumber} - ${r.payer}` }));
       case 'journal_entry':
         return state.journalEntries.map((j) => ({ id: j.id, label: `${j.docNumber} - ${j.title}` }));
+      case 'payroll':
+      case 'other':
+        return [];
     }
   };
   const linkLabel = (l: DocumentLink) =>
@@ -112,32 +122,21 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
-  const [selectedDocForPreview, setSelectedDocForPreview] = useState<DocRow | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<'active' | 'archived' | 'all'>('active');
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  // The row of the open preview, current after a link or an archive.
+  const selectedDocForPreview = documents.find((d) => d.id === previewDocId) ?? null;
+  const setSelectedDocForPreview = (doc: DocRow | null) => setPreviewDocId(doc ? doc.id : null);
 
-  // Only a stored file can be downloaded; a metadata-only record has nothing to download yet.
-  const handleDownloadFile = (doc: AppDocument) => {
-    if (!doc.url) return;
-    const a = document.createElement('a');
-    a.href = doc.url;
-    a.download = doc.fileName || doc.title;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-
-  // New Document Modal State
+  // Download goes through the server (access checked there); a metadata-only record has nothing to download.
+  const actions = useDocumentActions();
+  const handleDownloadFile = (doc: AppDocument) => actions.download(doc);
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
-  const [newDocTitle, setNewDocTitle] = useState('');
-  const [newDocCategory, setNewDocCategory] = useState<DocumentCategory>('نامه و مکاتبات رسمی');
-  const [newDocProject, setNewDocProject] = useState(projects[0]?.id || '');
-  const [newDocPartner, setNewDocPartner] = useState('');
-  const [newDocLinkType, setNewDocLinkType] = useState<DocumentEntityType>('contract');
-  const [newDocLinkId, setNewDocLinkId] = useState('');
-  const [newDocFormat, setNewDocFormat] = useState<AppDocument['fileFormat']>('PDF');
-  const [newDocDesc, setNewDocDesc] = useState('');
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   const filteredDocs = documents.filter((doc) => {
+    if (selectedStatus === 'active' && doc.status === 'بایگانی‌شده') return false;
+    if (selectedStatus === 'archived' && doc.status !== 'بایگانی‌شده') return false;
     if (selectedCategory !== 'all' && doc.category !== selectedCategory) return false;
     if (selectedProjectId !== 'all' && doc.projectId !== selectedProjectId) return false;
     if (searchQuery.trim()) {
@@ -153,25 +152,6 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
   });
   const docsPage = usePagination(filteredDocs, filteredDocs.length);
 
-  const handleUploadDoc = (e: React.FormEvent) => {
-    e.preventDefault();
-    const result = wf.uploadDocument({
-      title: newDocTitle,
-      category: newDocCategory,
-      format: newDocFormat,
-      projectId: newDocProject,
-      partnerId: newDocPartner,
-      linkType: newDocLinkType,
-      linkId: newDocLinkId,
-      description: newDocDesc,
-    });
-    if (!result.ok) return;
-    setIsNewDocModalOpen(false);
-    setNewDocTitle('');
-    setNewDocDesc('');
-    setNewDocPartner('');
-  };
-
   const categories: { id: string; label: string }[] = [
     { id: 'all', label: 'همه دسته‌بندی‌ها' },
     { id: 'قرارداد اصلی کارفرما', label: 'قراردادهای کارفرما' },
@@ -183,6 +163,8 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
     { id: 'نامه و مکاتبات رسمی', label: 'نامه‌ها و مکاتبات' },
     { id: 'صورتجلسه کارگاهی', label: 'صورتجلسات کارگاه' },
     { id: 'گزارش کنترل کیفیت و آزمایشگاه', label: 'گزارشات QC و آزمایشگاه' },
+    { id: 'عکس و تصویر کارگاه', label: 'عکس‌ها و تصاویر کارگاه' },
+    { id: 'سایر اسناد', label: 'سایر اسناد' },
   ];
 
   return (
@@ -211,7 +193,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
           className="flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-sm transition-colors cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 text-amber-400" />
-          <span>بارگذاری سند جدید</span>
+          <span>بارگذاری سند</span>
         </button>
       </div>
 
@@ -252,6 +234,16 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                 {formatText(p.name)}
               </option>
             ))}
+          </select>
+
+          <select aria-label="فیلتر: وضعیت سند"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value as typeof selectedStatus)}
+            className="py-2 px-2 rounded-lg border border-slate-200 bg-slate-50 text-xs focus:outline-none"
+          >
+            <option value="active">اسناد جاری</option>
+            <option value="archived">بایگانی‌شده</option>
+            <option value="all">همه وضعیت‌ها</option>
           </select>
         </div>
 
@@ -320,14 +312,16 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                         onClick={() => setSelectedDocForPreview(doc)}
                         className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer"
                         title="مشاهده جزئیات و محتوا"
+                        aria-label={`مشاهده ${doc.title}`}
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDownloadFile(doc)}
-                        disabled={!doc.url}
+                        disabled={!actions.hasFile(doc)}
                         className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={doc.url ? 'دریافت فایل پیوست' : 'فایل اصلی هنوز بارگذاری نشده است (به‌زودی)'}
+                        title={actions.hasFile(doc) ? 'دریافت فایل پیوست' : 'فایل اصلی برای این سند بارگذاری نشده است'}
+                        aria-label={`دانلود ${doc.title}`}
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
@@ -343,7 +337,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
 
       {/* Modal: Document Preview */}
       {selectedDocForPreview && (
-        <Dialog onClose={() => setSelectedDocForPreview(null)} label="پیش‌نمایش سند" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150">
+        <Dialog onClose={() => setSelectedDocForPreview(null)} label="پیش‌نمایش سند" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className={`bg-white rounded-xl ${actions.hasFile(selectedDocForPreview) ? 'max-w-3xl' : 'max-w-xl'} w-full max-h-[92vh] overflow-y-auto border border-slate-200 shadow-2xl p-6 text-right animate-in fade-in zoom-in-95 duration-150`}>
           
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-2">
@@ -364,6 +358,7 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
             </div>
 
             <div className="space-y-3 text-sm mb-4">
+              <DocumentFilePreview doc={selectedDocForPreview} />
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-500">پروژه منتسب:</span>
@@ -431,11 +426,12 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
                     ))}
                   </select>
                   <button
-                    disabled={!linkId}
+                    disabled={!linkId || selectedDocForPreview.links.some((l) => sameEntity(l, linkType, linkId))}
                     onClick={() => {
-                      wf.linkDocument(selectedDocForPreview.id, { entityType: linkType, entityId: linkId });
-                      const d = state.documents.find((x) => x.id === selectedDocForPreview.id);
-                      if (d) setSelectedDocForPreview({ ...selectedDocForPreview, links: [...selectedDocForPreview.links, { entityType: linkType, entityId: linkId }] });
+                      const target = { entityType: linkType, entityId: linkId };
+                      // An uploaded document is linked on the server; a record without a file keeps the local workflow.
+                      if (selectedDocForPreview.file) actions.link(selectedDocForPreview, target);
+                      else wf.linkDocument(selectedDocForPreview.id, target);
                       setLinkId('');
                     }}
                     className="px-2 py-1 rounded bg-slate-900 text-white text-xs disabled:opacity-40 cursor-pointer"
@@ -460,13 +456,22 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <span className="text-xs text-slate-500">ثبت‌کننده: {formatText(selectedDocForPreview.registeredBy)}</span>
               <div className="flex items-center gap-2">
+                {selectedDocForPreview.file?.canArchive && selectedDocForPreview.status !== 'بایگانی‌شده' && (
+                  <button
+                    onClick={() => setConfirmArchive(true)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    <span>بایگانی</span>
+                  </button>
+                )}
                 <button
                   onClick={() => handleDownloadFile(selectedDocForPreview)}
-                  disabled={!selectedDocForPreview.url}
+                  disabled={!actions.hasFile(selectedDocForPreview)}
                   className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Download className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{selectedDocForPreview.url ? 'دانلود فایل پیوست' : 'دانلود فایل (به‌زودی)'}</span>
+                  <span>{actions.hasFile(selectedDocForPreview) ? 'دانلود فایل پیوست' : 'فایل بارگذاری نشده است'}</span>
                 </button>
                 <button
                   onClick={() => setSelectedDocForPreview(null)}
@@ -479,155 +484,33 @@ export const DocumentCenterModule: React.FC<DocumentCenterModuleProps> = ({ proj
           </Dialog>
       )}
 
-      {/* Modal: Upload New Document */}
+      {/* Archive instead of delete: the file stays on the server and in the audit trail. */}
+      {confirmArchive && selectedDocForPreview && (
+        <Dialog onClose={() => setConfirmArchive(false)} label="بایگانی سند" className="card w-full max-w-sm p-6 space-y-4 text-right">
+          <h3 className="text-base font-bold text-ink">بایگانی سند</h3>
+          <p className="text-sm text-ink-muted">
+            سند «{formatText(selectedDocForPreview.title)}» از فهرست اسناد جاری خارج می‌شود؛ فایل حذف نمی‌شود و در بایگانی می‌ماند.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmArchive(false)} className="btn btn-secondary">
+              انصراف
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={async () => {
+                await actions.archive(selectedDocForPreview);
+                setConfirmArchive(false);
+              }}
+            >
+              بایگانی
+            </button>
+          </div>
+        </Dialog>
+      )}
+
       {isNewDocModalOpen && (
-        <Dialog onClose={() => setIsNewDocModalOpen(false)} label="بارگذاری و بایگانی سند جدید" overlayClassName="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 text-right">
-          
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-base font-bold text-slate-900">بارگذاری و بایگانی سند جدید</h3>
-              <button
-                onClick={() => setIsNewDocModalOpen(false)}
-                className="p-1 text-slate-500 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUploadDoc} className="space-y-3 text-sm">
-              <div>
-                <label htmlFor="document-center-module-1" className="block font-medium text-slate-700 mb-1">عنوان سند:</label>
-                <input id="document-center-module-1"
-                  type="text"
-                  placeholder="مثال: قرارداد تکمیلی، صورتجلسه کارگاهی..."
-                  value={newDocTitle}
-                  onChange={(e) => setNewDocTitle(e.target.value)}
-                  required
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="document-center-module-2" className="block font-medium text-slate-700 mb-1">دسته‌بندی مدرک:</label>
-                <select id="document-center-module-2"
-                  value={newDocCategory}
-                  onChange={(e) => setNewDocCategory(e.target.value as DocumentCategory)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
-                >
-                  {categories.filter((c) => c.id !== 'all').map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {formatText(c.label)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="document-center-module-3" className="block font-medium text-slate-700 mb-1">پروژه منتسب:</label>
-                <select id="document-center-module-3"
-                  value={newDocProject}
-                  onChange={(e) => setNewDocProject(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {formatText(p.name)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="document-center-module-4" className="block font-medium text-slate-700 mb-1">طرف‌حساب مرتبط (کارفرما / پیمانکار / وندور):</label>
-                <select id="document-center-module-4"
-                  value={newDocPartner}
-                  onChange={(e) => setNewDocPartner(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
-                >
-                  <option value="">— اختیاری —</option>
-                  {state.counterparties.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {formatText(c.name)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label htmlFor="document-center-module-5" className="block font-medium text-slate-700 mb-1">اتصال به رکورد:</label>
-                  <select id="document-center-module-5"
-                    value={newDocLinkType}
-                    onChange={(e) => {
-                      setNewDocLinkType(e.target.value as DocumentEntityType);
-                      setNewDocLinkId('');
-                    }}
-                    className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
-                  >
-                    {(Object.keys(ENTITY_LABELS) as DocumentEntityType[])
-                      .filter((t) => t !== 'project' && t !== 'counterparty')
-                      .map((t) => (
-                        <option key={t} value={t}>
-                          {ENTITY_LABELS[t]}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="document-center-module-6" className="block font-medium text-slate-700 mb-1">رکورد:</label>
-                  <select id="document-center-module-6" value={newDocLinkId} onChange={(e) => setNewDocLinkId(e.target.value)} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm">
-                    <option value="">— بدون اتصال —</option>
-                    {entityOptions(newDocLinkType, newDocProject).map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {formatText(o.label)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="document-center-module-7" className="block font-medium text-slate-700 mb-1">فرمت فایل:</label>
-                <select id="document-center-module-7"
-                  value={newDocFormat}
-                  onChange={(e) => setNewDocFormat(e.target.value as AppDocument['fileFormat'])}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
-                >
-                  <option value="PDF">سند PDF</option>
-                  <option value="DWG">نقشه اتوکد (DWG)</option>
-                  <option value="XLSX">صفحه‌گسترده اکسل</option>
-                  <option value="DOCX">سند ورد</option>
-                  <option value="JPG">تصویر یا اسکن</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="document-center-module-8" className="block font-medium text-slate-700 mb-1">توضیحات و خلاصه محتوا:</label>
-                <textarea id="document-center-module-8"
-                  rows={2}
-                  placeholder="شرح مختصر..."
-                  value={newDocDesc}
-                  onChange={(e) => setNewDocDesc(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 bg-white text-sm"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsNewDocModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg cursor-pointer"
-                >
-                  انصراف
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-secondary"
-                >
-                  ذخیره و ثبت سند
-                </button>
-              </div>
-            </form>
-          </Dialog>
+        <DocumentUploadDialog projects={projects} entityLabels={ENTITY_LABELS} entityOptions={entityOptions} onClose={() => setIsNewDocModalOpen(false)} />
       )}
     </div>
   );

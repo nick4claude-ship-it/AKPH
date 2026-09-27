@@ -6,9 +6,12 @@
  * send_frame_options_header(), CSP frame-ancestors). The Vazirmatn font is part of the app bundle
  * (app/assets), not Google Fonts.
  *
+ * Guests see the portal's own login page (class-akph-login.php) instead of wp-login.php.
+ *
  * After login, users with a portal role land on the app (login_redirect at priority 99, after paydar-portal):
- * a login that was heading to the app keeps its redirect_to; a plain login (no destination, or the default
- * dashboard) goes to the app; a login for any other specific page is left as the earlier filters made it.
+ * a login that was heading to the app keeps its redirect_to; senior managers, project managers and accountants
+ * always go to the app; for the system administrator a plain login (no destination, or the default dashboard)
+ * goes to the app and a login for any other specific page is left as the earlier filters made it.
  */
 if (!defined('ABSPATH')) {
     exit;
@@ -39,6 +42,11 @@ final class Akph_App {
         if (!$user instanceof WP_User || !Akph_Roles::role_of($user) || !user_can($user, Akph_Roles::ACCESS)) {
             return $redirect_to;
         }
+        // Senior manager, project manager and accountant always work in the app; the system administrator may
+        // also have asked for a specific admin page.
+        if (Akph_Login::is_member($user)) {
+            return self::url();
+        }
         return self::is_default_destination($requested) ? self::url() : $redirect_to;
     }
 
@@ -66,7 +74,9 @@ final class Akph_App {
         }
         self::no_store();
         if (!is_user_logged_in()) {
-            auth_redirect();
+            // The portal's own login page instead of wp-login.php (class-akph-login.php).
+            $page = Akph_Login::respond();
+            echo $page['html']; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped in page_html()
             exit;
         }
         $user = wp_get_current_user();
@@ -118,14 +128,32 @@ final class Akph_App {
         }
     }
 
-    /** Entry script, its CSS and the chunks it imports, from Vite's manifest. */
-    private static function assets() {
+    /** Vite's manifest of the built app (null when app/ is missing). */
+    private static function manifest() {
         $manifest_file = AKPH_PORTAL_DIR . 'app/.vite/manifest.json';
         if (!file_exists($manifest_file)) {
             return null;
         }
         $manifest = json_decode((string) file_get_contents($manifest_file), true);
-        if (!is_array($manifest)) {
+        return is_array($manifest) ? $manifest : null;
+    }
+
+    /** A built file (e.g. the logo) whose name contains `$needle`, relative to app/; null when absent. */
+    public static function asset_file($needle) {
+        foreach ((array) self::manifest() as $item) {
+            foreach (array_merge(isset($item['assets']) ? (array) $item['assets'] : array(), isset($item['file']) ? array($item['file']) : array()) as $file) {
+                if (is_string($file) && strpos($file, $needle) !== false) {
+                    return $file;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Entry script, its CSS and the chunks it imports, from Vite's manifest. */
+    public static function assets() {
+        $manifest = self::manifest();
+        if ($manifest === null) {
             return null;
         }
         foreach ($manifest as $item) {

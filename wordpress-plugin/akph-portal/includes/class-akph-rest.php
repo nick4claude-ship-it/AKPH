@@ -41,6 +41,12 @@ final class Akph_Rest {
             '/account/avatar' => array(array('POST', 'account_avatar', $r::ACCESS), array('DELETE', 'account_avatar_delete', $r::ACCESS)),
             '/account/sessions' => array(array('GET', 'account_sessions', $r::ACCESS)),
             '/account/sessions/logout-others' => array(array('POST', 'account_logout_others', $r::ACCESS)),
+            // Document center and attachments (project scope as for projects; archived, never deleted).
+            '/documents' => array(array('GET', 'list_documents', $r::ACCESS), array('POST', 'upload_document', $r::ACCESS)),
+            '/documents/' . self::ID => array(array('GET', 'get_document', $r::ACCESS)),
+            '/documents/' . self::ID . '/download' => array(array('GET', 'download_document', $r::ACCESS)),
+            '/documents/' . self::ID . '/links' => array(array('POST', 'link_document', $r::ACCESS)),
+            '/documents/' . self::ID . '/archive' => array(array('POST', 'archive_document', $r::ACCESS)),
             // «دستیار مدیریت»: the language model is called by the server only; settings for the system administrator.
             '/assistant/status' => array(array('GET', 'assistant_status', $r::ASSISTANT_USE)),
             '/assistant/ask' => array(array('POST', 'assistant_ask', $r::ASSISTANT_USE)),
@@ -136,6 +142,7 @@ final class Akph_Rest {
             'preferences' => Akph_Account::preferences($user->ID),
             'fiscal_year' => Akph_Jalali::fiscal_year($today),
             'closed_fiscal_years' => Akph_Settings::get('closed_fiscal_years'),
+            'document_max_bytes' => Akph_Documents::max_bytes(),
             'today' => $today,
             'caps' => $caps,
             'server_version' => AKPH_PORTAL_VERSION,
@@ -220,6 +227,83 @@ final class Akph_Rest {
         });
     }
 
+    // ------------------------------------------------------------------ documents
+
+    public static function list_documents(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            Akph_Account::assert_query($request);
+            list($page, $per_page) = self::page($request, 50, 200);
+            $p = $request->get_query_params();
+            $f = array(
+                'status' => isset($p['status']) && in_array($p['status'], array('active', 'archived', 'all'), true) ? $p['status'] : 'active',
+                'project_id' => Akph_Input::id($p, 'project_id'),
+                'doc_type' => isset($p['doc_type']) && $p['doc_type'] !== '' ? Akph_Input::one_of($p, 'doc_type', Akph_Documents::DOC_TYPES) : '',
+                'entity_type' => isset($p['entity_type']) && $p['entity_type'] !== '' ? Akph_Input::one_of($p, 'entity_type', Akph_Documents::ENTITY_TYPES) : '',
+                'entity_id' => isset($p['entity_id']) && preg_match('/^[A-Za-z0-9_-]{1,64}$/D', (string) $p['entity_id']) ? (string) $p['entity_id'] : '',
+                'q' => isset($p['q']) ? mb_substr(sanitize_text_field((string) $p['q']), 0, 100) : '',
+            );
+            if ($f['project_id']) {
+                Akph_Auth::assert_project($f['project_id']);
+            }
+            return Akph_Documents::list_documents($f, $page, $per_page);
+        });
+    }
+
+    public static function get_document(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            return array('document' => Akph_Documents::shape(Akph_Documents::get_visible(self::id($request))));
+        });
+    }
+
+    /** Multipart: file `file` and the form fields; the file's SHA-256 and the fields enter the request hash. */
+    public static function upload_document(WP_REST_Request $request) {
+        $files = $request->get_file_params();
+        $fields = (array) $request->get_body_params();
+        $tmp = isset($files['file']['tmp_name']) && is_string($files['file']['tmp_name']) ? $files['file']['tmp_name'] : '';
+        ksort($fields);
+        $fingerprint = ($tmp !== '' && is_file($tmp) ? (string) hash_file('sha256', $tmp) : '') . '|' . wp_json_encode($fields);
+        return Akph_Command::run($request, function ($body) use ($request, $files, $fields) {
+            Akph_Account::assert_fields($request, $body, array());
+            Akph_Account::assert_fields($request, $fields, array('title', 'doc_type', 'description', 'project_id', 'cost_center_id', 'counterparty_id', 'entity_type', 'entity_id'));
+            foreach (array_keys($files) as $key) {
+                if ($key !== 'file') {
+                    throw new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));
+                }
+            }
+            if (empty($files['file']) || !is_array($files['file']) || is_array($files['file']['name'] ?? null)) {
+                throw Akph_Error::invalid('فایل (file) فرستاده نشده است.', array('field' => 'file'));
+            }
+            return Akph_Documents::upload($fields, $files['file']);
+        }, array('fingerprint' => $fingerprint));
+    }
+
+    public static function download_document(WP_REST_Request $request) {
+        try {
+            $download = Akph_Documents::prepare_download(self::id($request), (string) $request->get_param('inline') === '1');
+        } catch (Akph_Error $e) {
+            return $e->to_wp_error();
+        }
+        if (!apply_filters('akph_documents_stream', true)) {
+            // Tests: the headers that would be sent, without streaming.
+            return new WP_REST_Response(array('headers' => $download['headers']), 200);
+        }
+        Akph_Documents::stream($download);
+    }
+
+    public static function link_document(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array('entity_type', 'entity_id'));
+            return Akph_Documents::link(self::id($request), $body);
+        });
+    }
+
+    public static function archive_document(WP_REST_Request $request) {
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array('version'));
+            return Akph_Documents::archive(self::id($request), Akph_Input::version($request, $body));
+        });
+    }
+
     // ------------------------------------------------------------------ assistant
 
     public static function assistant_status(WP_REST_Request $request) {
@@ -248,9 +332,9 @@ final class Akph_Rest {
 
     public static function assistant_update_settings(WP_REST_Request $request) {
         return Akph_Command::run($request, function ($body) use ($request) {
-            Akph_Account::assert_fields($request, $body, array('enabled', 'provider', 'base_url', 'model', 'max_tokens', 'daily_limit', 'log_content', 'api_key', 'clear_key'));
+            Akph_Account::assert_fields($request, $body, array('enabled', 'provider', 'base_url', 'model', 'max_tokens', 'daily_limit', 'log_content', 'api_key', 'clear_key', 'proxy_token', 'clear_proxy_token'));
             return array('message' => 'تنظیمات دستیار ذخیره شد.', 'records' => array('assistant_settings' => array(Akph_Assistant::update_settings($body))));
-        }, array('secret' => array('api_key')));
+        }, array('secret' => array('api_key', 'proxy_token')));
     }
 
     public static function assistant_test(WP_REST_Request $request) {

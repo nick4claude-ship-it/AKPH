@@ -1815,7 +1815,9 @@ export type DocumentCategory =
   | 'نقشه اجرایی و ازبیلت'
   | 'گزارش کنترل کیفیت و آزمایشگاه'
   | 'ضمانت‌نامه بانکی'
-  | 'رسید و سند مالی';
+  | 'رسید و سند مالی'
+  | 'عکس و تصویر کارگاه'
+  | 'سایر اسناد';
 
 export type DocumentEntityType =
   | 'project'
@@ -1830,7 +1832,9 @@ export type DocumentEntityType =
   | 'goods_receipt'
   | 'payment_request'
   | 'receipt'
-  | 'journal_entry';
+  | 'journal_entry'
+  | 'payroll'
+  | 'other';
 
 export interface DocumentLink {
   entityType: DocumentEntityType;
@@ -1846,10 +1850,10 @@ export interface Document {
   links: DocumentLink[];
   docNumber: string;
   date: string;
-  fileFormat: 'PDF' | 'DWG' | 'XLSX' | 'JPG' | 'DOCX';
+  fileFormat: 'PDF' | 'DWG' | 'DXF' | 'XLSX' | 'XLS' | 'JPG' | 'PNG' | 'WEBP' | 'HEIC' | 'DOCX' | 'DOC' | 'CSV' | 'TXT' | 'ZIP';
   fileSize: string;
   version: string;
-  status: 'معتبر و جاری' | 'نیازمند تمدید' | 'منقضی شده' | 'پیش‌نویس';
+  status: 'معتبر و جاری' | 'نیازمند تمدید' | 'منقضی شده' | 'پیش‌نویس' | 'بایگانی‌شده';
   confidentiality: 'عادی' | 'محرمانه مدیریت' | 'فنی کارگاهی';
   registeredBy: string;
   tags: string[];
@@ -1858,6 +1862,18 @@ export interface Document {
   amount?: number;
   expiryDate?: string;
   url?: string;
+  /** Uploaded file (server document center or the demo): what the list and preview need. */
+  file?: {
+    mime: string;
+    sizeBytes: number;
+    /** PDF and images open in the preview. */
+    previewable: boolean;
+    /** The current user may archive it (uploader, system administrator or senior manager). */
+    canArchive: boolean;
+    /** Concurrency token of the server record. */
+    recordVersion: number;
+    projectId?: string;
+  };
 }
 
 /** Alias to avoid clashing with the DOM `Document` type inside components. */

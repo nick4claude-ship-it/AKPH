@@ -24,6 +24,7 @@ import { selectDocumentsFor } from '../../store/domainSelectors';
 import { formatCurrency, formatNumber, toPersianDigits, formatDecimal, formatText } from '../../utils/formatters';
 import { formatInt } from '../../utils/money';
 import { Money } from '../common/Money';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 interface PettyCashApprovalsViewProps {
   expenses: PettyCashExpense[];
@@ -381,6 +382,8 @@ export const PettyCashApprovalsView: React.FC<PettyCashApprovalsViewProps> = ({
                     )}
                   </div>
                 </div>
+
+                <AttachmentsPanel entityType="petty_cash_expense" entityId={activeExpense.id} projectId={activeExpense.projectId} counterpartyId={activeExpense.counterpartyId} />
 
                 {/* Multi-Level Approval Stages Stepper: the chain comes from the stored petty cash policy */}
                 {(() => {

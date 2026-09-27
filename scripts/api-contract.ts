@@ -41,9 +41,21 @@ const responses: Record<string, unknown> = {
   ] },
   'GET journal-entries': { entries: [entry(), entry({ id: '12', doc_number: null, draft_number: 'DRF-1405-00002', status: 'pending', approved_by: null, approved_at: null, version: 1 })], page: 1, total: 2 },
   'GET audit': { events: [], page: 1, total: 0 },
+  'GET documents': { documents: [{
+    id: '31', doc_number: 'DOC-1405-00001', title: 'قرارداد اسکن‌شده', doc_type: 'client_contract', description: '', project_id: '5', cost_center_id: null, counterparty_id: '3',
+    file_name: 'contract.pdf', mime: 'application/pdf', size: 2048, sha256: 'a'.repeat(64), version: 1, uploaded_by: '7', uploaded_by_name: 'حسابدار یک',
+    uploaded_at: '2026-04-05T08:00:00Z', status: 'active', archived_at: null, preview: true, can_archive: true,
+    links: [{ entity_type: 'project', entity_id: '5' }, { entity_type: 'counterparty', entity_id: '3' }, { entity_type: 'invoice', entity_id: '44' }],
+  }], page: 1, total: 1 },
   'POST journal-entries': { message: 'سند DRF-1405-00003 ثبت شد.', id: '13', doc_number: 'DRF-1405-00003', records: { journal_entries: [entry({ id: '13', doc_number: null, draft_number: 'DRF-1405-00003', status: 'pending', version: 1 })] } },
   'POST journal-entries/12/post': { message: 'قطعی شد.', id: '12', doc_number: 'ACC-1405-00002', records: { journal_entries: [entry({ id: '12', doc_number: 'ACC-1405-00002', version: 2 })] } },
   'POST projects/5': { message: 'به‌روز شد.', id: '5', records: { projects: [] } },
+  'POST assistant/settings': { message: 'تنظیمات دستیار ذخیره شد.', records: { assistant_settings: [{
+    enabled: true, provider: 'gemini', base_url: 'https://proxy.example.test', model: 'gemini-3.8-flash', max_tokens: 4096, daily_limit: 30, log_content: false,
+    key: { source: 'settings', hint: '•••• 1234' }, proxy_token: { source: 'settings', hint: '•••• 9876' }, encryption_ready: true, configured: true,
+  }] } },
+  'POST documents/31/links': { message: 'سند DOC-1405-00001 به رکورد پیوند شد.', records: { documents: [{ id: '31', doc_number: 'DOC-1405-00001', title: 'قرارداد اسکن‌شده', doc_type: 'client_contract', file_name: 'contract.pdf', mime: 'application/pdf', size: 2048, version: 1, status: 'active', uploaded_at: '2026-04-05T08:00:00Z', links: [{ entity_type: 'statement', entity_id: '9' }], preview: true, can_archive: true }] } },
+  'POST documents/31/archive': { message: 'سند DOC-1405-00001 بایگانی شد.', records: { documents: [{ id: '31', doc_number: 'DOC-1405-00001', title: 'قرارداد اسکن‌شده', doc_type: 'client_contract', file_name: 'contract.pdf', mime: 'application/pdf', size: 2048, version: 2, status: 'archived', uploaded_at: '2026-04-05T08:00:00Z', links: [], preview: true, can_archive: false }] } },
 };
 
 const g = globalThis as unknown as Record<string, unknown>;
@@ -114,6 +126,16 @@ assert.equal(posted.rows[1].subledgerCode, '3');
 assert.equal(pending.status, 'در انتظار تأیید');
 assert.equal(pending.docNumber, 'DRF-1405-00002');
 assert.equal(state.subledgers[0].id, '3', 'counterparties are offered as subledgers');
+const [doc] = state.documents;
+assert.equal(doc.docNumber, 'DOC-1405-00001');
+assert.equal(doc.type, 'قرارداد اصلی کارفرما', 'server doc_type becomes the app category');
+assert.equal(doc.date, '۱۴۰۵/۰۱/۱۶');
+assert.equal(doc.fileFormat, 'PDF');
+assert.deepEqual(doc.links.map((l) => l.entityType), ['project', 'counterparty', 'vendor_invoice'], 'server entity types become app ones');
+assert.equal(doc.file?.previewable, true);
+assert.equal(doc.file?.canArchive, true);
+assert.equal(doc.url, undefined, 'no direct file URL: files come through the download route');
+assert.ok(calls.find((c) => c.url === 'documents')!.query.includes('status=all'), 'archived documents are loaded too');
 assert.deepEqual(state.financeSettings.closedFiscalYears, [1403]);
 assert.ok(!('saveChanges' in source) || source.saveChanges === undefined, 'no generic record write');
 assert.ok(calls.every((c) => c.headers['X-WP-Nonce'] === 'nonce-1'), 'every request carries the nonce');
@@ -164,6 +186,46 @@ await commands.run('updateProject', ['5', { physicalProgress: 40, startDate: '۱
 const upd = calls.find((c) => c.url === 'projects/5')!;
 assert.deepEqual(upd.body, { physical_progress: 40, start_date: '2026-04-21', manual_revenue: 7, version: 3 }, 'only the changed fields, with the version');
 console.log('  ✔ ویرایش پروژه فقط فیلدهای تغییرکرده را با نسخه رکورد می‌فرستد');
+
+// ---------------------------------------------------------------- documents
+{
+  const docs = source.documents!;
+  assert.equal(docs.demo, false);
+  const linked = await docs.link(state.documents[0], { entityType: 'subcontractor_statement', entityId: '9' }, 'doc-link-key');
+  const linkCall = calls.find((c) => c.url === 'documents/31/links')!;
+  assert.deepEqual(linkCall.body, { entity_type: 'statement', entity_id: '9' }, 'app record kinds are sent as the server entity types');
+  assert.equal(linkCall.headers['Idempotency-Key'], 'doc-link-key');
+  assert.equal(linked.document.links[0].entityType, 'client_statement');
+  const archived = await docs.archive(state.documents[0], 'doc-archive-key');
+  const archiveCall = calls.find((c) => c.url === 'documents/31/archive')!;
+  assert.deepEqual(archiveCall.body, { version: 1 });
+  assert.equal(archiveCall.headers['If-Match'], '"1"');
+  assert.equal(archived.document.status, 'بایگانی‌شده');
+  assert.equal(archived.document.file?.canArchive, false);
+}
+console.log('  ✔ پیوند و بایگانی سند فقط با فرمان سرور (Idempotency-Key و نسخه رکورد)؛ حذفی وجود ندارد');
+
+// ---------------------------------------------------------------- assistant settings (Gemini, proxy token)
+{
+  const { createAkphAssistantApi, parseAssistantSettings } = await import('../src/api/akph/assistant');
+  assert.equal(parseAssistantSettings({ key: {} }).provider, 'gemini', 'Gemini is the default provider');
+  assert.deepEqual(parseAssistantSettings({ key: {} }).proxyToken, { source: 'none', hint: '' });
+  const input = {
+    enabled: true, provider: 'gemini' as const, baseUrl: ' https://proxy.example.test ', model: 'gemini-3.8-flash', maxTokens: 4096, dailyLimit: 30, logContent: false,
+    apiKey: '', clearKey: false, proxyToken: 'proxy-token-0123456789', clearProxyToken: false,
+  };
+  const saved = await createAkphAssistantApi().saveSettings(input, 'assistant-settings-key');
+  const sentBody = calls.find((c) => c.url === 'assistant/settings')!.body as Record<string, unknown>;
+  assert.equal(sentBody.proxy_token, 'proxy-token-0123456789', 'a new proxy token is sent once, to the server');
+  assert.equal(sentBody.base_url, 'https://proxy.example.test');
+  assert.ok(!('api_key' in sentBody), 'an empty key keeps the stored one');
+  assert.equal(saved.settings.provider, 'gemini');
+  assert.deepEqual(saved.settings.proxyToken, { source: 'settings', hint: '•••• 9876' }, 'the token comes back only as a hint');
+  const { modelForProvider } = await import('../src/store/useAssistant');
+  assert.equal(modelForProvider('gemini', 'claude-opus-5'), 'gemini-3.8-flash', 'switching providers replaces a default model');
+  assert.equal(modelForProvider('gemini', 'my-model'), 'my-model', 'a model the administrator typed stays');
+}
+console.log('  ✔ تنظیمات دستیار: Gemini پیش‌فرض است و توکن واسط فقط فرستاده می‌شود و فقط با چهار نویسه آخر برمی‌گردد');
 
 // A reversal waits for a second person: pending on the wire, pending in the app, the original not yet reversed.
 {

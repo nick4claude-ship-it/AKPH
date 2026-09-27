@@ -11,6 +11,7 @@ import type { AccountFormInput, CostCenterFormInput, CounterpartyFormInput, Proj
 import { apiClient, ApiError } from '../client';
 import { createAkphAccountApi } from './account';
 import { createAkphAssistantApi } from './assistant';
+import { createAkphDocumentApi, loadDocuments } from './documents';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
   arr,
@@ -41,7 +42,7 @@ import {
  */
 
 /** Sections whose writes the server executes; the others show the read-only notice. */
-const WRITABLE_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications', '/account'];
+const WRITABLE_PATHS = ['/', '/projects', '/finance/accounting', '/ai', '/notifications', '/account', '/documents'];
 
 const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
   try {
@@ -221,20 +222,22 @@ export function createAkphDataSource(): DataSource {
     writablePaths: WRITABLE_PATHS,
     account: createAkphAccountApi(),
     assistant: createAkphAssistantApi(),
+    documents: createAkphDocumentApi(),
 
     async loadSession(): Promise<PortalSession> {
       const me = parseMe(await apiClient.get<unknown>('me'));
-      return { user: me.user, currency: me.currency, fiscalYear: me.fiscalYear, company: siteCompany(), closedFiscalYears: me.closedFiscalYears, preferences: me.preferences };
+      return { user: me.user, currency: me.currency, fiscalYear: me.fiscalYear, company: siteCompany(), closedFiscalYears: me.closedFiscalYears, preferences: me.preferences, documentMaxBytes: me.documentMaxBytes };
     },
 
     async loadState(session: PortalSession): Promise<AppState> {
-      const [projectsRaw, centersRaw, partiesRaw, chart, entriesRaw, audit] = await Promise.all([
+      const [projectsRaw, centersRaw, partiesRaw, chart, entriesRaw, audit, documents] = await Promise.all([
         apiClient.get<unknown>('projects'),
         apiClient.get<unknown>('cost-centers'),
         apiClient.get<unknown>('counterparties'),
         optional(apiClient.get<unknown>('accounts').then(parseAccounts), []),
         optional(apiClient.get<unknown>('journal-entries', { per_page: 500 }), { entries: [] }),
         optional(apiClient.get<unknown>('audit', { per_page: 200, object_type: 'entry' }).then(parseAudit), []),
+        optional(loadDocuments(), []),
       ]);
       const costCenters = arr('/cost-centers', obj('/cost-centers', centersRaw), 'cost_centers').map(parseCostCenter);
       const projects = arr('/projects', obj('/projects', projectsRaw), 'projects').map((p) => parseProject(p, costCenters));
@@ -245,6 +248,7 @@ export function createAkphDataSource(): DataSource {
       return {
         ...partial,
         journalEntries,
+        documents,
         auditLogs: audit,
         subledgers: subledgersOf(partial),
         financeSettings: { ...base.financeSettings, closedFiscalYears: session.closedFiscalYears || [] },

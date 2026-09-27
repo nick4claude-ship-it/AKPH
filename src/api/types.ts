@@ -8,6 +8,7 @@ import type { AppState, SliceKey } from '../store/types';
 import type { CurrencyUnit } from '../utils/money';
 import type { AccountApi, AccountPreferences } from './account';
 import type { AssistantApi } from './assistant';
+import type { DocumentApi } from './documents';
 
 /** Who is signed in and the ledger conventions of this installation. */
 export interface PortalSession {
@@ -21,6 +22,8 @@ export interface PortalSession {
   closedFiscalYears?: number[];
   /** The user's own settings («حساب کاربری من»): rows per table page, start page, currency choice. */
   preferences?: AccountPreferences;
+  /** Upload limit of the document center (set by the system administrator). */
+  documentMaxBytes?: number;
 }
 
 /** Records changed in one slice since the last save (demo data source only). */
@@ -82,6 +85,8 @@ export interface DataSource {
   account?: AccountApi;
   /** akph only: the management assistant through the server (absent: demo answers computed in the browser). */
   assistant?: AssistantApi;
+  /** Document center uploads, downloads, links and archive. */
+  documents?: DocumentApi;
   /** DEV only: users the role switcher can sign in as. */
   devUsers?(): UserProfile[];
 }

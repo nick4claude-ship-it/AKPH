@@ -43,6 +43,7 @@ import { Dialog } from '../../ui/Dialog';
 import { MoneyInput } from '../../ui/NumberInput';
 import { Money } from '../common/Money';
 import { formatText } from '../../utils/formatters';
+import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 
 interface JournalEntriesViewProps {
   entries: JournalEntry[];
@@ -459,6 +460,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
                 ))}
               </div>
             </div>
+            <AttachmentsPanel entityType="journal_entry" entityId={selectedEntry.id} projectId={selectedEntry.projectId} />
             {actionError && (
               <p className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-800" role="alert">
                 {actionError}

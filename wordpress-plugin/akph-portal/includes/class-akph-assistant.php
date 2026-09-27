@@ -5,11 +5,14 @@
  * may see.
  *
  * - Settings (option akph_portal_ai; system administrator only, capability akph_ai_manage): provider
- *   (Anthropic, OpenAI or an OpenAI-compatible service with its own base URL), model, key, response token
- *   limit, daily requests per user, on/off, and whether full questions and answers are kept.
- * - The key is stored encrypted (sodium_crypto_secretbox, key derived from AUTH_KEY and SECURE_AUTH_SALT) and
- *   shown only as «•••• last four». The constant AKPH_AI_API_KEY in wp-config.php takes priority. No REST
- *   response, audit row, log line or error message contains it.
+ *   (Google Gemini — the default —, Anthropic, OpenAI or an OpenAI-compatible service with its own base URL),
+ *   model, key, response token limit, daily requests per user, on/off, and whether full questions and answers
+ *   are kept. A base URL may point to a proxy (e.g. outside Iran for Gemini); the optional «توکن واسط» is then
+ *   sent in its own header (X-Akph-Proxy-Token) so the proxy can refuse anyone else.
+ * - The key and the proxy token are stored encrypted (sodium_crypto_secretbox, key derived from AUTH_KEY and
+ *   SECURE_AUTH_SALT) and shown only as «•••• last four». The constant AKPH_AI_API_KEY in wp-config.php takes
+ *   priority. No REST response, audit row, log line or error message contains them; the Gemini key goes in the
+ *   x-goog-api-key header, never in the URL.
  * - A question (capability akph_assistant_use) is answered from a short summary built here with the user's
  *   own scope: project managers get their own projects only and no headquarters figures; no email, mobile or
  *   national id is sent. The system prompt asks for Persian answers from that data only, says when data is
@@ -24,7 +27,13 @@ if (!defined('ABSPATH')) {
 final class Akph_Assistant {
     const OPTION = 'akph_portal_ai';
     const KEY_CONSTANT = 'AKPH_AI_API_KEY';
-    const PROVIDERS = array('anthropic', 'openai', 'compatible');
+    const PROVIDERS = array('gemini', 'anthropic', 'openai', 'compatible');
+    /** Model used when none was saved (Gemini: the current stable Flash model in Google's model list). */
+    const DEFAULT_MODELS = array('gemini' => 'gemini-3.8-flash', 'anthropic' => 'claude-opus-5');
+    const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
+    /** Header of the proxy token (only to a custom base URL). */
+    const PROXY_HEADER = 'X-Akph-Proxy-Token';
+    const REGION_MESSAGE = 'سرور سایت از منطقه‌ای درخواست می‌دهد که Gemini پشتیبانی نمی‌کند؛ نشانی پایه یک واسط خارج از ایران را وارد کنید.';
     const QUESTION_MAX = 1000;
     const TIMEOUT = 45;
     /** Earlier turns of a conversation sent again with a question. */
@@ -39,14 +48,16 @@ final class Akph_Assistant {
     public static function defaults() {
         return array(
             'enabled' => false,
-            'provider' => 'anthropic',
+            'provider' => 'gemini',
             'base_url' => '',
-            'model' => 'claude-opus-5',
+            'model' => self::DEFAULT_MODELS['gemini'],
             'max_tokens' => 4096,
             'daily_limit' => 30,
             'log_content' => false,
             'key_cipher' => '',
             'key_hint' => '',
+            'proxy_cipher' => '',
+            'proxy_hint' => '',
         );
     }
 
@@ -55,28 +66,34 @@ final class Akph_Assistant {
         $value = get_option(self::OPTION, array());
         $value = is_array($value) ? $value : array();
         $d = self::defaults();
+        $provider = isset($value['provider']) && in_array($value['provider'], self::PROVIDERS, true) ? $value['provider'] : $d['provider'];
         return array(
             'enabled' => !empty($value['enabled']),
-            'provider' => isset($value['provider']) && in_array($value['provider'], self::PROVIDERS, true) ? $value['provider'] : $d['provider'],
+            'provider' => $provider,
             'base_url' => isset($value['base_url']) ? (string) $value['base_url'] : '',
-            'model' => isset($value['model']) && is_string($value['model']) && $value['model'] !== '' ? $value['model'] : $d['model'],
+            'model' => isset($value['model']) && is_string($value['model']) && $value['model'] !== '' ? $value['model'] : (array_key_exists($provider, self::DEFAULT_MODELS) ? self::DEFAULT_MODELS[$provider] : ''),
             'max_tokens' => isset($value['max_tokens']) ? max(64, min(32000, (int) $value['max_tokens'])) : $d['max_tokens'],
             'daily_limit' => isset($value['daily_limit']) ? max(1, min(1000, (int) $value['daily_limit'])) : $d['daily_limit'],
             'log_content' => !empty($value['log_content']),
             'key_cipher' => isset($value['key_cipher']) ? (string) $value['key_cipher'] : '',
             'key_hint' => isset($value['key_hint']) ? (string) $value['key_hint'] : '',
+            'proxy_cipher' => isset($value['proxy_cipher']) ? (string) $value['proxy_cipher'] : '',
+            'proxy_hint' => isset($value['proxy_hint']) ? (string) $value['proxy_hint'] : '',
         );
     }
 
-    /** Settings as the administrator sees them: everything except the key, which is only described. */
+    /** Settings as the administrator sees them: everything except the key and the proxy token, which are only described. */
     public static function public_settings() {
-        $s = self::stored();
-        unset($s['key_cipher'], $s['key_hint']);
+        $stored = self::stored();
+        $s = $stored;
+        unset($s['key_cipher'], $s['key_hint'], $s['proxy_cipher'], $s['proxy_hint']);
         $source = self::key_source();
         $s['key'] = array(
             'source' => $source,
-            'hint' => $source === 'constant' ? self::hint(self::constant_key()) : ($source === 'settings' ? self::stored()['key_hint'] : ''),
+            'hint' => $source === 'constant' ? self::hint(self::constant_key()) : ($source === 'settings' ? $stored['key_hint'] : ''),
         );
+        $proxy = $stored['proxy_cipher'] === '' ? 'none' : (self::decrypt($stored['proxy_cipher']) !== '' ? 'settings' : 'unreadable');
+        $s['proxy_token'] = array('source' => $proxy, 'hint' => $proxy === 'settings' ? $stored['proxy_hint'] : '');
         $s['encryption_ready'] = self::crypto_key() !== null;
         $s['configured'] = self::configured();
         return $s;
@@ -133,6 +150,26 @@ final class Akph_Assistant {
             $s['key_hint'] = self::hint($key);
             $key_changed = true;
         }
+        $proxy_changed = false;
+        if (!empty($body['clear_proxy_token'])) {
+            $s['proxy_cipher'] = '';
+            $s['proxy_hint'] = '';
+            $proxy_changed = true;
+        }
+        if (array_key_exists('proxy_token', $body) && $body['proxy_token'] !== '' && $body['proxy_token'] !== null) {
+            // Printable ASCII only: it travels in an HTTP header.
+            $token = is_string($body['proxy_token']) ? trim($body['proxy_token']) : '';
+            if (!preg_match('/^[\x21-\x7E]{16,500}$/D', $token)) {
+                throw Akph_Error::invalid('توکن واسط باید دست‌کم ۱۶ نویسه لاتین بدون فاصله باشد.', array('field' => 'proxy_token'));
+            }
+            $cipher = self::encrypt($token);
+            if ($cipher === null) {
+                throw Akph_Error::rule('کلیدهای امنیتی وردپرس (AUTH_KEY و SECURE_AUTH_SALT در wp-config.php) تنظیم نشده‌اند؛ بدون آن‌ها توکن واسط ذخیره نمی‌شود.', array('field' => 'proxy_token'));
+            }
+            $s['proxy_cipher'] = $cipher;
+            $s['proxy_hint'] = self::hint($token);
+            $proxy_changed = true;
+        }
         if ($s['provider'] === 'compatible' && $s['base_url'] === '') {
             throw Akph_Error::invalid('برای سرویس سازگار با OpenAI نشانی پایه (Base URL) لازم است.', array('field' => 'base_url'));
         }
@@ -140,8 +177,9 @@ final class Akph_Assistant {
         $after = self::public_settings();
         $audit_before = $before;
         $audit_after = $after;
-        unset($audit_before['key']['hint'], $audit_after['key']['hint']);
+        unset($audit_before['key']['hint'], $audit_after['key']['hint'], $audit_before['proxy_token']['hint'], $audit_after['proxy_token']['hint']);
         $audit_after['key_changed'] = $key_changed;
+        $audit_after['proxy_token_changed'] = $proxy_changed;
         Akph_Audit::log('assistant_settings', 'assistant', 0, $audit_before, $audit_after);
         return $after;
     }
@@ -234,6 +272,11 @@ final class Akph_Assistant {
     private static function api_key() {
         $constant = self::constant_key();
         return $constant !== '' ? $constant : self::decrypt(self::stored()['key_cipher']);
+    }
+
+    /** Proxy token for a custom base URL ('' when none is stored or it cannot be opened). */
+    private static function proxy_token() {
+        return self::decrypt(self::stored()['proxy_cipher']);
     }
 
     private static function hint($key) {
@@ -332,7 +375,7 @@ final class Akph_Assistant {
         $status = 'ok';
         if ($result['refused'] || $answer === '') {
             $status = 'refused';
-            $answer = 'برای این پرسش پاسخی تولید نشد؛ پرسش را به شکل دیگری مطرح کنید.';
+            $answer = isset($result['refusal_message']) ? $result['refusal_message'] : 'برای این پرسش پاسخی تولید نشد؛ پرسش را به شکل دیگری مطرح کنید.';
         } elseif ($result['truncated']) {
             $answer .= "\n\n(پاسخ به سقف طول تعیین‌شده رسید و کوتاه شد.)";
         }
@@ -465,10 +508,24 @@ final class Akph_Assistant {
     /**
      * One request to the provider with wp_remote_post. Returns text, token counts and whether the answer was
      * refused or cut at the token limit. Errors are Akph_Error with a general Persian message; the provider's
-     * body is never passed on (it could repeat what was sent).
+     * body is never passed on (it could repeat what was sent), only its error kind is read.
      */
     private static function call(array $s, $key, $system, array $messages, $max_tokens) {
-        if ($s['provider'] === 'anthropic') {
+        if ($s['provider'] === 'gemini') {
+            // POST {base}/v1beta/models/{model}:generateContent; the key in its header, never in the URL.
+            $model = preg_replace('#^models/#', '', $s['model']);
+            $url = ($s['base_url'] !== '' ? $s['base_url'] : self::GEMINI_BASE) . '/v1beta/models/' . rawurlencode($model) . ':generateContent';
+            $headers = array('x-goog-api-key' => $key, 'Content-Type' => 'application/json');
+            $contents = array();
+            foreach ($messages as $m) {
+                $contents[] = array('role' => $m['role'] === 'assistant' ? 'model' : 'user', 'parts' => array(array('text' => (string) $m['content'])));
+            }
+            $body = array(
+                'systemInstruction' => array('parts' => array(array('text' => $system))),
+                'contents' => $contents,
+                'generationConfig' => array('maxOutputTokens' => (int) $max_tokens),
+            );
+        } elseif ($s['provider'] === 'anthropic') {
             $url = ($s['base_url'] !== '' ? $s['base_url'] : 'https://api.anthropic.com') . '/v1/messages';
             $headers = array('x-api-key' => $key, 'anthropic-version' => '2023-06-01', 'content-type' => 'application/json');
             $body = array('model' => $s['model'], 'max_tokens' => (int) $max_tokens, 'system' => $system, 'messages' => $messages);
@@ -479,6 +536,11 @@ final class Akph_Assistant {
             // OpenAI's current models take max_completion_tokens; compatible services keep max_tokens.
             $body[$s['provider'] === 'openai' ? 'max_completion_tokens' : 'max_tokens'] = (int) $max_tokens;
         }
+        // The proxy token goes only to a base URL the administrator set (a proxy), in its own header.
+        $proxy = $s['base_url'] !== '' ? self::proxy_token() : '';
+        if ($proxy !== '') {
+            $headers[self::PROXY_HEADER] = $proxy;
+        }
         $response = wp_remote_post($url, array(
             'timeout' => self::TIMEOUT,
             'redirection' => 0,
@@ -488,10 +550,15 @@ final class Akph_Assistant {
         ));
         if (is_wp_error($response)) {
             error_log('[akph-portal] assistant: provider unreachable (' . $response->get_error_code() . ')');
-            throw new Akph_Error('akph_assistant_unreachable', 'اتصال به سرویس هوش مصنوعی برقرار نشد؛ اگر میزبان سایت در ایران است، از سرویس «سازگار با OpenAI» با نشانی در دسترس استفاده کنید یا کمی بعد دوباره تلاش کنید.', 502);
+            throw new Akph_Error('akph_assistant_unreachable', $s['provider'] === 'gemini'
+                ? 'اتصال به Gemini برقرار نشد؛ اگر میزبان سایت در ایران است، نشانی پایه یک واسط خارج از ایران را وارد کنید یا کمی بعد دوباره تلاش کنید.'
+                : 'اتصال به سرویس هوش مصنوعی برقرار نشد؛ اگر میزبان سایت در ایران است، از سرویس «سازگار با OpenAI» با نشانی در دسترس استفاده کنید یا کمی بعد دوباره تلاش کنید.', 502);
         }
         $code = (int) wp_remote_retrieve_response_code($response);
         if ($code < 200 || $code >= 300) {
+            if ($s['provider'] === 'gemini') {
+                throw self::gemini_error($code, (string) wp_remote_retrieve_body($response), $s['base_url'] !== '');
+            }
             error_log('[akph-portal] assistant: provider answered HTTP ' . $code);
             if ($code === 401 || $code === 403) {
                 throw new Akph_Error('akph_assistant_auth', 'سرویس هوش مصنوعی کلید یا دسترسی را نپذیرفت؛ به مدیر سیستم اطلاع دهید.', 502);
@@ -507,6 +574,9 @@ final class Akph_Assistant {
         $data = json_decode((string) wp_remote_retrieve_body($response), true);
         if (!is_array($data)) {
             throw new Akph_Error('akph_assistant_unavailable', 'پاسخ سرویس هوش مصنوعی قابل خواندن نبود.', 502);
+        }
+        if ($s['provider'] === 'gemini') {
+            return self::gemini_result($data);
         }
         if ($s['provider'] === 'anthropic') {
             $text = '';
@@ -534,6 +604,85 @@ final class Akph_Assistant {
             'input_tokens' => isset($data['usage']['prompt_tokens']) ? (int) $data['usage']['prompt_tokens'] : 0,
             'output_tokens' => isset($data['usage']['completion_tokens']) ? (int) $data['usage']['completion_tokens'] : 0,
         );
+    }
+
+    /**
+     * generateContent answer: the text of candidates[0].content.parts (thought summaries left out), a block of
+     * the prompt (promptFeedback.blockReason) or of the answer (finishReason SAFETY and the like) as a refusal
+     * with its own message, and the token counts from usageMetadata (thinking tokens count as output).
+     */
+    private static function gemini_result(array $data) {
+        $safety = 'Gemini به دلیل سیاست‌های ایمنی Google به این پرسش پاسخ نداد؛ پرسش را به شکل دیگری مطرح کنید.';
+        $usage = isset($data['usageMetadata']) && is_array($data['usageMetadata']) ? $data['usageMetadata'] : array();
+        $tokens = array(
+            'input_tokens' => isset($usage['promptTokenCount']) ? (int) $usage['promptTokenCount'] : 0,
+            'output_tokens' => (isset($usage['candidatesTokenCount']) ? (int) $usage['candidatesTokenCount'] : 0) + (isset($usage['thoughtsTokenCount']) ? (int) $usage['thoughtsTokenCount'] : 0),
+        );
+        if (!empty($data['promptFeedback']['blockReason'])) {
+            return array_merge(array('text' => '', 'refused' => true, 'truncated' => false, 'refusal_message' => $safety), $tokens);
+        }
+        $candidate = isset($data['candidates'][0]) && is_array($data['candidates'][0]) ? $data['candidates'][0] : array();
+        $finish = isset($candidate['finishReason']) ? (string) $candidate['finishReason'] : '';
+        $text = '';
+        $parts = isset($candidate['content']['parts']) && is_array($candidate['content']['parts']) ? $candidate['content']['parts'] : array();
+        foreach ($parts as $part) {
+            if (is_array($part) && isset($part['text']) && is_string($part['text']) && empty($part['thought'])) {
+                $text .= $part['text'];
+            }
+        }
+        $blocked = in_array($finish, array('SAFETY', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'IMAGE_SAFETY'), true);
+        $result = array('text' => $blocked ? '' : trim($text), 'refused' => $blocked, 'truncated' => $finish === 'MAX_TOKENS');
+        if ($blocked) {
+            $result['refusal_message'] = $safety;
+        } elseif ($result['text'] === '' && $result['truncated']) {
+            // A thinking model can spend the whole limit before writing the answer.
+            $result['refusal_message'] = 'پاسخ پیش از نوشته شدن به سقف توکن رسید؛ «حداکثر توکن پاسخ» را در تنظیمات دستیار بیشتر کنید.';
+        }
+        return array_merge($result, $tokens);
+    }
+
+    /**
+     * Persian error for a failed Gemini call, from the HTTP status and the error's status / reason (the body
+     * itself is not kept or passed on). Location refusals come as FAILED_PRECONDITION "User location is not
+     * supported"; an invalid key as API_KEY_INVALID (400) or PERMISSION_DENIED (403); the quota as 429.
+     */
+    private static function gemini_error($code, $raw, $custom_base) {
+        $data = json_decode($raw, true);
+        $error = is_array($data) && isset($data['error']) && is_array($data['error']) ? $data['error'] : array();
+        $status = isset($error['status']) && is_string($error['status']) ? $error['status'] : '';
+        $message = isset($error['message']) && is_string($error['message']) ? $error['message'] : '';
+        $reasons = array();
+        foreach (isset($error['details']) && is_array($error['details']) ? $error['details'] : array() as $detail) {
+            if (is_array($detail) && isset($detail['reason']) && is_string($detail['reason'])) {
+                $reasons[] = $detail['reason'];
+            }
+        }
+        $kind = preg_replace('/[^A-Z_\/,]/', '', $status . ($reasons ? '/' . implode(',', $reasons) : ''));
+        error_log('[akph-portal] assistant: Gemini answered HTTP ' . $code . ($kind !== '' ? ' ' . substr($kind, 0, 80) : ''));
+
+        if ($status === 'FAILED_PRECONDITION' || stripos($message, 'location is not supported') !== false) {
+            return new Akph_Error('akph_assistant_region', self::REGION_MESSAGE, 502);
+        }
+        if (in_array('API_KEY_INVALID', $reasons, true) || stripos($message, 'API key not valid') !== false || stripos($message, 'API key expired') !== false) {
+            return new Akph_Error('akph_assistant_auth', 'کلید API سرویس Gemini نامعتبر است؛ کلید را در Google AI Studio بررسی کنید و دوباره وارد کنید.', 502);
+        }
+        if ($code === 429 || $status === 'RESOURCE_EXHAUSTED') {
+            return new Akph_Error('akph_assistant_quota', 'سهمیه یا سقف تعداد درخواست Gemini پر شده است؛ کمی بعد دوباره تلاش کنید یا سهمیه پروژه را در Google AI Studio بررسی کنید.', 502);
+        }
+        if ($code === 401 && $custom_base) {
+            // Google does not answer 401 to key requests: this is the proxy refusing the token.
+            return new Akph_Error('akph_assistant_proxy', 'واسط (نشانی پایه) درخواست را نپذیرفت؛ «توکن واسط» را در تنظیمات دستیار و در واسط بررسی کنید.', 502);
+        }
+        if ($code === 401 || $code === 403 || $status === 'PERMISSION_DENIED' || $status === 'UNAUTHENTICATED') {
+            return new Akph_Error('akph_assistant_auth', 'Gemini کلید یا دسترسی را نپذیرفت؛ کلید و فعال بودن Gemini API را در Google AI Studio بررسی کنید.', 502);
+        }
+        if ($code === 404 || $status === 'NOT_FOUND') {
+            return new Akph_Error('akph_assistant_request', 'مدل واردشده در Gemini پیدا نشد؛ نام دقیق مدل را از فهرست مدل‌های Google بردارید.', 502);
+        }
+        if ($code === 400 || $status === 'INVALID_ARGUMENT') {
+            return new Akph_Error('akph_assistant_request', 'Gemini درخواست را نپذیرفت (نام مدل و حداکثر توکن پاسخ را در تنظیمات بررسی کنید).', 502);
+        }
+        return new Akph_Error('akph_assistant_unavailable', 'سرویس Gemini پاسخ نداد؛ کمی بعد دوباره تلاش کنید.', 502);
     }
 
     // ------------------------------------------------------------------ for the settings screen
