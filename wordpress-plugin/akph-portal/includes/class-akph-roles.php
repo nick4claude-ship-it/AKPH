@@ -11,9 +11,9 @@ if (!defined('ABSPATH')) {
 final class Akph_Roles {
     /**
      * 1 — 0.3.0; 2 — akph_assistant_use (all four roles) and akph_ai_manage (system administrator);
-     * 3 — petty cash, treasury and approvals (0.6.0).
+     * 3 — petty cash, treasury and approvals (0.6.0); 4 — akph_report_settings (system administrator, 0.6.1).
      */
-    const ROLES_VERSION = '3';
+    const ROLES_VERSION = '4';
     const OPTION_VERSION = 'akph_portal_roles_version';
 
     const ACCESS = 'akph_access';
@@ -49,6 +49,8 @@ final class Akph_Roles {
     const PAYMENT_APPROVE = 'akph_payment_approve';
     /** Treasury: create manual payment requests. */
     const PAYMENT_REQUEST = 'akph_payment_request';
+    /** «تنظیمات گزارش و چاپ»: letterhead, logo and signatories (system administrator only). */
+    const REPORT_SETTINGS = 'akph_report_settings';
 
     /** WordPress role slug → portal role label (docs/SERVER-RULES.md §1), in order of precedence. */
     const PORTAL_ROLES = array(
@@ -65,15 +67,15 @@ final class Akph_Roles {
             self::MASTER_DATA, self::ACCOUNTS_MANAGE, self::JOURNAL_CREATE, self::JOURNAL_APPROVE, self::JOURNAL_REVERSE,
             self::REPORTS, self::AUDIT_READ, self::SETTINGS, self::ASSISTANT_USE, self::AI_MANAGE,
             self::PETTY_SUBMIT, self::PETTY_APPROVE, self::PETTY_MANAGE, self::TREASURY_MANAGE, self::PAYMENT_APPROVE,
-            self::PAYMENT_REQUEST,
+            self::PAYMENT_REQUEST, self::REPORT_SETTINGS,
         );
     }
 
     /** Mirrors ROLE_PERMISSIONS in src/utils/permissions.ts: system admin and senior manager may do everything. */
     public static function grants() {
-        $senior = array_values(array_diff(self::all_caps(), array(self::PROJECTS_EDIT_EXEC_OWN, self::AI_MANAGE)));
+        $senior = array_values(array_diff(self::all_caps(), array(self::PROJECTS_EDIT_EXEC_OWN, self::AI_MANAGE, self::REPORT_SETTINGS)));
         return array(
-            'administrator' => array_merge($senior, array(self::AI_MANAGE)),
+            'administrator' => array_merge($senior, array(self::AI_MANAGE, self::REPORT_SETTINGS)),
             'paydar_senior_manager' => $senior,
             'paydar_accountant' => array(
                 self::ACCESS, self::VIEW_ALL, self::PROJECTS_EDIT_FINANCIAL, self::MASTER_DATA, self::ACCOUNTS_MANAGE,
