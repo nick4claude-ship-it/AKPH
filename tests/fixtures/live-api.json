@@ -1,0 +1,1599 @@
+{
+    "me": {
+        "id": "3",
+        "display_name": "کاربر senior",
+        "avatar_url": null,
+        "role": "مدیر ارشد",
+        "role_slug": "paydar_senior_manager",
+        "view_all": true,
+        "project_ids": [],
+        "currency": "toman",
+        "site_currency": "toman",
+        "preferences": {
+            "currency": "site",
+            "rows_per_page": 25,
+            "start_page": "\/"
+        },
+        "fiscal_year": 1405,
+        "closed_fiscal_years": [],
+        "document_max_bytes": 20971520,
+        "today": "2026-09-29",
+        "caps": {
+            "akph_access": true,
+            "akph_view_all": true,
+            "akph_projects_create": true,
+            "akph_projects_edit_base": true,
+            "akph_projects_edit_budget": true,
+            "akph_projects_assign": true,
+            "akph_projects_edit_exec_all": true,
+            "akph_projects_edit_exec_own": false,
+            "akph_projects_edit_financial": true,
+            "akph_master_data": true,
+            "akph_accounts_manage": true,
+            "akph_journal_create": true,
+            "akph_journal_approve": true,
+            "akph_journal_reverse": true,
+            "akph_reports": true,
+            "akph_audit_read": true,
+            "akph_settings": true,
+            "akph_assistant_use": true,
+            "akph_ai_manage": false,
+            "akph_petty_submit": true,
+            "akph_petty_approve": true,
+            "akph_petty_manage": true,
+            "akph_treasury_manage": true,
+            "akph_payment_approve": true,
+            "akph_payment_request": true,
+            "akph_report_settings": false
+        },
+        "server_version": "0.6.0"
+    },
+    "projects": {
+        "projects": [
+            {
+                "id": "1",
+                "code": "PRJ-1405-00001",
+                "name": "پروژه آزمون چاپ",
+                "client_id": null,
+                "client_name": "کارفرمای آزمون",
+                "consultant_name": "",
+                "manager_user_id": null,
+                "manager_name": "",
+                "site_supervisor": "",
+                "location": "",
+                "contract_ref": "",
+                "description": "",
+                "status": "active",
+                "physical_progress": 0,
+                "start_date": null,
+                "end_date": null,
+                "budget": 40000000000,
+                "contract_amount": 50000000000,
+                "manual_summary": {
+                    "revenue": 0,
+                    "cost": 0,
+                    "cash": 0,
+                    "receivable": 0,
+                    "payable": 0,
+                    "note": ""
+                },
+                "legacy_id": null,
+                "version": 1,
+                "editable": [
+                    "base",
+                    "budget",
+                    "assign",
+                    "exec",
+                    "financial"
+                ],
+                "created_at": "2026-09-29T22:58:47Z",
+                "updated_at": "2026-09-29T22:58:47Z"
+            }
+        ]
+    },
+    "cost-centers": {
+        "cost_centers": []
+    },
+    "counterparties": {
+        "counterparties": []
+    },
+    "accounts": {
+        "accounts": [
+            {
+                "id": "1",
+                "code": "1",
+                "title": "دارایی‌ها",
+                "level": "group",
+                "nature": "debit",
+                "parent_code": null,
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "2",
+                "code": "11",
+                "title": "دارایی‌های جاری",
+                "level": "general",
+                "nature": "debit",
+                "parent_code": "1",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "3",
+                "code": "111",
+                "title": "موجودی نقد و بانک",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "11",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "4",
+                "code": "11101",
+                "title": "موجودی نزد بانک‌ها",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "111",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "5",
+                "code": "11102",
+                "title": "صندوق‌های ریالی مرکزی و کارگاه‌ها",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "111",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "6",
+                "code": "11103",
+                "title": "تنخواه‌گردان‌های کارگاه‌های ساختمانی",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "111",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "7",
+                "code": "112",
+                "title": "حساب‌ها و اسناد دریافتنی تجاری (مطالبات)",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "11",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "8",
+                "code": "11201",
+                "title": "مطالبات از کارفرمایان (صورت‌وضعیت کارکرد)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "112",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "9",
+                "code": "11202",
+                "title": "اسناد دریافتنی تجاری (چک‌های وصول‌نشده)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "112",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "10",
+                "code": "113",
+                "title": "سایر حساب‌ها و سپرده‌های دریافتنی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "11",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "11",
+                "code": "11301",
+                "title": "سپرده حسن انجام کار نزد کارفرما (۱۰٪)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "12",
+                "code": "11302",
+                "title": "سپرده بیمه ماده ۳۸ نزد کارفرما (۵٪)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "13",
+                "code": "11303",
+                "title": "مساعده و وام کارکنان و کارگاه",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "14",
+                "code": "11304",
+                "title": "مالیات بر ارزش افزوده خرید (اعتبار مالیاتی)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "15",
+                "code": "11305",
+                "title": "مالیات تکلیفی مکسوره توسط کارفرما (پیش‌پرداخت مالیات)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "16",
+                "code": "11306",
+                "title": "کسورات مصالح تحویلی کارفرما",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "17",
+                "code": "11307",
+                "title": "ارزش افزوده مکسوره نزد کارفرما",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "18",
+                "code": "11308",
+                "title": "سایر کسورات مکسوره کارفرما",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "113",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "19",
+                "code": "114",
+                "title": "پیش‌پرداخت‌ها به تأمین‌کنندگان و پیمانکاران",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "11",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "20",
+                "code": "11401",
+                "title": "پیش‌پرداخت خرید آهن‌آلات و سیمان",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "114",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "21",
+                "code": "11402",
+                "title": "پیش‌پرداخت به پیمانکاران جزء و قالب‌بندی",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "114",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "22",
+                "code": "115",
+                "title": "موجودی انبار مصالح و اقلام پای کار",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "11",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "23",
+                "code": "11501",
+                "title": "موجودی آهن‌آلات، میلگرد و پروفیل در انبار",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "115",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "24",
+                "code": "11502",
+                "title": "موجودی سیمان، شن و مصالح دانه‌ای پای کار",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "115",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "25",
+                "code": "11503",
+                "title": "تجهیزات تأسیسات مکانیکی و برقی تحویلی",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "115",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "26",
+                "code": "12",
+                "title": "دارایی‌های غیرجاری و ثابت",
+                "level": "general",
+                "nature": "debit",
+                "parent_code": "1",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "27",
+                "code": "121",
+                "title": "ماشین‌آلات سنگین، تاورکرین و دامپرها",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "12",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "28",
+                "code": "122",
+                "title": "ابزارآلات، تجهیزات قالب‌بندی و داربست فلزی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "12",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "29",
+                "code": "123",
+                "title": "استهلاک انباشته ماشین‌آلات و تجهیزات (بستانکار)",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "12",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "30",
+                "code": "2",
+                "title": "بدهی‌ها",
+                "level": "group",
+                "nature": "credit",
+                "parent_code": null,
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "31",
+                "code": "21",
+                "title": "بدهی‌های جاری",
+                "level": "general",
+                "nature": "credit",
+                "parent_code": "2",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "32",
+                "code": "211",
+                "title": "حساب‌ها و اسناد پرداختنی تجاری",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "33",
+                "code": "21101",
+                "title": "بستانکاران تأمین‌کننده مصالح و آهن‌آلات",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "211",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "34",
+                "code": "21102",
+                "title": "بستانکاران پیمانکاران جزء و اکیپ‌های اجرایی",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "211",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "35",
+                "code": "21103",
+                "title": "اسناد پرداختنی (چک‌های صادره سررسیدنشده)",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "211",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "36",
+                "code": "212",
+                "title": "سایر حساب‌ها و عوارض پرداختنی",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "37",
+                "code": "21201",
+                "title": "بیمه پرداختنی سازمان تأمین اجتماعی (ماده ۳۸ و پرسنل)",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "212",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "38",
+                "code": "21202",
+                "title": "ارزش افزوده فروش پرداختنی",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "212",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "39",
+                "code": "21203",
+                "title": "مالیات حقوق پرداختنی (ماده ۸۶)",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "212",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "40",
+                "code": "21204",
+                "title": "مالیات تکلیفی مکسوره از پیمانکاران",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "212",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "41",
+                "code": "213",
+                "title": "پیش‌دریافت‌ها از کارفرمایان",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "42",
+                "code": "21301",
+                "title": "پیش‌دریافت تجهیز کارگاه و اقساط قرارداد",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "213",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "43",
+                "code": "21302",
+                "title": "علی‌الحساب‌های دریافتی از کارفرما",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "213",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "44",
+                "code": "214",
+                "title": "کالای دریافتی فاکتورنشده (حساب موقت انبار)",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "45",
+                "code": "21401",
+                "title": "کالای دریافتی فاکتورنشده (رسید انبار باز)",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "214",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "46",
+                "code": "215",
+                "title": "حقوق و دستمزد پرداختنی پرسنل ستاد و کارگاه",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "47",
+                "code": "21501",
+                "title": "حقوق و مزایای پرداختنی پرسنل",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "215",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "48",
+                "code": "216",
+                "title": "سپرده‌های مکسوره پیمانکاران جزء",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "49",
+                "code": "21601",
+                "title": "سپرده حسن انجام کار مکسوره پیمانکاران جزء",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "216",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "50",
+                "code": "21602",
+                "title": "سپرده بیمه مکسوره پیمانکاران جزء (ماده ۳۸)",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "216",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "51",
+                "code": "21603",
+                "title": "جرائم و سایر کسورات مکسوره پیمانکاران جزء",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "216",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "52",
+                "code": "217",
+                "title": "بستانکاران متفرقه و حساب‌های معلق",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "21",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "53",
+                "code": "21701",
+                "title": "واریزهای نامشخص بانکی در انتظار تعیین تکلیف",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "217",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "54",
+                "code": "22",
+                "title": "بدهی‌های بلندمدت و تسهیلات بانکی",
+                "level": "general",
+                "nature": "credit",
+                "parent_code": "2",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "55",
+                "code": "221",
+                "title": "تسهیلات مضاربه و سلف بانکی",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "22",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "56",
+                "code": "3",
+                "title": "حقوق صاحبان سهام و سرمایه",
+                "level": "group",
+                "nature": "credit",
+                "parent_code": null,
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "57",
+                "code": "31",
+                "title": "سرمایه ثبت‌شده و پرداخت‌شده",
+                "level": "general",
+                "nature": "credit",
+                "parent_code": "3",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "58",
+                "code": "32",
+                "title": "اندوخته قانونی و احتیاطی",
+                "level": "general",
+                "nature": "credit",
+                "parent_code": "3",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "59",
+                "code": "33",
+                "title": "سود (زیان) انباشته سنوات قبل",
+                "level": "general",
+                "nature": "credit",
+                "parent_code": "3",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "60",
+                "code": "4",
+                "title": "درآمدها (کارکرد و پیمانکاری)",
+                "level": "group",
+                "nature": "credit",
+                "parent_code": null,
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "61",
+                "code": "41",
+                "title": "درآمد حاصل از پیمان‌های بلندمدت",
+                "level": "general",
+                "nature": "credit",
+                "parent_code": "4",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "62",
+                "code": "411",
+                "title": "درآمد صورت‌وضعیت‌های کارکرد موقت و قطعی",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "41",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "63",
+                "code": "41101",
+                "title": "درآمد تأییدشده کارکرد پروژه‌های عمرانی",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "411",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "64",
+                "code": "41102",
+                "title": "مصالح تحویلی کارفرما (کسر درآمد پیمان)",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "411",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "65",
+                "code": "412",
+                "title": "درآمد حاصل از تعدیل نرخ پیمان و مابه‌التفاوت مصالح",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "41",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "66",
+                "code": "413",
+                "title": "سایر درآمدهای عملیاتی",
+                "level": "subsidiary",
+                "nature": "credit",
+                "parent_code": "41",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "67",
+                "code": "41301",
+                "title": "اضافات انبارگردانی",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "413",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "68",
+                "code": "41302",
+                "title": "سایر درآمدهای متفرقه",
+                "level": "detail",
+                "nature": "credit",
+                "parent_code": "413",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "69",
+                "code": "5",
+                "title": "بهای تمام‌شده و هزینه‌های مستقیم پروژه‌ها (Direct Costs)",
+                "level": "group",
+                "nature": "debit",
+                "parent_code": null,
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "70",
+                "code": "51",
+                "title": "هزینه‌های مستقیم عملیات پیمانکاری",
+                "level": "general",
+                "nature": "debit",
+                "parent_code": "5",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "71",
+                "code": "511",
+                "title": "هزینه مصالح مصرفی مستقیم در کارگاه‌ها",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "72",
+                "code": "51101",
+                "title": "مصالح مصرفی پای کار و انبار کارگاه",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "511",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "73",
+                "code": "51102",
+                "title": "مغایرت قیمت خرید مصالح (فاکتور با رسید)",
+                "level": "detail",
+                "nature": "both",
+                "parent_code": "511",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "74",
+                "code": "512",
+                "title": "دستمزد مستقیم نیروی انسانی و اکیپ‌های بتن‌ریزی و آرماتور",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "75",
+                "code": "51201",
+                "title": "حقوق و دستمزد مستقیم اکیپ‌های اجرایی کارگاه",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "512",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "76",
+                "code": "513",
+                "title": "هزینه قراردادهای پیمانکاران جزء و تخصصی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "77",
+                "code": "51301",
+                "title": "کارکرد پیمانکاران جزء و اکیپ‌های پیمانکاری",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "513",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "78",
+                "code": "514",
+                "title": "اجاره و بهره‌برداری ماشین‌آلات و تجهیزات سنگین",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "79",
+                "code": "515",
+                "title": "هزینه کرایه حمل، باربری و باسکول مصالح",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "80",
+                "code": "516",
+                "title": "سوخت، روغن و روانکارهای ماشین‌آلات کارگاهی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "81",
+                "code": "517",
+                "title": "تعمیرات اضطراری ماشین‌آلات و قالب‌های کارگاهی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "51",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "82",
+                "code": "6",
+                "title": "هزینه‌های عمومی، اداری، ستادی و مالی (Overhead \/ Indirect)",
+                "level": "group",
+                "nature": "debit",
+                "parent_code": null,
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "83",
+                "code": "61",
+                "title": "هزینه‌های اداری، عمومی و تشکیلاتی دفتر مرکزی",
+                "level": "general",
+                "nature": "debit",
+                "parent_code": "6",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "84",
+                "code": "611",
+                "title": "حقوق و مزایای ستاد مرکزی، مهندسی و مدیران",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "61",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "85",
+                "code": "61101",
+                "title": "حقوق و دستمزد ناخالص پرسنل ستادی و مدیریت",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "611",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "86",
+                "code": "612",
+                "title": "اجاره‌بها، قبوض و خدمات دفتر مرکزی تهران",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "61",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "87",
+                "code": "613",
+                "title": "هزینه‌های حقوقی، مشاوره مهندسی، داوری و حسابرسی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "61",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "88",
+                "code": "614",
+                "title": "بیمه پرسنل ستادی و مسئولیت مدنی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "61",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "89",
+                "code": "62",
+                "title": "هزینه‌های مالی و کارمزد ضمانت‌نامه‌ها",
+                "level": "general",
+                "nature": "debit",
+                "parent_code": "6",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "90",
+                "code": "621",
+                "title": "کارمزد تمدید ضمانت‌نامه‌های بانکی شرکت در مناقصه و انجام تعهدات",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "62",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "91",
+                "code": "62101",
+                "title": "کارمزد خدمات بانکی و صدور ضمانت‌نامه‌ها",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "621",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "92",
+                "code": "622",
+                "title": "سود و کارمزد تسهیلات بانکی",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "62",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "93",
+                "code": "623",
+                "title": "جرائم و خسارات پیمان",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "62",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "94",
+                "code": "62301",
+                "title": "جرائم تأخیر مکسوره کارفرما",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "623",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "95",
+                "code": "624",
+                "title": "کسری و ضایعات انبار و صندوق",
+                "level": "subsidiary",
+                "nature": "debit",
+                "parent_code": "62",
+                "active": true,
+                "postable": false,
+                "version": 1
+            },
+            {
+                "id": "96",
+                "code": "62401",
+                "title": "کسری انبارگردانی",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "624",
+                "active": true,
+                "postable": true,
+                "version": 1
+            },
+            {
+                "id": "97",
+                "code": "62402",
+                "title": "کسری صندوق و تنخواه",
+                "level": "detail",
+                "nature": "debit",
+                "parent_code": "624",
+                "active": true,
+                "postable": true,
+                "version": 1
+            }
+        ]
+    },
+    "journal-entries": {
+        "entries": [
+            {
+                "id": "1",
+                "doc_number": "ACC-1405-00001",
+                "draft_number": "DRF-1405-00001",
+                "fiscal_year": 1405,
+                "date": "2026-09-29",
+                "description": "درآمد آزمون",
+                "entry_type": "general",
+                "source_type": "manual",
+                "project_id": "1",
+                "status": "posted",
+                "total": 12000000000,
+                "lines": [
+                    {
+                        "line_no": 1,
+                        "account_code": "11201",
+                        "project_id": "1",
+                        "cost_center_id": null,
+                        "counterparty_id": null,
+                        "description": "مطالبات",
+                        "debit": 12000000000,
+                        "credit": 0
+                    },
+                    {
+                        "line_no": 2,
+                        "account_code": "41101",
+                        "project_id": "1",
+                        "cost_center_id": null,
+                        "counterparty_id": null,
+                        "description": "درآمد",
+                        "debit": 0,
+                        "credit": 12000000000
+                    }
+                ],
+                "reversal_of": null,
+                "reversed_by": null,
+                "created_by": "4",
+                "created_by_name": "کاربر accountant",
+                "created_at": "2026-09-29T22:58:47Z",
+                "approved_by": "5",
+                "approved_by_name": "کاربر accountant2",
+                "approved_at": "2026-09-29T22:58:47Z",
+                "rejected_by": null,
+                "rejected_at": null,
+                "status_note": "",
+                "version": 2
+            }
+        ],
+        "page": 1,
+        "total": 1
+    },
+    "petty-cash": {
+        "funds": [],
+        "categories": [],
+        "settings": {
+            "fund_limits": {
+                "project_manager": {
+                    "ceiling": 3000000000,
+                    "min_balance_warning": 600000000,
+                    "max_single_expense": 1000000000
+                },
+                "site_supervisor": {
+                    "ceiling": 2500000000,
+                    "min_balance_warning": 500000000,
+                    "max_single_expense": 500000000
+                },
+                "procurement": {
+                    "ceiling": 1500000000,
+                    "min_balance_warning": 400000000,
+                    "max_single_expense": 800000000
+                },
+                "headquarters": {
+                    "ceiling": 1200000000,
+                    "min_balance_warning": 300000000,
+                    "max_single_expense": 400000000
+                }
+            },
+            "site_level_max": 200000000,
+            "project_level_max": 1000000000,
+            "approval_chains": {
+                "site_manager_and_finance": [
+                    "حسابدار"
+                ],
+                "project_and_finance": [
+                    "مدیر پروژه",
+                    "حسابدار"
+                ],
+                "ceo_full": [
+                    "مدیر پروژه",
+                    "حسابدار",
+                    "مدیر ارشد"
+                ]
+            },
+            "replenishment_senior_threshold": 1000000000,
+            "low_balance_percent": 25,
+            "default_expense_account": "51101"
+        },
+        "expenses": [],
+        "requests": [],
+        "counts": [],
+        "replenishments": []
+    },
+    "treasury": {
+        "accounts": [],
+        "payment_requests": [],
+        "receipts": [],
+        "cheques": [],
+        "transfers": [],
+        "statement_lines": [],
+        "settings": {
+            "payment_senior_threshold": 1000000000,
+            "vat_rate_percent": 10
+        }
+    },
+    "approvals": {
+        "items": [],
+        "total": 0
+    },
+    "report-settings": {
+        "settings": {
+            "company": {
+                "legal_name": "آریا کاوش پی هامون",
+                "national_id": "",
+                "registration_number": "",
+                "economic_code": "",
+                "address": "",
+                "phone": "",
+                "logo_url": null
+            },
+            "signatories": {
+                "projects": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "management": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "financial": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "journal_entry": [],
+                "petty_cash": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "petty_expense": [],
+                "payment_request": [],
+                "receipt": [],
+                "contracts": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "client_statement": [],
+                "subcontractor_statement": [],
+                "purchase_order": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "inventory": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ],
+                "payroll": [
+                    {
+                        "title": "تهیه‌کننده",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "حسابدار",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیر مالی",
+                        "user_id": null,
+                        "name": ""
+                    },
+                    {
+                        "title": "مدیرعامل",
+                        "user_id": null,
+                        "name": ""
+                    }
+                ]
+            },
+            "report_types": [
+                {
+                    "key": "projects",
+                    "label": "گزارش پروژه‌ها",
+                    "workflow": false
+                },
+                {
+                    "key": "management",
+                    "label": "گزارش مدیریتی و هوش تجاری",
+                    "workflow": false
+                },
+                {
+                    "key": "financial",
+                    "label": "گزارش‌های مالی (ترازنامه، سود و زیان، تراز)",
+                    "workflow": false
+                },
+                {
+                    "key": "journal_entry",
+                    "label": "سند حسابداری",
+                    "workflow": true
+                },
+                {
+                    "key": "petty_cash",
+                    "label": "گزارش‌ها و صورتجلسه تنخواه",
+                    "workflow": false
+                },
+                {
+                    "key": "petty_expense",
+                    "label": "هزینه تنخواه",
+                    "workflow": true
+                },
+                {
+                    "key": "payment_request",
+                    "label": "درخواست پرداخت",
+                    "workflow": true
+                },
+                {
+                    "key": "receipt",
+                    "label": "رسید دریافت",
+                    "workflow": true
+                },
+                {
+                    "key": "contracts",
+                    "label": "گزارش قراردادها",
+                    "workflow": false
+                },
+                {
+                    "key": "client_statement",
+                    "label": "صورت‌وضعیت کارفرما",
+                    "workflow": true
+                },
+                {
+                    "key": "subcontractor_statement",
+                    "label": "صورت‌وضعیت پیمانکار جزء",
+                    "workflow": true
+                },
+                {
+                    "key": "purchase_order",
+                    "label": "سفارش خرید",
+                    "workflow": false
+                },
+                {
+                    "key": "inventory",
+                    "label": "اسناد و کاردکس انبار",
+                    "workflow": false
+                },
+                {
+                    "key": "payroll",
+                    "label": "حقوق و دستمزد",
+                    "workflow": false
+                }
+            ],
+            "version": 1,
+            "updated_at": "2026-09-29T22:58:47Z"
+        }
+    },
+    "treasury\/settings": {
+        "settings": {
+            "payment_senior_threshold": 1000000000,
+            "vat_rate_percent": 10
+        }
+    },
+    "documents": {
+        "documents": [],
+        "page": 1,
+        "total": 0
+    },
+    "print\/signatures": {
+        "entity_type": "journal_entry",
+        "entity_id": "1",
+        "report_type": "journal_entry",
+        "number": "ACC-1405-00001",
+        "slots": [
+            {
+                "title": "تهیه‌کننده",
+                "user_id": "4",
+                "name": "کاربر accountant",
+                "role": "",
+                "at": "2026-09-29T22:58:47Z",
+                "signed": true,
+                "source": "approval"
+            },
+            {
+                "title": "تأییدکننده",
+                "user_id": "5",
+                "name": "کاربر accountant2",
+                "role": "",
+                "at": "2026-09-29T22:58:47Z",
+                "signed": true,
+                "source": "approval"
+            }
+        ]
+    }
+}

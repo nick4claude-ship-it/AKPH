@@ -75,7 +75,7 @@
 
 ## ۳. مسیرها و دسترسی
 
-✓ = مجاز. مدیر سیستم و مدیر ارشد همه‌جا مجازند (با تفکیک وظایف)، جز تنظیمات دستیار که فقط مدیر سیستم دارد.
+✓ = مجاز. مدیر سیستم و مدیر ارشد همه‌جا مجازند (با تفکیک وظایف)، جز تنظیمات دستیار و «تنظیمات گزارش و چاپ» که فقط مدیر سیستم دارد.
 
 | مسیر | قابلیت | حسابدار | مدیر پروژه |
 |---|---|---|---|
@@ -113,6 +113,9 @@
 | `POST /payment-requests` | `akph_payment_request` | ✓ | — |
 | `POST /payment-requests/{id}/approve`، `/reject`، `POST /receipts/{id}/approve`، `/reject` | `akph_payment_approve` | ✓ تا آستانه (نه درخواست خودش) | — |
 | `GET /approvals` | `akph_access` | ✓ موارد مرحله خودش | ✓ موارد مرحله خودش در پروژه‌های خودش |
+| `GET /report-settings` | `akph_access` | ✓ | ✓ |
+| `POST /report-settings`، `GET /report-settings/users`، `POST|DELETE /report-settings/logo` | `akph_report_settings` (فقط مدیر سیستم) | — | — |
+| `GET /print/signatures` | `akph_access` + دسترسی به همان رکورد | ✓ | ✓ فقط رکورد پروژه‌های خودش (سند حسابداری، درخواست پرداخت و دریافت هرگز) |
 | `GET /` (فهرست فضای نام) | `akph_access` | ✓ | ✓ |
 
 ## ۴. جزئیات مسیرها
@@ -484,6 +487,42 @@
 
 تأیید و رد همیشه فرمان ماژول مالک (`approve_path` / `reject_path`) است؛ کپی رکوردی در کارتابل نیست.
 
+### گزارش و چاپ (۰٫۶٫۱)
+
+`GET /report-settings` → `{ settings: { company, signatories, report_types, version, updated_at } }`:
+
+```json
+{ "company": { "legal_name": "آریا کاوش پی هامون", "national_id": "", "registration_number": "", "economic_code": "", "address": "", "phone": "", "logo_url": null },
+  "signatories": { "projects": [{ "title": "تهیه‌کننده", "user_id": null, "name": "" }, …], "journal_entry": [], … },
+  "report_types": [{ "key": "projects", "label": "گزارش پروژه‌ها", "workflow": false }, …], "version": 1 }
+```
+
+- پیش‌فرض: نام رسمی «آریا کاوش پی هامون» و برای هر گزارش فقط عنوان جایگاه‌ها («تهیه‌کننده»، «حسابدار»، «مدیر مالی»، «مدیرعامل») بدون نام؛
+  برای انواع دارای گردش تأیید (`workflow: true`) جایگاه اضافه‌ای تعریف نشده است.
+- `name` جایگاهی که `user_id` دارد نام نمایشی همان کاربر است (هیچ اطلاعات دیگری از کاربر برگردانده نمی‌شود).
+
+| فرمان | بدنه | قاعده |
+|---|---|---|
+| `POST /report-settings` | `company: { legal_name, national_id, registration_number, economic_code, address, phone }`، `signatories: { <report_type>: [{ title, user_id? , name? }] }`، `version` (یا `If-Match`) | فقط مدیر سیستم؛ نام رسمی الزامی؛ شناسه ملی ۱۰ یا ۱۱ رقم؛ حداکثر ۶ جایگاه؛ `user_id` باید کاربر پرتال باشد؛ نسخه کهنه ← ۴۰۹؛ ممیزی `report_settings` |
+| `POST /report-settings/logo` | multipart، فایل `logo`؛ نسخه در `If-Match` | JPG/PNG/WebP تا ۲ مگابایت، بررسی محتوا، بازنویسی با ضلع بزرگ حداکثر ۶۰۰ پیکسل بدون برش؛ لوگوی قبلی حذف می‌شود |
+| `DELETE /report-settings/logo` | `version` | |
+
+`GET /report-settings/users` → `{ users: [{ id, name, role }] }` کاربران چهار نقش پرتال برای انتخاب امضاکننده.
+
+`GET /print/signatures?entity_type=&entity_id=` → `{ entity_type, entity_id, report_type, number, slots: [{ title, user_id, name, role, at, signed, source }] }`.
+جایگاه‌ها از سابقه تأیید سرور ساخته می‌شوند و جایگاه‌های «تنظیمات گزارش و چاپ» همان نوع (`source: "settings"`) پس از آن‌ها می‌آیند؛
+مرحله تأییدنشده `signed: false` و بدون نام و تاریخ است.
+
+| `entity_type` | جایگاه‌ها |
+|---|---|
+| `journal_entry` | تهیه‌کننده، تأییدکننده (فقط سند قطعی) |
+| `petty_expense` | تنخواه‌دار (ثبت‌کننده)، سپس یک جایگاه برای هر مرحله زنجیره («تأیید مدیر پروژه»، …) از تأییدهای دور جاری |
+| `petty_request` | درخواست‌کننده و مراحل زنجیره |
+| `payment_request` | درخواست‌کننده، تأییدکننده، پرداخت‌کننده |
+| `receipt` | ثبت‌کننده، تأییدکننده |
+
+`GET /treasury/settings` و `POST /treasury/settings` از ۰٫۶٫۱ `vat_rate_percent` (عدد صحیح ۰ تا ۱۰۰، پیش‌فرض ۱۰) هم دارند؛ صفحه تنظیمات اپ آن را می‌خواند و می‌نویسد.
+
 ## ۵. کلاینت
 
 - `src/api/akph`: خواندن همه مسیرهای بالا، تبدیل ISO ↔ شمسی (`src/utils/jalali.ts`، همان الگوریتم سرور) و ارسال فرمان‌ها.
@@ -506,6 +545,11 @@
 - `src/api/akph/finance.ts`: نگاشت تنخواه، خزانه و کارتابل. این فرمان‌ها بدون اجرای آزمایشی محلی مستقیم به سرور می‌روند
   (`serverValidated`)، چون مرحله، آستانه و موجودی را سرور تعیین می‌کند. پس از هر فرمان `GET /approvals` دوباره خوانده می‌شود
   (کارتابل، شمارنده منو و اعلان‌ها). بخش‌های تنخواه، خزانه و کارتابل در حالت واقعی فقط‌خواندنی نیستند (`WRITABLE_PATHS`).
+
+- `src/api/akph/print.ts`، `src/store/usePrint.ts` و `src/components/common/OfficialPrint.tsx`: قالب چاپ رسمی همه گزارش‌ها (سربرگ و
+  لوگو از «تنظیمات گزارش و چاپ»، شماره و تاریخ شمسی، فیلترها، جدول با ارقام فارسی و واحد یک بار در سرستون، جمع‌ها، امضاها، پاورقی
+  «صفحه ۱ از ۳» با زمان تهیه و نام تهیه‌کننده، A4 عمودی/افقی، تکرار سرستون در هر صفحه). سند چاپی زیر `<body>` کپی می‌شود و فقط
+  همان چاپ می‌شود. خروجی Excel (CSV با BOM) از همان ردیف‌های چاپ (`src/store/views/exports.ts`).
 
 ## ۶. فرمان‌های فاز بعد (هنوز فقط‌خواندنی)
 
