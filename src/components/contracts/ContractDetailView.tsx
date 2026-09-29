@@ -746,23 +746,7 @@ export const ContractDetailView: React.FC<ContractDetailViewProps> = ({
                 <p className="text-xs text-slate-500">سوابق نامه‌نگاری‌ها با مهندس مشاور و کارفرما</p>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="p-3 rounded-xl border border-slate-200 bg-white flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-slate-900 block">نامه شماره ۳۴۲/ص: اعلام آمادگی جهت بتن‌ریزی سقف منفی ۲</span>
-                    <span className="text-slate-500 text-xs block mt-1">گیرنده: مهندسین مشاور سازه‌اندیش شرق · تاریخ: ۱۴۰۳/۰۵/۲۲</span>
-                  </div>
-                  <span className="px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-800 font-bold">پاسخ مثبت دریافت شد</span>
-                </div>
-
-                <div className="p-3 rounded-xl border border-slate-200 bg-white flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-slate-900 block">صورت‌جلسه کارگاهی شماره ۱۲: تطبیق احجام عملیات خاکی نهایی گود</span>
-                    <span className="text-slate-500 text-xs block mt-1">امضاکنندگان: سرپرست کارگاه + ناظر مقیم مشاور · تاریخ: ۱۴۰۳/۰۵/۱۸</span>
-                  </div>
-                  <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-bold">مصوب و منضم به صورت‌وضعیت</span>
-                </div>
-              </div>
+              <AttachmentsPanel entityType="contract" entityId={contract.id} projectId={contract.projectId} />
             </div>
           )}
 

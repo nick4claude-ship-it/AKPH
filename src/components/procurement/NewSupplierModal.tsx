@@ -170,7 +170,7 @@ export const NewSupplierModal: React.FC<NewSupplierModalProps> = ({
                 type="text"
                 value={contactPerson}
                 onChange={(e) => setContactPerson(e.target.value)}
-                placeholder="مهندس احمدی"
+                placeholder="نام و نام خانوادگی"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
                 required
               />

@@ -141,7 +141,7 @@ export const NewSubcontractorContractModal: React.FC<NewSubcontractorContractMod
               <input id="new-subcontractor-contract-modal-3"
                 type="text"
                 required
-                placeholder="مثال: صنایع جوش پیشگام (قادری)"
+                placeholder="نام پیمانکار جزء"
                 value={subcontractorName}
                 onChange={(e) => setSubcontractorName(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold"

@@ -25,6 +25,9 @@ import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../utils/mon
 import { formatDecimal, formatText } from '../../utils/formatters';
 import { kardexTotals } from '../../store/views/inventory';
 import { Money } from '../common/Money';
+import { OfficialPrint, moneyHeader } from '../common/OfficialPrint';
+import { Dialog } from '../../ui/Dialog';
+import { X } from 'lucide-react';
 
 interface KardexViewProps {
   materials: MaterialItem[];
@@ -52,9 +55,8 @@ export const KardexView: React.FC<KardexViewProps> = ({
   const { totalIn, totalOut } = kardexTotals(records);
   const currentBalance = selectedMaterial ? selectedMaterial.currentStock : totalIn - totalOut;
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const [printOpen, setPrintOpen] = useState(false);
+  const handlePrint = () => setPrintOpen(true);
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
@@ -74,6 +76,7 @@ export const KardexView: React.FC<KardexViewProps> = ({
           <div className="flex items-center gap-2 self-stretch sm:self-auto">
             <button
               onClick={handlePrint}
+              disabled={!selectedMaterial}
               className="btn btn-secondary"
             >
               <Printer className="w-4 h-4" />
@@ -250,6 +253,84 @@ export const KardexView: React.FC<KardexViewProps> = ({
           </table>
         </div>
       </div>
+      {printOpen && selectedMaterial && (
+        <Dialog onClose={() => setPrintOpen(false)} label="پیش‌نمایش چاپ کاردکس" overlayClassName="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl my-auto overflow-hidden flex flex-col max-h-[92vh]">
+          <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between no-print">
+            <span className="text-sm font-bold text-slate-800">پیش‌نمایش چاپ رسمی کاردکس</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => window.print()} className="btn btn-primary">
+                <Printer className="w-4 h-4" />
+                <span>چاپ / ذخیره PDF</span>
+              </button>
+              <button onClick={() => setPrintOpen(false)} aria-label="بستن" className="p-2 rounded-lg text-slate-500 hover:bg-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div className="p-4 sm:p-6 overflow-y-auto">
+            <OfficialPrint
+              reportType="inventory"
+              title="کاردکس مقداری و ریالی کالا"
+              orientation="landscape"
+              money
+              preview={records.length === 0}
+              filters={[
+                { label: 'کالا', value: `${selectedMaterial.code} - ${selectedMaterial.name}` },
+                { label: 'واحد سنجش', value: selectedMaterial.unit },
+                { label: 'روش ارزیابی', value: 'میانگین موزون' },
+              ]}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>ردیف</th>
+                    <th>تاریخ</th>
+                    <th>نوع</th>
+                    <th>شماره سند</th>
+                    <th>طرف حساب / انبار</th>
+                    <th>وارده</th>
+                    <th>صادره</th>
+                    <th>مانده</th>
+                    <th>{moneyHeader('نرخ واحد')}</th>
+                    <th>{moneyHeader('ارزش مانده')}</th>
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {records.map((r, index) => (
+                    <tr key={r.id}>
+                      <td>{formatDecimal(index + 1)}</td>
+                      <td>{formatText(r.date)}</td>
+                      <td>{formatText(r.docType)}</td>
+                      <td>{formatText(r.docNumber)}</td>
+                      <td>{formatText(`${r.counterparty} — ${r.warehouseName}`)}</td>
+                      <td>{r.inQty > 0 ? formatDecimal(r.inQty) : '—'}</td>
+                      <td>{r.outQty > 0 ? formatDecimal(r.outQty) : '—'}</td>
+                      <td>{formatDecimal(r.balanceQty)}</td>
+                      <td>{formatMoney(r.unitCost, false)}</td>
+                      <td>{formatMoney(r.balanceValuation, false)}</td>
+                    </tr>
+                  ))}
+                  {records.length === 0 && (
+                    <tr>
+                      <td colSpan={10}>گردشی برای این کالا ثبت نشده است.</td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="font-bold">
+                    <td colSpan={5}>جمع</td>
+                    <td>{formatDecimal(totalIn)}</td>
+                    <td>{formatDecimal(totalOut)}</td>
+                    <td>{formatDecimal(currentBalance)}</td>
+                    <td>—</td>
+                    <td>{formatMoney(selectedMaterial.totalStockValue, false)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </OfficialPrint>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 };

@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CompanyProfile, JournalEntry, UserProfile } from '../types';
+import type { CompanyProfile, JournalEntry, ReportSettings, UserProfile } from '../types';
 import type { AppState, SliceKey } from '../store/types';
 import type { CurrencyUnit } from '../utils/money';
 import type { AccountApi, AccountPreferences } from './account';
 import type { AssistantApi } from './assistant';
 import type { DocumentApi } from './documents';
+import type { PrintApi } from './print';
 
 /** Who is signed in and the ledger conventions of this installation. */
 export interface PortalSession {
@@ -16,8 +17,10 @@ export interface PortalSession {
   /** Display currency, chosen once in the paydar-portal plugin. Amounts are always integer Rials, in the store and on the wire. */
   currency: CurrencyUnit;
   fiscalYear: number;
-  /** The company this installation belongs to (WordPress: the site name). */
+  /** The company this installation belongs to: the letterhead of «تنظیمات گزارش و چاپ». */
   company: CompanyProfile;
+  /** Letterhead and signatories of printed reports (akph/v1 GET /report-settings). */
+  reportSettings?: ReportSettings;
   /** Jalali fiscal years closed on the server (akph/v1 GET /me). */
   closedFiscalYears?: number[];
   /** The user's own settings («حساب کاربری من»): rows per table page, start page, currency choice. */
@@ -92,6 +95,8 @@ export interface DataSource {
   assistant?: AssistantApi;
   /** Document center uploads, downloads, links and archive. */
   documents?: DocumentApi;
+  /** «تنظیمات گزارش و چاپ» and the signature slots of printed records. */
+  print?: PrintApi;
   /** DEV only: users the role switcher can sign in as. */
   devUsers?(): UserProfile[];
 }

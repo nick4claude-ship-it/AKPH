@@ -32,6 +32,8 @@ import { useCompany } from '../../store/session';
 import { clientStatementActions, statementVatPercent } from '../../store/views/contracts';
 import { Money } from '../common/Money';
 import { AttachmentsPanel } from '../documents/AttachmentsPanel';
+import { OfficialPrint, moneyHeader } from '../common/OfficialPrint';
+import { clientStatementSignatures } from '../../store/views/print';
 
 interface StatementDetailAndPrintModalProps {
   statement: DetailedProgressStatement;
@@ -49,13 +51,13 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   onDecide,
   onIssueAccountingEntry,
 }) => {
-  const company = useCompany();
   const [activeView, setActiveView] = useState<'detail' | 'print_preview'>('detail');
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectError, setRejectError] = useState(false);
   const [accountingIssued, setAccountingIssued] = useState(!!statement.accountingJournalEntryId);
   const actions = clientStatementActions(currentUser, statement);
+  const signatures = clientStatementSignatures(statement);
 
   // Status mapping
   const statusMeta: Record<string, { label: string; color: string }> = {
@@ -74,8 +76,12 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
     returned_for_correction: { label: 'بازگشت جهت اصلاح', color: 'bg-orange-100 text-orange-900' },
   };
 
+  // The official layout must be on the page before printing.
   const handlePrint = () => {
-    window.print();
+    if (activeView !== 'print_preview') {
+      setActiveView('print_preview');
+      setTimeout(() => window.print(), 150);
+    } else window.print();
   };
 
   const handleExportExcel = () => downloadTable(clientStatementItemsCsv(statement));
@@ -387,178 +393,69 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
               </div>
             </div>
           ) : (
-            /* OFFICIAL PRINT PREVIEW (FORMAL IRANIAN CONTRACT PROGRESS STATEMENT) */
-            <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-xs max-w-4xl mx-auto space-y-6 font-sans text-sm">
-              {/* Letterhead */}
-              <div className="border-b-2 border-slate-900 pb-4 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Building className="w-6 h-6 text-slate-900" />
-                    <span className="text-base font-bold text-slate-900">
-                      {formatText(company.legalName)}
-                    </span>
-                  </div>
-                  <span className="text-sm text-slate-600 block mt-1">
-                    دفتر فنی و امور قراردادهای پروژه‌های عمرانی
-                  </span>
-                </div>
-
-                <div className="text-center">
-                  <h3 className="text-base font-bold text-slate-900 border-2 border-slate-900 px-4 py-1 rounded">
-                    صورت‌وضعیت موقت / کارکرد پیمان
-                  </h3>
-                  <span className="text-xs text-slate-500 block mt-1">
-                    منطبق بر نشریه ۴۳۱۱ سازمان برنامه و بودجه
-                  </span>
-                </div>
-
-                <div className="text-left text-sm text-slate-600 space-y-1 tabular-nums">
-                  <div>شماره سند: <strong>{formatText(statement.statementNumber)}</strong></div>
-                  <div>تاریخ تهیه: <strong>{formatText(statement.preparationDate)}</strong></div>
-                  <div>صفحه: <strong>۱ از ۳</strong></div>
-                </div>
-              </div>
-
-              {/* Contract Information Box */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded border border-slate-200 text-slate-800">
-                <div>
-                  <span className="text-xs text-slate-500 block">پروژه:</span>
-                  <span className="font-bold">{formatText(statement.projectName)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">شماره و تاریخ پیمان:</span>
-                  <span className="tabular-nums">{formatText(statement.contractNumber)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">دستگاه اجرایی / کارفرما:</span>
-                  <span className="font-bold">{formatText(statement.client)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">مهندسین مشاور:</span>
-                  <span className="font-bold">{formatText(statement.consultant)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">دوره کارکرد:</span>
-                  <span className="tabular-nums">از {formatText(statement.periodStartDate)} تا {formatText(statement.periodEndDate)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">پیمانکار:</span>
-                  <span className="font-bold">{formatText(company.name)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">تعدیل آحادبها:</span>
-                  <span className="tabular-nums font-bold"><Money rial={statement.adjustmentAmount} /></span>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500 block">مالیات بر ارزش افزوده:</span>
-                  <span className="tabular-nums font-bold"><Money rial={statement.vatAmount} /></span>
-                </div>
-              </div>
-
-              {/* Items Condensed Table */}
-              <div className="table-scroll">
-                <table className="w-full text-right text-sm border border-slate-300 border-collapse">
+            /* OFFICIAL PRINT (letterhead and signatories from «تنظیمات گزارش و چاپ») */
+            <div className="max-w-4xl mx-auto">
+              <OfficialPrint
+                reportType="client_statement"
+                title="صورت‌وضعیت موقت / کارکرد پیمان"
+                number={statement.statementNumber}
+                money
+                localSignatures={signatures}
+                entity={null}
+                filters={[
+                  { label: 'پروژه', value: statement.projectName },
+                  { label: 'پیمان', value: `${statement.contractNumber} (${statement.contractCode})` },
+                  { label: 'کارفرما', value: statement.client },
+                  { label: 'مشاور', value: statement.consultant },
+                  { label: 'دوره', value: `از ${statement.periodStartDate} تا ${statement.periodEndDate}` },
+                ]}
+              >
+                <table className="mb-4">
                   <thead>
-                    <tr className="bg-slate-200 text-slate-900 border-b border-slate-300 font-bold">
-                      <th className="p-2 border border-slate-300">ردیف</th>
-                      <th className="p-2 border border-slate-300">کد</th>
-                      <th className="p-2 border border-slate-300">شرح مختصر عملیات</th>
-                      <th className="p-2 border border-slate-300 text-center">واحد</th>
-                      <th className="p-2 border border-slate-300 text-left">کارکرد این دوره</th>
-                      <th className="p-2 border border-slate-300 text-left">بهای واحد</th>
-                      <th className="p-2 border border-slate-300 text-left">مبلغ دوره ({moneyUnitLabel()})</th>
+                    <tr>
+                      <th>ردیف</th>
+                      <th>کد</th>
+                      <th>شرح عملیات</th>
+                      <th>واحد</th>
+                      <th>کارکرد این دوره</th>
+                      <th>{moneyHeader('بهای واحد')}</th>
+                      <th>{moneyHeader('مبلغ دوره')}</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="tabular-nums">
                     {statement.items.map((i) => (
-                      <tr key={i.id} className="border-b border-slate-200">
-                        <td className="p-2 border border-slate-300 tabular-nums text-center">{formatText(i.rowNumber)}</td>
-                        <td className="p-2 border border-slate-300 tabular-nums text-center">{formatText(i.code)}</td>
-                        <td className="p-2 border border-slate-300">{formatText(i.description)}</td>
-                        <td className="p-2 border border-slate-300 text-center">{formatText(i.unit)}</td>
-                        <td className="p-2 border border-slate-300 text-left tabular-nums">{formatDecimal(i.currentQuantity)}</td>
-                        <td className="p-2 border border-slate-300 text-left tabular-nums">{formatMoney(i.unitRate, false)}</td>
-                        <td className="p-2 border border-slate-300 text-left tabular-nums font-bold">{formatMoney(i.currentAmount, false)}</td>
+                      <tr key={i.id}>
+                        <td>{formatText(i.rowNumber)}</td>
+                        <td>{formatText(i.code)}</td>
+                        <td>{formatText(i.description)}</td>
+                        <td>{formatText(i.unit)}</td>
+                        <td>{formatDecimal(i.currentQuantity)}</td>
+                        <td>{formatMoney(i.unitRate, false)}</td>
+                        <td>{formatMoney(i.currentAmount, false)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Financial Calculation Statement */}
-              <div className="bg-slate-50 p-4 rounded border border-slate-300 space-y-2 text-sm">
-                <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>۱. کارکرد عملیات این دوره:</span>
-                  <span className="tabular-nums font-bold"><Money rial={statement.workAmountCurrent} /></span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>۲. تعدیل آحادبها و مابه‌التفاوت مصالح:</span>
-                  <span className="tabular-nums font-bold">+<Money rial={statement.adjustmentAmount} /></span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>۳. مصالح پای‌کار و سایر اقلام مجاز:</span>
-                  <span className="tabular-nums font-bold">+<Money rial={statement.otherAllowableItemsAmount} /></span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-200">
-                  <span>۴. مالیات بر ارزش افزوده ({formatPercent(statementVatPercent(statement))}):</span>
-                  <span className="tabular-nums font-bold">+<Money rial={statement.vatAmount} /></span>
-                </div>
-                <div className="flex justify-between py-2 bg-slate-200 px-2 rounded font-bold text-slate-900">
-                  <span>مجموع ناخالص کارکرد دوره:</span>
-                  <span className="tabular-nums"><Money rial={statement.grossAmount} /></span>
-                </div>
-                <div className="flex justify-between py-1 text-rose-700">
-                  <span>کسورات قانونی و قراردادی (استرداد پیش‌پرداخت، حسن انجام کار، بیمه و...):</span>
-                  <span className="tabular-nums font-bold">-<Money rial={statement.totalDeductions} /></span>
-                </div>
-                <div className="flex justify-between py-2 bg-amber-100 text-amber-950 px-2 rounded font-bold text-sm">
-                  <span>مبلغ خالص قابل پرداخت به پیمانکار:</span>
-                  <span className="tabular-nums"><Money rial={statement.netPayable} /></span>
-                </div>
-              </div>
-
-              {/* Matrix of 4 Legal Signatures */}
-              <div className="pt-6 border-t-2 border-slate-400 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
-                <div className="space-y-12">
-                  <div>
-                    <span className="font-bold text-slate-800 block">پیمانکار - {formatText(company.name)}</span>
-                    <span className="text-slate-500 block">سرپرست کارگاه و مدیر پروژه</span>
-                  </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
-                    امضا و مهر
-                  </div>
-                </div>
-
-                <div className="space-y-12">
-                  <div>
-                    <span className="font-bold text-slate-800 block">مهندسین مشاور سازه‌اندیش</span>
-                    <span className="text-slate-500 block">سرناظر مقیم و مدیر فنی</span>
-                  </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
-                    امضا و مهر
-                  </div>
-                </div>
-
-                <div className="space-y-12">
-                  <div>
-                    <span className="font-bold text-slate-800 block">دستگاه اجرایی / کارفرما</span>
-                    <span className="text-slate-500 block">نماینده فنی و مدیر طرح</span>
-                  </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
-                    امضا و مهر
-                  </div>
-                </div>
-
-                <div className="space-y-12">
-                  <div>
-                    <span className="font-bold text-slate-800 block">مدیریت امور مالی شرکت</span>
-                    <span className="text-slate-500 block">کنترل و تطبیق حسابداری</span>
-                  </div>
-                  <div className="border-t border-dashed border-slate-400 pt-1 text-slate-500">
-                    امضا و مهر
-                  </div>
-                </div>
-              </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>شرح</th>
+                      <th>{moneyHeader('مبلغ')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    <tr><td>۱. کارکرد عملیات این دوره</td><td><Money rial={statement.workAmountCurrent} unit={false} /></td></tr>
+                    <tr><td>۲. تعدیل آحادبها و مابه‌التفاوت مصالح</td><td><Money rial={statement.adjustmentAmount} unit={false} /></td></tr>
+                    <tr><td>۳. مصالح پای‌کار و سایر اقلام مجاز</td><td><Money rial={statement.otherAllowableItemsAmount} unit={false} /></td></tr>
+                    <tr><td>{`۴. مالیات بر ارزش افزوده (${formatPercent(statementVatPercent(statement))})`}</td><td><Money rial={statement.vatAmount} unit={false} /></td></tr>
+                    <tr className="font-bold"><td>مجموع ناخالص کارکرد دوره</td><td><Money rial={statement.grossAmount} unit={false} /></td></tr>
+                    <tr><td>کسورات قانونی و قراردادی</td><td><Money rial={statement.totalDeductions} unit={false} /></td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="font-bold"><td>مبلغ خالص قابل پرداخت</td><td><Money rial={statement.netPayable} unit={false} /></td></tr>
+                  </tfoot>
+                </table>
+              </OfficialPrint>
             </div>
           )}
         </div>

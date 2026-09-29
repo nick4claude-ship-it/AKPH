@@ -15,6 +15,7 @@ import { moneyUnitLabel, toDisplayAmount } from '../../utils/money';
 import { contractProgress } from './contracts';
 
 const m = (rial: number) => toDisplayAmount(rial);
+const sumOf = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
 export function contractProgressCsv(contracts: readonly Contract[]): CsvTable {
   const unit = moneyUnitLabel();
@@ -92,12 +93,13 @@ export function financialReportCsv(kind: FinancialReportKind, r: ReturnType<type
   const unit = moneyUnitLabel();
   switch (kind) {
     case 'project_pnl':
-      return { filename: `project-pnl-${project?.code || ''}`, headers: ['کد حساب', 'حساب', `مبلغ (${unit})`], rows: r.breakdown.map((b) => [b.accountCode, b.accountName, m(b.amount)]) };
+      return { filename: `project-pnl-${project?.code || ''}`, headers: ['کد حساب', 'حساب', `مبلغ (${unit})`], rows: r.breakdown.map((b) => [b.accountCode, b.accountName, m(b.amount)]), totals: ['جمع', '', m(sumOf(r.breakdown.map((b) => b.amount)))] };
     case 'trial_balance':
       return {
         filename: 'trial-balance',
         headers: ['کد حساب', 'حساب', `گردش بدهکار (${unit})`, `گردش بستانکار (${unit})`, `مانده بدهکار (${unit})`, `مانده بستانکار (${unit})`],
         rows: r.trial.map((t) => [t.code, t.name, m(t.debit), m(t.credit), m(t.debitBalance), m(t.creditBalance)]),
+        totals: ['جمع', '', m(r.trialTotals.debit), m(r.trialTotals.credit), m(sumOf(r.trial.map((t) => t.debitBalance))), m(sumOf(r.trial.map((t) => t.creditBalance)))],
       };
     case 'income_statement': {
       const i = r.incomeStatement;
@@ -131,6 +133,36 @@ export function financialReportCsv(kind: FinancialReportKind, r: ReturnType<type
         filename: 'journal',
         headers: ['شماره سند', 'تاریخ', 'نوع', 'شرح', 'کد حساب', 'حساب', `بدهکار (${unit})`, `بستانکار (${unit})`],
         rows: r.finals.flatMap((j) => j.rows.map((row) => [j.docNumber, j.date, j.type, j.title, row.accountCode, row.accountName, m(row.debit), m(row.credit)])),
+        totals: ['جمع', '', '', '', '', '', m(sumOf(r.finals.map((j) => j.totalDebit))), m(sumOf(r.finals.map((j) => j.totalCredit)))],
       };
   }
+}
+
+/** «گزارش پروژه‌ها»: the rows and totals of the printed project report. */
+export function projectsReportCsv(projects: readonly Project[]): CsvTable {
+  const unit = moneyUnitLabel();
+  return {
+    filename: 'گزارش_پروژه‌ها.csv',
+    headers: ['کد', 'پروژه', 'کارفرما', `مبلغ قرارداد (${unit})`, `کارکرد (${unit})`, `هزینه (${unit})`, `سود (${unit})`, 'حاشیه سود ٪', `مطالبات (${unit})`, 'وضعیت'],
+    rows: projects.map((p) => [p.code, p.name, p.client, m(p.contractAmount), m(p.recordedRevenue), m(p.cost), m(p.profit), p.profitMargin.toFixed(1), m(p.receivables), p.status]),
+    totals: ['جمع', '', '', m(sumOf(projects.map((p) => p.contractAmount))), m(sumOf(projects.map((p) => p.recordedRevenue))), m(sumOf(projects.map((p) => p.cost))), m(sumOf(projects.map((p) => p.profit))), '', m(sumOf(projects.map((p) => p.receivables))), ''],
+  };
+}
+
+/** «گزارش مدیریتی»: profitability and variance of each project (the BI screen's table). */
+export function biProjectsCsv(projects: readonly Project[]): CsvTable {
+  const unit = moneyUnitLabel();
+  const rows = projects.map((p) => {
+    const profit = p.recordedRevenue - p.actualCost;
+    return {
+      cells: [p.code, p.name, m(p.contractAmount), m(p.recordedRevenue), m(p.actualCost), m(profit), p.recordedRevenue ? ((profit * 100) / p.recordedRevenue).toFixed(1) : '0.0', m(p.budget - p.actualCost), `${p.physicalProgress}`, `${p.financialProgress}`] as (string | number)[],
+      profit,
+    };
+  });
+  return {
+    filename: 'گزارش_مدیریتی_پروژه‌ها.csv',
+    headers: ['کد', 'پروژه', `مبلغ قرارداد (${unit})`, `درآمد تأییدشده (${unit})`, `بهای تمام‌شده (${unit})`, `سود ناخالص (${unit})`, 'حاشیه سود ٪', `انحراف بودجه (${unit})`, 'پیشرفت فیزیکی ٪', 'پیشرفت مالی ٪'],
+    rows: rows.map((r) => r.cells),
+    totals: ['جمع', '', m(sumOf(projects.map((p) => p.contractAmount))), m(sumOf(projects.map((p) => p.recordedRevenue))), m(sumOf(projects.map((p) => p.actualCost))), m(sumOf(rows.map((r) => r.profit))), '', m(sumOf(projects.map((p) => p.budget - p.actualCost))), '', ''],
+  };
 }

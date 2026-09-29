@@ -59,6 +59,8 @@ export function selectPettyCashDashboard(accounts: readonly PettyCashAccount[], 
     totalPendingExpenses: sumBy(accounts, (a) => a.pendingExpenses),
     totalUsableBalance,
     totalMonthlySpent: sumBy(accounts, (a) => a.monthlySpent),
+    /** Projects the funds serve (headquarters funds count as none). */
+    projectCount: new Set(accounts.map((a) => a.projectId).filter(Boolean)).size,
     /** Usable balance as a share of the book balance. */
     usablePercent: percentOf(totalUsableBalance, totalActualBalance || 1),
     lowBalanceAccounts: accounts.filter((a) => isLowBalance(a) && a.status === 'active'),
@@ -241,4 +243,10 @@ export function pettyReportFigures(state: AppState, expenses: readonly PettyCash
 /** A new expense category (edited in the settings screen, saved by updatePettyCashCategories). */
 export function newPettyCategory(name: string): PettyCashCategoryItem {
   return { id: generateUUID(), name: name.trim(), subcategories: [] };
+}
+
+/** «صورتجلسه تسویه» of one fund: its approved expenses (all of them, oldest first) and their total. */
+export function pettySettlementSheet(expenses: readonly PettyCashExpense[], fundId: string | undefined) {
+  const rows = expenses.filter((e) => e.pettyCashId === fundId && isPettyApproved(e)).slice().reverse();
+  return { rows, total: sumBy(rows, (e) => e.amount) };
 }

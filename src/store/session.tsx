@@ -5,11 +5,12 @@
 
 import React, { createContext, useCallback, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CompanyProfile, UserProfile } from '../types';
+import { CompanyProfile, ReportSettings, UserProfile } from '../types';
 import type { PortalSession } from '../api/types';
 import { DEFAULT_PREFERENCES, type AccountApi, type AccountPreferences } from '../api/account';
 import type { AssistantApi } from '../api/assistant';
 import type { DocumentApi } from '../api/documents';
+import type { PrintApi } from '../api/print';
 import type { CurrencyUnit } from '../utils/money';
 import { ActionContext, can, checkPermission, PermissionCheck, UserAction } from '../utils/permissions';
 import { matchNav } from '../navigation/navConfig';
@@ -22,6 +23,8 @@ export interface SessionPatch {
   preferences?: AccountPreferences;
   /** New display unit (the screens are drawn again with it). */
   currency?: CurrencyUnit;
+  /** Saved «تنظیمات گزارش و چاپ» (letterhead and signatories of every print). */
+  reportSettings?: ReportSettings;
 }
 
 interface SessionValue {
@@ -44,6 +47,8 @@ interface SessionValue {
   logoutUrl?: string;
   /** Document center API of the data source. */
   documents?: DocumentApi;
+  /** «تنظیمات گزارش و چاپ» and signature slots of printed records. */
+  print?: PrintApi;
   updateSession?: (patch: SessionPatch) => void;
 }
 

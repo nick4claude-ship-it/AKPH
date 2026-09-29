@@ -195,6 +195,59 @@ export interface CompanyProfile {
   legalName: string;
   nationalId?: string;
   registrationNumber?: string;
+  economicCode?: string;
+  address?: string;
+  phone?: string;
+  /** Uploaded letterhead logo («تنظیمات گزارش و چاپ»); none: the letterhead shows the name only. */
+  logoUrl?: string | null;
+}
+
+/** Report types with their own signatories («تنظیمات گزارش و چاپ», akph/v1 GET /report-settings). */
+export type ReportType =
+  | 'projects'
+  | 'management'
+  | 'financial'
+  | 'journal_entry'
+  | 'petty_cash'
+  | 'petty_expense'
+  | 'payment_request'
+  | 'receipt'
+  | 'contracts'
+  | 'client_statement'
+  | 'subcontractor_statement'
+  | 'purchase_order'
+  | 'inventory'
+  | 'payroll';
+
+/** A signature position: a title and, optionally, a portal user or a name typed by hand. */
+export interface SignatorySlot {
+  title: string;
+  userId: string | null;
+  /** The user's display name, or the typed name; '' leaves only the title and the signature line. */
+  name: string;
+}
+
+export interface ReportTypeInfo {
+  key: ReportType;
+  label: string;
+  /** Records with an approval workflow sign from the server's approval history first. */
+  workflow: boolean;
+}
+
+export interface ReportSettings {
+  company: CompanyProfile;
+  signatories: Partial<Record<ReportType, SignatorySlot[]>>;
+  reportTypes: ReportTypeInfo[];
+  version: number;
+}
+
+/** One signature box of a printed report. */
+export interface PrintSignature {
+  title: string;
+  name: string;
+  /** ISO time of the approval; null when not signed yet. */
+  at: string | null;
+  signed: boolean;
 }
 
 export type TimeRange = 'this_month' | 'last_3_months' | 'last_6_months' | 'current_year' | 'custom';

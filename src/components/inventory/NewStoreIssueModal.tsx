@@ -204,7 +204,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
                   type="text"
                   value={subcontractorName}
                   onChange={(e) => setSubcontractorName(e.target.value)}
-                  placeholder="مثلاً: اکیپ آرماتوربندی کریم صفری"
+                  placeholder="نام اکیپ یا سرگروه تحویل‌گیرنده"
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
                 />
               </div>

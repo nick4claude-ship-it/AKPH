@@ -202,7 +202,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 type="text"
                 value={consultant}
                 onChange={(e) => setConsultant(e.target.value)}
-                placeholder="مثال: مهندسین مشاور سازه‌اندیش"
+                placeholder="نام شرکت مهندسین مشاور"
                 className="w-full p-2 rounded-lg border border-slate-300"
               />
             </div>

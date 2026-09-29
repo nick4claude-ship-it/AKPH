@@ -22,6 +22,7 @@ const ALLOWED_MODULES = {
   'src/store/useAssistant': {},
   'src/store/useAccount': {},
   'src/store/useAvatarCrop': {},
+  'src/store/usePrint': {},
   'src/store/pagination': {},
   'src/store/useDocuments': {},
   'src/store/documents': { names: ['DOCUMENT_CATEGORIES', 'ACCEPT_ATTRIBUTE', 'defaultCategoryFor', 'sameEntity'] },

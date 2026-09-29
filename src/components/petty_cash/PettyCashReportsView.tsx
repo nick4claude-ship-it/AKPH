@@ -21,7 +21,9 @@ import {
   Project,
 } from '../../types';
 import { useSelector } from '../../store/AppStore';
-import { pettyReportFigures } from '../../store/views/pettyCash';
+import { pettyReportFigures, pettySettlementSheet } from '../../store/views/pettyCash';
+import { OfficialPrint, moneyHeader } from '../common/OfficialPrint';
+import { EmptyState } from '../common/EmptyState';
 import { formatCurrency, formatNumber, formatPercent, formatDecimal, formatText } from '../../utils/formatters';
 import { toPersianDate } from '../../utils/date';
 import { Dialog } from '../../ui/Dialog';
@@ -62,6 +64,8 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
   const report = useSelector((s) => pettyReportFigures(s, expenses), [expenses]);
   const { missingDocsExpenses, rejectedExpenses, categoryRows } = report;
   const lastReconciliation = reconciliations.find((r) => r.pettyCashId === selectedAccount?.id);
+  const sheet = pettySettlementSheet(expenses, selectedAccount?.id);
+  const needsAccount = selectedReportType === 'statement' || selectedReportType === 'reconciliation_sheet';
 
   // Trigger print
   const handlePrint = () => {
@@ -84,7 +88,8 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPrintModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-lg transition-colors shadow-xs"
+            disabled={!selectedAccount}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-lg transition-colors shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Printer className="w-4 h-4 text-amber-400" />
             نمایش نسخه چاپی و PDF رسمی
@@ -170,8 +175,11 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
 
       {/* REPORT CONTENT AREA */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        {needsAccount && !selectedAccount && (
+          <EmptyState title="تنخواهی ثبت نشده است" description="پس از تعریف تنخواه‌گردان، صورت گردش و صورتجلسه تسویه آن از دفاتر ساخته می‌شود." />
+        )}
         {/* REPORT 1: STATEMENT OF ACCOUNT */}
-        {selectedReportType === 'statement' && (
+        {selectedReportType === 'statement' && selectedAccount && (
           <div>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
@@ -396,7 +404,7 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
         )}
 
         {/* REPORT 5: RECONCILIATION SHEET (صورتجلسه تسویه) */}
-        {selectedReportType === 'reconciliation_sheet' && (
+        {selectedReportType === 'reconciliation_sheet' && selectedAccount && (
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
@@ -439,157 +447,99 @@ export const PettyCashReportsView: React.FC<PettyCashReportsViewProps> = ({
               </div>
             </div>
 
-            {/* Reconciliation Signature Matrix Preview */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
-              <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-sm font-bold text-slate-700 block">تنخواه‌دار / کارپرداز</span>
-                <span className="text-xs text-slate-500 block">{formatText(selectedAccount.holderName)}</span>
-              </div>
-              <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-sm font-bold text-slate-700 block">سرپرست / مدیر پروژه</span>
-                <span className="text-xs text-slate-500 block">مهندس ناظر پروژه</span>
-              </div>
-              <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-sm font-bold text-slate-700 block">مدیر امور مالی</span>
-                <span className="text-xs text-slate-500 block">دکتر صمدیان</span>
-              </div>
-              <div className="border border-slate-200 rounded-xl p-3 text-center space-y-8 bg-white">
-                <span className="text-sm font-bold text-slate-700 block">مدیرعامل</span>
-                <span className="text-xs text-slate-500 block">مهندس رادمنش</span>
-              </div>
-            </div>
+            <p className="text-xs text-slate-500 border-t border-slate-200 pt-4">
+              جایگاه‌های امضای صورتجلسه از «تنظیمات گزارش و چاپ» (مدیر سیستم) خوانده می‌شود؛ نام‌ها فقط وقتی چاپ می‌شوند که در آن‌جا انتخاب شده باشند.
+            </p>
           </div>
         )}
       </div>
 
-      {/* Official Print/PDF Modal (Prompt Section 25 & 16) */}
-      {isPrintModalOpen && (
-        <Dialog onClose={() => setIsPrintModalOpen(false)} label="پیش‌نمایش چاپ گزارش تنخواه" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 print:shadow-none print:border-none print:m-0 print:p-0">
-          
-            {/* Modal Print Toolbar */}
-            <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl flex items-center justify-between print:hidden">
-              <div className="text-sm font-bold text-slate-800">
-                پیش‌نمایش فرم چاپی و خروجی رسمی صورتجلسه تنخواه
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePrint}
-                  className="btn btn-secondary"
-                >
-                  <Printer className="w-4 h-4 text-amber-400" />
-                  چاپ یا ذخیره PDF
-                </button>
-                <button
-                  onClick={() => setIsPrintModalOpen(false)}
-                  className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* Official print: letterhead, signatories and footer from «تنظیمات گزارش و چاپ» */}
+      {isPrintModalOpen && selectedAccount && (
+        <Dialog onClose={() => setIsPrintModalOpen(false)} label="پیش‌نمایش چاپ صورتجلسه تنخواه" overlayClassName="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200">
+          <div className="p-4 border-b border-slate-200 bg-slate-50 rounded-t-2xl flex items-center justify-between no-print">
+            <div className="text-sm font-bold text-slate-800">پیش‌نمایش چاپ رسمی صورتجلسه تنخواه</div>
+            <div className="flex items-center gap-2">
+              <button onClick={handlePrint} className="btn btn-secondary">
+                <Printer className="w-4 h-4 text-amber-400" />
+                چاپ یا ذخیره PDF
+              </button>
+              <button onClick={() => setIsPrintModalOpen(false)} aria-label="بستن" className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-
-            {/* Official Formal Document Layout */}
-            <div className="p-8 space-y-6 text-slate-900 bg-white" id="printable-reconciliation">
-              {/* Header Letterhead */}
-              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
-                <div>
-                  <h1 className="text-lg font-bold text-slate-950">
-                    شرکت مهندسی و پیمانکاری سازه گستر پیشرو
-                  </h1>
-                  <h2 className="text-sm font-bold text-slate-600 mt-1">
-                    سامانه جامع مدیریت مالی و پروژه‌های عمرانی
-                  </h2>
-                </div>
-
-                <div className="text-center font-bold text-sm bg-slate-100 px-4 py-2 rounded-lg border border-slate-300">
-                  صورتجلسه تسویه دوره‌ای و تطبیق تنخواه‌گردان
-                </div>
-
-                <div className="text-left text-sm space-y-1 tabular-nums">
-                  <div>شماره مدرک: {lastReconciliation?.reconNumber ?? '—'}</div>
-                  <div>تاریخ تنظیم: {toPersianDate(new Date())}</div>
-                  <div>پیوست: دارد</div>
-                </div>
-              </div>
-
-              {/* Account Profile Table */}
-              <div className="border border-slate-300 rounded-lg overflow-hidden text-sm">
-                <div className="grid grid-cols-2 md:grid-cols-4 bg-slate-50 font-bold p-2 border-b border-slate-300">
-                  <div>عنوان تنخواه: {formatText(selectedAccount.title)}</div>
-                  <div>کد تنخواه: {formatText(selectedAccount.code)}</div>
-                  <div>پروژه: {formatText(selectedAccount.projectName)}</div>
-                  <div>مسئول: {formatText(selectedAccount.holderName)}</div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 p-2">
-                  <div>سقف مصوب: {formatCurrency(selectedAccount.ceilingLimit)}</div>
-                  <div>موجودی واقعی: {formatCurrency(selectedAccount.actualBalance)}</div>
-                  <div>تعهدات در انتظار: {formatCurrency(selectedAccount.pendingExpenses)}</div>
-                  <div>مانده آزاد قابل مصرف: {formatCurrency(selectedAccount.usableBalance)}</div>
-                </div>
-              </div>
-
-              {/* Expenses breakdown table in Print */}
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-2">
-                  سیاهه هزینه‌های مصوب تنخواه در دوره مالی شهریور ۱۴۰۳:
-                </h4>
-                <div className="table-scroll"><table className="w-full text-right text-sm border border-slate-300">
-                  <thead className="bg-slate-100 border-b border-slate-300 font-bold">
-                    <tr>
-                      <th className="p-2 border-l border-slate-300">ردیف</th>
-                      <th className="p-2 border-l border-slate-300">شماره هزینه</th>
-                      <th className="p-2 border-l border-slate-300">تاریخ</th>
-                      <th className="p-2 border-l border-slate-300">سرفصل</th>
-                      <th className="p-2 border-l border-slate-300">فروشنده</th>
-                      <th className="p-2 border-l border-slate-300">شرح خرید</th>
-                      <th className="p-2 text-left">مبلغ ({moneyUnitLabel()})</th>
+          </div>
+          <div className="p-4 sm:p-8">
+            <OfficialPrint
+              reportType="petty_cash"
+              title="صورتجلسه تسویه دوره‌ای و تطبیق تنخواه‌گردان"
+              number={lastReconciliation?.reconNumber}
+              money
+              preview={sheet.rows.length === 0}
+              filters={[
+                { label: 'تنخواه', value: `${selectedAccount.title} (${selectedAccount.code})` },
+                { label: 'پروژه', value: selectedAccount.projectName || 'ستاد' },
+                { label: 'مسئول', value: selectedAccount.holderName },
+              ]}
+            >
+              <table className="mb-4">
+                <thead>
+                  <tr>
+                    <th>{moneyHeader('سقف مصوب')}</th>
+                    <th>{moneyHeader('موجودی دفتری')}</th>
+                    <th>{moneyHeader('در انتظار تأیید')}</th>
+                    <th>{moneyHeader('مانده قابل مصرف')}</th>
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  <tr>
+                    <td><Money rial={selectedAccount.ceilingLimit} unit={false} /></td>
+                    <td><Money rial={selectedAccount.actualBalance} unit={false} /></td>
+                    <td><Money rial={selectedAccount.pendingExpenses} unit={false} /></td>
+                    <td><Money rial={selectedAccount.usableBalance} unit={false} /></td>
+                  </tr>
+                </tbody>
+              </table>
+              <table>
+                <thead>
+                  <tr>
+                    <th>ردیف</th>
+                    <th>شماره هزینه</th>
+                    <th>تاریخ</th>
+                    <th>سرفصل</th>
+                    <th>فروشنده</th>
+                    <th>شرح</th>
+                    <th>{moneyHeader('مبلغ')}</th>
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {sheet.rows.map((exp, idx) => (
+                    <tr key={exp.id}>
+                      <td>{formatDecimal(idx + 1)}</td>
+                      <td>{formatText(exp.expenseNumber)}</td>
+                      <td>{formatText(exp.date)}</td>
+                      <td>{formatText(exp.category)}</td>
+                      <td>{formatText(exp.vendor)}</td>
+                      <td>{formatText(exp.description)}</td>
+                      <td><Money rial={exp.amount} unit={false} /></td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {accountExpenses.slice(0, 6).map((exp, idx) => (
-                      <tr key={exp.id}>
-                        <td className="p-2 border-l border-slate-200 text-center tabular-nums">
-                          {formatDecimal(idx + 1)}
-                        </td>
-                        <td className="p-2 border-l border-slate-200 tabular-nums text-sm">
-                          {formatText(exp.expenseNumber)}
-                        </td>
-                        <td className="p-2 border-l border-slate-200">{formatText(exp.date)}</td>
-                        <td className="p-2 border-l border-slate-200">{formatText(exp.category)}</td>
-                        <td className="p-2 border-l border-slate-200">{formatText(exp.vendor)}</td>
-                        <td className="p-2 border-l border-slate-200">{formatText(exp.description)}</td>
-                        <td className="p-2 text-left font-bold tabular-nums">
-                          <Money rial={exp.amount} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table></div>
-              </div>
-
-              {/* Settlement Signatures */}
-              <div className="pt-8">
-                <div className="grid grid-cols-4 gap-4 text-center text-sm">
-                  <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
-                    <span className="font-bold text-slate-800">امضای تنخواه‌دار</span>
-                    <span className="text-xs text-slate-500">{formatText(selectedAccount.holderName)}</span>
-                  </div>
-                  <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
-                    <span className="font-bold text-slate-800">امضای مدیر پروژه</span>
-                    <span className="text-xs text-slate-500">مهندس ناظر کارگاه</span>
-                  </div>
-                  <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
-                    <span className="font-bold text-slate-800">امضای مدیر امور مالی</span>
-                    <span className="text-xs text-slate-500">دکتر صمدیان</span>
-                  </div>
-                  <div className="border border-slate-300 rounded-lg p-3 h-28 flex flex-col justify-between">
-                    <span className="font-bold text-slate-800">امضای مدیرعامل</span>
-                    <span className="text-xs text-slate-500">مهندس رادمنش</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Dialog>
+                  ))}
+                  {sheet.rows.length === 0 && (
+                    <tr>
+                      <td colSpan={7}>هزینه تأییدشده‌ای برای این تنخواه ثبت نشده است.</td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="font-bold">
+                    <td colSpan={6}>جمع هزینه‌های تأییدشده</td>
+                    <td><Money rial={sheet.total} unit={false} /></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </OfficialPrint>
+          </div>
+        </Dialog>
       )}
     </div>
   );

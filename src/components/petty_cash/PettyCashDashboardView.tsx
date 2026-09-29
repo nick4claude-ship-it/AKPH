@@ -23,7 +23,7 @@ import {
   PettyCashReplenishmentRequest,
   PettyCashSubTab,
 } from '../../types';
-import { barWidth, formatCurrency, formatNumber, formatDecimal, formatPercent, formatText } from '../../utils/formatters';
+import { barWidth, formatCurrency, formatNumber, formatDecimal, formatPercent, formatText, formatInt } from '../../utils/formatters';
 import { selectPettyCashDashboard } from '../../store/views/pettyCash';
 import { Money } from '../common/Money';
 
@@ -215,10 +215,10 @@ export const PettyCashDashboardView: React.FC<PettyCashDashboardViewProps> = ({
             <div className="text-xl font-bold text-slate-900 tabular-nums">
               <Money rial={totalMonthlySpent} />
             </div>
-            <div className="text-xs text-slate-500 mt-1">مصارف تاییدشده شهریور ۱۴۰۳</div>
+            <div className="text-xs text-slate-500 mt-1">مصارف تأییدشده ماه جاری</div>
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-sm text-blue-700 font-medium">
-            <span>تخصیص به ۵ پروژه</span>
+            <span>{`تخصیص به ${formatInt(dash.projectCount)} پروژه`}</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </div>
         </div>

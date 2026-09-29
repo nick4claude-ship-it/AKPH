@@ -17,6 +17,7 @@ import { apiClient, ApiError } from '../client';
 import { createAkphAccountApi } from './account';
 import { createAkphAssistantApi } from './assistant';
 import { createAkphDocumentApi, loadDocuments } from './documents';
+import { createAkphPrintApi } from './print';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
   parseApprovals,
@@ -83,6 +84,8 @@ const WRITABLE_PATHS = [
   '/finance/banks',
   '/finance/cash',
   '/approvals',
+  // 0.6.1: settings (VAT, petty cash policy, «تنظیمات گزارش و چاپ»).
+  '/settings',
 ];
 
 const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
@@ -95,6 +98,7 @@ const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
   }
 };
 
+/** Letterhead before the report settings are read (or when they cannot be): the site name, nothing else. */
 function siteCompany(): CompanyProfile {
   const name = window.AkphPortal?.siteName?.trim() || 'پرتال مدیریت پیمانکاری';
   return { name, legalName: name };
@@ -150,7 +154,14 @@ function toRecords(raw: unknown, state: AppState): Records {
   if (Array.isArray(records.receipts)) push('receipts', records.receipts.map((r) => as(parseReceipt(r, fl))));
   if (Array.isArray(records.cheques)) push('treasuryChecks', records.cheques.map((c) => as(parseCheque(c, fl))));
   if (Array.isArray(records.bank_statement_lines)) push('bankReconciliations', records.bank_statement_lines.map((l) => as(parseStatementLine(l))));
+  if (Array.isArray(records.treasury_settings) && records.treasury_settings[0]) out.push({ slice: 'financeSettings', replace: { ...state.financeSettings, ...parseFinanceSettings(records.treasury_settings[0]) } });
   return out;
+}
+
+/** Treasury settings of the server → the app's finance settings (VAT rate). */
+function parseFinanceSettings(raw: unknown): Partial<AppState['financeSettings']> {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return Number.isInteger(o.vat_rate_percent) ? { vatRatePercent: o.vat_rate_percent as number } : {};
 }
 
 const financeLookups = (state: Pick<AppState, 'projects' | 'costCenters'>): FinanceLookups => ({ projects: state.projects, costCenters: state.costCenters });
@@ -424,6 +435,12 @@ const COMMANDS: Record<string, Command> = {
     return result(await post(key, approve ? a.server.approvePath : a.server.rejectPath, approve ? { comment: (text as string) || '' } : { reason: text }, a.server.version), state);
   },
 
+  // ------------------------------------------------------------------ settings (0.6.1)
+  async updateFinanceSettings([patch], state, key) {
+    const p = patch as Partial<AppState['financeSettings']>;
+    return result(await post(key, 'treasury/settings', { vat_rate_percent: p.vatRatePercent }), state);
+  },
+
   async createAccount([form], state, key) {
     const f = form as AccountFormInput;
     const raw = await post(key, 'accounts', { code: f.code, title: f.title.trim(), level: LEVEL_KEYS[f.level], nature: NATURE_KEYS[f.nature], parent_code: f.parentCode || '' });
@@ -490,6 +507,7 @@ function loadFinance(partial: Pick<AppState, 'projects' | 'costCenters'>, pettyR
 }
 
 export function createAkphDataSource(): DataSource {
+  const printApi = createAkphPrintApi();
   const commands: CommandGateway = {
     supports: (action) => action in COMMANDS,
     serverValidated: (action) => SERVER_VALIDATED.has(action),
@@ -515,10 +533,12 @@ export function createAkphDataSource(): DataSource {
     account: createAkphAccountApi(),
     assistant: createAkphAssistantApi(),
     documents: createAkphDocumentApi(),
+    print: printApi,
 
     async loadSession(): Promise<PortalSession> {
-      const me = parseMe(await apiClient.get<unknown>('me'));
-      return { user: me.user, currency: me.currency, fiscalYear: me.fiscalYear, company: siteCompany(), closedFiscalYears: me.closedFiscalYears, preferences: me.preferences, documentMaxBytes: me.documentMaxBytes };
+      const [me, reportSettings] = await Promise.all([apiClient.get<unknown>('me').then(parseMe), printApi.settings().catch(() => undefined)]);
+      const company = reportSettings?.company.legalName ? reportSettings.company : siteCompany();
+      return { user: me.user, currency: me.currency, fiscalYear: me.fiscalYear, company, reportSettings, closedFiscalYears: me.closedFiscalYears, preferences: me.preferences, documentMaxBytes: me.documentMaxBytes };
     },
 
     async loadState(session: PortalSession): Promise<AppState> {
@@ -534,6 +554,7 @@ export function createAkphDataSource(): DataSource {
         optional(apiClient.get<unknown>('treasury'), null),
         apiClient.get<unknown>('approvals'),
       ]);
+      const treasurySettings = await optional(apiClient.get<unknown>('treasury/settings'), null);
       const costCenters = arr('/cost-centers', obj('/cost-centers', centersRaw), 'cost_centers').map(parseCostCenter);
       const projects = arr('/projects', obj('/projects', projectsRaw), 'projects').map((p) => parseProject(p, costCenters));
       const counterparties = arr('/counterparties', obj('/counterparties', partiesRaw), 'counterparties').map(parseCounterparty);
@@ -549,7 +570,11 @@ export function createAkphDataSource(): DataSource {
         documents,
         auditLogs: audit,
         subledgers: subledgersOf(partial),
-        financeSettings: { ...base.financeSettings, closedFiscalYears: session.closedFiscalYears || [] },
+        financeSettings: {
+          ...base.financeSettings,
+          ...parseFinanceSettings(treasurySettings && typeof treasurySettings === 'object' ? (treasurySettings as { settings?: unknown }).settings : null),
+          closedFiscalYears: session.closedFiscalYears || [],
+        },
       };
     },
 

@@ -911,7 +911,7 @@ export const PaymentsTreasuryModule: React.FC<PaymentsTreasuryModuleProps> = ({
                 <label htmlFor="payments-treasury-module-6" className="block font-medium text-slate-700 mb-1">نام طرف حساب / ذینفع دریافت وجه:</label>
                 <input id="payments-treasury-module-6"
                   type="text"
-                  placeholder="مثال: شرکت آرمان بتن سازه / مهندس اکبری..."
+                  placeholder="نام ذی‌نفع (شخص یا شرکت)"
                   value={newRequestBeneficiary}
                   onChange={(e) => setNewRequestBeneficiary(e.target.value)}
                   required

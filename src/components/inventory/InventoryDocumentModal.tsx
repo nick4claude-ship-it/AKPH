@@ -21,6 +21,7 @@ import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { useCompany } from '../../store/session';
 import { formatDecimal, formatText } from '../../utils/formatters';
 import { Money } from '../common/Money';
+import { OfficialPrint } from '../common/OfficialPrint';
 
 interface InventoryDocumentModalProps {
   receipt: GoodsReceiptNote | null;
@@ -74,6 +75,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
             </button>
             <button
               onClick={onClose}
+              aria-label="بستن"
               className="p-1 rounded-lg text-slate-500 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -123,43 +125,30 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
           )}
         </div>
 
-        {/* Printable Official Document Body */}
-        <div className="p-8 overflow-y-auto space-y-6 text-sm text-slate-800 bg-white">
-          {/* Header */}
-          <div className="border-b-2 border-slate-900 pb-4 flex items-center justify-between">
-            <div className="text-right">
-              <h1 className="text-base font-bold text-slate-900">
-                {formatText(company.legalName)}
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">
-                سامانه مکانیزه انبارداری، مدیریت مصالح و زنجیره تأمین پروژه‌ها
-              </p>
-            </div>
-
-            <div className="text-center">
-              <h2 className="text-base font-bold text-slate-900 px-4 py-1 border-2 border-slate-900 rounded-lg">
-                {receipt ? 'قبض رسید ورود کالا و انبار (GRN)' : 'حواله خروج و مصرف کارگاهی کالا (SIV)'}
-              </h2>
-            </div>
-
-            <div className="text-left space-y-1 tabular-nums text-sm">
-              <div>
-                <span className="text-slate-500">شماره سند: </span>
-                <span className="font-bold">{receipt ? receipt.receiptNumber : issue?.issueNumber}</span>
-              </div>
-              <div>
-                <span className="text-slate-500">تاریخ: </span>
-                <span className="font-bold">{receipt ? receipt.date : issue?.date}</span>
-              </div>
-              <div>
-                <span className="text-slate-500">سند مالی: </span>
-                <span className="font-bold text-emerald-700">
-                  {receipt ? receipt.accountingJournalEntryId : issue?.accountingJournalEntryId || 'ثبت شده'}
-                </span>
-              </div>
-            </div>
-          </div>
-
+        {/* Official print (letterhead and signatories from «تنظیمات گزارش و چاپ») */}
+        <div className="p-4 sm:p-8 overflow-y-auto">
+          <OfficialPrint
+            reportType="inventory"
+            title={receipt ? 'قبض رسید ورود کالا به انبار' : 'حواله خروج و مصرف کارگاهی کالا'}
+            number={receipt ? receipt.receiptNumber : issue?.issueNumber}
+            money
+            localSignatures={
+              receipt
+                ? [
+                    { title: 'تحویل‌گیرنده (انباردار)', name: receipt.receiverName || '', at: null, signed: false },
+                    { title: 'کنترل کیفی', name: receipt.qcInspectorName || '', at: null, signed: false },
+                  ]
+                : [
+                    { title: 'تحویل‌دهنده (انباردار)', name: issue?.dispatchedByKeeperName || '', at: null, signed: false },
+                    { title: 'تحویل‌گیرنده کارگاه', name: issue?.receivedByCrewLeaderName || '', at: null, signed: false },
+                    { title: 'تأیید مدیر پروژه', name: issue?.approvedByManagerName || '', at: null, signed: false },
+                  ]
+            }
+            filters={[
+              { label: 'تاریخ', value: (receipt ? receipt.date : issue?.date) || '' },
+              { label: 'سند مالی', value: (receipt ? receipt.accountingJournalEntryId : issue?.accountingJournalEntryId) || 'ثبت نشده' },
+            ]}
+          >
           {/* Receipt Details */}
           {receipt && (
             <div className="space-y-4">
@@ -350,36 +339,7 @@ export const InventoryDocumentModal: React.FC<InventoryDocumentModalProps> = ({
             </div>
           )}
 
-          {/* Signatures Footer */}
-          <div className="pt-8 grid grid-cols-4 gap-4 text-center text-sm">
-            <div className="space-y-8">
-              <span className="font-bold text-slate-700 block">تحویل‌دهنده (انباردار)</span>
-              <span className="text-slate-500 text-xs block">
-                {receipt ? receipt.receiverName : issue?.dispatchedByKeeperName}
-              </span>
-            </div>
-
-            <div className="space-y-8">
-              <span className="font-bold text-slate-700 block">
-                {receipt ? 'کنترل کیفی و ناظر سازه' : 'تحویل‌گیرنده کارگاه'}
-              </span>
-              <span className="text-slate-500 text-xs block">
-                {receipt ? receipt.qcInspectorName : issue?.receivedByCrewLeaderName}
-              </span>
-            </div>
-
-            <div className="space-y-8">
-              <span className="font-bold text-slate-700 block">مدیر پروژه / کارگاه</span>
-              <span className="text-slate-500 text-xs block">
-                {formatText(issue?.approvedByManagerName || 'مهندس کیارش نادری')}
-              </span>
-            </div>
-
-            <div className="space-y-8">
-              <span className="font-bold text-slate-700 block">تأیید حسابداری و مالی</span>
-              <span className="text-slate-500 text-xs block">دکتر هادی صمدیان</span>
-            </div>
-          </div>
+          </OfficialPrint>
         </div>
       </Dialog>
   );

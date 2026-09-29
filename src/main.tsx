@@ -61,6 +61,8 @@ function Root() {
               user: { ...b.session.user, ...patch.user },
               preferences: patch.preferences ?? b.session.preferences,
               currency: patch.currency ?? b.session.currency,
+              reportSettings: patch.reportSettings ?? b.session.reportSettings,
+              company: patch.reportSettings ? patch.reportSettings.company : b.session.company,
             },
           }
         : b
@@ -96,6 +98,7 @@ function Root() {
         logoutUrl={typeof window !== 'undefined' ? window.AkphPortal?.logoutUrl : undefined}
         assistant={boot.source.assistant}
         documents={boot.source.documents}
+        print={boot.source.print}
         updateSession={updateSession}
         devUsers={devUsers}
         switchUser={devUsers ? (userId) => load(userId, { source: boot.source, epoch: boot.epoch }) : undefined}

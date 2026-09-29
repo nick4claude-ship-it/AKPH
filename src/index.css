@@ -325,8 +325,163 @@
   }
 }
 
+/* Official print layout (src/components/common/OfficialPrint.tsx): the same document on screen (preview) and on paper. */
+.official-print {
+  font-family: 'Vazirmatn Variable', Vazirmatn, sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.official-print-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.official-print-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+.official-print-title {
+  text-align: center;
+}
+.official-print-preview {
+  display: inline-block;
+  margin-top: 4px;
+  border: 1px dashed #b45309;
+  color: #92400e;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.official-print-facts {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+.official-print-facts div {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.official-print-facts dt {
+  color: #475569;
+}
+.official-print-facts dd {
+  font-weight: 700;
+}
+.official-print-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.official-print-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.official-print-content th,
+.official-print-content td {
+  border: 1px solid #cbd5e1;
+  padding: 4px 6px;
+}
+.official-print-content thead th {
+  background: #f1f5f9;
+  font-weight: 700;
+}
+.official-print-signatures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+  text-align: center;
+  break-inside: avoid;
+}
+.official-print-signer {
+  min-height: 24px;
+  font-size: 13px;
+}
+.official-print-line {
+  border-bottom: 1px solid #0f172a;
+  height: 36px;
+  margin: 0 12px 4px;
+}
+.official-print-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  border-top: 1px solid #cbd5e1;
+  padding-top: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+.official-print-portal {
+  display: none;
+}
+
 /* Print styles for official PDF export */
+@page {
+  size: A4 portrait;
+  margin: 14mm 12mm 18mm;
+  @bottom-center {
+    content: 'صفحه ' counter(page, persian) ' از ' counter(pages, persian);
+    font-family: 'Vazirmatn Variable', Vazirmatn, sans-serif;
+    font-size: 9pt;
+    color: #475569;
+  }
+  @bottom-left {
+    font-family: 'Vazirmatn Variable', Vazirmatn, sans-serif;
+    font-size: 9pt;
+    color: #475569;
+  }
+}
+@page landscape {
+  size: A4 landscape;
+}
 @media print {
+  /* An official document is open: only its copy under <body> is printed (no menu, button or dialog). */
+  body:has(> .official-print-portal) > :not(.official-print-portal) {
+    display: none !important;
+  }
+  .official-print-portal {
+    display: block !important;
+    direction: rtl;
+  }
+  .official-print-portal[data-orientation='landscape'] {
+    page: landscape;
+  }
+  .official-print-portal .official-print-foot {
+    display: none;
+  }
+  .official-print thead {
+    display: table-header-group;
+  }
+  /* Totals print once, after the last row (not repeated on every page). */
+  .official-print tfoot {
+    display: table-row-group;
+  }
+  .official-print tr,
+  .official-print-signatures {
+    break-inside: avoid;
+  }
+  .official-print .table-scroll {
+    overflow: visible;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   body {
     background: white !important;
     color: black !important;
