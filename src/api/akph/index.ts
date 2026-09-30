@@ -11,13 +11,15 @@ import type { AccountFormInput, CostCenterFormInput, CounterpartyFormInput, Proj
 import type { PettyExpenseFormInput } from '../../store/views/pettyCash';
 import { fundTypeForHolderRole } from '../../store/views/pettyCash';
 import type { ManualPaymentRequestInput, PaymentFormInput } from '../../store/views/treasury';
-import type { NewPettyFundInput, TreasuryAccountInput, TreasuryTransferInput } from '../../store/recordWorkflows';
+import type { EmployerApprovalFields, GuaranteeInput, NewAmendmentInput, NewClientContractInput, NewPettyFundInput, NewSubcontractInput, TreasuryAccountInput, TreasuryTransferInput } from '../../store/recordWorkflows';
+import type { ClientStatementFormInput, SubcontractorStatementFormInput } from '../../store/views/contracts';
 import type { PaymentInput, ReceiptInput } from '../../store/workflows';
 import { apiClient, ApiError } from '../client';
 import { createAkphAccountApi } from './account';
 import { createAkphAssistantApi } from './assistant';
 import { createAkphDocumentApi, loadDocuments } from './documents';
 import { createAkphPrintApi } from './print';
+import { contractSlices, qtyString, statementSlices } from './contracts';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
   parseApprovals,
@@ -86,6 +88,9 @@ const WRITABLE_PATHS = [
   '/approvals',
   // 0.6.1: settings (VAT, petty cash policy, «تنظیمات گزارش و چاپ»).
   '/settings',
+  // 0.7.0: client contracts, subcontracts and their progress statements.
+  '/contracts',
+  '/statements',
 ];
 
 const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
@@ -154,6 +159,18 @@ function toRecords(raw: unknown, state: AppState): Records {
   if (Array.isArray(records.receipts)) push('receipts', records.receipts.map((r) => as(parseReceipt(r, fl))));
   if (Array.isArray(records.cheques)) push('treasuryChecks', records.cheques.map((c) => as(parseCheque(c, fl))));
   if (Array.isArray(records.bank_statement_lines)) push('bankReconciliations', records.bank_statement_lines.map((l) => as(parseStatementLine(l))));
+  if (Array.isArray(records.contracts)) {
+    const c = contractSlices(records.contracts);
+    push('contracts', c.contracts.map(as));
+    push('subcontractorContracts', c.subcontractorContracts.map(as));
+    push('contractBoq', c.contractBoq.map(as));
+    push('contractAmendments', c.contractAmendments.map(as));
+  }
+  if (Array.isArray(records.statements)) {
+    const st = statementSlices(records.statements);
+    push('clientStatements', st.clientStatements.map(as));
+    push('subcontractorStatements', st.subcontractorStatements.map(as));
+  }
   if (Array.isArray(records.treasury_settings) && records.treasury_settings[0]) out.push({ slice: 'financeSettings', replace: { ...state.financeSettings, ...parseFinanceSettings(records.treasury_settings[0]) } });
   return out;
 }
@@ -272,6 +289,30 @@ async function reconcileLine(key: string, state: AppState, itemId: string) {
     .find((l) => l.direction === direction && l.amount === item.amount);
   if (candidate) return result(await post(key, `bank-statement-lines/${itemId}/match`, { ledger_line_id: String(candidate.line_id) }, item.version), state);
   return result(await post(key, `bank-statement-lines/${itemId}/voucher`, {}, item.version), state);
+}
+
+
+/** Common fields of a new contract (client or subcontract); the amount is the server's total of the lines. */
+function contractBody(contractNo: string, title: string, projectId: string, dates: { contractDate?: string; startDate?: string; endDate?: string }, description: string, lines: readonly { code: string; description: string; unit: string; quantity: number; rate: number }[]) {
+  return {
+    contract_no: contractNo.trim(),
+    title: title.trim(),
+    project_id: projectId,
+    contract_date: isoOrUndefined(dates.contractDate),
+    start_date: isoOrUndefined(dates.startDate),
+    end_date: isoOrUndefined(dates.endDate),
+    description: description || '',
+    lines: lines
+      .filter((l) => l.description.trim() || l.quantity || l.rate)
+      .map((l) => ({ code: l.code.trim(), description: l.description.trim(), unit: l.unit.trim(), quantity: qtyString(l.quantity), rate: l.rate })),
+  };
+}
+
+/** Version of a client contract or subcontract (409 when it changed meanwhile). */
+function contractVersion(state: AppState, id: string): number {
+  const c = [...state.contracts, ...state.subcontractorContracts].find((x) => x.id === id);
+  if (!c?.server) throw new ApiError(409, 'Unknown contract', 'قرارداد در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
+  return c.server.version;
 }
 
 /** Commands; each key is the reference workflow (src/store) whose effect the server now performs. */
@@ -400,6 +441,8 @@ const COMMANDS: Record<string, Command> = {
       payer_name: party ? undefined : r.description?.trim() || 'واریزکننده',
       project_id: r.projectId || undefined,
       account_id: r.bankAccountId,
+      statement_id: r.sourceType === 'صورت‌وضعیت کارفرما' ? r.statementId || undefined : undefined,
+      contract_id: r.sourceType === 'پیش‌پرداخت' ? r.contractId || undefined : undefined,
       method,
       tracking: method === 'cheque' ? '' : r.trackingNumber,
       cheque_number: method === 'cheque' ? r.trackingNumber : undefined,
@@ -427,12 +470,151 @@ const COMMANDS: Record<string, Command> = {
     return result(await post(key, `treasury/accounts/${bankId}/statement`, { csv }), state);
   },
 
+
+  // ------------------------------------------------------------------ contracts and statements (0.7.0)
+  async createClientContract([input], state, key) {
+    const f = input as NewClientContractInput;
+    const project = state.projects.find((p) => p.id === f.projectId);
+    const party = state.counterparties.find((c) => c.kind === 'client' && c.name.trim() === f.employer.trim());
+    const body = {
+      kind: 'client',
+      ...contractBody(f.number, f.projectTitle, f.projectId, { contractDate: f.contractDate, startDate: f.startDate, endDate: f.endDate }, f.description, f.lines || []),
+      cost_center_id: project?.costCenterIds?.[0] || undefined,
+      counterparty_id: party?.id || project?.clientId || '',
+      duration_days: Math.max(0, Math.round(f.durationMonths * 30)),
+      advance_pct: f.advancePaymentPercentage,
+      retention_pct: f.retentionPercentage,
+      insurance_pct: f.insurancePercentage || 0,
+      tax_pct: f.taxPercentage || 0,
+      other_pct: f.otherPercentage || 0,
+      adjustment_base_index: f.adjustmentBaseIndex ? f.adjustmentBaseIndex : undefined,
+      adjustment_factor_pct: f.adjustmentBaseIndex ? f.adjustmentFactorPercentage || undefined : undefined,
+    };
+    return result(await post(key, 'contracts', body), state);
+  },
+  async createSubcontractorContract([input], state, key) {
+    const f = input as NewSubcontractInput;
+    const project = state.projects.find((p) => p.id === f.projectId);
+    const party = f.counterpartyId
+      ? state.counterparties.find((c) => c.id === f.counterpartyId)
+      : state.counterparties.find((c) => c.kind === 'subcontractor' && c.name.trim() === f.subcontractorName.trim());
+    if (!party) throw new ApiError(400, 'Unknown subcontractor', 'پیمانکار را از طرف حساب‌های «پیمانکار جزء» انتخاب کنید (ابتدا در اطلاعات پایه تعریف شود).');
+    const body = {
+      kind: 'subcontract',
+      ...contractBody(f.contractNumber, f.title, f.projectId, { startDate: f.startDate, endDate: f.endDate }, f.notes, f.lines || []),
+      cost_center_id: project?.costCenterIds?.[0] || '',
+      counterparty_id: party.id,
+      trade_type: f.tradeType,
+      advance_pct: f.advancePercentage || 0,
+      retention_pct: f.retentionDepositRate,
+      insurance_pct: f.insurancePercentage || 0,
+      tax_pct: f.taxPercentage || 0,
+    };
+    return result(await post(key, 'contracts', body), state);
+  },
+  async decideContract([id, decision, text], state, key) {
+    const version = contractVersion(state, id as string);
+    const approve = decision === 'approve';
+    return result(await post(key, `contracts/${id}/${approve ? 'approve' : 'reject'}`, approve ? { comment: (text as string) || '' } : { reason: text }, version), state);
+  },
+  async createContractAmendment([contractId, input], state, key) {
+    const f = input as NewAmendmentInput;
+    const body = {
+      amendment_no: f.number.trim(),
+      date: isoOrUndefined(f.date),
+      extend_days: f.extendedDays || 0,
+      description: f.description || '',
+      lines: (f.lines || [])
+        .filter((l) => l.quantityDelta !== 0)
+        .map((l) =>
+          l.contractLineId
+            ? { contract_line_id: l.contractLineId, quantity_delta: qtyString(l.quantityDelta) }
+            : { description: l.description.trim(), unit: l.unit.trim(), rate: l.rate, quantity_delta: qtyString(l.quantityDelta) }
+        ),
+    };
+    return result(await post(key, `contracts/${contractId}/amendments`, body), state);
+  },
+  async decideContractAmendment([id, decision, text], state, key) {
+    const version = versionOf(state.contractAmendments as { id: string; version?: number }[], id as string, 'الحاقیه');
+    const approve = decision === 'approve';
+    return result(await post(key, `contract-amendments/${id}/${approve ? 'approve' : 'reject'}`, approve ? { comment: (text as string) || '' } : { reason: text }, version), state);
+  },
+  async addContractGuarantee([contractId, input], state, key) {
+    const g = input as GuaranteeInput;
+    const body = { kind: g.kind, guarantee_no: g.guaranteeNo.trim(), bank: g.bank.trim(), amount: g.amount, issue_date: isoOrUndefined(g.issueDate), due_date: isoOrUndefined(g.dueDate), notes: g.notes || '' };
+    return result(await post(key, `contracts/${contractId}/guarantees`, body), state);
+  },
+  async updateContractGuarantee([id, patch], state, key) {
+    const p = patch as { status?: string; dueDate?: string; notes?: string };
+    const guarantee = [...state.contracts, ...state.subcontractorContracts].flatMap((c) => c.server?.guarantees || []).find((g) => g.id === id);
+    if (!guarantee) throw new ApiError(409, 'Unknown guarantee', 'ضمانت‌نامه در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
+    const body: Record<string, unknown> = {};
+    if (p.status) body.status = p.status;
+    if (p.dueDate) body.due_date = isoOrUndefined(p.dueDate);
+    if (p.notes !== undefined) body.notes = p.notes;
+    return result(await post(key, `contract-guarantees/${id}`, body, guarantee.version), state);
+  },
+  async requestSubcontractAdvance([contractId, amount], state, key) {
+    return result(await post(key, `contracts/${contractId}/advance`, { amount }), state);
+  },
+  async submitClientStatementForm([form, target], state, key) {
+    const f = form as ClientStatementFormInput;
+    const body = {
+      contract_id: f.contractId,
+      title: f.statementNumber.trim() || f.description.trim(),
+      period_start: isoOrUndefined(f.periodStartDate),
+      period_end: isoOrUndefined(f.periodEndDate),
+      lines: Object.entries(f.quantities)
+        .filter(([, q]) => q > 0)
+        .map(([lineId, q]) => ({ contract_line_id: lineId, quantity: qtyString(q) })),
+      include_vat: f.includeVAT,
+      adjustment_index: f.adjustmentIndex ? String(f.adjustmentIndex) : undefined,
+      fixed_deduction: f.materialDeduction || 0,
+      description: f.description || '',
+      submit: target === 'submitted_to_consultant',
+    };
+    return result(await post(key, 'client-statements', body), state);
+  },
+  async decideClientStatement([id, decision, reason, employer], state, key) {
+    const version = versionOf(state.clientStatements.map((s) => ({ id: s.id, version: s.server?.version })), id as string, 'صورت‌وضعیت');
+    if (decision === 'return') return result(await post(key, `statements/${id}/return`, { reason }, version), state);
+    const e = employer as EmployerApprovalFields | undefined;
+    const body = e ? { comment: (reason as string) || '', employer_ref: e.employerRef.trim(), employer_date: isoOrUndefined(e.employerDate) } : { comment: (reason as string) || '' };
+    return result(await post(key, `statements/${id}/approve`, body, version), state);
+  },
+  async submitSubcontractorStatementForm([form], state, key) {
+    const f = form as SubcontractorStatementFormInput;
+    const unknown = f.lines.find((l) => l.currentQuantity > 0 && !l.contractLineId);
+    if (unknown) throw new ApiError(400, 'Line outside the contract', `ردیف «${unknown.description}» در قرارداد نیست؛ کار جدید با الحاقیه به قرارداد اضافه می‌شود.`);
+    const body = {
+      contract_id: f.contractId,
+      title: f.statementNumber.trim(),
+      period_start: isoOrUndefined(f.periodStartDate),
+      period_end: isoOrUndefined(f.periodEndDate),
+      lines: f.lines.filter((l) => l.currentQuantity > 0).map((l) => ({ contract_line_id: l.contractLineId, quantity: qtyString(l.currentQuantity) })),
+      fixed_deduction: (f.penaltyAmount || 0) + (f.otherDeduction || 0),
+    };
+    return result(await post(key, 'subcontractor-statements', body), state);
+  },
+  async decideSubcontractorStatement([id, decision, comment], state, key) {
+    const version = versionOf(state.subcontractorStatements.map((s) => ({ id: s.id, version: s.server?.version })), id as string, 'صورت‌وضعیت');
+    if (decision === 'approve') return result(await post(key, `statements/${id}/approve`, { comment: (comment as string) || '' }, version), state);
+    const reason = (comment as string)?.trim() || 'نیاز به اصلاح متره';
+    return result(await post(key, `statements/${id}/${decision === 'reject' ? 'reject' : 'return'}`, { reason }, version), state);
+  },
+  async voidStatement([id, reason], state, key) {
+    const all = [...state.clientStatements, ...state.subcontractorStatements].map((s) => ({ id: s.id, version: s.server?.version }));
+    return result(await post(key, `statements/${id}/void`, { reason }, versionOf(all, id as string, 'صورت‌وضعیت')), state);
+  },
+
   // ------------------------------------------------------------------ approval center (0.6.0)
-  async decideServerApproval([item, decision, text], state, key) {
+  async decideServerApproval([item, decision, text, fields], state, key) {
     const a = item as ApprovalItem;
     if (!a.server) throw new ApiError(400, 'Not a server approval', 'این مورد از کارتابل سرور نیست؛ صفحه را تازه کنید.');
     const approve = decision === 'approve';
-    return result(await post(key, approve ? a.server.approvePath : a.server.rejectPath, approve ? { comment: (text as string) || '' } : { reason: text }, a.server.version), state);
+    const f = fields as EmployerApprovalFields | undefined;
+    const extra = approve && a.server.requires?.length ? { employer_ref: f?.employerRef.trim() || '', employer_date: isoOrUndefined(f?.employerDate) } : {};
+    return result(await post(key, approve ? a.server.approvePath : a.server.rejectPath, approve ? { comment: (text as string) || '', ...extra } : { reason: text }, a.server.version), state);
   },
 
   // ------------------------------------------------------------------ settings (0.6.1)
@@ -475,6 +657,20 @@ const SERVER_VALIDATED = new Set([
   'changeChequeStatus',
   'importBankStatement',
   'decideServerApproval',
+  // 0.7.0: amounts, caps, previous quantities, deductions and approval steps are the server's.
+  'createClientContract',
+  'createSubcontractorContract',
+  'decideContract',
+  'createContractAmendment',
+  'decideContractAmendment',
+  'addContractGuarantee',
+  'updateContractGuarantee',
+  'requestSubcontractAdvance',
+  'submitClientStatementForm',
+  'decideClientStatement',
+  'submitSubcontractorStatementForm',
+  'decideSubcontractorStatement',
+  'voidStatement',
 ]);
 
 /** GET /petty-cash and GET /treasury (office roles only) → the petty cash and treasury slices. */
@@ -554,7 +750,11 @@ export function createAkphDataSource(): DataSource {
         optional(apiClient.get<unknown>('treasury'), null),
         apiClient.get<unknown>('approvals'),
       ]);
-      const treasurySettings = await optional(apiClient.get<unknown>('treasury/settings'), null);
+      const [treasurySettings, contractsRaw, statementsRaw] = await Promise.all([
+        optional(apiClient.get<unknown>('treasury/settings'), null),
+        optional(apiClient.get<unknown>('contracts'), { contracts: [] }),
+        optional(apiClient.get<unknown>('statements'), { statements: [] }),
+      ]);
       const costCenters = arr('/cost-centers', obj('/cost-centers', centersRaw), 'cost_centers').map(parseCostCenter);
       const projects = arr('/projects', obj('/projects', projectsRaw), 'projects').map((p) => parseProject(p, costCenters));
       const counterparties = arr('/counterparties', obj('/counterparties', partiesRaw), 'counterparties').map(parseCounterparty);
@@ -562,9 +762,13 @@ export function createAkphDataSource(): DataSource {
       const partial = { ...base, projects, costCenters, counterparties, chartOfAccounts: chart };
       const journalEntries = arr('/journal-entries', obj('/journal-entries', entriesRaw), 'entries').map((e) => parseEntry(e, lookups(partial)));
       const finance = loadFinance(partial, pettyRaw, treasuryRaw);
+      const contractState = contractSlices(arr('/contracts', obj('/contracts', contractsRaw), 'contracts'));
+      const statementState = statementSlices(arr('/statements', obj('/statements', statementsRaw), 'statements'));
       return {
         ...partial,
         ...finance,
+        ...contractState,
+        ...statementState,
         serverApprovals: parseApprovals(approvalsRaw),
         journalEntries,
         documents,

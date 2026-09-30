@@ -112,7 +112,9 @@ export type ApprovalModule =
   | 'petty_replenishment'
   | 'petty_adjustment'
   | 'bank_voucher'
-  | 'receipt';
+  | 'receipt'
+  | 'contract'
+  | 'contract_amendment';
 
 /** A pending approval, gathered by a selector from the owning module's records. */
 export interface ApprovalItem {
@@ -140,7 +142,7 @@ export interface ApprovalItem {
   classification: 'مستقیم پروژه' | 'سربار و ستادی' | 'مالی';
   documentCount: number;
   /** akph/v1: the owning module's commands for this item (GET /approvals). */
-  server?: { approvePath: string; rejectPath: string; version: number };
+  server?: { approvePath: string; rejectPath: string; version: number; /** Fields the approval must carry (e.g. employer_ref, employer_date). */ requires?: string[] };
 }
 
 // ==================== NOTIFICATION CENTER ====================
@@ -767,7 +769,10 @@ export type ContractStatus =
   | 'تکمیل‌شده'
   | 'تحویل موقت'
   | 'تحویل قطعی'
-  | 'خاتمه‌یافته';
+  | 'خاتمه‌یافته'
+  // akph/v1 (0.7.0): a contract waits for its approval chain before statements can be issued.
+  | 'در انتظار تأیید'
+  | 'رد شده';
 
 export type ContractType =
   | 'فهرست‌بهایی'
@@ -809,6 +814,71 @@ export interface Contract {
   advancePaymentPercentage: number; // درصد پیش‌پرداخت مجاز
   retentionPercentage: number; // درصد سپرده حسن انجام کار (معمولاً ۱۰٪)
   description?: string;
+  /** akph/v1 (0.7.0): server-side fields; figures above are computed by the server. */
+  server?: ContractServerInfo;
+}
+
+/** Guarantee (ضمانت‌نامه) of a client contract or subcontract (akph/v1 0.7.0). */
+export type GuaranteeKind = 'performance' | 'advance' | 'retention' | 'bid' | 'other';
+
+export interface ContractGuarantee {
+  id: string;
+  contractId: string;
+  kind: GuaranteeKind;
+  guaranteeNo: string;
+  bank: string;
+  amount: number;
+  issueDate: string;
+  dueDate: string;
+  status: 'active' | 'released' | 'expired';
+  notes: string;
+  daysToDue: number | null;
+  dueSoon: boolean;
+  version: number;
+  contractNumber?: string;
+  contractTitle?: string;
+  projectId?: string;
+}
+
+/** A BOQ line of a contract as the server holds it (quantities include approved amendments). */
+export interface ContractServerLine {
+  id: string;
+  rowNo: number;
+  code: string;
+  description: string;
+  unit: string;
+  baseQuantity: number;
+  quantity: number;
+  rate: number;
+  amount: number;
+  approvedQuantity: number;
+  pendingQuantity: number;
+}
+
+/** Approval state and server figures of a contract (client or subcontract). */
+export interface ContractServerInfo {
+  /** pending | active | rejected | closed */
+  status: string;
+  version: number;
+  number: string;
+  currentStep: string | null;
+  createdById: string;
+  createdByName: string;
+  lastApprovedById: string | null;
+  rejectReason: string;
+  percents: { advance: number; retention: number; insurance: number; tax: number; other: number };
+  adjustmentBaseIndex: number | null;
+  adjustmentFactorPercent: number;
+  durationDays: number;
+  lines: ContractServerLine[];
+  guarantees: ContractGuarantee[];
+  amendmentsTotal: number;
+  advanceAmount: number;
+  advanceExpected: number;
+  advanceRemaining: number;
+  deductions: Record<string, number>;
+  settledAmount: number;
+  balanceDue: number;
 }
 
 export type AmendmentType =
@@ -831,9 +901,14 @@ export interface ContractAmendment {
   extendedDays?: number; // تمدید مدت به روز
   description: string;
   documentRef?: string;
-  status: 'پیش‌نویس' | 'در حال بررسی مشاور' | 'تأیید شده' | 'رد شده';
+  status: 'پیش‌نویس' | 'در حال بررسی مشاور' | 'تأیید شده' | 'رد شده' | 'در انتظار تأیید';
   approvedBy?: string;
   approvalDate?: string;
+  /** akph/v1 (0.7.0): server version, creator and line changes. */
+  version?: number;
+  createdById?: string;
+  rejectReason?: string;
+  lines?: { contractLineId: string | null; newLine: boolean; description: string; unit: string; rate: number; quantityDelta: number; amount: number }[];
 }
 
 export interface ContractBOQItem {
@@ -879,7 +954,8 @@ export type StatementWorkflowStatus =
   | 'partially_paid' // وصول بخشی از مبلغ
   | 'paid' // تسویه کامل
   | 'rejected' // رد شده
-  | 'returned_for_correction'; // برگشت جهت اصلاح
+  | 'returned_for_correction' // برگشت جهت اصلاح
+  | 'voided'; // ابطال پس از تأیید (سند معکوس)
 
 export interface StatementBOQItem {
   id: string;
@@ -1028,7 +1104,8 @@ export type SubcontractorStatementWorkflowStatus =
   | 'management_approved' // تأیید مدیر ارشد ← ثبت بدهی و درخواست پرداخت
   | 'paid' // پرداخت‌شده و ثبت هزینه پروژه
   | 'rejected' // رد شده
-  | 'returned_for_revision'; // برگشت جهت اصلاح متره
+  | 'returned_for_revision' // برگشت جهت اصلاح متره
+  | 'voided'; // ابطال پس از تأیید (سند معکوس)
 
 export interface SubcontractorContract {
   id: string;
@@ -1049,12 +1126,14 @@ export interface SubcontractorContract {
   remainingContractValue: number; // ظرفیت باقیمانده قرارداد (مبلغ قرارداد - کارکرد)
   startDate: string;
   endDate: string;
-  status: 'فعال' | 'معلق' | 'خاتمه‌یافته' | 'تسویه‌شده';
+  status: 'فعال' | 'معلق' | 'خاتمه‌یافته' | 'تسویه‌شده' | 'در انتظار تأیید' | 'رد شده';
   unitRateDescription: string; // بهای واحد توافقی (مثلاً: کیلویی ۱۸,۵۰۰ تومان یا متری ۳۵۰,۰۰۰ تومان)
   advancePaid: number; // پیش‌پرداخت پرداختی به پیمانکار
   retentionDeposit: number; // سپرده حسن انجام کار مکسوره (معمولاً ۱۰٪ یا ۵٪)
   penaltyOrDeductions: number; // سایر کسورات کارگاهی
   notes?: string;
+  /** akph/v1 (0.7.0): server-side fields; figures above are computed by the server. */
+  server?: ContractServerInfo;
 }
 
 export interface SubcontractorStatementItem {
@@ -1070,6 +1149,8 @@ export interface SubcontractorStatementItem {
   cumulativeAmount: number; // مبلغ کل تجمعی
   siteEngineerApprovedQty?: number; // مقدار مصوب سرپرست کارگاه پس از متره میدانی
   notes?: string;
+  /** akph/v1: the contract BOQ line this quantity is measured on. */
+  contractLineId?: string;
 }
 
 export interface SubcontractorStatementDeductions {
@@ -1127,6 +1208,8 @@ export interface SubcontractorProgressStatement {
   payingBankId?: string;
   payingBankTitle?: string;
   projectExpenseRecordId?: string; // شناسه سند ثبت هزینه پروژه در حسابداری
+  /** akph/v1 (0.7.0): approval step, version and posting of the server. */
+  server?: StatementServerInfo;
   workflowHistory: {
     date: string;
     time: string;
@@ -1189,6 +1272,27 @@ export interface DetailedProgressStatement {
   overdueDays: number;
   workflowHistory: StatementWorkflowHistory[];
   accountingJournalEntryId?: string;
+  /** akph/v1 (0.7.0): approval step, version and posting of the server. */
+  server?: StatementServerInfo;
+}
+
+/** Server state of a client or subcontractor statement (akph/v1 0.7.0). */
+export interface StatementServerInfo {
+  version: number;
+  title: string;
+  number: string;
+  /** Step waiting for a decision: its label, the role that acts, and the fields it requires. */
+  currentStep: { label: string; role: string; approval: boolean; nextStatus: string; requires: string[] } | null;
+  createdById: string;
+  lastApprovedById: string | null;
+  employerRef: string;
+  employerDate: string;
+  entryNumber?: string;
+  voidEntryNumber?: string;
+  adjustmentIndex: number | null;
+  includeVat: boolean;
+  pendingReceipts: number;
+  paymentRequest: { id: string; number: string; status: string; amount: number; paidAmount: number } | null;
 }
 
 export type ContractSubTab =

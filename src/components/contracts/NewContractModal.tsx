@@ -12,8 +12,10 @@ import { suggestContractCode } from '../../store/views/contracts';
 import type { NewClientContractInput } from '../../store/recordWorkflows';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
-import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
-import { useCompany } from '../../store/session';
+import { IntegerInput, MoneyInput, QuantityInput } from '../../ui/NumberInput';
+import { useCompany, useServerBooks } from '../../store/session';
+import { blankContractLine, contractCounterparties, contractLinesTotal, type ContractLineInput } from '../../store/views/contracts';
+import { ContractLinesEditor } from './ContractLinesEditor';
 import { Money } from '../common/Money';
 import { formatText } from '../../utils/formatters';
 
@@ -52,6 +54,15 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
   const [retentionPercentage, setRetentionPercentage] = useState<number>(10);
   const [description, setDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const live = useServerBooks();
+  const clients = useSelector((s) => contractCounterparties(s, 'client'));
+  const [lines, setLines] = useState<ContractLineInput[]>(() => [blankContractLine()]);
+  const linesTotal = useSelector(() => contractLinesTotal(lines), [JSON.stringify(lines)]);
+  const [insurancePercentage, setInsurancePercentage] = useState<number>(5);
+  const [taxPercentage, setTaxPercentage] = useState<number>(0);
+  const [otherPercentage, setOtherPercentage] = useState<number>(0);
+  const [adjustmentBaseIndex, setAdjustmentBaseIndex] = useState<number>(0);
+  const [adjustmentFactorPercentage, setAdjustmentFactorPercentage] = useState<number>(95);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +85,12 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
       advancePaymentPercentage,
       retentionPercentage,
       description,
+      lines,
+      insurancePercentage,
+      taxPercentage,
+      otherPercentage,
+      adjustmentBaseIndex,
+      adjustmentFactorPercentage,
     });
     if (!result.ok) return setFormError(result.message);
     setFormError(null);
@@ -113,8 +130,9 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               <label htmlFor="new-contract-modal-1" className="block text-slate-700 font-bold mb-1">کد سیستمی قرارداد:</label>
               <input id="new-contract-modal-1"
                 type="text"
-                value={code}
+                value={live ? 'شماره را سرور صادر می‌کند' : code}
                 onChange={(e) => setCode(e.target.value)}
+                disabled={live}
                 className="w-full p-2 rounded-lg border border-slate-300 tabular-nums"
                 required
               />
@@ -183,8 +201,15 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
                 onChange={(e) => setEmployer(e.target.value)}
                 placeholder="مثال: شرکت سرمایه‌گذاری مسکن"
                 className="w-full p-2 rounded-lg border border-slate-300"
+                list="new-contract-clients"
                 required
               />
+              <datalist id="new-contract-clients">
+                {clients.map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
+              {live && <span className="text-xs text-slate-500 mt-1 block">از طرف حساب‌های «کارفرما» انتخاب شود.</span>}
             </div>
             <div>
               <label htmlFor="new-contract-modal-7" className="block text-slate-700 font-bold mb-1">دستگاه اجرایی:</label>
@@ -212,13 +237,13 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
             <div>
               <label htmlFor="new-contract-modal-9" className="block text-slate-700 font-bold mb-1">مبلغ اولیه پیمان ({moneyUnitLabel()}):</label>
               <MoneyInput id="new-contract-modal-9"
-                value={initialValue}
+                value={linesTotal > 0 ? linesTotal : initialValue}
                 onValueChange={(v) => setInitialValue(v)}
+                disabled={linesTotal > 0 || live}
                 className="w-full p-2 rounded-lg border border-slate-300 tabular-nums font-bold"
-                required
               />
               <span className="text-xs text-slate-500 mt-1 block">
-                <Money rial={initialValue} compact />
+                {linesTotal > 0 || live ? 'جمع ردیف‌های فهرست بها' : <Money rial={initialValue} compact />}
               </span>
             </div>
             <div>
@@ -238,6 +263,34 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               />
             </div>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="new-contract-modal-17" className="block text-slate-700 font-bold mb-1">بیمه مکسوره (٪):</label>
+              <IntegerInput id="new-contract-modal-17" value={insurancePercentage} onValueChange={setInsurancePercentage} max={100} className="w-full p-2 rounded-lg border border-slate-300 tabular-nums" />
+            </div>
+            <div>
+              <label htmlFor="new-contract-modal-18" className="block text-slate-700 font-bold mb-1">مالیات تکلیفی (٪):</label>
+              <IntegerInput id="new-contract-modal-18" value={taxPercentage} onValueChange={setTaxPercentage} max={100} className="w-full p-2 rounded-lg border border-slate-300 tabular-nums" />
+            </div>
+            <div>
+              <label htmlFor="new-contract-modal-19" className="block text-slate-700 font-bold mb-1">سایر کسورات (٪):</label>
+              <IntegerInput id="new-contract-modal-19" value={otherPercentage} onValueChange={setOtherPercentage} max={100} className="w-full p-2 rounded-lg border border-slate-300 tabular-nums" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="new-contract-modal-20" className="block text-slate-700 font-bold mb-1">شاخص مبنای تعدیل (خالی: بدون تعدیل):</label>
+              <QuantityInput id="new-contract-modal-20" value={adjustmentBaseIndex} onValueChange={setAdjustmentBaseIndex} blankZero className="w-full p-2 rounded-lg border border-slate-300 tabular-nums" />
+            </div>
+            <div>
+              <label htmlFor="new-contract-modal-21" className="block text-slate-700 font-bold mb-1">ضریب تعدیل (٪):</label>
+              <IntegerInput id="new-contract-modal-21" value={adjustmentFactorPercentage} onValueChange={setAdjustmentFactorPercentage} max={100} disabled={!adjustmentBaseIndex} className="w-full p-2 rounded-lg border border-slate-300 tabular-nums" />
+            </div>
+          </div>
+
+          <ContractLinesEditor idPrefix="new-contract-line" lines={lines} onChange={setLines} />
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
@@ -300,7 +353,7 @@ export const NewContractModal: React.FC<NewContractModalProps> = ({
               type="submit"
               className="btn btn-primary"
             >
-              ثبت و ایجاد قرارداد
+              {live ? 'ثبت و ارسال برای تأیید مدیر ارشد' : 'ثبت و ایجاد قرارداد'}
             </button>
           </div>
         </form>

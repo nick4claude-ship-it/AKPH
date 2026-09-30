@@ -65,6 +65,13 @@ const WORKFLOW_ACTIONS = [
   'createSubcontractorContract',
   'submitSubcontractorStatementForm',
   'decideSubcontractorStatement',
+  // Contracts on the server (0.7.0)
+  'decideContract',
+  'decideContractAmendment',
+  'addContractGuarantee',
+  'updateContractGuarantee',
+  'requestSubcontractAdvance',
+  'voidStatement',
   'createRequisition',
   'createRfqFromRequisition',
   'selectWinningBid',

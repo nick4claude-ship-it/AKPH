@@ -535,6 +535,8 @@ final class Akph_Treasury {
             'cheque_number' => $row->cheque_number,
             'cheque_due_date' => $row->cheque_due_date,
             'cheque_id' => $row->cheque_id ? (string) $row->cheque_id : null,
+            'statement_id' => $row->statement_id ? (string) $row->statement_id : null,
+            'contract_id' => $row->contract_id ? (string) $row->contract_id : null,
             'description' => $row->description,
             'status' => $row->status,
             'created_by' => (string) $row->created_by,
@@ -570,7 +572,7 @@ final class Akph_Treasury {
             throw Akph_Error::invalid('طرف حساب پیدا نشد.', array('field' => 'counterparty_id'));
         }
         $payer = Akph_Input::text($body, 'payer_name', 190);
-        if (!$party && $payer === '') {
+        if (!$party && $payer === '' && empty($body['statement_id']) && empty($body['contract_id'])) {
             throw Akph_Error::invalid('پرداخت‌کننده (طرف حساب) را انتخاب کنید.', array('field' => 'counterparty_id'));
         }
         $project = Akph_Input::id($body, 'project_id');
@@ -580,6 +582,26 @@ final class Akph_Treasury {
         $method = Akph_Input::one_of($body, 'method', self::METHODS, 'transfer');
         $year = Akph_Jalali::fiscal_year($date);
         Akph_Numbering::lock('REC', $year);
+        // 0.7.0: a receivable is received only against an approved client statement (≤ what is still due) and a
+        // client's advance only against its contract; the counterparty and project are those of the record.
+        $statement_id = Akph_Input::id($body, 'statement_id');
+        $contract_id = Akph_Input::id($body, 'contract_id');
+        if ($type === 'statement') {
+            if (!$statement_id) {
+                throw Akph_Error::invalid('دریافت مطالبات فقط با انتخاب صورت‌وضعیت تأییدشده کارفرما ثبت می‌شود.', array('field' => 'statement_id'));
+            }
+            $st = Akph_Statements::assert_receivable($statement_id, $amount);
+            $party = (int) $st->counterparty_id;
+            $project = (int) $st->project_id;
+            $contract_id = (int) $st->contract_id;
+        } elseif ($type === 'advance' && $contract_id) {
+            $ct = Akph_Statements::assert_advance_receipt($contract_id, $amount);
+            $party = (int) $ct->counterparty_id;
+            $project = (int) $ct->project_id;
+        } elseif ($statement_id || $contract_id) {
+            throw Akph_Error::invalid('صورت‌وضعیت یا قرارداد فقط در دریافت مطالبات یا پیش‌دریافت پذیرفته می‌شود.', array('field' => $statement_id ? 'statement_id' : 'contract_id'));
+        }
+        Akph_Auth::assert_project($project ?: null);
         $account = self::active_account(Akph_Input::id($body, 'account_id', false), false);
         $cheque_no = $method === 'cheque' ? Akph_Input::text($body, 'cheque_number', 40, true, 'شماره چک') : '';
         $now = Akph_Db::now_utc();
@@ -597,6 +619,8 @@ final class Akph_Treasury {
             'cheque_number' => $cheque_no,
             'cheque_bank' => $method === 'cheque' ? Akph_Input::text($body, 'cheque_bank', 100) : '',
             'cheque_due_date' => $method === 'cheque' ? (Akph_Input::iso_date($body, 'cheque_due_date', false) ?: $date) : null,
+            'statement_id' => $type === 'statement' ? $statement_id : null,
+            'contract_id' => in_array($type, array('statement', 'advance'), true) && $contract_id ? $contract_id : null,
             'description' => Akph_Input::text($body, 'description', 1000),
             'status' => 'pending',
             'created_by' => get_current_user_id(),
@@ -633,6 +657,11 @@ final class Akph_Treasury {
         if ((int) $row->created_by === get_current_user_id()) {
             throw new Akph_Error('akph_segregation_of_duties', 'دریافتی را که خودتان ثبت کرده‌اید تأیید نمی‌کنید (تفکیک وظایف).', 403);
         }
+        if ($row->statement_id) {
+            Akph_Statements::assert_receivable($row->statement_id, (int) $row->amount, $row->id);
+        } elseif ($row->receipt_type === 'advance' && $row->contract_id) {
+            Akph_Statements::assert_advance_receipt($row->contract_id, (int) $row->amount, $row->id);
+        }
         $account = self::active_account($row->account_id);
         $cheque = null;
         $credit = array('code' => $row->credit_account_code, 'label' => 'حساب بستانکار دریافت', 'credit' => (int) $row->amount, 'counterparty_id' => $row->counterparty_id, 'project_id' => $row->project_id, 'description' => 'دریافت ' . $row->number . ' از ' . $row->payer_name);
@@ -664,6 +693,15 @@ final class Akph_Treasury {
         $records = array('receipts' => array(self::receipt_shape($after)), 'journal_entries' => array(Akph_Ledger::shape($entry)), 'treasury_accounts' => array(self::account_shape(Akph_Db::find(self::t('treasury_accounts'), $account->id))));
         if ($cheque) {
             $records['cheques'] = array(self::cheque_shape(Akph_Db::find(self::t('cheques'), $cheque->id)));
+        }
+        if ($row->statement_id) {
+            $st = Akph_Statements::on_receipt($row->statement_id);
+            if ($st) {
+                $records['statements'] = array(Akph_Statements::shape($st));
+            }
+        }
+        if ($row->contract_id) {
+            $records['contracts'] = array(Akph_Contracts::shape(Akph_Db::find(self::t('contracts'), $row->contract_id)));
         }
         return array('message' => 'دریافت ' . $row->number . ' تأیید شد و سند ' . $entry->doc_number . ' صادر شد.', 'id' => $row->id, 'doc_number' => $entry->doc_number, 'records' => $records);
     }

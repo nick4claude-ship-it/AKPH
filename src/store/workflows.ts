@@ -221,6 +221,8 @@ export function returnClientStatement(env: WorkflowEnv, id: string, reason: stri
 export interface ReceiptInput {
   sourceType: NonNullable<ReceiptRecord['sourceType']>;
   statementId?: string;
+  /** akph/v1: the client contract whose advance (پیش‌دریافت) this receipt is. */
+  contractId?: string;
   counterpartyId?: string;
   projectId?: string;
   amount: number;

@@ -7,8 +7,8 @@ import React, { useMemo, useState } from 'react';
 import { SubcontractorContract, UserProfile } from '../../../types';
 import { X, Plus, Trash2, FileCheck2, Lock } from 'lucide-react';
 import { Dialog } from '../../../ui/Dialog';
-import { IntegerInput, MoneyInput, PercentInput } from '../../../ui/NumberInput';
-import { formatMoney, formatMoneyCompact, formatInt, moneyUnitLabel } from '../../../utils/money';
+import { MoneyInput, PercentInput, QuantityInput } from '../../../ui/NumberInput';
+import { formatMoney, formatMoneyCompact, moneyUnitLabel } from '../../../utils/money';
 import { getRelativePersianDate } from '../../../utils/date';
 import { useSelector } from '../../../store/AppStore';
 import {
@@ -23,7 +23,7 @@ import {
 } from '../../../store/views/contracts';
 import type { WorkflowResult } from '../../../store/workflowKit';
 import { Money } from '../../common/Money';
-import { formatText } from '../../../utils/formatters';
+import { formatDecimal, formatText } from '../../../utils/formatters';
 
 interface NewSubcontractorStatementModalProps {
   onClose: () => void;
@@ -52,14 +52,16 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
   const [otherDeduction, setOtherDeduction] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
+  // akph/v1: lines, percentages and advance amortization come from the contract on the server.
+  const server = selectedContract?.server;
   const form: SubcontractorStatementFormInput = {
     contractId: selectedContract?.id || '',
     statementNumber,
     periodStartDate,
     periodEndDate,
     lines,
-    retentionRate,
-    advanceDeduction,
+    retentionRate: server ? server.percents.retention : retentionRate,
+    advanceDeduction: server ? 0 : advanceDeduction,
     penaltyAmount,
     otherDeduction,
   };
@@ -169,10 +171,14 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-slate-900">ردیف‌های کارکرد:</span>
+            {server ? (
+              <span className="text-xs text-slate-500">کار جدید با الحاقیه به ردیف‌های قرارداد اضافه می‌شود.</span>
+            ) : (
             <button type="button" onClick={addLine} className="text-sm font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer">
               <Plus className="w-3.5 h-3.5" />
               <span>افزودن ردیف جدید</span>
             </button>
+            )}
           </div>
           <div className="border border-slate-200 rounded-xl table-scroll">
             <table className="w-full text-right text-sm">
@@ -203,17 +209,17 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
                           <input type="text" aria-label="شرح عملیات" value={l.description} onChange={(e) => update(l.id, { description: e.target.value })} className={input} />
                         )}
                         {err && <span className="block text-sm text-rose-700 font-bold mt-1">{err}</span>}
-                        {l.pendingQuantity > 0 && <span className="block text-sm text-amber-700">در جریان تأیید: {formatInt(l.pendingQuantity)}</span>}
+                        {l.pendingQuantity > 0 && <span className="block text-sm text-amber-700">در جریان تأیید: {formatDecimal(l.pendingQuantity)}</span>}
                       </td>
                       <td className="p-2 text-center">
                         {l.locked ? l.unit : <input type="text" aria-label="واحد" value={l.unit} onChange={(e) => update(l.id, { unit: e.target.value })} className={`${input} text-center`} />}
                       </td>
                       <td className="p-2 text-center tabular-nums">
-                        {l.locked ? formatInt(l.contractQuantity) : <IntegerInput aria-label="مقدار قرارداد" value={l.contractQuantity} onValueChange={(v) => update(l.id, { contractQuantity: v })} className={`${input} text-center`} />}
+                        {l.locked ? formatDecimal(l.contractQuantity) : <QuantityInput aria-label="مقدار قرارداد" value={l.contractQuantity} onValueChange={(v) => update(l.id, { contractQuantity: v })} className={`${input} text-center`} />}
                       </td>
-                      <td className="p-2 text-center tabular-nums text-slate-600">{formatInt(l.previousQuantity)}</td>
+                      <td className="p-2 text-center tabular-nums text-slate-600">{formatDecimal(l.previousQuantity)}</td>
                       <td className="p-2">
-                        <IntegerInput aria-label="مقدار این دوره" value={l.currentQuantity} onValueChange={(v) => update(l.id, { currentQuantity: v })} aria-invalid={!!err} className={`${input} text-center font-bold`} />
+                        <QuantityInput aria-label="مقدار این دوره" value={l.currentQuantity} onValueChange={(v) => update(l.id, { currentQuantity: v })} aria-invalid={!!err} className={`${input} text-center font-bold`} />
                       </td>
                       <td className="p-2 text-left tabular-nums">
                         {l.locked ? formatMoney(l.unitRate, false) : <MoneyInput aria-label="نرخ واحد" value={l.unitRate} onValueChange={(v) => update(l.id, { unitRate: v })} className={`${input} text-left`} />}
@@ -237,16 +243,18 @@ export const NewSubcontractorStatementModal: React.FC<NewSubcontractorStatementM
 
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
           <span className="text-sm font-bold text-slate-800 block">کسورات پیمانکار جزء:</span>
+          {server && <span className="text-xs text-slate-500 block">درصدهای قرارداد و استهلاک پیش‌پرداخت (از مانده) را سرور اعمال می‌کند؛ جریمه و سایر کسورات به‌صورت مقطوع ثبت می‌شوند.</span>}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
             <label className="text-xs text-slate-500 block">
               درصد سپرده حسن انجام کار:
-              <PercentInput value={retentionRate} onValueChange={setRetentionRate} className="mt-1 w-full p-2 bg-white border border-slate-200 rounded-lg text-sm font-bold" />
+              <PercentInput value={form.retentionRate} disabled={!!server} onValueChange={setRetentionRate} className="mt-1 w-full p-2 bg-white border border-slate-200 rounded-lg text-sm font-bold" />
               <span className="text-xs text-slate-500 block mt-1"><Money rial={retentionAmount} /></span>
             </label>
             <label className="text-xs text-slate-500 block">
               استهلاک پیش‌پرداخت (حداکثر <Money rial={remainingAdvance} />):
               <MoneyInput
-                value={advanceDeduction}
+                disabled={!!server}
+                value={form.advanceDeduction}
                 onValueChange={(v) => {
                   setAdvanceDeduction(capAdvanceDeduction(v, remainingAdvance));
                   setError(null);

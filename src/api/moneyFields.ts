@@ -12,6 +12,8 @@
  * The only conversion left is the demo seed, which is written in Tomans and turned into Rials once, at load.
  */
 export const MONEY_FIELDS: ReadonlySet<string> = new Set([
+  // akph/v1 0.7.0 contracts and statements
+  'amendmentsTotal', 'advanceAmount', 'advanceExpected', 'advanceRemaining', 'settledAmount', 'balanceDue', 'pendingReceipts',
   'actualBalance', 'actualCost', 'actualCountedCash', 'adjustmentAmount', 'advancePaid', 'advancePaymentAmount',
   'advancePaymentDeduction', 'allocatedCost', 'amortizedAmount', 'amount', 'approvedAmount', 'approvedBilledValue',
   'approvedChangesValue', 'approvedNetPayable', 'approvedRevenue', 'approvedStatementsValue', 'averageUnitPrice',
@@ -44,6 +46,8 @@ export const MONEY_FIELDS: ReadonlySet<string> = new Set([
 
 /** Numeric fields that are not money. */
 export const NON_MONEY_NUMERIC_FIELDS: ReadonlySet<string> = new Set([
+  // akph/v1 0.7.0 contracts: quantities (DECIMAL(18,3)), indexes, percentages, days, row numbers
+  'baseQuantity', 'approvedQuantity', 'pendingQuantity', 'adjustmentBaseIndex', 'adjustmentIndex', 'adjustmentFactorPercent', 'durationDays', 'daysToDue', 'rowNo',
   // quantities and measures
   'acceptedQty', 'approvedQty', 'areaM2', 'balanceQty', 'contractQuantity', 'cumulativeExecutedQuantity', 'cumulativeQuantity',
   'currentPeriodQuantity', 'currentQuantity', 'currentStock', 'deliveredQty', 'exceededQuantity', 'grossWeightKg', 'inQty',

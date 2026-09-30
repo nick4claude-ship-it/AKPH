@@ -11,9 +11,10 @@ if (!defined('ABSPATH')) {
 final class Akph_Roles {
     /**
      * 1 — 0.3.0; 2 — akph_assistant_use (all four roles) and akph_ai_manage (system administrator);
-     * 3 — petty cash, treasury and approvals (0.6.0); 4 — akph_report_settings (system administrator, 0.6.1).
+     * 3 — petty cash, treasury and approvals (0.6.0); 4 — akph_report_settings (system administrator, 0.6.1);
+     * 5 — contracts and progress statements (0.7.0).
      */
-    const ROLES_VERSION = '4';
+    const ROLES_VERSION = '5';
     const OPTION_VERSION = 'akph_portal_roles_version';
 
     const ACCESS = 'akph_access';
@@ -51,6 +52,12 @@ final class Akph_Roles {
     const PAYMENT_REQUEST = 'akph_payment_request';
     /** «تنظیمات گزارش و چاپ»: letterhead, logo and signatories (system administrator only). */
     const REPORT_SETTINGS = 'akph_report_settings';
+    /** Contracts: create and edit contracts, amendments, guarantees and subcontract advances. */
+    const CONTRACTS_MANAGE = 'akph_contracts_manage';
+    /** Act on an approval step of a contract, amendment or statement (the step's role decides who). */
+    const CONTRACTS_APPROVE = 'akph_contracts_approve';
+    /** Prepare progress statements (measurement, sending) for own projects. */
+    const STATEMENTS_PREPARE = 'akph_statements_prepare';
 
     /** WordPress role slug → portal role label (docs/SERVER-RULES.md §1), in order of precedence. */
     const PORTAL_ROLES = array(
@@ -67,7 +74,7 @@ final class Akph_Roles {
             self::MASTER_DATA, self::ACCOUNTS_MANAGE, self::JOURNAL_CREATE, self::JOURNAL_APPROVE, self::JOURNAL_REVERSE,
             self::REPORTS, self::AUDIT_READ, self::SETTINGS, self::ASSISTANT_USE, self::AI_MANAGE,
             self::PETTY_SUBMIT, self::PETTY_APPROVE, self::PETTY_MANAGE, self::TREASURY_MANAGE, self::PAYMENT_APPROVE,
-            self::PAYMENT_REQUEST, self::REPORT_SETTINGS,
+            self::PAYMENT_REQUEST, self::REPORT_SETTINGS, self::CONTRACTS_MANAGE, self::CONTRACTS_APPROVE, self::STATEMENTS_PREPARE,
         );
     }
 
@@ -81,9 +88,9 @@ final class Akph_Roles {
                 self::ACCESS, self::VIEW_ALL, self::PROJECTS_EDIT_FINANCIAL, self::MASTER_DATA, self::ACCOUNTS_MANAGE,
                 self::JOURNAL_CREATE, self::JOURNAL_APPROVE, self::JOURNAL_REVERSE, self::REPORTS, self::AUDIT_READ,
                 self::ASSISTANT_USE, self::PETTY_SUBMIT, self::PETTY_APPROVE, self::PETTY_MANAGE, self::TREASURY_MANAGE,
-                self::PAYMENT_APPROVE, self::PAYMENT_REQUEST,
+                self::PAYMENT_APPROVE, self::PAYMENT_REQUEST, self::CONTRACTS_MANAGE, self::CONTRACTS_APPROVE,
             ),
-            'paydar_project_manager' => array(self::ACCESS, self::PROJECTS_EDIT_EXEC_OWN, self::REPORTS, self::ASSISTANT_USE, self::PETTY_SUBMIT, self::PETTY_APPROVE),
+            'paydar_project_manager' => array(self::ACCESS, self::PROJECTS_EDIT_EXEC_OWN, self::REPORTS, self::ASSISTANT_USE, self::PETTY_SUBMIT, self::PETTY_APPROVE, self::CONTRACTS_APPROVE, self::STATEMENTS_PREPARE),
         );
     }
 

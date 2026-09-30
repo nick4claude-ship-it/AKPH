@@ -38,6 +38,10 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
   const [search, setSearch] = useState('');
   const [rejecting, setRejecting] = useState<ApprovalItem | null>(null);
   const [reason, setReason] = useState('');
+  // Client statement at the employer step: the employer's approval letter is recorded with the decision.
+  const [employerFor, setEmployerFor] = useState<ApprovalItem | null>(null);
+  const [employerRef, setEmployerRef] = useState('');
+  const [employerDate, setEmployerDate] = useState('');
 
   const { groups, totalAmount } = useMemo(() => approvalSummary(approvals), [approvals]);
 
@@ -171,7 +175,7 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
                       <button
                         disabled={!allowed}
                         title={allowed ? 'تأیید' : permission.reason}
-                        onClick={() => onToast(approve(a).message)}
+                        onClick={() => (a.server?.requires?.length ? setEmployerFor(a) : onToast(approve(a).message))}
                         className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 disabled:opacity-40 cursor-pointer"
                       >
                         <CheckCircle2 className="w-3 h-3" /> تأیید
@@ -199,6 +203,53 @@ export const ApprovalCenterModule: React.FC<ApprovalCenterModuleProps> = ({ onTo
           </tbody>
         </table>
       </div>
+
+      {employerFor && (
+        <Dialog
+          onClose={() => setEmployerFor(null)}
+          label={`تأیید کارفرما ${employerFor.docNumber}`}
+          overlayClassName="fixed inset-0 z-50 bg-slate-950/60 flex items-center justify-center p-4"
+          className="bg-white rounded-xl max-w-md w-full border border-slate-200 shadow-2xl p-5 text-right space-y-3 text-sm"
+        >
+            <h3 className="text-base font-bold text-slate-900">
+              ثبت تأیید کارفرما — {formatText(employerFor.docNumber)}
+            </h3>
+            <label className="block space-y-1">
+              <span className="text-xs text-slate-600">شماره نامه تأیید کارفرما</span>
+              <input
+                value={employerRef}
+                onChange={(e) => setEmployerRef(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 p-2 focus:outline-none focus:border-amber-500"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs text-slate-600">تاریخ تأیید کارفرما (شمسی)</span>
+              <input
+                value={employerDate}
+                onChange={(e) => setEmployerDate(e.target.value)}
+                placeholder="۱۴۰۵/۰۱/۱۵"
+                className="w-full rounded-lg border border-slate-200 p-2 focus:outline-none focus:border-amber-500"
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEmployerFor(null)} className="px-3 py-2 rounded-lg border border-slate-200 cursor-pointer">
+                انصراف
+              </button>
+              <button
+                disabled={!employerRef.trim() || !employerDate.trim()}
+                onClick={() => {
+                  onToast(approve(employerFor, '', { employerRef: employerRef.trim(), employerDate: employerDate.trim() }).message);
+                  setEmployerFor(null);
+                  setEmployerRef('');
+                  setEmployerDate('');
+                }}
+                className="px-3 py-2 rounded-lg bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-40"
+              >
+                تأیید و ثبت سند مطالبات
+              </button>
+            </div>
+        </Dialog>
+      )}
 
       {rejecting && (
         <Dialog

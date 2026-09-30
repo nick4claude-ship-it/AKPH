@@ -499,6 +499,9 @@ export function parseReceipt(raw: unknown, l: FinanceLookups): ReceiptRecord {
     status: status === 'rejected' ? 'برگشت خورده' : status === 'approved' && !cheque ? 'وصول شده' : 'در جریان وصول',
     sourceType: RECEIPT_SOURCE[String(o.receipt_type)] || 'سایر درآمدها',
     bankAccountId: str(route, o, 'account_id'),
+    // 0.7.0: the statement (receivable) or client contract (advance) the receipt settles.
+    statementId: idOrEmpty(o.statement_id) || undefined,
+    contractId: idOrEmpty(o.contract_id) || undefined,
     pendingApproval: status === 'pending',
     version: version(route, o),
   };
@@ -552,12 +555,36 @@ export function parseStatementLine(raw: unknown): BankReconciliationItem {
 
 // ---------------------------------------------------------------------------- approvals
 
-const APPROVAL_MODULES: ReadonlySet<string> = new Set(['journal_entry', 'journal_reversal', 'petty_adjustment', 'bank_voucher', 'petty_cash_expense', 'petty_replenishment', 'payment_request', 'receipt']);
+const APPROVAL_MODULES: ReadonlySet<string> = new Set([
+  'journal_entry',
+  'journal_reversal',
+  'petty_adjustment',
+  'bank_voucher',
+  'petty_cash_expense',
+  'petty_replenishment',
+  'payment_request',
+  'receipt',
+  // 0.7.0
+  'contract',
+  'contract_amendment',
+  'client_statement',
+  'subcontractor_statement',
+]);
 
-function approvalAction(module: string, role: string): UserAction {
+function approvalAction(module: string, role: string, approval: boolean): UserAction {
   if (module === 'petty_cash_expense' || module === 'petty_replenishment') return PETTY_STEP_ACTION[role as PortalRole] ?? 'petty.approve_ceo';
   if (module === 'payment_request') return 'payment_request.approve';
   if (module === 'receipt') return 'receipt.record';
+  if (module === 'contract' || module === 'contract_amendment') return 'contract.approve';
+  if (module === 'client_statement') {
+    if (!approval) return 'client_statement.prepare';
+    return role === 'مدیر پروژه' ? 'client_statement.consultant_approval' : 'client_statement.employer_approval';
+  }
+  if (module === 'subcontractor_statement') {
+    if (!approval) return 'sub_statement.measure';
+    if (role === 'مدیر پروژه') return 'sub_statement.pm_approval';
+    return role === 'حسابدار' ? 'sub_statement.finance_approval' : 'sub_statement.ceo_approval';
+  }
   return 'journal.approve';
 }
 
@@ -582,7 +609,7 @@ export function parseApproval(raw: unknown): ApprovalItem {
     date: jdate(route, o, 'date'),
     stage: str(route, o, 'stage', true),
     approverRole: role,
-    action: approvalAction(module, role),
+    action: approvalAction(module, role, o.approval !== false),
     context: {
       projectId: projectId || null,
       createdBy: str(route, o, 'requester_id', true) || null,
@@ -591,7 +618,12 @@ export function parseApproval(raw: unknown): ApprovalItem {
     },
     classification: module === 'petty_cash_expense' || module === 'petty_replenishment' ? (projectId ? 'مستقیم پروژه' : 'سربار و ستادی') : 'مالی',
     documentCount: 0,
-    server: { approvePath: str(route, o, 'approve_path').replace(/^\//, ''), rejectPath: str(route, o, 'reject_path').replace(/^\//, ''), version: version(route, o) },
+    server: {
+      approvePath: str(route, o, 'approve_path').replace(/^\//, ''),
+      rejectPath: str(route, o, 'reject_path').replace(/^\//, ''),
+      version: version(route, o),
+      requires: Array.isArray(o.requires) ? o.requires.filter((r): r is string => typeof r === 'string') : [],
+    },
   };
 }
 

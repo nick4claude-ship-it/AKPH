@@ -5,18 +5,22 @@
 
 import React, { useState } from 'react';
 import { Contract, ContractAmendment, AmendmentType, UserProfile } from '../../types';
-import { amendmentChangePercent } from '../../store/views/contracts';
+import { amendableLines, amendmentChangePercent, amendmentDeltaPreview, blankAmendmentLine, type AmendmentLineInput } from '../../store/views/contracts';
+import { useSelector } from '../../store/AppStore';
+import { Trash2 } from 'lucide-react';
 import type { NewAmendmentInput } from '../../store/recordWorkflows';
 import { X, Plus, FileText, Calendar, DollarSign } from 'lucide-react';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoneyCompact, moneyUnitLabel } from '../../utils/money';
 import { formatPercent, formatText } from '../../utils/formatters';
-import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
+import { IntegerInput, MoneyInput, QuantityInput } from '../../ui/NumberInput';
+import { formatMoney } from '../../utils/money';
 import { getRelativePersianDate } from '../../utils/date';
 import { Money } from '../common/Money';
 
 interface NewAmendmentModalProps {
-  contract: Contract;
+  /** A client contract, or a subcontract shown with the same fields. */
+  contract: Pick<Contract, 'id' | 'code' | 'projectTitle' | 'initialValue' | 'currentValue' | 'server'>;
   currentUser: UserProfile;
   onClose: () => void;
   /** Records the amendment through the workflow; an approved one updates the contract value there. */
@@ -37,12 +41,18 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ContractAmendment['status']>('تأیید شده');
   const [formError, setFormError] = useState<string | null>(null);
-
-  const changePercentage = amendmentChangePercent(contract, amount);
+  // akph/v1: the amendment is a set of line changes priced by the server and approved by the senior manager.
+  const server = contract.server;
+  const contractLines = amendableLines(contract);
+  const [lines, setLines] = useState<AmendmentLineInput[]>([]);
+  const delta = useSelector(() => amendmentDeltaPreview(contract, lines), [JSON.stringify(lines), contract.id]);
+  const effect = server ? delta : amount;
+  const changePercentage = amendmentChangePercent(contract, effect);
+  const updateLine = (id: string, patch: Partial<AmendmentLineInput>) => setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = onSaveAmendment({ number, type, date, amount, extendedDays, description, status });
+    const result = onSaveAmendment({ number, type, date, amount: effect, extendedDays, description, status: server ? 'در انتظار تأیید' : status, lines: server ? lines : undefined });
     if (!result.ok) return setFormError(result.message);
     onClose();
   };
@@ -99,14 +109,77 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             </div>
           </div>
 
+          {server && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-700 font-bold">تغییر مقادیر ردیف‌ها و ردیف‌های جدید:</span>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setLines((prev) => [...prev, blankAmendmentLine(contractLines[0]?.id || '')])} className="text-sm font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer">
+                    <Plus className="w-3.5 h-3.5" /> تغییر مقدار ردیف
+                  </button>
+                  <button type="button" onClick={() => setLines((prev) => [...prev, blankAmendmentLine('')])} className="text-sm font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer">
+                    <Plus className="w-3.5 h-3.5" /> ردیف جدید
+                  </button>
+                </div>
+              </div>
+              <div className="border border-slate-200 rounded-xl table-scroll">
+                <table className="w-full text-right text-sm">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                      <th className="p-2">ردیف قرارداد / شرح</th>
+                      <th className="p-2 w-20 text-center">واحد</th>
+                      <th className="p-2 w-28 text-left">نرخ ({moneyUnitLabel()})</th>
+                      <th className="p-2 w-24 text-center">تغییر مقدار</th>
+                      <th className="p-2 w-10 text-center">حذف</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {lines.map((l) => (
+                      <tr key={l.id}>
+                        <td className="p-2">
+                          {l.contractLineId ? (
+                            <select aria-label="ردیف قرارداد" value={l.contractLineId} onChange={(e) => updateLine(l.id, { contractLineId: e.target.value })} className="w-full p-2 rounded border border-slate-300 bg-white">
+                              {contractLines.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {formatText(c.description)} ({formatText(c.unit)})
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input aria-label="شرح ردیف جدید" type="text" value={l.description} onChange={(e) => updateLine(l.id, { description: e.target.value })} className="w-full p-2 rounded border border-slate-300" />
+                          )}
+                        </td>
+                        <td className="p-2 text-center">
+                          {l.contractLineId ? formatText(contractLines.find((c) => c.id === l.contractLineId)?.unit) : <input aria-label="واحد" type="text" value={l.unit} onChange={(e) => updateLine(l.id, { unit: e.target.value })} className="w-full p-2 rounded border border-slate-300 text-center" />}
+                        </td>
+                        <td className="p-2 text-left tabular-nums">
+                          {l.contractLineId ? formatMoney(contractLines.find((c) => c.id === l.contractLineId)?.rate || 0, false) : <MoneyInput aria-label="نرخ" value={l.rate} onValueChange={(v) => updateLine(l.id, { rate: v })} className="w-full p-2 rounded border border-slate-300 text-left" />}
+                        </td>
+                        <td className="p-2">
+                          <QuantityInput aria-label="تغییر مقدار" signed={!!l.contractLineId} value={l.quantityDelta} onValueChange={(v) => updateLine(l.id, { quantityDelta: v })} className="w-full p-2 rounded border border-slate-300 text-center" />
+                        </td>
+                        <td className="p-2 text-center">
+                          <button type="button" aria-label="حذف" onClick={() => setLines((prev) => prev.filter((x) => x.id !== l.id))} className="text-slate-500 hover:text-rose-600 cursor-pointer">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {lines.length === 0 && <p className="py-4 text-center text-xs text-slate-500">فقط تمدید مدت؛ برای تغییر مبلغ ردیف اضافه کنید.</p>}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label htmlFor="new-amendment-modal-3" className="block text-slate-700 font-bold mb-1">مبلغ اثر مالی ({moneyUnitLabel()}):</label>
               <MoneyInput id="new-amendment-modal-3"
-                value={amount}
+                value={server ? delta : amount}
+                disabled={!!server}
                 onValueChange={(v) => setAmount(v)}
                 className="w-full p-2 rounded-lg border border-slate-300 tabular-nums font-bold"
-                required
               />
               <span className="text-xs text-slate-500 mt-1 block">
                 {formatPercent(changePercentage, 2)} از مبلغ اولیه
@@ -134,6 +207,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
             </div>
           </div>
 
+          {!server && (
           <div>
             <label htmlFor="new-amendment-modal-6" className="block text-slate-700 font-bold mb-1">وضعیت ابلاغ و تصویب:</label>
             <select id="new-amendment-modal-6"
@@ -147,6 +221,7 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
               <option value="رد شده">رد شده</option>
             </select>
           </div>
+          )}
 
           <div>
             <label htmlFor="new-amendment-modal-7" className="block text-slate-700 font-bold mb-1">توضیحات و مستندات قانونی:</label>
@@ -161,12 +236,12 @@ export const NewAmendmentModal: React.FC<NewAmendmentModalProps> = ({
           </div>
 
           <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-sm text-amber-950">
-            <strong>اثر سیستمی:</strong> در صورت انتخاب «تأیید شده»، مبلغ سقف پیمان از{' '}
+            <strong>اثر سیستمی:</strong> {server ? 'پس از تأیید مدیر ارشد' : 'در صورت انتخاب «تأیید شده»'}، مبلغ سقف پیمان از{' '}
             <span className="tabular-nums font-bold"><Money rial={contract.currentValue} compact /></span> به{' '}
             <span className="tabular-nums font-bold text-emerald-800">
-              <Money rial={(contract.currentValue + amount)} compact />
+              <Money rial={(contract.currentValue + effect)} compact />
             </span>{' '}
-            افزایش خواهد یافت.
+            تغییر خواهد کرد.
           </div>
 
           {formError && (

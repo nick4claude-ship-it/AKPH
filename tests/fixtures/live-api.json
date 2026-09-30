@@ -55,10 +55,10 @@
                 "code": "PRJ-1405-00001",
                 "name": "پروژه آزمون چاپ",
                 "client_id": null,
-                "client_name": "کارفرمای آزمون",
+                "client_name": "کارفرمای آزمایشی",
                 "consultant_name": "",
-                "manager_user_id": null,
-                "manager_name": "",
+                "manager_user_id": "6",
+                "manager_name": "کاربر pm",
                 "site_supervisor": "",
                 "location": "",
                 "contract_ref": "",
@@ -67,8 +67,8 @@
                 "physical_progress": 0,
                 "start_date": null,
                 "end_date": null,
-                "budget": 40000000000,
-                "contract_amount": 50000000000,
+                "budget": 0,
+                "contract_amount": 0,
                 "manual_summary": {
                     "revenue": 0,
                     "cost": 0,
@@ -86,16 +86,62 @@
                     "exec",
                     "financial"
                 ],
-                "created_at": "2026-09-29T22:58:47Z",
-                "updated_at": "2026-09-29T22:58:47Z"
+                "created_at": "2026-09-30T15:19:38Z",
+                "updated_at": "2026-09-30T15:19:38Z"
             }
         ]
     },
     "cost-centers": {
-        "cost_centers": []
+        "cost_centers": [
+            {
+                "id": "1",
+                "code": "CC-1405-00001",
+                "name": "کارگاه آزمون",
+                "project_id": "1",
+                "type": "project_site",
+                "manager_name": "",
+                "budget": 0,
+                "active": true,
+                "version": 1,
+                "updated_at": "2026-09-30T15:19:38Z"
+            }
+        ]
     },
     "counterparties": {
-        "counterparties": []
+        "counterparties": [
+            {
+                "id": "2",
+                "kind": "subcontractor",
+                "name": "پیمانکار آزمون",
+                "national_id": "",
+                "economic_code": "",
+                "phone": "",
+                "email": "",
+                "address": "",
+                "sheba": "",
+                "bank_name": "",
+                "trade_type": "",
+                "active": true,
+                "version": 1,
+                "updated_at": "2026-09-30T15:19:38Z"
+            },
+            {
+                "id": "1",
+                "kind": "client",
+                "name": "کارفرمای آزمون",
+                "national_id": "",
+                "economic_code": "",
+                "phone": "",
+                "email": "",
+                "address": "",
+                "sheba": "",
+                "bank_name": "",
+                "trade_type": "",
+                "active": true,
+                "version": 1,
+                "updated_at": "2026-09-30T15:19:38Z"
+            }
+        ]
     },
     "accounts": {
         "accounts": [
@@ -1285,8 +1331,30 @@
         }
     },
     "approvals": {
-        "items": [],
-        "total": 0
+        "items": [
+            {
+                "id": "contract:2",
+                "module": "contract",
+                "module_label": "قرارداد پیمانکار جزء",
+                "record_id": "2",
+                "doc_number": "SCN-1405-00001",
+                "title": "آرماتوربندی (ج-۷)",
+                "amount": 150000000,
+                "requester_id": "4",
+                "requester": "کاربر accountant",
+                "previous_approver_id": "6",
+                "project_id": "1",
+                "project_name": "پروژه آزمون چاپ",
+                "date": "2026-09-30",
+                "stage": "تأیید مدیر ارشد",
+                "approver_role": "مدیر ارشد",
+                "version": 2,
+                "approve_path": "\/contracts\/2\/approve",
+                "reject_path": "\/contracts\/2\/reject",
+                "entity_type": "contract"
+            }
+        ],
+        "total": 1
     },
     "report-settings": {
         "settings": {
@@ -1593,6 +1661,341 @@
                 "at": "2026-09-29T22:58:47Z",
                 "signed": true,
                 "source": "approval"
+            }
+        ]
+    },
+    "contracts": {
+        "contracts": [
+            {
+                "id": "2",
+                "number": "SCN-1405-00001",
+                "kind": "subcontract",
+                "contract_no": "ج-۷",
+                "title": "آرماتوربندی",
+                "project_id": "1",
+                "project_name": "پروژه آزمون چاپ",
+                "cost_center_id": "1",
+                "counterparty_id": "2",
+                "counterparty_name": "پیمانکار آزمون",
+                "trade_type": "آرماتوربندی و قالب‌بندی",
+                "amount": 150000000,
+                "contract_date": null,
+                "start_date": null,
+                "end_date": null,
+                "duration_days": 0,
+                "advance_pct": "10",
+                "retention_pct": "5",
+                "insurance_pct": "0",
+                "tax_pct": "0",
+                "other_pct": "0",
+                "adjustment_base_index": null,
+                "adjustment_factor_pct": "0",
+                "description": "",
+                "status": "pending",
+                "chain": [
+                    "مدیر پروژه",
+                    "مدیر ارشد"
+                ],
+                "step_index": 1,
+                "current_step": "مدیر ارشد",
+                "history": [
+                    {
+                        "action": "submitted",
+                        "step": "ثبت قرارداد",
+                        "user_id": "4",
+                        "user_name": "کاربر accountant",
+                        "role": "حسابدار",
+                        "at": "2026-09-30T15:19:39Z",
+                        "comment": ""
+                    },
+                    {
+                        "action": "approved",
+                        "step": "مدیر پروژه",
+                        "user_id": "6",
+                        "user_name": "کاربر pm",
+                        "role": "مدیر پروژه",
+                        "at": "2026-09-30T15:19:39Z",
+                        "comment": ""
+                    }
+                ],
+                "last_approved_by": "6",
+                "reject_reason": "",
+                "created_by": "4",
+                "created_by_name": "کاربر accountant",
+                "created_at": "2026-09-30T15:19:39Z",
+                "lines": [
+                    {
+                        "id": "3",
+                        "row_no": 1,
+                        "code": "",
+                        "description": "آرماتوربندی",
+                        "unit": "kg",
+                        "base_quantity": "5000",
+                        "quantity": "5000",
+                        "rate": 30000,
+                        "amount": 150000000,
+                        "approved_quantity": "0",
+                        "pending_quantity": "0",
+                        "amendment_id": null
+                    }
+                ],
+                "amendments": [],
+                "guarantees": [],
+                "version": 2,
+                "amendments_total": 0,
+                "extend_days": 0,
+                "current_amount": 150000000,
+                "measured_amount": 0,
+                "approved_amount": 0,
+                "approved_gross": 0,
+                "approved_net": 0,
+                "remaining_amount": 150000000,
+                "settled_amount": 0,
+                "balance_due": 0,
+                "advance_amount": 0,
+                "advance_expected": 15000000,
+                "advance_remaining": 0,
+                "deductions": []
+            },
+            {
+                "id": "1",
+                "number": "CNT-1405-00001",
+                "kind": "client",
+                "contract_no": "ق-۱۰۰",
+                "title": "اجرای فونداسیون",
+                "project_id": "1",
+                "project_name": "پروژه آزمون چاپ",
+                "cost_center_id": "1",
+                "counterparty_id": "1",
+                "counterparty_name": "کارفرمای آزمون",
+                "trade_type": "",
+                "amount": 601000000,
+                "contract_date": null,
+                "start_date": "2026-09-30",
+                "end_date": null,
+                "duration_days": 0,
+                "advance_pct": "10",
+                "retention_pct": "5",
+                "insurance_pct": "5",
+                "tax_pct": "3",
+                "other_pct": "0",
+                "adjustment_base_index": "100",
+                "adjustment_factor_pct": "95",
+                "description": "",
+                "status": "active",
+                "chain": [
+                    "مدیر ارشد"
+                ],
+                "step_index": 1,
+                "current_step": null,
+                "history": [
+                    {
+                        "action": "submitted",
+                        "step": "ثبت قرارداد",
+                        "user_id": "4",
+                        "user_name": "کاربر accountant",
+                        "role": "حسابدار",
+                        "at": "2026-09-30T15:19:39Z",
+                        "comment": ""
+                    },
+                    {
+                        "action": "approved",
+                        "step": "مدیر ارشد",
+                        "user_id": "3",
+                        "user_name": "کاربر senior",
+                        "role": "مدیر ارشد",
+                        "at": "2026-09-30T15:19:39Z",
+                        "comment": ""
+                    }
+                ],
+                "last_approved_by": "3",
+                "reject_reason": "",
+                "created_by": "4",
+                "created_by_name": "کاربر accountant",
+                "created_at": "2026-09-30T15:19:39Z",
+                "lines": [
+                    {
+                        "id": "1",
+                        "row_no": 1,
+                        "code": "010101",
+                        "description": "خاک‌برداری",
+                        "unit": "m3",
+                        "base_quantity": "120.5",
+                        "quantity": "120.5",
+                        "rate": 2000000,
+                        "amount": 241000000,
+                        "approved_quantity": "0",
+                        "pending_quantity": "10.25",
+                        "amendment_id": null
+                    },
+                    {
+                        "id": "2",
+                        "row_no": 2,
+                        "code": "020101",
+                        "description": "بتن‌ریزی",
+                        "unit": "m3",
+                        "base_quantity": "40",
+                        "quantity": "40",
+                        "rate": 9000000,
+                        "amount": 360000000,
+                        "approved_quantity": "0",
+                        "pending_quantity": "0",
+                        "amendment_id": null
+                    }
+                ],
+                "amendments": [],
+                "guarantees": [
+                    {
+                        "id": "1",
+                        "contract_id": "1",
+                        "kind": "performance",
+                        "guarantee_no": "ض-۱",
+                        "bank": "بانک نمونه",
+                        "amount": 10000000,
+                        "issue_date": null,
+                        "due_date": "2026-10-10",
+                        "status": "active",
+                        "notes": "",
+                        "days_to_due": 10,
+                        "due_soon": true,
+                        "version": 1
+                    }
+                ],
+                "version": 2,
+                "amendments_total": 0,
+                "extend_days": 0,
+                "current_amount": 601000000,
+                "measured_amount": 20500000,
+                "approved_amount": 0,
+                "approved_gross": 0,
+                "approved_net": 0,
+                "remaining_amount": 601000000,
+                "settled_amount": 0,
+                "balance_due": 0,
+                "advance_amount": 0,
+                "advance_expected": 60100000,
+                "advance_remaining": 0,
+                "deductions": []
+            }
+        ]
+    },
+    "statements": {
+        "statements": [
+            {
+                "id": "1",
+                "number": "STC-1405-00001",
+                "kind": "client",
+                "title": "صورت‌وضعیت موقت ۱",
+                "contract_id": "1",
+                "contract_number": "CNT-1405-00001",
+                "contract_no": "ق-۱۰۰",
+                "contract_title": "اجرای فونداسیون",
+                "project_id": "1",
+                "project_name": "پروژه آزمون چاپ",
+                "cost_center_id": "1",
+                "counterparty_id": "1",
+                "counterparty_name": "کارفرمای آزمون",
+                "trade_type": "",
+                "period_start": "2026-09-30",
+                "period_end": "2026-09-30",
+                "status": "approved_by_consultant",
+                "current_step": {
+                    "label": "تأیید کارفرما",
+                    "role": "حسابدار",
+                    "approval": true,
+                    "next_status": "approved_by_employer",
+                    "requires": [
+                        "employer_ref",
+                        "employer_date"
+                    ]
+                },
+                "include_vat": true,
+                "lines": [
+                    {
+                        "id": "1",
+                        "contract_line_id": "1",
+                        "row_no": 1,
+                        "code": "010101",
+                        "description": "خاک‌برداری",
+                        "unit": "m3",
+                        "contract_quantity": "120.5",
+                        "previous_quantity": "0",
+                        "quantity": "10.25",
+                        "cumulative_quantity": "10.25",
+                        "rate": 2000000,
+                        "amount": 20500000,
+                        "cumulative_amount": 20500000
+                    }
+                ],
+                "work_amount": 20500000,
+                "adjustment_index": null,
+                "adjustment_amount": 0,
+                "vat_rate": 10,
+                "vat_amount": 2050000,
+                "gross_amount": 22550000,
+                "fixed_deduction": 0,
+                "deductions": [
+                    {
+                        "type": "retention",
+                        "title": "سپرده حسن انجام کار",
+                        "rate": "5",
+                        "amount": 1025000
+                    },
+                    {
+                        "type": "insurance",
+                        "title": "بیمه مکسوره",
+                        "rate": "5",
+                        "amount": 1025000
+                    },
+                    {
+                        "type": "tax",
+                        "title": "مالیات تکلیفی",
+                        "rate": "3",
+                        "amount": 615000
+                    }
+                ],
+                "total_deductions": 2665000,
+                "net_amount": 19885000,
+                "settled_amount": 0,
+                "pending_receipts": 0,
+                "balance_due": 0,
+                "payment_request": null,
+                "employer_ref": "",
+                "employer_date": null,
+                "description": "",
+                "history": [
+                    {
+                        "action": "submitted",
+                        "step": "ثبت و ارسال به مشاور",
+                        "user_id": "6",
+                        "user_name": "کاربر pm",
+                        "role": "مدیر پروژه",
+                        "at": "2026-09-30T15:19:39Z",
+                        "comment": "",
+                        "from": "draft",
+                        "to": "submitted_to_consultant"
+                    },
+                    {
+                        "action": "approved",
+                        "step": "تأیید مشاور",
+                        "user_id": "3",
+                        "user_name": "کاربر senior",
+                        "role": "مدیر ارشد",
+                        "at": "2026-09-30T15:19:39Z",
+                        "comment": "",
+                        "from": "submitted_to_consultant",
+                        "to": "approved_by_consultant"
+                    }
+                ],
+                "created_by": "6",
+                "created_by_name": "کاربر pm",
+                "last_approved_by": "3",
+                "reject_reason": "",
+                "entry": null,
+                "void_entry": null,
+                "approved_at": null,
+                "created_at": "2026-09-30T15:19:39Z",
+                "version": 2
             }
         ]
     }

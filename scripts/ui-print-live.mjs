@@ -113,6 +113,37 @@ try {
   const expected = fixture['report-settings'].settings.signatories.projects.map((s) => s.title);
   if (JSON.stringify(printed.signatureTitles) !== JSON.stringify(expected)) problems.push(`signature titles ${JSON.stringify(printed.signatureTitles)} ≠ ${JSON.stringify(expected)}`);
   if (printed.signers.some((s) => s && s !== ' ')) problems.push(`names printed in default signature boxes: ${printed.signers.join('، ')}`);
+
+  // 0.7.0: contracts and statements are written on the server — no «به‌زودی» notice; server items and alerts show.
+  await page.emulateMedia({ media: 'screen' });
+  const live = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: 'fa-IR' });
+  live.on('pageerror', (e) => errors.push(e.message));
+  const checks = [
+    ['/contracts/client', 'اجرای فونداسیون'],
+    ['/contracts/subcontract', 'آرماتوربندی'],
+    ['/statements/client', 'صورت‌وضعیت'],
+    ['/statements/subcontractor', 'صورت‌وضعیت'],
+    ['/approvals', 'قرارداد پیمانکار جزء'],
+    ['/notifications', 'سررسید ضمانت‌نامه'],
+  ];
+  for (const [path, text] of checks) {
+    await live.goto(`${base}#${path}`, { waitUntil: 'networkidle' });
+    await live.waitForSelector('main', { timeout: 20000 });
+    await live.waitForFunction((t) => (document.querySelector('main')?.innerText || '').includes(t), text, { timeout: 5000 }).catch(() => {});
+    const body = await live.evaluate(() => document.querySelector('main')?.innerText || '');
+    if (body.includes('به‌زودی')) problems.push(`«به‌زودی» notice on ${path} in live mode`);
+    if (!body.includes(text)) problems.push(`${path}: «${text}» from the server is not shown`);
+  }
+  // The contract opened from the list shows its server state (approval, guarantees, amendments).
+  await live.goto(`${base}#/contracts/client`, { waitUntil: 'networkidle' });
+  await live.getByRole('button', { name: 'قراردادهای کارفرما' }).click();
+  await live.getByText('اجرای فونداسیون').first().click();
+  await live.waitForTimeout(300);
+  const detail = await live.evaluate(() => document.querySelector('main')?.innerText || '');
+  if (!detail.includes('وضعیت قرارداد در دفاتر رسمی')) problems.push('the contract detail does not show the server panel');
+  if (!detail.includes('ض-۱')) problems.push('the guarantee of the contract is not shown');
+  await live.screenshot({ path: join(outDir, 'contract-live.png'), fullPage: true });
+  await live.close();
   for (const e of errors) problems.push(`page error: ${e}`);
 } finally {
   await browser.close();
@@ -123,3 +154,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✔ چاپ رسمی گزارش پروژه‌ها در حالت واقعی: فقط سند رسمی، بدون نام نمونه، سربرگ و امضاهای تنظیمات؛ ${join('ui-screenshots', 'print')}`);
+console.log('✔ قراردادها و صورت‌وضعیت‌ها در حالت واقعی: بدون «به‌زودی»، وضعیت سرور، کارتابل و هشدار سررسید ضمانت‌نامه');

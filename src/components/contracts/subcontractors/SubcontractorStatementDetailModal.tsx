@@ -31,6 +31,7 @@ import {
   SUBCONTRACTOR_STATEMENT_STEPS,
   subcontractorActiveStepTitle,
   subcontractorStatementActions,
+  canVoidStatement,
   subcontractorStatementStep,
 } from '../../../store/views/contracts';
 import { formatDecimal, formatText } from '../../../utils/formatters';
@@ -47,6 +48,8 @@ interface SubcontractorStatementDetailModalProps {
   /** Next approval step, or return for revision (runs the store workflow). */
   onDecide?: (statementId: string, decision: 'approve' | 'return' | 'reject', comment?: string) => void;
   onOpenPaymentModal?: (statement: SubcontractorProgressStatement) => void;
+  /** akph/v1: void an approved statement (senior manager; the server posts the reversal). */
+  onVoid?: (statementId: string, reason: string) => void;
 }
 
 export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementDetailModalProps> = ({
@@ -56,8 +59,10 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
   currentUser,
   onDecide,
   onOpenPaymentModal,
+  onVoid,
 }) => {
   const company = useCompany();
+  const [voidReason, setVoidReason] = useState('');
   const [activeTab, setActiveTab] = useState<'details' | 'history' | 'print'>('details');
 
   if (!isOpen || !statement) return null;
@@ -440,6 +445,14 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
           </div>
 
           <div className="flex items-center gap-2">
+            {onVoid && canVoidStatement(currentUser, statement) && (
+              <>
+                <input aria-label="علت ابطال" placeholder="علت ابطال" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} className="p-2 rounded-lg border border-slate-300 text-sm" />
+                <button type="button" disabled={!voidReason.trim()} onClick={() => onVoid(statement.id, voidReason.trim())} className="btn btn-secondary disabled:opacity-40">
+                  ابطال (سند برگشتی)
+                </button>
+              </>
+            )}
             {actions.awaitingPayment && onOpenPaymentModal && (
               <button
                 onClick={() => {

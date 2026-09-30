@@ -52,6 +52,7 @@ import { AdjustmentsEngineView } from './AdjustmentsEngineView';
 import { PaymentsReceivablesView } from './PaymentsReceivablesView';
 import { ContractReportsView } from './ContractReportsView';
 import { ContractDocumentsView } from './ContractDocumentsView';
+import { ContractServerPanel } from './ContractServerPanel';
 import { useAppState, useSelector } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
 import { useCompany } from '../../store/session';
@@ -147,7 +148,15 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   const [isNewStatementOpen, setIsNewStatementOpen] = useState(false);
   const [contractForNewStatement, setContractForNewStatement] = useState<Contract | null>(null);
   const [isNewAmendmentOpen, setIsNewAmendmentOpen] = useState(false);
-  const [contractForNewAmendment, setContractForNewAmendment] = useState<Contract | null>(null);
+  const [contractForNewAmendment, setContractForNewAmendment] = useState<Pick<Contract, 'id' | 'code' | 'projectTitle' | 'initialValue' | 'currentValue' | 'server'> | null>(null);
+  // akph/v1: statements are issued only on contracts approved on the server.
+  const issuable = contracts.filter((c) => !c.server || c.server.status === 'active');
+  const issuableSub = subContracts.filter((c) => !c.server || c.server.status === 'active');
+  const openSubContract = selectedSubContract ? subContracts.find((c) => c.id === selectedSubContract.id) || selectedSubContract : null;
+  const openSubAmendment = (c: SubcontractorContract) => {
+    setContractForNewAmendment({ id: c.id, code: c.contractNumber, projectTitle: c.title, initialValue: c.contractValue, currentValue: c.contractValue, server: c.server });
+    setIsNewAmendmentOpen(true);
+  };
   const setIsRecordReceiptOpen = (_open: boolean) => navigate('/finance/receipts');
 
   // ---------------- Subcontractor Handlers ----------------
@@ -157,7 +166,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   };
 
   const handleOpenNewSubStatement = (contract?: SubcontractorContract) => {
-    setContractForNewSubStatement(contract || selectedSubContract || subContracts[0] || null);
+    setContractForNewSubStatement(contract || selectedSubContract || issuableSub[0] || null);
     setIsNewSubStatementOpen(true);
   };
 
@@ -184,7 +193,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   };
 
   const handleOpenNewStatement = (contract?: Contract) => {
-    setContractForNewStatement(contract || selectedContract || contracts[0] || null);
+    setContractForNewStatement(contract || selectedContract || issuable[0] || null);
     setIsNewStatementOpen(true);
   };
 
@@ -196,8 +205,8 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
   // The open contract follows the store (an approved amendment changes its value).
   const openContract = selectedContract ? contracts.find((c) => c.id === selectedContract.id) || selectedContract : null;
 
-  const handleStatementDecision = (statementId: string, decision: 'approve' | 'return', reason?: string) => {
-    toast(wf.decideClientStatement(statementId, decision, reason));
+  const handleStatementDecision = (statementId: string, decision: 'approve' | 'return', reason?: string, employer?: { employerRef: string; employerDate: string }) => {
+    toast(wf.decideClientStatement(statementId, decision, reason, employer));
     if (selectedStatement?.id === statementId) setSelectedStatement(null);
   };
 
@@ -350,6 +359,10 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
             />
           )}
 
+          {activeTab === 'contract_detail' && openContract?.server && (
+            <ContractServerPanel contract={openContract} kind="client" currentUser={currentUser} onToast={onToast} onNewAmendment={() => handleOpenNewAmendment(openContract)} />
+          )}
+
           {activeTab === 'contract_detail' && openContract && (
             <ContractDetailView
               contract={openContract}
@@ -490,6 +503,10 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
             </div>
           </div>
 
+          {openSubContract?.server && (
+            <ContractServerPanel contract={openSubContract} kind="subcontract" currentUser={currentUser} onToast={onToast} onNewAmendment={() => openSubAmendment(openSubContract)} />
+          )}
+
           {/* Subcontractor Subtab Content */}
           {subTab === 'dashboard' && (
             <SubcontractorDashboard
@@ -564,7 +581,7 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
       {isNewSubStatementOpen && (
       <NewSubcontractorStatementModal
         onClose={() => setIsNewSubStatementOpen(false)}
-        contracts={subContracts}
+        contracts={issuableSub}
         initialContract={contractForNewSubStatement}
         currentUser={currentUser}
         onSave={(form) => reportIfOk(wf.submitSubcontractorStatementForm(form))}
@@ -591,6 +608,11 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
         currentUser={currentUser}
         onDecide={handleSubStatementDecision}
         onOpenPaymentModal={(stm) => openSubPayment(stm)}
+        onVoid={(id, reason) => {
+          toast(wf.voidStatement(id, reason));
+          setIsSubStatementDetailOpen(false);
+          setSelectedSubStatement(null);
+        }}
       />
 
       {/* =========================================================================
@@ -603,12 +625,16 @@ export const ContractsModule: React.FC<ContractsModuleProps> = ({
           onClose={() => setSelectedStatement(null)}
           onDecide={handleStatementDecision}
           onIssueAccountingEntry={handleIssueAccountingEntryForStatement}
+          onVoid={(id, reason) => {
+            toast(wf.voidStatement(id, reason));
+            setSelectedStatement(null);
+          }}
         />
       )}
 
       {isNewStatementOpen && (
         <NewStatementModal
-          contracts={contracts}
+          contracts={issuable}
           preselectedContract={contractForNewStatement}
           currentUser={currentUser}
           onClose={() => setIsNewStatementOpen(false)}

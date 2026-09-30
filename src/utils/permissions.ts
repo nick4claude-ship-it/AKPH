@@ -49,6 +49,7 @@ export type UserAction =
   | 'sub_statement.return'
   // قراردادها
   | 'contract.manage'
+  | 'contract.approve'
   // تنخواه
   | 'petty.submit_expense'
   | 'petty.approve_pm'
@@ -116,6 +117,7 @@ const APPROVAL_ACTIONS: ReadonlySet<UserAction> = new Set<UserAction>([
   'payroll.approve',
   'journal.approve',
   'inventory.issue_confirm',
+  'contract.approve',
 ]);
 
 /** true for actions that approve someone else's work. */
@@ -169,6 +171,7 @@ const ROLE_PERMISSIONS: Record<PortalRole, typeof ALL | ReadonlySet<UserAction>>
     'sub_statement.site_approval',
     'sub_statement.pm_approval',
     'sub_statement.return',
+    'contract.approve',
     'petty.submit_expense',
     'petty.approve_pm',
     'petty.reject',

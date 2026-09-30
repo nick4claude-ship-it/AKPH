@@ -29,7 +29,7 @@ import { downloadTable } from '../../utils/export';
 import { clientStatementItemsCsv } from '../../store/views/exports';
 import { formatPercent, formatDecimal, formatText } from '../../utils/formatters';
 import { useCompany } from '../../store/session';
-import { clientStatementActions, statementVatPercent } from '../../store/views/contracts';
+import { canVoidStatement, clientStatementActions, statementVatPercent } from '../../store/views/contracts';
 import { Money } from '../common/Money';
 import { AttachmentsPanel } from '../documents/AttachmentsPanel';
 import { OfficialPrint, moneyHeader } from '../common/OfficialPrint';
@@ -40,8 +40,10 @@ interface StatementDetailAndPrintModalProps {
   currentUser: UserProfile;
   onClose: () => void;
   /** Next approval step, or return to the site with a reason (runs the store workflow). */
-  onDecide: (statementId: string, decision: 'approve' | 'return', reason?: string) => void;
+  onDecide: (statementId: string, decision: 'approve' | 'return', reason?: string, employer?: { employerRef: string; employerDate: string }) => void;
   onIssueAccountingEntry?: (statement: DetailedProgressStatement) => void;
+  /** akph/v1: void an approved statement (senior manager; the server posts the reversal). */
+  onVoid?: (statementId: string, reason: string) => void;
 }
 
 export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModalProps> = ({
@@ -50,7 +52,13 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
   onClose,
   onDecide,
   onIssueAccountingEntry,
+  onVoid,
 }) => {
+  // akph/v1: the employer step records the employer's approval letter; approved statements can be voided.
+  const needsEmployer = !!statement.server?.currentStep?.requires.includes('employer_ref');
+  const [employerRef, setEmployerRef] = useState('');
+  const [employerDate, setEmployerDate] = useState('');
+  const [voiding, setVoiding] = useState(false);
   const [activeView, setActiveView] = useState<'detail' | 'print_preview'>('detail');
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
@@ -208,10 +216,16 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {actions.advance && needsEmployer && (
+                    <>
+                      <input aria-label="شماره نامه تأیید کارفرما" placeholder="شماره نامه کارفرما" value={employerRef} onChange={(e) => setEmployerRef(e.target.value)} className="p-2 rounded-lg border border-slate-300 text-sm" />
+                      <input aria-label="تاریخ تأیید کارفرما" placeholder="تاریخ (۱۴۰۵/۰۱/۱۵)" value={employerDate} onChange={(e) => setEmployerDate(e.target.value)} className="p-2 rounded-lg border border-slate-300 text-sm tabular-nums w-36" />
+                    </>
+                  )}
                   {actions.advance && (
                     <button
-                      onClick={() => onDecide(statement.id, 'approve')}
-                      disabled={!actions.advance.allowed}
+                      onClick={() => onDecide(statement.id, 'approve', undefined, needsEmployer ? { employerRef, employerDate } : undefined)}
+                      disabled={!actions.advance.allowed || (needsEmployer && (!employerRef.trim() || !employerDate.trim()))}
                       title={actions.advance.reason}
                       className="px-3 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold cursor-pointer"
                     >
@@ -236,6 +250,24 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                       <BookOpen className="w-3.5 h-3.5" />
                       <span>ثبت سند شناسایی درآمد و مطالبات در حسابداری</span>
                     </button>
+                  )}
+
+                  {onVoid && canVoidStatement(currentUser, statement) && (
+                    <button
+                      onClick={() => {
+                        setVoiding(true);
+                        setShowRejectBox(true);
+                      }}
+                      className="px-3 py-2 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-sm font-bold cursor-pointer"
+                    >
+                      ابطال صورت‌وضعیت (سند برگشتی)
+                    </button>
+                  )}
+
+                  {statement.server?.employerRef && (
+                    <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold">
+                      تأیید کارفرما: {formatText(statement.server.employerRef)} — {formatText(statement.server.employerDate)}
+                    </span>
                   )}
 
                   {accountingIssued && (
@@ -282,13 +314,15 @@ export const StatementDetailAndPrintModal: React.FC<StatementDetailAndPrintModal
                           setRejectError(true);
                           return;
                         }
-                        onDecide(statement.id, 'return', rejectReason);
+                        if (voiding && onVoid) onVoid(statement.id, rejectReason);
+                        else onDecide(statement.id, 'return', rejectReason);
                         setShowRejectBox(false);
+                        setVoiding(false);
                         setRejectError(false);
                       }}
                       className="px-3 py-1 rounded bg-rose-700 hover:bg-rose-800 text-white text-sm font-bold cursor-pointer"
                     >
-                      ثبت بازگشت به کارگاه
+                      {voiding ? 'ثبت ابطال' : 'ثبت بازگشت به کارگاه'}
                     </button>
                   </div>
                 </div>

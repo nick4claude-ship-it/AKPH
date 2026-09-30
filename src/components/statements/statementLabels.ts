@@ -19,6 +19,7 @@ export const CLIENT_STATUS_LABELS: Record<StatementWorkflowStatus, string> = {
   paid: 'وصول کامل',
   rejected: 'رد شده',
   returned_for_correction: 'برگشت جهت اصلاح',
+  voided: 'ابطال‌شده',
 };
 
 export const SUB_STATUS_LABELS: Record<SubcontractorStatementWorkflowStatus, string> = {
@@ -31,4 +32,5 @@ export const SUB_STATUS_LABELS: Record<SubcontractorStatementWorkflowStatus, str
   paid: 'پرداخت‌شده',
   rejected: 'رد شده',
   returned_for_revision: 'برگشت جهت اصلاح',
+  voided: 'ابطال‌شده',
 };

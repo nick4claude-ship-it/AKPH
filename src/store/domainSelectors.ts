@@ -326,6 +326,22 @@ export function selectNotifications(state: AppState, includeDismissed = false, u
     });
   }
 
+  // Guarantees (ضمانت‌نامه) due within 30 days or past due (akph/v1: the server marks them)
+  for (const c of [...state.contracts, ...state.subcontractorContracts]) {
+    const client = 'code' in c;
+    for (const g of c.server?.guarantees || []) {
+      if (!g.dueSoon) continue;
+      const overdue = (g.daysToDue ?? 0) < 0;
+      out.push({
+        id: `guarantee_due:${g.id}`, kind: 'contract_ending', priority: overdue ? 'critical' : 'warning', date: todayStr,
+        title: overdue ? `سررسید ضمانت‌نامه ${g.guaranteeNo} گذشته است` : `سررسید ضمانت‌نامه ${g.guaranteeNo}`,
+        description: `${g.bank} — قرارداد ${client ? c.code : c.contractNumber} — سررسید ${g.dueDate}${overdue ? '؛ تمدید یا آزادسازی لازم است.' : ` (${fa(g.daysToDue ?? 0)} روز مانده).`}`,
+        relatedProjectId: c.projectId, relatedProjectName: c.projectName, amount: g.amount,
+        actionLabel: 'مشاهده قرارداد', actionPath: client ? '/contracts/client' : '/contracts/subcontract',
+      });
+    }
+  }
+
   // Overdue receivables
   for (const s of state.clientStatements) {
     if (!CLIENT_APPROVED_STATUSES.includes(s.status) || s.remainingPayable <= 0) continue;
