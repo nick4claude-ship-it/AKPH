@@ -12,9 +12,9 @@ final class Akph_Roles {
     /**
      * 1 — 0.3.0; 2 — akph_assistant_use (all four roles) and akph_ai_manage (system administrator);
      * 3 — petty cash, treasury and approvals (0.6.0); 4 — akph_report_settings (system administrator, 0.6.1);
-     * 5 — contracts and progress statements (0.7.0).
+     * 5 — contracts and progress statements (0.7.0); 6 — procurement, inventory and payroll (0.8.0).
      */
-    const ROLES_VERSION = '5';
+    const ROLES_VERSION = '6';
     const OPTION_VERSION = 'akph_portal_roles_version';
 
     const ACCESS = 'akph_access';
@@ -58,6 +58,20 @@ final class Akph_Roles {
     const CONTRACTS_APPROVE = 'akph_contracts_approve';
     /** Prepare progress statements (measurement, sending) for own projects. */
     const STATEMENTS_PREPARE = 'akph_statements_prepare';
+    /** Purchase requisitions for own projects. */
+    const PROCUREMENT_REQUEST = 'akph_procurement_request';
+    /** Requests for quotation, quotes, purchase orders and vendor invoices (registration). */
+    const PROCUREMENT_MANAGE = 'akph_procurement_manage';
+    /** Act on an approval step of a requisition, purchase order or vendor invoice (the step's role decides who). */
+    const PROCUREMENT_APPROVE = 'akph_procurement_approve';
+    /** Goods and service receipts against purchase orders, returns to the supplier. */
+    const INVENTORY_RECEIVE = 'akph_inventory_receive';
+    /** Store issues (request, confirm), returns from a project and transfers between warehouses. */
+    const INVENTORY_ISSUE = 'akph_inventory_issue';
+    /** Materials, warehouses and stocktakes (count and approval). */
+    const INVENTORY_MANAGE = 'akph_inventory_manage';
+    /** Employees (with their personal data), timesheets, payroll calculation and approval. */
+    const PAYROLL_MANAGE = 'akph_payroll_manage';
 
     /** WordPress role slug → portal role label (docs/SERVER-RULES.md §1), in order of precedence. */
     const PORTAL_ROLES = array(
@@ -75,6 +89,8 @@ final class Akph_Roles {
             self::REPORTS, self::AUDIT_READ, self::SETTINGS, self::ASSISTANT_USE, self::AI_MANAGE,
             self::PETTY_SUBMIT, self::PETTY_APPROVE, self::PETTY_MANAGE, self::TREASURY_MANAGE, self::PAYMENT_APPROVE,
             self::PAYMENT_REQUEST, self::REPORT_SETTINGS, self::CONTRACTS_MANAGE, self::CONTRACTS_APPROVE, self::STATEMENTS_PREPARE,
+            self::PROCUREMENT_REQUEST, self::PROCUREMENT_MANAGE, self::PROCUREMENT_APPROVE, self::INVENTORY_RECEIVE,
+            self::INVENTORY_ISSUE, self::INVENTORY_MANAGE, self::PAYROLL_MANAGE,
         );
     }
 
@@ -89,8 +105,13 @@ final class Akph_Roles {
                 self::JOURNAL_CREATE, self::JOURNAL_APPROVE, self::JOURNAL_REVERSE, self::REPORTS, self::AUDIT_READ,
                 self::ASSISTANT_USE, self::PETTY_SUBMIT, self::PETTY_APPROVE, self::PETTY_MANAGE, self::TREASURY_MANAGE,
                 self::PAYMENT_APPROVE, self::PAYMENT_REQUEST, self::CONTRACTS_MANAGE, self::CONTRACTS_APPROVE,
+                self::PROCUREMENT_MANAGE, self::PROCUREMENT_APPROVE, self::INVENTORY_RECEIVE, self::INVENTORY_MANAGE, self::PAYROLL_MANAGE,
             ),
-            'paydar_project_manager' => array(self::ACCESS, self::PROJECTS_EDIT_EXEC_OWN, self::REPORTS, self::ASSISTANT_USE, self::PETTY_SUBMIT, self::PETTY_APPROVE, self::CONTRACTS_APPROVE, self::STATEMENTS_PREPARE),
+            'paydar_project_manager' => array(
+                self::ACCESS, self::PROJECTS_EDIT_EXEC_OWN, self::REPORTS, self::ASSISTANT_USE, self::PETTY_SUBMIT, self::PETTY_APPROVE,
+                self::CONTRACTS_APPROVE, self::STATEMENTS_PREPARE, self::PROCUREMENT_REQUEST, self::PROCUREMENT_APPROVE,
+                self::INVENTORY_RECEIVE, self::INVENTORY_ISSUE,
+            ),
         );
     }
 

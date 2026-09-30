@@ -32,6 +32,11 @@ final class Akph_Approvals {
         return self::$names;
     }
 
+    /** An approval item of another module (inventory, procurement, payroll). */
+    public static function make_item($module, $label, $row_id, array $d) {
+        return self::item($module, $label, $row_id, $d);
+    }
+
     private static function item($module, $label, $row_id, array $d) {
         $names = self::project_names();
         $project = !empty($d['project_id']) ? (int) $d['project_id'] : 0;
@@ -70,7 +75,10 @@ final class Akph_Approvals {
             self::receipts($uid),
             self::contracts($uid),
             self::amendments($uid),
-            self::statements($uid)
+            self::statements($uid),
+            Akph_Inventory::approval_items($uid),
+            Akph_Procurement::approval_items($uid),
+            Akph_Payroll::approval_items($uid)
         );
         usort($items, function ($a, $b) {
             return strcmp($b['date'], $a['date']) ?: strcmp($b['id'], $a['id']);
