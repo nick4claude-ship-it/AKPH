@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Akph_Schema {
-    const DB_VERSION = '5';
+    const DB_VERSION = '6';
     const OPTION_VERSION = 'akph_portal_db_version';
     /** Tables that are not InnoDB (transactions and row locks would silently not work). */
     const OPTION_ENGINE_PROBLEMS = 'akph_portal_engine_problems';
@@ -500,6 +500,14 @@ final class Akph_Schema {
  PRIMARY KEY  (id),
  UNIQUE KEY link (document_id,entity_type,entity_id),
  KEY entity (entity_type,entity_id)",
+            // 0.6.1: one row (id 1) with the letterhead and the signatories of printed reports (JSON), versioned.
+            'report_settings' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+ settings longtext NULL,
+ logo_id bigint(20) unsigned NULL DEFAULT NULL,
+ version int(10) unsigned NOT NULL DEFAULT 1,
+ updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+ updated_at datetime NOT NULL,
+ PRIMARY KEY  (id)",
             'doc_sequences' => "id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
  prefix varchar(8) NOT NULL,
  fiscal_year smallint(5) unsigned NOT NULL,
@@ -531,7 +539,8 @@ final class Akph_Schema {
      * Versions: 1 — tables of 0.3.0; 2 — ledger_entries.reversal_target (the entry a reversal reverses, kept
      * after a rejected reversal releases reversal_of); 3 — ai_requests (assistant requests: audit and daily limit); 4 — documents and document_links (document
      * center and attachments; files in wp-content/uploads/akph-private); 5 — ledger_lines.cash_ref, ledger_events (one entry
-     * per business event) and the tables of petty cash, treasury and bank reconciliation.
+     * per business event) and the tables of petty cash, treasury and bank reconciliation; 6 — report_settings (company
+     * letterhead, logo and signatories of printed reports, one versioned row).
      */
     public static function migrate() {
         global $wpdb;

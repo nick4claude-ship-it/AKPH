@@ -44,6 +44,7 @@ import { MoneyInput } from '../../ui/NumberInput';
 import { Money } from '../common/Money';
 import { formatText } from '../../utils/formatters';
 import { AttachmentsPanel } from '../documents/AttachmentsPanel';
+import { JournalVoucherPrint } from './JournalVoucherPrint';
 
 interface JournalEntriesViewProps {
   entries: JournalEntry[];
@@ -96,6 +97,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
   const [rejectingEntryId, setRejectingEntryId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [printingEntry, setPrintingEntry] = useState<JournalEntry | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [newDocDate, setNewDocDate] = useState(() => toPersianDate(new Date()));
@@ -471,7 +473,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
           <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => window.print()}
+                onClick={() => setPrintingEntry(selectedEntry)}
                 className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-sm font-medium text-slate-700 inline-flex items-center gap-1 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -880,6 +882,7 @@ export const JournalEntriesView: React.FC<JournalEntriesViewProps> = ({
           </div>
         </Dialog>
       )}
+      {printingEntry && <JournalVoucherPrint entry={printingEntry} onClose={() => setPrintingEntry(null)} />}
     </div>
   );
 };

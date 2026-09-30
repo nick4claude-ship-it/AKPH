@@ -84,6 +84,12 @@ final class Akph_Rest {
             '/bank-statement-lines/' . self::ID . '/voucher' => array(array('POST', 'bank_line_voucher', $r::TREASURY_MANAGE)),
             // Approval center: everything waiting for the signed-in user, from every server module.
             '/approvals' => array(array('GET', 'approvals', $r::ACCESS)),
+            // 0.6.1: «تنظیمات گزارش و چاپ» (read by every portal user to print; changed by the system administrator)
+            // and the signature slots of a record from its approval history.
+            '/report-settings' => array(array('GET', 'report_settings', $r::ACCESS), array('POST', 'report_settings_update', $r::REPORT_SETTINGS)),
+            '/report-settings/users' => array(array('GET', 'report_settings_users', $r::REPORT_SETTINGS)),
+            '/report-settings/logo' => array(array('POST', 'report_logo_upload', $r::REPORT_SETTINGS), array('DELETE', 'report_logo_delete', $r::REPORT_SETTINGS)),
+            '/print/signatures' => array(array('GET', 'print_signatures', $r::ACCESS)),
             // «دستیار مدیریت»: the language model is called by the server only; settings for the system administrator.
             '/assistant/status' => array(array('GET', 'assistant_status', $r::ASSISTANT_USE)),
             '/assistant/ask' => array(array('POST', 'assistant_ask', $r::ASSISTANT_USE)),
@@ -475,7 +481,7 @@ final class Akph_Rest {
     }
 
     public static function treasury_update_settings(WP_REST_Request $request) {
-        return self::command($request, array('payment_senior_threshold'), function ($body) {
+        return self::command($request, array('payment_senior_threshold', 'vat_rate_percent'), function ($body) {
             return Akph_Treasury::update_settings($body);
         });
     }
@@ -834,6 +840,59 @@ final class Akph_Rest {
                 throw Akph_Error::invalid('نوع رکورد نامعتبر است.');
             }
             return Akph_Audit::list_rows($page, $per_page, $type, (int) $request->get_param('object_id'));
+        });
+    }
+
+    // ------------------------------------------------------------------ report settings and print (0.6.1)
+
+    public static function report_settings(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('settings' => Akph_Print::shape());
+        });
+    }
+
+    public static function report_settings_users(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('users' => Akph_Print::portal_users());
+        });
+    }
+
+    public static function report_settings_update(WP_REST_Request $request) {
+        return self::command($request, array('company', 'signatories', 'version'), function ($body) use ($request) {
+            $version = Akph_Input::version($request, $body);
+            unset($body['version']);
+            return Akph_Print::update($body, $version);
+        });
+    }
+
+    /** Multipart: file `logo`; the version in If-Match (or the form field `version`). */
+    public static function report_logo_upload(WP_REST_Request $request) {
+        $files = $request->get_file_params();
+        $tmp = isset($files['logo']['tmp_name']) && is_string($files['logo']['tmp_name']) ? $files['logo']['tmp_name'] : '';
+        $fingerprint = $tmp !== '' && is_file($tmp) ? (string) hash_file('sha256', $tmp) : '';
+        return Akph_Command::run($request, function ($body) use ($request) {
+            Akph_Account::assert_fields($request, $body, array('version'));
+            $fields = (array) $request->get_body_params();
+            return Akph_Print::upload_logo($request, Akph_Input::version($request, array_merge($fields, $body)));
+        }, array('fingerprint' => $fingerprint));
+    }
+
+    public static function report_logo_delete(WP_REST_Request $request) {
+        return self::command($request, array('version'), function ($body) use ($request) {
+            return Akph_Print::delete_logo(Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function print_signatures(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            $p = $request->get_query_params();
+            foreach (array_keys($p) as $key) {
+                if (!in_array($key, array('entity_type', 'entity_id'), true)) {
+                    throw new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));
+                }
+            }
+            $id = Akph_Input::id($p, 'entity_id', false);
+            return Akph_Print::signatures(isset($p['entity_type']) ? (string) $p['entity_type'] : '', $id);
         });
     }
 }

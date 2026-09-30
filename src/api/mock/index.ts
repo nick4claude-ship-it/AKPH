@@ -13,6 +13,8 @@ import { registerDocNumbers } from '../../utils/ids';
 import { demoCompany, mockUsers } from './seeds';
 import { createMockAccountApi } from './account';
 import { createMockDocumentApi } from './documents';
+import { createMockPrintApi } from './print';
+import type { CompanyProfile } from '../../types';
 
 /** Project ids a project manager may see; undefined for roles that see every project. */
 function projectScope(user: UserProfile, state: AppState): string[] | undefined {
@@ -55,6 +57,8 @@ export function createMockDataSource(): DataSource {
   let server: AppState | null = null;
   const ensure = () => (server ??= buildMockState());
   let signedIn: UserProfile = mockUsers[0];
+  let company: CompanyProfile = demoCompany;
+  const print = createMockPrintApi(() => company);
 
   return {
     kind: 'mock',
@@ -67,11 +71,14 @@ export function createMockDataSource(): DataSource {
       const sandboxUser = page?.mode === 'demo' ? { id: String(page.userId || 'admin'), name: page.displayName || 'مدیر سیستم', role: 'مدیر سیستم' as const, email: '', avatar: '' } : null;
       const base = sandboxUser || mockUsers.find((u) => u.id === userId) || mockUsers[0];
       signedIn = base;
+      company = page?.siteName ? { name: page.siteName, legalName: page.siteName } : demoCompany;
+      const reportSettings = await print.settings();
       return {
         user: { ...base, projectIds: projectScope(base, state) },
         currency: 'toman',
         fiscalYear: getCurrentFiscalYear(),
-        company: page?.siteName ? { name: page.siteName, legalName: page.siteName } : demoCompany,
+        company: reportSettings.company,
+        reportSettings,
       };
     },
 
@@ -92,6 +99,8 @@ export function createMockDataSource(): DataSource {
     account: createMockAccountApi(() => signedIn),
 
     documents: createMockDocumentApi(() => signedIn.name),
+
+    print,
 
     async listManagers() {
       return mockUsers.filter((u) => u.role === 'مدیر پروژه').map((u) => ({ id: u.id, name: u.name }));

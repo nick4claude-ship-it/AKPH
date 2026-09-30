@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { PayslipPrint } from './PayslipPrint';
 import {
   Users,
   CreditCard,
@@ -68,6 +69,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
 
   // Modal State for Slip View & Print
   const [selectedSlipForModal, setSelectedSlipForModal] = useState<PayrollSlip | null>(null);
+  const [printingSlip, setPrintingSlip] = useState<PayrollSlip | null>(null);
   const [notification, setNotification] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
   const showNotification = (text: string, type: 'success' | 'info' = 'success') => {
@@ -613,7 +615,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => setPrintingSlip(selectedSlipForModal)}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium cursor-pointer flex items-center gap-2"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -629,6 +631,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
             </div>
         </Dialog>
       )}
+      {printingSlip && <PayslipPrint slip={printingSlip} onClose={() => setPrintingSlip(null)} />}
     </div>
   );
 };

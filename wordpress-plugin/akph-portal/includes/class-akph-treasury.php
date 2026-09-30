@@ -68,6 +68,8 @@ final class Akph_Treasury {
         return array(
             // Payment requests above this amount (Rials) need the senior manager; up to it the accountant approves.
             'payment_senior_threshold' => isset($s['payment_senior_threshold']) && is_int($s['payment_senior_threshold']) ? $s['payment_senior_threshold'] : 1000000000,
+            // VAT rate (whole percent) of the settings screen; purchase orders and statements read it (0.6.1).
+            'vat_rate_percent' => isset($s['vat_rate_percent']) && is_int($s['vat_rate_percent']) ? $s['vat_rate_percent'] : 10,
         );
     }
 
@@ -77,6 +79,13 @@ final class Akph_Treasury {
         $s = $before;
         if (array_key_exists('payment_senior_threshold', $body)) {
             $s['payment_senior_threshold'] = Akph_Input::amount($body, 'payment_senior_threshold', 'آستانه تأیید مدیر ارشد');
+        }
+        if (array_key_exists('vat_rate_percent', $body)) {
+            $v = $body['vat_rate_percent'];
+            if (!is_int($v) || $v < 0 || $v > 100) {
+                throw Akph_Error::invalid('نرخ ارزش افزوده باید عدد صحیح بین ۰ و ۱۰۰ باشد.', array('field' => 'vat_rate_percent'));
+            }
+            $s['vat_rate_percent'] = $v;
         }
         update_option(self::OPTION, $s, false);
         Akph_Audit::log('treasury_settings', 'treasury_settings', 0, $before, $s);

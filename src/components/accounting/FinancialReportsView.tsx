@@ -8,6 +8,8 @@ import { useSelector } from '../../store/AppStore';
 import { selectFinancialReports } from '../../store/views/accounting';
 import { financialReportCsv } from '../../store/views/exports';
 import { Money } from '../common/Money';
+import { TablePrintDialog } from '../common/TablePrintDialog';
+import { getCurrentFiscalYear } from '../../utils/date';
 
 interface FinancialReportsViewProps {
   projects: Project[];
@@ -45,6 +47,8 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
   const totalCredit = trialTotals.credit;
 
   const exportCsv = () => downloadTable(financialReportCsv(reportType, reports, targetProject));
+  const [printing, setPrinting] = useState(false);
+  const reportLabel = REPORTS.find(([k]) => k === reportType)?.[1] || '';
 
   const row = (label: string, amount: number, className = '') => (
     <div className={`flex justify-between py-2 border-b border-slate-100 font-sans ${className}`}>
@@ -74,7 +78,7 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
             <Download className="w-3.5 h-3.5" />
             <span>خروجی Excel </span>
           </button>
-          <button onClick={() => window.print()} className="flex items-center gap-1 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium cursor-pointer">
+          <button onClick={() => setPrinting(true)} className="flex items-center gap-1 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-medium cursor-pointer">
             <Printer className="w-3.5 h-3.5" />
             <span>چاپ</span>
           </button>
@@ -293,6 +297,20 @@ export const FinancialReportsView: React.FC<FinancialReportsViewProps> = ({ proj
             </div>
           ))}
         </div>
+      )}
+      {printing && (
+        <TablePrintDialog
+          reportType="financial"
+          title={reportType === 'project_pnl' && targetProject ? `${reportLabel}: ${targetProject.name}` : reportLabel}
+          table={financialReportCsv(reportType, reports, targetProject)}
+          orientation={reportType === 'general_ledger' || reportType === 'trial_balance' ? 'landscape' : 'portrait'}
+          filters={[
+            { label: 'دوره', value: `سال مالی ${getCurrentFiscalYear()}` },
+            { label: 'مبنا', value: 'اسناد قطعی' },
+            ...(reportType === 'project_pnl' && targetProject ? [{ label: 'پروژه', value: `${targetProject.name} (${targetProject.code})` }] : []),
+          ]}
+          onClose={() => setPrinting(false)}
+        />
       )}
     </div>
   );

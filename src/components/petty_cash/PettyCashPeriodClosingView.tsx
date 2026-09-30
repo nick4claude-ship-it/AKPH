@@ -1,3 +1,4 @@
+import { getCurrentPersianMonthName, getCurrentFiscalYear } from '../../utils/date';
 import React, { useState } from 'react';
 import {
   Lock,
@@ -33,7 +34,7 @@ export const PettyCashPeriodClosingView: React.FC<PettyCashPeriodClosingViewProp
   const wf = useWorkflows();
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
-  const [closingPeriod, setClosingPeriod] = useState('شهریور ۱۴۰۳');
+  const [closingPeriod, setClosingPeriod] = useState(() => `${getCurrentPersianMonthName()} ${formatText(getCurrentFiscalYear())}`);
   const [isLocked, setIsLocked] = useState(false);
 
   // Check unresolved expenses for this account

@@ -124,10 +124,15 @@ export type OperationalSeeds = NonNullable<MockSeeds['operational']>;
 
 export { mockUsers };
 
-/** The fictional company of the demo dataset. Identifiers fail their check digits, so they match no real company. */
-export const demoCompany: CompanyProfile = {
-  name: 'شرکت پیمانکاری نمونه',
-  legalName: 'شرکت پیمانکاری نمونه (سهامی خاص) — داده ساختگی',
-  nationalId: '۱۰۱۰۰۰۰۰۰۰۱',
-  registrationNumber: '۰۰۰۰۰۱',
-};
+/**
+ * The fictional company of the demo dataset (demo builds only). Identifiers fail their check digits, so they
+ * match no real company. A plain production build (the plugin's sandbox) shows a neutral title instead.
+ */
+export const demoCompany: CompanyProfile = DEMO_DATA
+  ? {
+      name: 'شرکت پیمانکاری نمونه',
+      legalName: 'شرکت پیمانکاری نمونه (سهامی خاص) — داده ساختگی',
+      nationalId: '۱۰۱۰۰۰۰۰۰۰۱',
+      registrationNumber: '۰۰۰۰۰۱',
+    }
+  : { name: 'نسخه نمایشی', legalName: 'نسخه نمایشی' };

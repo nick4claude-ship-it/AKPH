@@ -28,6 +28,10 @@ import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { useSelector } from '../../store/AppStore';
 import { projectProfitability, projectVariance, selectBiSummary } from '../../store/views/reports';
 import { Money } from '../common/Money';
+import { TablePrintDialog } from '../common/TablePrintDialog';
+import { downloadTable } from '../../utils/export';
+import { biProjectsCsv } from '../../store/views/exports';
+import { getCurrentFiscalYear } from '../../utils/date';
 
 interface ReportsBIModuleProps {
   projects: Project[];
@@ -36,6 +40,7 @@ interface ReportsBIModuleProps {
 export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) => {
   const [activeTab, setActiveTab] = useState<'financial_summary' | 'projects_variance' | 'receivables_aging' | 'cost_centers'>('financial_summary');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+  const [printing, setPrinting] = useState(false);
 
   // Aggregates and receivables aging (store view model).
   const bi = useSelector((s) => selectBiSummary(s, projects), [projects]);
@@ -64,19 +69,15 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => window.print()}
+            onClick={() => setPrinting(true)}
             className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-sm transition-colors cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>چاپ گزارش</span>
           </button>
-          <button
-            disabled
-            title="اتصال به موتور هوش تجاری اکسل"
-            className="btn btn-secondary btn-sm"
-          >
+          <button onClick={() => downloadTable(biProjectsCsv(projects))} disabled={projects.length === 0} className="btn btn-secondary btn-sm">
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>خروجی اکسل (به‌زودی)</span>
+            <span>خروجی اکسل</span>
           </button>
         </div>
       </div>
@@ -297,6 +298,19 @@ export const ReportsBIModule: React.FC<ReportsBIModuleProps> = ({ projects }) =>
             </div>
           </div>
         </div>
+      )}
+      {printing && (
+        <TablePrintDialog
+          reportType="management"
+          title="گزارش مدیریتی سودآوری و انحراف پروژه‌ها"
+          table={biProjectsCsv(projects)}
+          orientation="landscape"
+          filters={[
+            { label: 'پروژه', value: 'همه پروژه‌های در دسترس' },
+            { label: 'دوره', value: `سال مالی ${getCurrentFiscalYear()}` },
+          ]}
+          onClose={() => setPrinting(false)}
+        />
       )}
     </div>
   );

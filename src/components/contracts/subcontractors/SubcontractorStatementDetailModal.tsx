@@ -36,6 +36,8 @@ import {
 import { formatDecimal, formatText } from '../../../utils/formatters';
 import { Money } from '../../common/Money';
 import { AttachmentsPanel } from '../../documents/AttachmentsPanel';
+import { OfficialPrint, moneyHeader } from '../../common/OfficialPrint';
+import { subcontractorStatementSignatures } from '../../../store/views/print';
 
 interface SubcontractorStatementDetailModalProps {
   isOpen: boolean;
@@ -366,103 +368,67 @@ export const SubcontractorStatementDetailModal: React.FC<SubcontractorStatementD
           )}
 
           {activeTab === 'print' && (
-            <div className="border border-slate-300 p-8 rounded-xl bg-white text-slate-900 space-y-6 shadow-sm">
-              <div className="text-center border-b border-slate-300 pb-4">
-                <h2 className="text-lg font-bold">{formatText(company.legalName)}</h2>
-                <h3 className="text-base font-bold text-slate-700 mt-1">
-                  برگه تأییدیه کارکرد و صورت‌وضعیت پیمانکار جزء
-                </h3>
-                <span className="text-xs text-slate-500 block mt-1">
-                  شماره: {formatText(statement.statementNumber)} | تاریخ: {formatText(statement.submissionDate)}
-                </span>
+            <div>
+              <div className="flex justify-end mb-3 no-print">
+                <button onClick={() => window.print()} className="btn btn-primary btn-sm">
+                  <Printer className="w-4 h-4" />
+                  <span>چاپ / ذخیره PDF</span>
+                </button>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm border border-slate-200 p-4 rounded-lg bg-slate-50">
-                <div>
-                  <span className="text-slate-500">پروژه:</span> <strong>{formatText(statement.projectName)}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500">شماره پیمان:</span>{' '}
-                  <strong>{formatText(statement.subcontractorContractNumber)}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500">پیمانکار جزء:</span>{' '}
-                  <strong>{formatText(statement.subcontractorName)}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500">رشته کاری:</span> <strong>{formatText(statement.tradeType)}</strong>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="table-scroll">
-                <table className="w-full text-right text-sm border border-slate-300">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300">
-                    <th className="p-2 border-l border-slate-300">ردیف</th>
-                    <th className="p-2 border-l border-slate-300">شرح عملیات</th>
-                    <th className="p-2 border-l border-slate-300 text-center">واحد</th>
-                    <th className="p-2 border-l border-slate-300 text-center">مقدار</th>
-                    <th className="p-2 border-l border-slate-300 text-left">نرخ واحد ({moneyUnitLabel()})</th>
-                    <th className="p-2 text-left">مبلغ کل ({moneyUnitLabel()})</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {statement.items.map((item, i) => (
-                    <tr key={item.id}>
-                      <td className="p-2 border-l border-slate-200 text-center">{i + 1}</td>
-                      <td className="p-2 border-l border-slate-200">{formatText(item.description)}</td>
-                      <td className="p-2 border-l border-slate-200 text-center">{formatText(item.unit)}</td>
-                      <td className="p-2 border-l border-slate-200 text-center font-bold">
-                        {formatDecimal(item.currentQuantity)}
-                      </td>
-                      <td className="p-2 border-l border-slate-200 text-left">
-                        {formatMoney(item.unitRate, false)}
-                      </td>
-                      <td className="p-2 text-left font-bold">{formatMoney(item.currentAmount, false)}</td>
+              <OfficialPrint
+                reportType="subcontractor_statement"
+                title="برگه تأییدیه کارکرد و صورت‌وضعیت پیمانکار جزء"
+                number={statement.statementNumber}
+                money
+                localSignatures={subcontractorStatementSignatures(statement)}
+                entity={null}
+                filters={[
+                  { label: 'پروژه', value: statement.projectName },
+                  { label: 'پیمان', value: statement.subcontractorContractNumber },
+                  { label: 'پیمانکار جزء', value: statement.subcontractorName },
+                  { label: 'رشته کاری', value: statement.tradeType },
+                  { label: 'تاریخ ثبت', value: statement.submissionDate },
+                ]}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ردیف</th>
+                      <th>شرح عملیات</th>
+                      <th>واحد</th>
+                      <th>مقدار</th>
+                      <th>{moneyHeader('نرخ واحد')}</th>
+                      <th>{moneyHeader('مبلغ کل')}</th>
                     </tr>
-                  ))}
-                  <tr className="bg-slate-50 font-bold border-t border-slate-300">
-                    <td colSpan={5} className="p-2 text-left border-l border-slate-300">
-                      مبلغ ناخالص صورت‌وضعیت:
-                    </td>
-                    <td className="p-2 text-left">{formatMoney(statement.grossAmount, false)}</td>
-                  </tr>
-                  <tr className="bg-slate-50 border-t border-slate-200 text-rose-700">
-                    <td colSpan={5} className="p-2 text-left border-l border-slate-300">
-                      کسورات (حسن انجام کار، پیش‌پرداخت، جریمه):
-                    </td>
-                    <td className="p-2 text-left">{formatMoney(statement.totalDeductions, false)}</td>
-                  </tr>
-                  <tr className="bg-amber-100 font-bold border-t border-slate-300 text-amber-950">
-                    <td colSpan={5} className="p-2 text-left border-l border-slate-300">
-                      خالص قابل پرداخت به پیمانکار:
-                    </td>
-                    <td className="p-2 text-left"><Money rial={statement.netPayable} /></td>
-                  </tr>
-                </tbody>
-              </table>
-              </div>
-
-              {/* 4 Signatures row */}
-              <div className="grid grid-cols-4 gap-2 pt-8 text-center text-sm">
-                <div className="border-t border-slate-400 pt-2">
-                  <span className="font-bold block text-slate-800">پیمانکار جزء</span>
-                  <span className="text-xs text-slate-500 mt-1 block">مهر و امضا</span>
-                </div>
-                <div className="border-t border-slate-400 pt-2">
-                  <span className="font-bold block text-slate-800">سرپرست کارگاه</span>
-                  <span className="text-xs text-slate-500 mt-1 block">تأیید متره میدانی</span>
-                </div>
-                <div className="border-t border-slate-400 pt-2">
-                  <span className="font-bold block text-slate-800">مدیر پروژه</span>
-                  <span className="text-xs text-slate-500 mt-1 block">تأیید فنی و زمانی</span>
-                </div>
-                <div className="border-t border-slate-400 pt-2">
-                  <span className="font-bold block text-slate-800">مدیرعامل / امور مالی</span>
-                  <span className="text-xs text-slate-500 mt-1 block">دستور پرداخت</span>
-                </div>
-              </div>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    {statement.items.map((item, i) => (
+                      <tr key={item.id}>
+                        <td>{formatDecimal(i + 1)}</td>
+                        <td>{formatText(item.description)}</td>
+                        <td>{formatText(item.unit)}</td>
+                        <td>{formatDecimal(item.currentQuantity)}</td>
+                        <td>{formatMoney(item.unitRate, false)}</td>
+                        <td>{formatMoney(item.currentAmount, false)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="font-bold">
+                      <td colSpan={5}>مبلغ ناخالص صورت‌وضعیت</td>
+                      <td>{formatMoney(statement.grossAmount, false)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5}>کسورات (حسن انجام کار، پیش‌پرداخت، بیمه، مالیات، جریمه)</td>
+                      <td>{formatMoney(statement.totalDeductions, false)}</td>
+                    </tr>
+                    <tr className="font-bold">
+                      <td colSpan={5}>خالص قابل پرداخت به پیمانکار</td>
+                      <td>{formatMoney(statement.netPayable, false)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </OfficialPrint>
             </div>
           )}
         </div>

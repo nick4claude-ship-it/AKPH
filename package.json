@@ -22,10 +22,11 @@
     "test:rules": "node scripts/run-ts.mjs scripts/posting-rules.ts",
     "test:save": "node scripts/run-ts.mjs scripts/save-queue.ts",
     "test:boundary": "node scripts/check-design-boundary.mjs",
-    "test": "npm run test:save && npm run test:money && npm run test:numbering && npm run test:duties && npm run test:rules && npm run test:posting && npm run test:workflows && npm run test:api && npm run test:master && npm run test:chart && npm run test:boundary",
+    "test": "npm run test:save && npm run test:money && npm run test:numbering && npm run test:duties && npm run test:rules && npm run test:posting && npm run test:workflows && npm run test:api && npm run test:master && npm run test:chart && npm run test:boundary && npm run test:live-bundle",
     "check:design": "node scripts/check-design.mjs",
     "design:pack": "node scripts/design-pack.mjs",
-    "test:ui": "node scripts/ui-screens.mjs"
+    "test:ui": "node scripts/ui-screens.mjs && node scripts/ui-print-live.mjs",
+    "test:live-bundle": "node scripts/check-live-bundle.mjs"
   },
   "dependencies": {
     "@fontsource-variable/vazirmatn": "^5.3.0",

@@ -103,6 +103,22 @@ const responses: Record<string, unknown> = {
     settings: { payment_senior_threshold: 1_000_000_000 },
   },
   'GET approvals': approvalsBody,
+  'GET treasury/settings': { settings: { payment_senior_threshold: 1_000_000_000, vat_rate_percent: 9 } },
+  'GET report-settings': { settings: {
+    company: { legal_name: 'آریا کاوش پی هامون', national_id: '', registration_number: '', economic_code: '', address: '', phone: '', logo_url: null },
+    signatories: { projects: [{ title: 'تهیه‌کننده', user_id: null, name: '' }, { title: 'مدیرعامل', user_id: '4', name: 'مدیر یک' }], journal_entry: [] },
+    report_types: [{ key: 'projects', label: 'گزارش پروژه‌ها', workflow: false }, { key: 'journal_entry', label: 'سند حسابداری', workflow: true }],
+    version: 3, updated_at: null,
+  } },
+  'GET print/signatures': { entity_type: 'journal_entry', entity_id: '12', report_type: 'journal_entry', number: 'ACC-1405-00002', slots: [
+    { title: 'تهیه‌کننده', user_id: '7', name: 'حسابدار یک', role: '', at: '2026-09-20T08:00:00Z', signed: true, source: 'approval' },
+    { title: 'تأییدکننده', user_id: null, name: '', role: '', at: null, signed: false, source: 'approval' },
+  ] },
+  'POST treasury/settings': { message: 'تنظیمات خزانه ذخیره شد.', records: { treasury_settings: [{ payment_senior_threshold: 1_000_000_000, vat_rate_percent: 10 }] } },
+  'POST report-settings': { message: 'تنظیمات گزارش و چاپ ذخیره شد.', records: { report_settings: [{
+    company: { legal_name: 'آریا کاوش پی هامون', national_id: '10100000000', registration_number: '', economic_code: '', address: '', phone: '', logo_url: null },
+    signatories: { projects: [{ title: 'حسابدار', user_id: null, name: '' }] }, report_types: [], version: 4, updated_at: null,
+  }] } },
   'GET treasury/accounts/61/reconciliation': { account: {}, statement_lines: [], unmatched_ledger_lines: [{ line_id: '501', doc_number: 'ACC-1405-00010', date: '2026-09-23', description: 'x', direction: 'withdrawal', amount: 25_000 }] },
   'POST petty-cash/expenses/51/approve': { message: 'هزینه EXP-1405-00002 تأیید نهایی شد و سند ACC-1405-00011 صادر شد.', id: '51', doc_number: 'ACC-1405-00011', records: {
     petty_expenses: [expense({ status: 'approved', current_step: null, step_index: 2, entry: { id: '92', number: 'ACC-1405-00011', status: 'posted' }, version: 3 })],
@@ -194,7 +210,7 @@ assert.equal(session.user.role, 'حسابدار');
 assert.equal(session.user.id, '7');
 assert.equal(session.user.projectIds, undefined, 'view-all roles are not scoped');
 assert.equal(session.currency, 'rial');
-assert.equal(session.company.name, 'شرکت آزمون');
+assert.equal(session.company.name, 'آریا کاوش پی هامون', 'the report settings name the company (the site name only when they cannot be read)');
 const state = await source.loadState(session);
 assert.equal(state.projects[0].status, 'تجهیز کارگاه');
 assert.equal(state.projects[0].startDate, '۱۴۰۵/۰۱/۱۵', 'ISO dates become Jalali');
@@ -473,6 +489,39 @@ assert.equal(replaced.chartOfAccounts[0].code, '1');
   await sendCommand('POST', 'journal-entries/12/post', {}, { idempotencyKey: 'retry-key-4' });
   assert.deepEqual(sends().map((c) => c.headers['Idempotency-Key']), ['retry-key-4', 'retry-key-4'], 'a lost answer is asked again with the same key');
   console.log('  ✔ خطای 409 akph_retry (بن‌بست/پایان مهلت قفل) و پاسخ گم‌شده یک بار با همان کلید تکرار می‌شوند؛ تعارض نسخه تکرار نمی‌شود');
+}
+
+// ---------------------------------------------------------------- report settings and print (0.6.1)
+{
+  const { readOnlyNoticeFor } = await import('../src/store/readOnly');
+  assert.equal(session.company.legalName, 'آریا کاوش پی هامون', 'the letterhead comes from the report settings, not the site name');
+  assert.equal(session.reportSettings?.version, 3);
+  assert.deepEqual(session.reportSettings?.signatories.projects, [{ title: 'تهیه‌کننده', userId: null, name: '' }, { title: 'مدیرعامل', userId: '4', name: 'مدیر یک' }]);
+  assert.equal(state.financeSettings.vatRatePercent, 9, 'VAT rate from the server');
+  assert.equal(readOnlyNoticeFor(source.writablePaths, '/settings'), null, '/settings is not read-only with the server');
+
+  calls.length = 0;
+  await commands.run('updateFinanceSettings', [{ vatRatePercent: 10 }], state, 'submission-key-vat1');
+  const vat = calls.find((c) => c.url === 'treasury/settings' && c.method === 'POST')!;
+  assert.deepEqual(vat.body, { vat_rate_percent: 10 });
+
+  const print = source.print!;
+  calls.length = 0;
+  const saved = await print.save({ company: { nationalId: '10100000000' }, signatories: { projects: [{ title: 'حسابدار', userId: null, name: ' ' }, { title: 'مدیرعامل', userId: '4', name: 'نادیده' }] } }, 3, 'report-settings-key-1');
+  const post = calls.find((c) => c.url === 'report-settings')!;
+  assert.deepEqual(post.body, { version: 3, company: { national_id: '10100000000' }, signatories: { projects: [{ title: 'حسابدار', name: '' }, { title: 'مدیرعامل', user_id: '4' }] } }, 'a slot sends a user id or a typed name, never both');
+  assert.equal(post.headers['If-Match'], '"3"');
+  assert.equal(post.headers['Idempotency-Key'], 'report-settings-key-1');
+  assert.equal(saved.settings.version, 4);
+  assert.equal(saved.settings.company.nationalId, '10100000000');
+
+  const sig = await print.signatures('journal_entry', '12');
+  const sigCall = calls.find((c) => c.url === 'print/signatures')!;
+  assert.match(sigCall.query, /entity_type=journal_entry/);
+  assert.equal(sig?.slots[0].name, 'حسابدار یک');
+  assert.equal(sig?.slots[1].signed, false);
+  assert.equal(sig?.slots[1].at, null, 'an unsigned step has no date');
+  console.log('  ✔ تنظیمات گزارش و چاپ (سربرگ، امضاکنندگان، نسخه و کلید)، نرخ ارزش افزوده و امضاهای سند از سرور');
 }
 
 // ---------------------------------------------------------------- strict parsing

@@ -37,8 +37,10 @@ export interface CsvTable {
   filename: string;
   headers: string[];
   rows: CsvCell[][];
+  /** «جمع» row, written last in the file and as the footer of the printed table. */
+  totals?: CsvCell[];
 }
 
 export function downloadTable(table: CsvTable): void {
-  downloadCsv(table.filename, table.headers, table.rows);
+  downloadCsv(table.filename, table.headers, table.totals ? [...table.rows, table.totals] : table.rows);
 }

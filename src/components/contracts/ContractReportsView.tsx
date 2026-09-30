@@ -26,6 +26,8 @@ import { contractProgress } from '../../store/views/contracts';
 import { clientReceivablesCsv, clientStatementsCsv, contractProgressCsv } from '../../store/views/exports';
 import { useCompany } from '../../store/session';
 import { Money } from '../common/Money';
+import { TablePrintDialog } from '../common/TablePrintDialog';
+import { toPersianDate } from '../../utils/date';
 
 interface ContractReportsViewProps {
   contracts: Contract[];
@@ -45,9 +47,10 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
     'progress'
   );
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const [printing, setPrinting] = useState(false);
+  const handlePrint = () => setPrinting(true);
+  const printTable = activeReport === 'statements' ? clientStatementsCsv(statements) : activeReport === 'receivables' ? clientReceivablesCsv(contracts) : contractProgressCsv(contracts);
+  const printTitle = activeReport === 'statements' ? 'گزارش جامع صورت‌وضعیت‌ها' : activeReport === 'receivables' ? 'گزارش مطالبات از کارفرمایان' : 'گزارش کارکرد در برابر سقف قراردادها';
 
   const handleExportCSV = () => {
     if (activeReport === 'progress') downloadTable(contractProgressCsv(contracts));
@@ -125,7 +128,7 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
           <div className="flex justify-between items-center pb-3 border-b border-slate-200">
             <div>
               <h3 className="text-base font-bold text-slate-900">گزارش کارکرد متره شده در برابر سقف قراردادها</h3>
-              <span className="text-xs text-slate-500">تاریخ گزارش: مهر ماه ۱۴۰۳ · {formatText(company.name)}</span>
+              <span className="text-xs text-slate-500">تاریخ گزارش: {formatText(toPersianDate(new Date()))} · {formatText(company.name)}</span>
             </div>
           </div>
 
@@ -306,6 +309,7 @@ export const ContractReportsView: React.FC<ContractReportsViewProps> = ({
           </div>
         </div>
       )}
+      {printing && <TablePrintDialog reportType="contracts" title={printTitle} table={printTable} orientation="landscape" onClose={() => setPrinting(false)} />}
     </div>
   );
 };
