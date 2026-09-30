@@ -230,9 +230,12 @@ class Test_Akph_Contracts extends Akph_Test_Case {
             return $i['id'] === 'client_statement:' . $s['id'];
         }))[0];
         $this->assertSame(array('employer_ref', 'employer_date'), $item['requires']);
+        $this->assertTrue($item['approval'], 'the employer step is an approval (the creator may not take it)');
         $done = $this->ok('accountant', 'POST', "/statements/{$s['id']}/approve", array('version' => 4, 'employer_ref' => 'ک-۱', 'employer_date' => $this->today));
         $s = $done['records']['statements'][0];
         $this->assertSame('approved_by_employer', $s['status']);
+        $last = end($s['history']);
+        $this->assertSame(array('approved', 'approved_by_consultant', 'approved_by_employer'), array($last['action'], $last['from'], $last['to']), 'the step trail records the status change');
         $this->assertMatchesRegularExpression('/^ACC-\d{4}-\d{5}$/', $done['doc_number']);
         $lines = $this->entry_lines($s['entry']['id']);
         $this->assertSame($s['net_amount'], $lines['11201']);

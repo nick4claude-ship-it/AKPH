@@ -91,6 +91,11 @@ export function useReadOnlyNotice(pathname: string): string | null {
   return readOnlyNoticeFor(useSession().writablePaths, pathname);
 }
 
+/** true with the official books (akph/v1): numbers, approvals and postings are the server's. */
+export function useServerBooks(): boolean {
+  return Boolean(useSession().writablePaths);
+}
+
 /** Users who may be assigned as project manager (empty while loading or when unavailable). */
 export function useProjectManagers(): { id: string; name: string }[] {
   const { listManagers } = useSession();

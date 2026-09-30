@@ -7,6 +7,7 @@ import { useCallback } from 'react';
 import { ApprovalItem } from '../types';
 import { useWorkflows } from './useWorkflows';
 import { WorkflowResult } from './workflows';
+import type { EmployerApprovalFields } from './recordWorkflows';
 
 /**
  * Routes approve/reject from the approval center (or dashboard) back to the workflow of the
@@ -16,9 +17,9 @@ export function useApprovalActions() {
   const wf = useWorkflows();
 
   const approve = useCallback(
-    (item: ApprovalItem, comment?: string): WorkflowResult => {
+    (item: ApprovalItem, comment?: string, fields?: EmployerApprovalFields): WorkflowResult => {
       // akph/v1: the item names its own module's command (GET /approvals).
-      if (item.server) return wf.decideServerApproval(item, 'approve', comment || '');
+      if (item.server) return wf.decideServerApproval(item, 'approve', comment || '', fields);
       switch (item.module) {
         case 'client_statement':
           return wf.advanceClientStatement(item.recordId, comment);
@@ -88,4 +89,6 @@ export const APPROVAL_MODULE_PATHS: Record<ApprovalItem['module'], string> = {
   bank_voucher: '/finance/accounting',
   petty_replenishment: '/petty-cash',
   receipt: '/finance/receipts',
+  contract: '/contracts/client',
+  contract_amendment: '/contracts/client',
 };

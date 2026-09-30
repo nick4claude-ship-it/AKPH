@@ -8,6 +8,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ArrowDownLeft, Plus, X } from 'lucide-react';
 import { ReceiptRecord } from '../../types';
 import { useAppState } from '../../store/AppStore';
+import { useServerBooks } from '../../store/session';
 import { useWorkflows } from '../../store/useWorkflows';
 import { selectReceiptsFigures } from '../../store/views/treasury';
 import { formatNumber, formatCurrencyCompact, formatDecimal, formatText } from '../../utils/formatters';
@@ -34,6 +35,10 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
   const [sourceType, setSourceType] = useState<ReceiptSource>('صورت‌وضعیت کارفرما');
   const [statementId, setStatementId] = useState(preselected);
   const [counterpartyId, setCounterpartyId] = useState('');
+  // akph/v1: a client advance (پیش‌دریافت) is received against an approved client contract.
+  const live = useServerBooks();
+  const [contractId, setContractId] = useState('');
+  const advanceContracts = state.contracts.filter((c) => c.server?.status === 'active');
   const [projectId, setProjectId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
   const [amount, setAmount] = useState(() => state.clientStatements.find((s) => s.id === preselected)?.remainingPayable || 0);
@@ -50,6 +55,7 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
     const result = wf.recordReceipt({
       sourceType,
       statementId: sourceType === 'صورت‌وضعیت کارفرما' ? statementId : undefined,
+      contractId: sourceType === 'پیش‌پرداخت' && live ? contractId : undefined,
       counterpartyId: sourceType === 'صورت‌وضعیت کارفرما' ? undefined : counterpartyId,
       projectId: sourceType === 'صورت‌وضعیت کارفرما' ? undefined : projectId,
       amount,
@@ -168,6 +174,18 @@ export const TreasuryReceiptsTab: React.FC<{ onToast: (msg: string) => void }> =
                   ))}
                 </select>
                 {statement && <span className="text-xs text-slate-500">کارفرما: {formatText(statement.client)}</span>}
+              </label>
+            ) : sourceType === 'پیش‌پرداخت' && live ? (
+              <label className="block space-y-1">
+                <span className="text-slate-600">قرارداد کارفرما (پیش‌دریافت)</span>
+                <select value={contractId} onChange={(e) => setContractId(e.target.value)} required className="w-full p-2 rounded-lg border border-slate-300">
+                  <option value="">— انتخاب قرارداد —</option>
+                  {advanceContracts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {formatText(c.code)} · {formatText(c.employer)} · {formatText(c.projectName)}
+                    </option>
+                  ))}
+                </select>
               </label>
             ) : (
               <div className="grid grid-cols-2 gap-2">

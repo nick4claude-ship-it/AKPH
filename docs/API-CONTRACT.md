@@ -116,6 +116,12 @@
 | `GET /report-settings` | `akph_access` | ✓ | ✓ |
 | `POST /report-settings`، `GET /report-settings/users`، `POST|DELETE /report-settings/logo` | `akph_report_settings` (فقط مدیر سیستم) | — | — |
 | `GET /print/signatures` | `akph_access` + دسترسی به همان رکورد | ✓ | ✓ فقط رکورد پروژه‌های خودش (سند حسابداری، درخواست پرداخت و دریافت هرگز) |
+| `GET /contracts`، `GET /contracts/{id}`، `GET /contracts/guarantees-due`، `GET /reports/contracts`، `GET /statements`، `GET /statements/{id}` | `akph_access` | ✓ همه | ✓ فقط پروژه‌های خودش |
+| `POST /contracts`، `POST /contracts/{id}`، `/amendments`، `/guarantees`، `/advance`، `POST /contract-guarantees/{id}` | `akph_contracts_manage` | ✓ | — |
+| `POST /contracts/{id}/approve`، `/reject`، `POST /contract-amendments/{id}/approve`، `/reject` | `akph_contracts_approve` + نقش مرحله | — | ✓ مرحله «مدیر پروژه» قرارداد جزء پروژه خودش |
+| `POST /client-statements`، `POST /subcontractor-statements`، `POST /statements/{id}` | `akph_statements_prepare` | — | ✓ پروژه خودش |
+| `POST /statements/{id}/approve`، `/return`، `/reject` | مرحله تهیه: `akph_statements_prepare`؛ مرحله تأیید: `akph_contracts_approve` + نقش مرحله | ✓ مرحله «حسابدار» | ✓ مراحل «مدیر پروژه» پروژه خودش |
+| `POST /statements/{id}/void` | مدیر ارشد یا مدیر سیستم | — | — |
 | `GET /` (فهرست فضای نام) | `akph_access` | ✓ | ✓ |
 
 ## ۴. جزئیات مسیرها
@@ -463,7 +469,7 @@
 | `POST /payment-requests` | `amount`، `beneficiary_name`، `payable_type` (`supplier`، `subcontractor`، `payroll`، `insurance`، `tax_vat`، `tax_payroll`، `tax_withholding`، `advance`، `subcontractor_advance`، `general_expense`) یا `debit_account_code`، `project_id`، `cost_center_id`، `counterparty_id`، `due_date`، `priority`، `description` | ثبت دستی؛ درخواست‌های منبع‌دار (شارژ تنخواه) را ماژول مبدأ می‌سازد |
 | `POST /payment-requests/{id}/approve`، `/reject` | `version`؛ رد: `reason` | نه درخواست‌کننده؛ حسابدار تا آستانه `payment_senior_threshold` (پیش‌فرض ۱٬۰۰۰٬۰۰۰٬۰۰۰ ریال)، بالاتر مدیر ارشد |
 | `POST /payment-requests/{id}/pay` | `amount`، `account_id`، `method` (`satna`\|`paya`\|`transfer`\|`card`\|`cash`\|`cheque`)، `tracking`، `date`، `cheque_number`، `cheque_due_date`، `version` | پرداخت‌کننده ≠ تأییدکننده؛ پرداخت جزئی مجاز و مانده به‌روز می‌شود؛ مبدأ منفی نمی‌شود؛ چک: بستانکار اسناد پرداختنی ۲۱۱۰۳ |
-| `POST /receipts`، `/{id}/approve`، `/{id}/reject` | `amount`، `receipt_type` (`statement` ۱۱۲۰۱، `advance` ۲۱۳۰۱، `other_income` ۴۱۳۰۲، `custom` + `credit_account_code`)، `account_id`، `counterparty_id` یا `payer_name`، `project_id`، `method`، `tracking`، `cheque_number`، `cheque_bank`، `cheque_due_date`، `date`، `description` | تأیید با کاربر دیگر؛ چک دریافتی: بدهکار اسناد دریافتنی ۱۱۲۰۲ |
+| `POST /receipts`، `/{id}/approve`، `/{id}/reject` | `amount`، `receipt_type` (`statement` ۱۱۲۰۱ با `statement_id` صورت‌وضعیت مصوب و حداکثر تا مانده آن، `advance` ۲۱۳۰۱ با `contract_id` قرارداد کارفرمای فعال، `other_income` ۴۱۳۰۲، `custom` + `credit_account_code`)، `account_id`، `counterparty_id` یا `payer_name`، `project_id`، `method`، `tracking`، `cheque_number`، `cheque_bank`، `cheque_due_date`، `date`، `description` | تأیید با کاربر دیگر؛ چک دریافتی: بدهکار اسناد دریافتنی ۱۱۲۰۲ |
 | `POST /treasury/transfers` | `from_account_id`، `to_account_id`، `amount`، `date`، `tracking`، `description` | سند همان لحظه؛ مبدأ منفی نمی‌شود |
 | `POST /cheques/{id}/status` | `status` (`cleared`\|`bounced`)، `note` (برگشت: الزامی)، `date`، `account_id`، `version` | هر تغییر یک سند؛ برگشت چک پرداختنی درخواست پرداخت را دوباره باز می‌کند |
 | `POST /treasury/accounts/{id}/statement` | `lines: [{ date, description, deposit, withdrawal, reference }]` یا `csv` (همان ستون‌ها؛ تاریخ شمسی یا میلادی) | حداکثر ۱۰۰۰ ردیف |
@@ -476,7 +482,9 @@
 
 `GET /approvals` → `{ "items": [...], "total": 2 }`؛ فقط مواردی که مرحله جاری‌شان با نقش (و پروژه) همین کاربر است و کاربر ثبت‌کننده یا
 تأییدکننده مرحله قبل نیست و مبلغ در آستانه اوست: سند دستی، سند معکوس، سند تعدیل شمارش، سند مغایرت بانکی، هزینه تنخواه، درخواست شارژ،
-درخواست پرداخت و دریافت.
+درخواست پرداخت و دریافت؛ از ۰٫۷ قرارداد (`contract`)، الحاقیه (`contract_amendment`) و صورت‌وضعیت‌ها (`client_statement`،
+`subcontractor_statement`). مورد صورت‌وضعیت `approval` (مرحله تأیید یا تهیه) و `requires` (در تأیید کارفرما
+`["employer_ref", "employer_date"]`) هم دارد.
 
 ```json
 { "id": "petty_cash_expense:51", "module": "petty_cash_expense", "module_label": "هزینه تنخواه", "record_id": "51", "doc_number": "EXP-1405-00002",
@@ -486,6 +494,57 @@
 ```
 
 تأیید و رد همیشه فرمان ماژول مالک (`approve_path` / `reject_path`) است؛ کپی رکوردی در کارتابل نیست.
+
+### قراردادها و صورت‌وضعیت‌ها (۰٫۷٫۰)
+
+مقدار رشته اعشاری با حداکثر سه رقم (`"120.5"`) و مبلغ ریال صحیح است؛ درصد رشته یا عدد با حداکثر دو رقم اعشار. مبلغ ردیف،
+مبلغ قرارداد و الحاقیه، مقدار قبلی، کسورات، ارزش افزوده، خالص و شماره‌ها را سرور تعیین می‌کند و از کلاینت پذیرفته نمی‌شود.
+
+`GET /contracts[?kind=client|subcontract]` → `{ contracts: [...] }`:
+
+```json
+{ "id": "201", "number": "CNT-1405-00001", "kind": "client", "contract_no": "ق-۱۰۰", "title": "…", "project_id": "5", "cost_center_id": "8",
+  "counterparty_id": "3", "counterparty_name": "…", "trade_type": "", "amount": 200000000, "contract_date": "2026-03-25", "start_date": "…", "end_date": "…",
+  "duration_days": 360, "advance_pct": "10", "retention_pct": "5", "insurance_pct": "5", "tax_pct": "3", "other_pct": "0",
+  "adjustment_base_index": "100", "adjustment_factor_pct": "95", "status": "pending|active|rejected|closed", "chain": ["مدیر ارشد"], "step_index": 0,
+  "current_step": "مدیر ارشد", "history": [...], "created_by": "7", "last_approved_by": null, "reject_reason": "",
+  "lines": [{ "id": "301", "row_no": 1, "code": "010101", "description": "…", "unit": "m3", "base_quantity": "100", "quantity": "120.5", "rate": 2000000,
+              "amount": 241000000, "approved_quantity": "40", "pending_quantity": "10.25", "amendment_id": null }],
+  "amendments": [...], "guarantees": [{ "id": "501", "kind": "performance", "guarantee_no": "…", "bank": "…", "amount": 10000000, "issue_date": "…",
+  "due_date": "…", "status": "active", "days_to_due": 10, "due_soon": true, "version": 1 }],
+  "amendments_total": 41000000, "extend_days": 30, "current_amount": 241000000, "measured_amount": 100500000, "approved_amount": 80000000,
+  "approved_gross": 87200000, "approved_net": 70000000, "remaining_amount": 161000000, "settled_amount": 30000000, "balance_due": 40000000,
+  "advance_amount": 20000000, "advance_expected": 24100000, "advance_remaining": 12000000, "deductions": { "retention": 4000000 }, "version": 5 }
+```
+
+| فرمان | بدنه | قاعده |
+|---|---|---|
+| `POST /contracts` | `kind`، `contract_no`، `title`، `project_id`، `cost_center_id` (جزء: الزامی)، `counterparty_id` (کارفرما یا پیمانکار جزء)، `trade_type` (جزء)، `contract_date`، `start_date`، `end_date`، `duration_days`، `advance_pct`، `retention_pct`، `insurance_pct`، `tax_pct`، `other_pct`، `adjustment_base_index`، `adjustment_factor_pct`، `description`، `lines: [{ code, description, unit, quantity, rate }]` | شماره CNT/SCN؛ وضعیت `pending`؛ زنجیره کارفرما [مدیر ارشد]، جزء [مدیر پروژه، مدیر ارشد] |
+| `POST /contracts/{id}` | همان فیلدها + `version` | فقط `pending` یا `rejected` (ارسال دوباره از ابتدای زنجیره) |
+| `POST /contracts/{id}/approve`، `/reject` | `comment` / `reason`، `version` | ثبت‌کننده و تأییدکننده مرحله قبل تأیید نمی‌کنند |
+| `POST /contracts/{id}/amendments` | `amendment_no`، `date`، `extend_days`، `description`، `lines: [{ contract_line_id, quantity_delta }` یا `{ description, unit, rate, quantity_delta }]` | فقط قرارداد فعال؛ شماره AMD؛ کاهش کمتر از مقدار اندازه‌گیری‌شده ممنوع |
+| `POST /contract-amendments/{id}/approve`، `/reject` | `comment` / `reason`، `version` | مدیر ارشد، نه ثبت‌کننده؛ ردیف جدید و تغییر مقدار فقط پس از تأیید |
+| `POST /contracts/{id}/guarantees` | `kind` (`performance`\|`advance`\|`retention`\|`bid`\|`other`)، `guarantee_no`، `bank`، `amount`، `issue_date`، `due_date`، `notes` | |
+| `POST /contract-guarantees/{id}` | `status` (`active`\|`released`\|`expired`)، `due_date`، `notes`، `version` | |
+| `POST /contracts/{id}/advance` | `amount`، `due_date` | فقط قرارداد جزء فعال؛ درخواست پرداخت خزانه (`subcontractor_advance`، ۱۱۴۰۲) تا سقف درصد پیش‌پرداخت |
+
+`GET /contracts/guarantees-due` → `{ guarantees }` ضمانت‌نامه‌های فعال با سررسید تا ۳۰ روز آینده یا گذشته.
+`GET /reports/contracts?project_id=&counterparty_id=` → `{ summary: { client: {...}, subcontract: {...} } }` جمع مبالغ بالا برای صفحه پروژه و طرف حساب.
+
+`GET /statements[?kind=]` → `{ statements: [...] }`؛ هر صورت‌وضعیت: `number` (STC/STS)، `kind`، `title`، `contract_id`، `period_start`، `period_end`،
+`status`، `current_step: { label, role, approval, next_status, requires }`، `lines: [{ contract_line_id, contract_quantity, previous_quantity, quantity,
+cumulative_quantity, rate, amount, cumulative_amount }]`، `work_amount`، `adjustment_index`، `adjustment_amount`، `vat_rate`، `vat_amount`، `gross_amount`،
+`fixed_deduction`، `deductions: [{ type, title, rate, amount }]`، `total_deductions`، `net_amount`، `settled_amount`، `pending_receipts`، `balance_due`،
+`payment_request`، `employer_ref`، `employer_date`، `history` (هر ردیف با `from` و `to`)، `entry`، `void_entry`، `version`.
+
+| فرمان | بدنه | قاعده |
+|---|---|---|
+| `POST /client-statements` | `contract_id`، `title`، `period_start`، `period_end`، `lines: [{ contract_line_id, quantity }]`، `include_vat`، `adjustment_index`، `fixed_deduction` (مصالح تحویلی کارفرما)، `description`، `submit` | قرارداد فعال؛ قبلی + در جریان + این دوره ≤ مقدار قرارداد |
+| `POST /subcontractor-statements` | همان، بدون `include_vat` و `submit`؛ `fixed_deduction` = جریمه و سایر | |
+| `POST /statements/{id}` | فیلدهای بالا + `version` | فقط پیش‌نویس و اندازه‌گیری‌شده (کارفرما، پیش از ارسال به مشاور)، ثبت‌شده (جزء، پیش از اندازه‌گیری) یا برگشتی |
+| `POST /statements/{id}/approve` | `comment`، `version`؛ تأیید کارفرما: `employer_ref`، `employer_date` | مرحله بعد؛ مرحله نهایی سند `CLIENT_STATEMENT_APPROVED` / `SUBCONTRACTOR_STATEMENT_APPROVED` و (جزء) درخواست پرداخت خالص |
+| `POST /statements/{id}/return`، `/reject` | `reason`، `version` | برگشت به تهیه (زنجیره از نو) یا رد |
+| `POST /statements/{id}/void` | `reason`، `version` | مدیر ارشد/مدیر سیستم؛ بدون دریافت یا پرداخت؛ سند برگشتی `STATEMENT_VOIDED` و لغو درخواست پرداخت پرداخت‌نشده |
 
 ### گزارش و چاپ (۰٫۶٫۱)
 
@@ -520,6 +579,8 @@
 | `petty_request` | درخواست‌کننده و مراحل زنجیره |
 | `payment_request` | درخواست‌کننده، تأییدکننده، پرداخت‌کننده |
 | `receipt` | ثبت‌کننده، تأییدکننده |
+| `client_statement` | تهیه‌کننده، تأیید مشاور، تأیید کارفرما (۰٫۷) |
+| `subcontractor_statement` | ثبت کارکرد، اندازه‌گیری، تأیید کارگاه، تأیید مدیر پروژه، تأیید مالی، تأیید مدیر ارشد (۰٫۷) |
 
 `GET /treasury/settings` و `POST /treasury/settings` از ۰٫۶٫۱ `vat_rate_percent` (عدد صحیح ۰ تا ۱۰۰، پیش‌فرض ۱۰) هم دارند؛ صفحه تنظیمات اپ آن را می‌خواند و می‌نویسد.
 
@@ -550,8 +611,12 @@
   لوگو از «تنظیمات گزارش و چاپ»، شماره و تاریخ شمسی، فیلترها، جدول با ارقام فارسی و واحد یک بار در سرستون، جمع‌ها، امضاها، پاورقی
   «صفحه ۱ از ۳» با زمان تهیه و نام تهیه‌کننده، A4 عمودی/افقی، تکرار سرستون در هر صفحه). سند چاپی زیر `<body>` کپی می‌شود و فقط
   همان چاپ می‌شود. خروجی Excel (CSV با BOM) از همان ردیف‌های چاپ (`src/store/views/exports.ts`).
+- `src/api/akph/contracts.ts` (۰٫۷): نگاشت قراردادها، فهرست بها، الحاقیه‌ها، ضمانت‌نامه‌ها و صورت‌وضعیت‌ها. فرمان‌های قرارداد و
+  صورت‌وضعیت `serverValidated` هستند؛ بدنه فقط ورودی کاربر است (ردیف صورت‌وضعیت فقط `contract_line_id` و `quantity`).
+  `/contracts` و `/statements` در `WRITABLE_PATHS` هستند. کنترل‌های سرور (`ContractServerPanel`: تأیید، الحاقیه، ضمانت‌نامه،
+  پیش‌پرداخت؛ نامه کارفرما و ابطال در جزئیات صورت‌وضعیت) فقط برای رکوردهای سرور نمایش داده می‌شوند.
 
 ## ۶. فرمان‌های فاز بعد (هنوز فقط‌خواندنی)
 
-صورت‌وضعیت‌ها، خرید، انبار، حقوق، قراردادها و بستن سال. قواعد آن‌ها در
+خرید، انبار، حقوق و بستن سال. قواعد آن‌ها در
 [SERVER-RULES.md](./SERVER-RULES.md) آمده و با همین چارچوب (Idempotency-Key، version، تراکنش، ممیزی) ساخته می‌شوند.

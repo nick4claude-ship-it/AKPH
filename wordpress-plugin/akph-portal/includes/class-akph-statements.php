@@ -348,7 +348,7 @@ final class Akph_Statements {
         $x = self::compute($c, self::parse_quantities($body), $include_vat, $index, $fixed);
         $status = $kind === 'client' ? (!empty($body['submit']) ? 'submitted_to_consultant' : 'draft') : 'submitted';
         $now = Akph_Db::now_utc();
-        $history = Akph_Flow::push_history('[]', 'submitted', $kind === 'client' ? ($status === 'draft' ? 'ثبت پیش‌نویس' : 'ثبت و ارسال به مشاور') : 'ثبت کارکرد');
+        $history = Akph_Flow::push_history('[]', 'submitted', $kind === 'client' ? ($status === 'draft' ? 'ثبت پیش‌نویس' : 'ثبت و ارسال به مشاور') : 'ثبت کارکرد', '', $kind === 'client' ? 'draft' : 'submitted', $status);
         $id = Akph_Db::insert(self::t('statements'), self::amount_columns($x) + array(
             'kind' => $kind,
             'title' => Akph_Input::text($body, 'title', 190, true, 'عنوان صورت‌وضعیت'),
@@ -401,7 +401,7 @@ final class Akph_Statements {
             'adjustment_index' => $index,
             'fixed_deduction' => $fixed,
             'description' => Akph_Input::text($body, 'description', 1000),
-            'history' => Akph_Flow::push_history($s->history, 'edited', 'اصلاح مقادیر'),
+            'history' => Akph_Flow::push_history($s->history, 'edited', 'اصلاح مقادیر', '', $s->status, $s->status),
             'version' => (int) $s->version + 1,
             'updated_at' => Akph_Db::now_utc(),
         ), array('id' => $s->id));
@@ -446,7 +446,7 @@ final class Akph_Statements {
         }
         $data = array(
             'status' => $next,
-            'history' => Akph_Flow::push_history($s->history, $approval ? 'approved' : 'step', $label, $comment),
+            'history' => Akph_Flow::push_history($s->history, $approval ? 'approved' : 'step', $label, $comment, $s->status, $next),
             'version' => (int) $s->version + 1,
             'updated_at' => Akph_Db::now_utc(),
         );
@@ -585,7 +585,7 @@ final class Akph_Statements {
             'status' => $to,
             'reject_reason' => $reason,
             'last_approved_by' => null,
-            'history' => Akph_Flow::push_history($s->history, $reject ? 'rejected' : 'returned', $flow[$s->status][2], $reason),
+            'history' => Akph_Flow::push_history($s->history, $reject ? 'rejected' : 'returned', $flow[$s->status][2], $reason, $s->status, $to),
             'version' => (int) $s->version + 1,
             'updated_at' => Akph_Db::now_utc(),
         ), array('id' => $s->id));
@@ -637,7 +637,7 @@ final class Akph_Statements {
         }
         $original = Akph_Db::find(Akph_Ledger::entries_table(), $s->entry_id);
         $posted = Akph_Posting::post(array('source' => 'statement', 'source_id' => $s->id, 'type' => 'STATEMENT_VOIDED', 'date' => $today, 'description' => 'ابطال صورت‌وضعیت ' . $s->number . ' (سند ' . ($original ? $original->doc_number : '') . '): ' . $reason, 'entry_type' => 'statement', 'project_id' => $s->project_id, 'lines' => $lines));
-        Akph_Db::update(self::t('statements'), array('status' => 'voided', 'reject_reason' => $reason, 'void_entry_id' => $posted['entry']->id, 'history' => Akph_Flow::push_history($s->history, 'voided', 'ابطال', $reason), 'version' => (int) $s->version + 1, 'updated_at' => Akph_Db::now_utc()), array('id' => $s->id));
+        Akph_Db::update(self::t('statements'), array('status' => 'voided', 'reject_reason' => $reason, 'void_entry_id' => $posted['entry']->id, 'history' => Akph_Flow::push_history($s->history, 'voided', 'ابطال', $reason, $s->status, 'voided'), 'version' => (int) $s->version + 1, 'updated_at' => Akph_Db::now_utc()), array('id' => $s->id));
         $after = Akph_Db::find(self::t('statements'), $s->id);
         Akph_Audit::log('statement_voided', 'statement', $s->id, (array) $s, (array) $after, $s->number);
         $extra['journal_entries'] = array(Akph_Ledger::shape($posted['entry']));

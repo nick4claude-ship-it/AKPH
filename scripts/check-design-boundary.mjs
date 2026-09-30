@@ -58,7 +58,7 @@ const FORBIDDEN_CODE = [
     'renders a raw number (Latin digits); use formatInt / formatDecimal / formatPercent',
   ],
 ];
-const CONTROL = /<(input|select|textarea|IntegerInput|MoneyInput|PercentInput)\b/;
+const CONTROL = /<(input|select|textarea|IntegerInput|MoneyInput|PercentInput|QuantityInput)\b/;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {

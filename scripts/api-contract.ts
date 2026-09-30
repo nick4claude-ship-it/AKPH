@@ -60,7 +60,75 @@ const approvalsBody = { items: [
     version: 1, approve_path: '/receipts/95/approve', reject_path: '/receipts/95/reject', entity_type: 'receipt' },
 ], total: 2 };
 
+
+// Contracts and statements as akph/v1 0.7.0 shapes them (class-akph-contracts.php, class-akph-statements.php).
+const contractLine = (over: Record<string, unknown> = {}) => ({
+  id: '301', row_no: 1, code: '010101', description: 'خاک‌برداری', unit: 'm3', base_quantity: '100', quantity: '120.5', rate: 2_000_000, amount: 241_000_000,
+  approved_quantity: '40', pending_quantity: '10.25', amendment_id: null, ...over,
+});
+const contract = (over: Record<string, unknown> = {}) => ({
+  id: '201', number: 'CNT-1405-00001', kind: 'client', contract_no: 'K-100', title: 'اجرای فونداسیون', project_id: '5', project_name: 'پروژه آزمون', cost_center_id: '8',
+  counterparty_id: '3', counterparty_name: 'کارفرمای آزمون', trade_type: '', amount: 200_000_000, contract_date: '2026-03-25', start_date: '2026-04-01', end_date: '2027-03-31',
+  duration_days: 360, advance_pct: '10', retention_pct: '5', insurance_pct: '5', tax_pct: '3', other_pct: '0', adjustment_base_index: '100', adjustment_factor_pct: '95',
+  description: '', status: 'active', chain: ['مدیر ارشد'], step_index: 1, current_step: null,
+  history: [{ action: 'submitted', step: 'ثبت قرارداد', user_id: '7', user_name: 'حسابدار یک', role: 'حسابدار', at: '2026-03-25T08:00:00Z', comment: '' }],
+  last_approved_by: '1', reject_reason: '', created_by: '7', created_by_name: 'حسابدار یک', created_at: '2026-03-25T08:00:00Z',
+  lines: [contractLine()],
+  amendments: [{ id: '401', number: 'AMD-1405-00001', contract_id: '201', amendment_no: 'ال-۱', date: '2026-05-01', amount_delta: 41_000_000, extend_days: 30, description: '',
+    status: 'approved', lines: [{ contract_line_id: '301', new_line: false, code: '010101', description: 'خاک‌برداری', unit: 'm3', rate: 2_000_000, quantity_delta: '20.5', amount: 41_000_000 }],
+    created_by: '7', created_by_name: 'حسابدار یک', approved_by: '1', approved_by_name: 'مدیر ارشد', approved_at: '2026-05-02T08:00:00Z', reject_reason: '', version: 2 }],
+  guarantees: [{ id: '501', contract_id: '201', kind: 'performance', guarantee_no: 'G-1', bank: 'بانک نمونه', amount: 10_000_000, issue_date: '2026-03-25', due_date: '2026-10-10',
+    status: 'active', notes: '', days_to_due: 10, due_soon: true, version: 1 }],
+  version: 5,
+  amendments_total: 41_000_000, extend_days: 30, current_amount: 241_000_000, measured_amount: 100_500_000, approved_amount: 80_000_000, approved_gross: 87_200_000,
+  approved_net: 70_000_000, remaining_amount: 161_000_000, settled_amount: 30_000_000, balance_due: 40_000_000, advance_amount: 20_000_000, advance_expected: 24_100_000,
+  advance_remaining: 12_000_000, deductions: { retention: 4_000_000, advance_payment: 8_000_000 },
+  ...over,
+});
+const statement = (over: Record<string, unknown> = {}) => ({
+  id: '601', number: 'STC-1405-00002', kind: 'client', title: 'صورت‌وضعیت موقت ۲', contract_id: '201', contract_number: 'CNT-1405-00001', contract_no: 'K-100',
+  contract_title: 'اجرای فونداسیون', project_id: '5', project_name: 'پروژه آزمون', cost_center_id: '8', counterparty_id: '3', counterparty_name: 'کارفرمای آزمون', trade_type: '',
+  period_start: '2026-08-23', period_end: '2026-09-22', status: 'approved_by_consultant',
+  current_step: { label: 'تأیید کارفرما', role: 'حسابدار', approval: true, next_status: 'approved_by_employer', requires: ['employer_ref', 'employer_date'] },
+  include_vat: true,
+  lines: [{ id: '701', contract_line_id: '301', row_no: 1, code: '010101', description: 'خاک‌برداری', unit: 'm3', contract_quantity: '120.5', previous_quantity: '40',
+    quantity: '10.25', cumulative_quantity: '50.25', rate: 2_000_000, amount: 20_500_000, cumulative_amount: 100_500_000 }],
+  work_amount: 20_500_000, adjustment_index: '110', adjustment_amount: 1_947_500, vat_rate: 10, vat_amount: 2_244_750, gross_amount: 24_692_250, fixed_deduction: 0,
+  deductions: [{ type: 'retention', title: 'سپرده حسن انجام کار', rate: '5', amount: 1_122_375 }, { type: 'advance_payment', title: 'استهلاک پیش‌پرداخت', rate: '10', amount: 2_244_750 }],
+  total_deductions: 3_367_125, net_amount: 21_325_125, settled_amount: 0, pending_receipts: 0, balance_due: 0, payment_request: null, employer_ref: null, employer_date: null,
+  description: '', history: [
+    { action: 'submitted', step: 'ثبت و ارسال به مشاور', user_id: '21', user_name: 'مدیر پروژه', role: 'مدیر پروژه', at: '2026-09-22T07:00:00Z', comment: '', from: 'draft', to: 'submitted_to_consultant' },
+    { action: 'approved', step: 'تأیید مشاور', user_id: '22', user_name: 'مدیر پروژه دو', role: 'مدیر پروژه', at: '2026-09-23T07:00:00Z', comment: '', from: 'submitted_to_consultant', to: 'approved_by_consultant' },
+  ],
+  created_by: '21', created_by_name: 'مدیر پروژه', last_approved_by: '22', reject_reason: '', entry: null, void_entry: null, approved_at: null,
+  created_at: '2026-09-22T07:00:00Z', version: 3,
+  ...over,
+});
+const subContract = contract({
+  id: '202', number: 'SCN-1405-00001', kind: 'subcontract', contract_no: 'S-7', title: 'آرماتوربندی', counterparty_id: '4', counterparty_name: 'پیمانکار جزء', trade_type: 'آرماتوربندی و قالب‌بندی',
+  status: 'pending', chain: ['مدیر پروژه', 'مدیر ارشد'], step_index: 0, current_step: 'مدیر پروژه', amendments: [], guarantees: [], version: 1, last_approved_by: null,
+  lines: [contractLine({ id: '302', description: 'آرماتوربندی', unit: 'kg', quantity: '5000', base_quantity: '5000', rate: 30_000, amount: 150_000_000, approved_quantity: '0', pending_quantity: '0' })],
+});
+const contractsBody = { contracts: [contract(), subContract] };
+const statementsBody = { statements: [statement(), statement({ id: '602', number: 'STS-1405-00001', kind: 'subcontract', contract_id: '202', status: 'finance_approved',
+  current_step: { label: 'تأیید مدیر ارشد', role: 'مدیر ارشد', approval: true, next_status: 'management_approved', requires: [] }, include_vat: false, vat_amount: 0,
+  payment_request: null, history: [] })] };
+
 const responses: Record<string, unknown> = {
+  'GET contracts': contractsBody,
+  'GET statements': statementsBody,
+  'POST contracts': { status: 201, message: 'قرارداد ثبت شد.', id: '203', doc_number: 'CNT-1405-00002', records: { contracts: [contract({ id: '203', number: 'CNT-1405-00002', status: 'pending', current_step: 'مدیر ارشد', step_index: 0, version: 1 })] } },
+  'POST contracts/202/approve': { message: 'تأیید شد.', id: '202', records: { contracts: [{ ...subContract, step_index: 1, current_step: 'مدیر ارشد', version: 2, last_approved_by: '21' }] } },
+  'POST contracts/201/amendments': { message: 'الحاقیه ثبت شد.', id: '402', doc_number: 'AMD-1405-00002', records: { contracts: [contract()] } },
+  'POST contracts/201/guarantees': { message: 'ضمانت‌نامه ثبت شد.', id: '502', records: { contracts: [contract()] } },
+  'POST contract-guarantees/501': { message: 'ضمانت‌نامه به‌روز شد.', id: '501', records: { contracts: [contract()] } },
+  'POST client-statements': { message: 'صورت‌وضعیت ثبت شد.', id: '603', doc_number: 'STC-1405-00003', records: { statements: [statement({ id: '603', number: 'STC-1405-00003', status: 'draft', version: 1 })], contracts: [contract()] } },
+  'POST subcontractor-statements': { message: 'صورت‌وضعیت ثبت شد.', id: '604', doc_number: 'STS-1405-00002', records: { statements: [statement({ id: '604', kind: 'subcontract', number: 'STS-1405-00002', status: 'submitted', contract_id: '202', version: 1 })], contracts: [subContract] } },
+  'POST statements/601/approve': { message: 'تأیید کارفرما ثبت شد.', id: '601', records: { statements: [statement({ status: 'approved_by_employer', employer_ref: 'ن-۱۲', employer_date: '2026-09-25', entry: { id: '95', number: 'ACC-1405-00020', status: 'posted' }, current_step: null, version: 4 })], contracts: [contract()] } },
+  'POST statements/602/return': { message: 'برگشت شد.', id: '602', records: { statements: [], contracts: [] } },
+  'POST statements/601/void': { message: 'ابطال شد.', id: '601', records: { statements: [], contracts: [] } },
+  'POST contracts/202/advance': { message: 'درخواست پرداخت پیش‌پرداخت ثبت شد.', records: { payment_requests: [] } },
+  'POST receipts': { message: 'دریافت ثبت شد.', records: { receipts: [] } },
   'GET petty-cash': {
     funds: [fund()], categories: [{ id: '1', name: 'مصالح جزئی', subcategories: ['پیچ و مهره'], account_code: '51101', active: true, version: 1 }],
     settings: {
@@ -135,7 +203,8 @@ const responses: Record<string, unknown> = {
     legacy_id: 'PRJ-24-AAA', version: 3, editable: ['financial'], created_at: '2026-04-01T00:00:00Z', updated_at: '2026-04-01T00:00:00Z',
   }] },
   'GET cost-centers': { cost_centers: [{ id: '8', code: 'CC-1405-00001', name: 'کارگاه', project_id: '5', type: 'project_site', manager_name: '', budget: 0, active: true, version: 1 }] },
-  'GET counterparties': { counterparties: [{ id: '3', kind: 'supplier', name: 'تأمین‌کننده', national_id: '', economic_code: '', phone: '', email: '', address: '', sheba: '', bank_name: '', trade_type: '', active: true, version: 1 }] },
+  'GET counterparties': { counterparties: [{ id: '3', kind: 'supplier', name: 'تأمین‌کننده', national_id: '', economic_code: '', phone: '', email: '', address: '', sheba: '', bank_name: '', trade_type: '', active: true, version: 1 },
+    { id: '13', kind: 'client', name: 'کارفرمای آزمون', national_id: '', economic_code: '', phone: '', email: '', address: '', sheba: '', bank_name: '', trade_type: '', active: true, version: 1 }] },
   'GET accounts': { accounts: [
     { id: '1', code: '1', title: 'دارایی', level: 'group', nature: 'debit', parent_code: null, active: true, postable: false, version: 1 },
     { id: '2', code: '11', title: 'جاری', level: 'general', nature: 'debit', parent_code: '1', active: true, postable: false, version: 1 },
@@ -251,7 +320,7 @@ const commands = source.commands!;
 for (const a of ['createManualJournalEntry', 'submitManualJournalEntryForm', 'approveJournalEntryLogged', 'rejectJournalEntryLogged', 'reverseJournalEntryLogged', 'createProject', 'updateProject', 'createCostCenter', 'createCounterparty', 'createAccount']) {
   assert.equal(commands.supports(a), true, a);
 }
-for (const a of ['approveVendorInvoice', 'closeFiscalYearLogged', 'createClientContract']) assert.equal(commands.supports(a), false, a);
+for (const a of ['approveVendorInvoice', 'closeFiscalYearLogged', 'createRequisition']) assert.equal(commands.supports(a), false, a);
 console.log('  ✔ فرمان‌های این مرحله پشتیبانی می‌شوند؛ بقیه «فقط خواندنی — به‌زودی»');
 
 const draftKey = 'submission-key-0001';
@@ -522,6 +591,126 @@ assert.equal(replaced.chartOfAccounts[0].code, '1');
   assert.equal(sig?.slots[1].signed, false);
   assert.equal(sig?.slots[1].at, null, 'an unsigned step has no date');
   console.log('  ✔ تنظیمات گزارش و چاپ (سربرگ، امضاکنندگان، نسخه و کلید)، نرخ ارزش افزوده و امضاهای سند از سرور');
+}
+
+
+// ---------------------------------------------------------------- contracts and statements (0.7.0)
+{
+  const { readOnlyNoticeFor } = await import('../src/store/readOnly');
+  for (const path of ['/contracts/client', '/contracts/subcontract', '/statements/client', '/statements/subcontractor']) {
+    assert.equal(readOnlyNoticeFor(source.writablePaths, path), null, `${path} is not read-only with the server`);
+  }
+  const [client] = state.contracts;
+  assert.equal(client.code, 'CNT-1405-00001', 'the server number is the contract code');
+  assert.equal(client.number, 'K-100');
+  assert.equal(client.status, 'فعال');
+  assert.equal(client.currentValue, 241_000_000, 'value after amendments from the server');
+  assert.equal(client.approvedChangesValue, 41_000_000);
+  assert.equal(client.executedValue, 80_000_000);
+  assert.equal(client.receivableValue, 40_000_000);
+  assert.equal(client.server?.guarantees[0].dueSoon, true);
+  assert.equal(client.server?.percents.tax, 3);
+  const boq = state.contractBoq.find((b) => b.id === '301')!;
+  assert.equal(boq.initialQuantity, 120.5, 'decimal quantity');
+  assert.equal(boq.cumulativeExecutedQuantity, 40, 'previous = approved quantity');
+  assert.equal(state.contractAmendments[0].status, 'تأیید شده');
+  assert.equal(state.contractAmendments[0].amount, 41_000_000);
+  const [sub] = state.subcontractorContracts;
+  assert.equal(sub.status, 'در انتظار تأیید');
+  assert.equal(sub.server?.currentStep, 'مدیر پروژه');
+  const [stc, sts] = [state.clientStatements[0], state.subcontractorStatements[0]];
+  assert.equal(stc.statementNumber, 'STC-1405-00002');
+  assert.equal(stc.status, 'approved_by_consultant');
+  assert.equal(stc.items[0].currentQuantity, 10.25);
+  assert.equal(stc.items[0].boqItemId, '301');
+  assert.equal(stc.workflowHistory[1].stepAction, 'client_statement.consultant_approval', 'server history keeps the approval actions');
+  assert.equal(stc.workflowHistory[1].toStatus, 'approved_by_consultant');
+  assert.deepEqual(stc.server?.currentStep?.requires, ['employer_ref', 'employer_date']);
+  assert.equal(stc.deductions[0].calculatedAmount, 1_122_375);
+  assert.equal(sts.subcontractorContractId, '202');
+  assert.equal(sts.status, 'finance_approved');
+
+  calls.length = 0;
+  await commands.run('createClientContract', [{
+    code: 'X', number: ' K-200 ', projectTitle: 'دیوارچینی', projectId: '5', employer: 'کارفرمای آزمون', executiveBody: '', consultant: '', contractor: '', initialValue: 999,
+    contractDate: '۱۴۰۵/۰۱/۰۵', startDate: '۱۴۰۵/۰۱/۱۰', endDate: '', durationMonths: 12, contractType: 'فهرست‌بهایی', status: 'فعال', advancePaymentPercentage: 10,
+    retentionPercentage: 5, description: '', insurancePercentage: 5, taxPercentage: 3, otherPercentage: 0, adjustmentBaseIndex: 100, adjustmentFactorPercentage: 95,
+    lines: [{ id: 'l1', code: '01', description: 'دیوار', unit: 'm2', quantity: 12.345, rate: 1_500_000 }, { id: 'l2', code: '', description: '', unit: '', quantity: 0, rate: 0 }],
+  }], state, 'contract-key-1');
+  const cc = calls.find((c) => c.method === 'POST' && c.url === 'contracts')!;
+  const cb = cc.body as Record<string, unknown>;
+  assert.equal(cc.headers['Idempotency-Key'], 'contract-key-1');
+  for (const k of ['amount', 'number', 'status', 'code', 'initial_value', 'version']) assert.ok(!(k in cb), `contract body must not carry ${k}`);
+  assert.equal(cb.kind, 'client');
+  assert.equal(cb.contract_no, 'K-200');
+  assert.equal(cb.counterparty_id, '13', 'the employer counterparty (by name among clients)');
+  assert.equal(cb.contract_date, '2026-03-25');
+  assert.deepEqual(cb.lines, [{ code: '01', description: 'دیوار', unit: 'm2', quantity: '12.345', rate: 1_500_000 }], 'blank rows left out; quantity as a decimal string; no amount');
+  assert.equal(cb.adjustment_base_index, 100);
+
+  calls.length = 0;
+  await commands.run('decideContract', ['202', 'approve', ''], state, 'contract-key-2');
+  const ca = calls.find((c) => c.url === 'contracts/202/approve')!;
+  assert.equal(ca.headers['If-Match'], '"1"');
+
+  calls.length = 0;
+  await commands.run('createContractAmendment', ['201', { number: 'ال-۲', type: 'تغییر مقادیر', date: '۱۴۰۵/۰۳/۰۱', amount: 1, extendedDays: 0, description: '', status: 'در انتظار تأیید',
+    lines: [{ id: 'a', contractLineId: '301', description: '', unit: '', rate: 0, quantityDelta: -5.5 }, { id: 'b', contractLineId: '', description: 'ردیف نو', unit: 'm', rate: 900, quantityDelta: 3 }] }], state, 'amend-key-1');
+  const am = calls.find((c) => c.url === 'contracts/201/amendments')!.body as Record<string, unknown>;
+  assert.ok(!('amount' in am) && !('amount_delta' in am), 'the amendment amount is the server\'s');
+  assert.deepEqual(am.lines, [{ contract_line_id: '301', quantity_delta: '-5.5' }, { description: 'ردیف نو', unit: 'm', rate: 900, quantity_delta: '3' }]);
+
+  calls.length = 0;
+  await commands.run('submitClientStatementForm', [{
+    contractId: '201', statementNumber: 'موقت ۳', statementType: 'موقت', periodStartDate: '۱۴۰۵/۰۶/۰۱', periodEndDate: '۱۴۰۵/۰۶/۳۱', preparationDate: '', description: '',
+    quantities: { '301': 7.125 }, overrunClassifications: {}, otherAllowables: 0, adjustmentAmount: 12345, includeVAT: true, advanceRate: 99, retentionRate: 99, insuranceRate: 99,
+    withholdingTaxRate: 99, materialDeduction: 0, adjustmentIndex: 110,
+  }, 'draft'], state, 'stc-key-1');
+  const sb = calls.find((c) => c.url === 'client-statements')!.body as Record<string, unknown>;
+  assert.deepEqual(sb.lines, [{ contract_line_id: '301', quantity: '7.125' }], 'only the line and quantity; previous quantity, rate and amount are the server\'s');
+  for (const k of ['adjustment_amount', 'retention_rate', 'advance_rate', 'gross_amount', 'net_amount', 'deductions', 'vat_amount']) assert.ok(!(k in sb), `statement body must not carry ${k}`);
+  assert.equal(sb.adjustment_index, '110');
+  assert.equal(sb.submit, false);
+
+  calls.length = 0;
+  const stcMerged = await commands.run('decideClientStatement', ['601', 'approve', '', { employerRef: 'ن-۱۲', employerDate: '۱۴۰۵/۰۷/۰۳' }], state, 'stc-key-2');
+  const ap = calls.find((c) => c.url === 'statements/601/approve')!;
+  assert.deepEqual(ap.body, { comment: '', employer_ref: 'ن-۱۲', employer_date: '2026-09-25', version: 3 }, 'employer approval letter with the version');
+  const approved = appReducer(state, { type: 'MERGE_SERVER_RECORDS', records: stcMerged.records }).clientStatements.find((x) => x.id === '601')!;
+  assert.equal(approved.status, 'approved_by_employer');
+  assert.equal(approved.accountingJournalEntryId, 'ACC-1405-00020', 'the receivable entry of the posting engine');
+
+  calls.length = 0;
+  await commands.run('submitSubcontractorStatementForm', [{ contractId: '202', statementNumber: 'کارکرد ۱', periodStartDate: '۱۴۰۵/۰۶/۰۱', periodEndDate: '۱۴۰۵/۰۶/۳۱', retentionRate: 50, advanceDeduction: 7, penaltyAmount: 1000, otherDeduction: 500,
+    lines: [{ id: 'x', contractLineId: '302', locked: true, description: 'آرماتوربندی', unit: 'kg', contractQuantity: 5000, unitRate: 1, previousQuantity: 0, pendingQuantity: 0, currentQuantity: 1200 }] }], state, 'sts-key-1');
+  const ssb = calls.find((c) => c.url === 'subcontractor-statements')!.body as Record<string, unknown>;
+  assert.deepEqual(ssb.lines, [{ contract_line_id: '302', quantity: '1200' }]);
+  assert.equal(ssb.fixed_deduction, 1500, 'penalty and other deductions as one fixed deduction; retention and advance by the server');
+  await assert.rejects(
+    commands.run('submitSubcontractorStatementForm', [{ contractId: '202', statementNumber: 'x', periodStartDate: '', periodEndDate: '', retentionRate: 0, advanceDeduction: 0, penaltyAmount: 0, otherDeduction: 0,
+      lines: [{ id: 'n', locked: false, description: 'کار جدید', unit: 'm', contractQuantity: 1, unitRate: 1, previousQuantity: 0, pendingQuantity: 0, currentQuantity: 1 }] }], state, 'sts-key-2'),
+    (e: unknown) => e instanceof ApiError && /الحاقیه/.test(e.farsiMessage),
+    'work outside the contract lines needs an amendment',
+  );
+
+  calls.length = 0;
+  await commands.run('decideSubcontractorStatement', ['602', 'return', 'متره دوباره'], state, 'sts-key-3');
+  assert.deepEqual(calls.find((c) => c.url === 'statements/602/return')!.body, { reason: 'متره دوباره', version: 3 });
+  await commands.run('voidStatement', ['601', 'اشتباه'], state, 'void-key-1');
+  assert.deepEqual(calls.find((c) => c.url === 'statements/601/void')!.body, { reason: 'اشتباه', version: 3 });
+  await commands.run('addContractGuarantee', ['201', { kind: 'performance', guaranteeNo: 'G-2', bank: 'بانک', amount: 5_000_000, issueDate: '۱۴۰۵/۰۱/۰۵', dueDate: '۱۴۰۶/۰۱/۰۵', notes: '' }], state, 'g-key-1');
+  assert.equal((calls.find((c) => c.url === 'contracts/201/guarantees')!.body as Record<string, unknown>).due_date, '2027-03-25');
+  await commands.run('updateContractGuarantee', ['501', { status: 'released' }], state, 'g-key-2');
+  assert.deepEqual(calls.find((c) => c.url === 'contract-guarantees/501')!.body, { status: 'released', version: 1 });
+  await commands.run('requestSubcontractAdvance', ['202', 3_000_000], state, 'adv-key-1');
+  assert.deepEqual(calls.find((c) => c.url === 'contracts/202/advance')!.body, { amount: 3_000_000 });
+
+  calls.length = 0;
+  await commands.run('recordReceipt', [{ sourceType: 'صورت‌وضعیت کارفرما', statementId: '601', amount: 5_000_000, bankAccountId: '61', method: 'حواله بانکی', trackingNumber: 'T-9' }], state, 'rec-key-9');
+  const rb = calls.find((c) => c.url === 'receipts')!.body as Record<string, unknown>;
+  assert.equal(rb.statement_id, '601', 'a statement receipt names its statement');
+  assert.equal(rb.receipt_type, 'statement');
+  console.log('  ✔ قرارداد، الحاقیه، ضمانت‌نامه و صورت‌وضعیت‌ها: فقط ورودی کاربر؛ مبلغ، مقدار قبلی، کسورات و سند را سرور تعیین می‌کند');
 }
 
 // ---------------------------------------------------------------- strict parsing

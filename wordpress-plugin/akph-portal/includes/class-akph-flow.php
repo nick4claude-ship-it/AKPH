@@ -63,7 +63,7 @@ final class Akph_Flow {
     }
 
     /** History row appended to a record's JSON history. */
-    public static function push_history($json, $action, $step, $comment = '') {
+    public static function push_history($json, $action, $step, $comment = '', $from = null, $to = null) {
         $rows = json_decode((string) $json, true);
         $rows = is_array($rows) ? $rows : array();
         $user = wp_get_current_user();
@@ -76,6 +76,10 @@ final class Akph_Flow {
             'at' => gmdate('Y-m-d\TH:i:s\Z'),
             'comment' => (string) $comment,
         );
+        if ($to !== null) {
+            // Statements: the status moved from → to (the app shows the step trail and prints signatures by status).
+            $rows[count($rows) - 1] += array('from' => (string) $from, 'to' => (string) $to);
+        }
         return wp_json_encode($rows);
     }
 

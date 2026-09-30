@@ -360,7 +360,7 @@ final class Akph_Approvals {
                 'approve_path' => '/statements/' . $r->id . '/approve',
                 'reject_path' => '/statements/' . $r->id . '/return',
                 'entity_type' => $r->kind === 'client' ? 'client_statement' : 'subcontractor_statement',
-            )) + array('requires' => $r->kind === 'client' && $r->status === 'approved_by_consultant' ? array('employer_ref', 'employer_date') : array());
+            )) + array('requires' => $r->kind === 'client' && $r->status === 'approved_by_consultant' ? array('employer_ref', 'employer_date') : array(), 'approval' => (bool) $approval);
         }
         return $out;
     }

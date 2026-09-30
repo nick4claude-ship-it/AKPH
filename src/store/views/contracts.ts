@@ -12,6 +12,7 @@ import type {
   AdvancePaymentRecord,
   AppDocument,
   Contract,
+  ContractAmendment,
   ContractBOQItem,
   DeductionItem,
   DetailedProgressStatement,
@@ -357,6 +358,8 @@ export interface ClientStatementFormInput {
   withholdingTaxRate: number;
   /** Integer Rials. */
   materialDeduction: number;
+  /** akph/v1: price index of this period; the server computes the adjustment from the contract's base index. */
+  adjustmentIndex?: number;
 }
 
 export interface ClientStatementDraft {
@@ -410,8 +413,9 @@ export function clientStatementFormDefaults(state: AppState, contractId: string)
     includeVAT: true,
     advanceRate: contract?.advancePaymentPercentage || 0,
     retentionRate: contract?.retentionPercentage || 0,
-    insuranceRate: 5,
-    withholdingTaxRate: 0,
+    // akph/v1: the contract's own percentages (the server applies exactly these).
+    insuranceRate: contract?.server ? contract.server.percents.insurance : 5,
+    withholdingTaxRate: contract?.server ? contract.server.percents.tax : 0,
     materialDeduction: 0,
   };
 }
@@ -714,6 +718,8 @@ export interface SubcontractorStatementLineInput {
   previousQuantity: number;
   pendingQuantity: number;
   currentQuantity: number;
+  /** akph/v1: the contract BOQ line (server contracts; new work is added by an amendment there). */
+  contractLineId?: string;
 }
 
 export interface SubcontractorStatementFormInput {
@@ -730,6 +736,22 @@ export interface SubcontractorStatementFormInput {
 
 /** Contract lines with quantities already approved or pending, ready to be filled for this period. */
 export function subcontractorStatementLines(state: AppState, contractId: string): SubcontractorStatementLineInput[] {
+  // akph/v1: the contract's own BOQ lines, with approved and in-flight quantities counted by the server.
+  const server = state.subcontractorContracts.find((c) => c.id === contractId)?.server;
+  if (server) {
+    return server.lines.map((l) => ({
+      id: generateUUID(),
+      contractLineId: l.id,
+      locked: true,
+      description: l.description,
+      unit: l.unit,
+      contractQuantity: l.quantity,
+      unitRate: l.rate,
+      previousQuantity: l.approvedQuantity,
+      pendingQuantity: l.pendingQuantity,
+      currentQuantity: 0,
+    }));
+  }
   return selectSubcontractLines(state, contractId).map((l) => ({
     id: generateUUID(),
     locked: true,
@@ -775,6 +797,7 @@ export function computeSubcontractorStatementDraft(state: AppState, form: Subcon
         unitRate: l.unitRate,
         currentAmount: roundRial(l.currentQuantity * l.unitRate),
         cumulativeAmount: roundRial(cumulativeQuantity * l.unitRate),
+        contractLineId: l.contractLineId,
       };
     });
   const grossAmount = sumBy(items, (i) => i.currentAmount);
@@ -879,4 +902,101 @@ export function clientStatementStage(s: Pick<DetailedProgressStatement, 'status'
 export function subcontractorStatementStage(s: Pick<SubcontractorProgressStatement, 'status'>) {
   const step = SUBCONTRACTOR_STATEMENT_FLOW[s.status];
   return { approved: isSubStatementApproved(s), nextLabel: step?.label, nextRole: step?.role };
+}
+
+// =============================================================================
+// Contract BOQ lines, amendments and guarantees (akph/v1 0.7.0)
+// =============================================================================
+
+/** A BOQ line typed in the new-contract form. */
+export interface ContractLineInput {
+  id: string;
+  code: string;
+  description: string;
+  unit: string;
+  /** Up to three decimals. */
+  quantity: number;
+  /** Integer Rials. */
+  rate: number;
+}
+
+export const blankContractLine = (): ContractLineInput => ({ id: generateUUID(), code: '', description: '', unit: '', quantity: 0, rate: 0 });
+
+/** Preview of a line amount (the server rounds quantity × rate the same way and keeps its own figure). */
+export const contractLineAmount = (l: Pick<ContractLineInput, 'quantity' | 'rate'>) => roundRial(l.quantity * l.rate);
+
+export function contractLinesTotal(lines: readonly Pick<ContractLineInput, 'quantity' | 'rate'>[]): number {
+  return sumBy(lines, contractLineAmount);
+}
+
+/** The filled lines of the form (blank rows left out); an error when a filled row is incomplete. */
+export function filledContractLines(lines: readonly ContractLineInput[]): { lines: ContractLineInput[]; error: string | null } {
+  const filled = lines.filter((l) => l.description.trim() || l.unit.trim() || l.quantity || l.rate);
+  const bad = filled.find((l) => !l.description.trim() || !l.unit.trim() || !(l.quantity > 0) || !(l.rate > 0));
+  return { lines: filled, error: bad ? 'برای هر ردیف فهرست بها شرح، واحد، مقدار و نرخ لازم است.' : null };
+}
+
+/** A change of an amendment: a quantity change of an existing line or a new line. */
+export interface AmendmentLineInput {
+  id: string;
+  /** '' for a new line. */
+  contractLineId: string;
+  description: string;
+  unit: string;
+  rate: number;
+  /** Signed for an existing line; positive for a new line. */
+  quantityDelta: number;
+}
+
+export const blankAmendmentLine = (contractLineId = ''): AmendmentLineInput => ({ id: generateUUID(), contractLineId, description: '', unit: '', rate: 0, quantityDelta: 0 });
+
+/** Contract lines offered in the amendment form (server contracts only). */
+export function amendableLines(contract: Pick<Contract, 'server'> | Pick<SubcontractorContract, 'server'> | null | undefined) {
+  return contract?.server?.lines || [];
+}
+
+/** Preview of the amendment's effect on the contract value. */
+export function amendmentDeltaPreview(contract: Pick<Contract, 'server'> | null | undefined, lines: readonly AmendmentLineInput[]): number {
+  const byId = new Map(amendableLines(contract).map((l) => [l.id, l]));
+  return sumBy(lines, (l) => roundRial(l.quantityDelta * (l.contractLineId ? byId.get(l.contractLineId)?.rate || 0 : l.rate)));
+}
+
+/** Counterparties a contract may be made with: clients for client contracts, subcontractors for subcontracts. */
+export function contractCounterparties(state: Pick<AppState, 'counterparties'>, kind: 'client' | 'subcontract') {
+  const want = kind === 'client' ? 'client' : 'subcontractor';
+  return state.counterparties.filter((c) => c.kind === want).map((c) => ({ id: c.id, name: c.name }));
+}
+
+/** Guarantees of the server contracts the user can see, soonest due first. */
+export function selectContractGuarantees(state: Pick<AppState, 'contracts' | 'subcontractorContracts'>) {
+  const all = [...state.contracts, ...state.subcontractorContracts].flatMap((c) =>
+    (c.server?.guarantees || []).map((g) => ({ ...g, contractNumber: 'code' in c ? c.number : c.contractNumber, contractTitle: 'projectTitle' in c ? c.projectTitle : c.title, projectId: c.projectId }))
+  );
+  return all.sort((a, b) => (a.daysToDue ?? 99999) - (b.daysToDue ?? 99999));
+}
+
+/** What the signed-in user may do on a server contract (approval, amendments, guarantees, advance). */
+export function contractServerActions(user: UserProfile, c: Pick<Contract, 'server' | 'projectId'> | Pick<SubcontractorContract, 'server' | 'projectId'>) {
+  const s = c.server;
+  if (!s) return { live: false, canApprove: false, approveReason: undefined as string | undefined, canManage: false, active: false, pendingStep: null as string | null };
+  const approve = checkPermission(user, 'contract.approve', { projectId: c.projectId, createdBy: s.createdById, lastApprovedBy: s.lastApprovedById });
+  const stepRoleOk = s.currentStep === null || user.role === s.currentStep || user.role === 'مدیر ارشد' || user.role === 'مدیر سیستم';
+  return {
+    live: true,
+    canApprove: s.status === 'pending' && approve.ok && stepRoleOk,
+    approveReason: approve.ok ? (stepRoleOk ? undefined : `این مرحله با ${s.currentStep} است.`) : approve.reason,
+    canManage: checkPermission(user, 'contract.manage', { projectId: c.projectId }).ok,
+    active: s.status === 'active',
+    pendingStep: s.status === 'pending' ? s.currentStep : null,
+  };
+}
+
+/** A statement approved and posted may be voided by the senior manager (the server posts the reversal). */
+export function canVoidStatement(user: UserProfile, s: { server?: { entryNumber?: string; version: number }; status: string }): boolean {
+  return !!s.server?.entryNumber && s.status !== 'voided' && (user.role === 'مدیر ارشد' || user.role === 'مدیر سیستم');
+}
+
+/** Amendments are approved by the senior manager (or the system administrator), never by their author. */
+export function canDecideAmendment(user: UserProfile, a: Pick<ContractAmendment, 'createdById' | 'status'>): boolean {
+  return a.status === 'در انتظار تأیید' && a.createdById !== user.id && (user.role === 'مدیر ارشد' || user.role === 'مدیر سیستم');
 }

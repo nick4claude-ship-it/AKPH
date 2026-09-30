@@ -92,3 +92,57 @@ export const MoneyInput: React.FC<BaseProps & { showUnit?: boolean }> = ({ value
 export const PercentInput: React.FC<Omit<BaseProps, 'max'>> = ({ onValueChange, ...rest }) => (
   <IntegerInput {...rest} onValueChange={(v) => onValueChange(Math.min(100, v))} />
 );
+
+const LATIN_DIGITS: Record<string, string> = { '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9', '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9' };
+const showQty = (n: number, blankZero?: boolean) => (blankZero && n === 0 ? '' : n.toLocaleString('fa-IR', { maximumFractionDigits: 3 }));
+
+/** Reads a quantity with up to three decimals (Persian/Arabic/Latin digits, «٫» or «.»). */
+function readQuantity(t: string, signed: boolean): { ok: true; value: number } | { ok: false; error: string } {
+  const s = t.replace(/[۰-۹٠-٩]/g, (d) => LATIN_DIGITS[d]).replace(/[٬,\s]/g, '').replace(/[٫/]/g, '.').replace(/[−–]/g, '-');
+  if (s === '' || s === '-') return { ok: true, value: 0 };
+  if (!(signed ? /^-?\d{1,12}(\.\d{0,3})?$/ : /^\d{1,12}(\.\d{0,3})?$/).test(s)) return { ok: false, error: 'مقدار باید عدد با حداکثر سه رقم اعشار باشد.' };
+  return { ok: true, value: Number(s) };
+}
+
+/**
+ * Quantity field (DECIMAL(18,3) on the server): up to three decimals; `signed` allows a negative change
+ * (amendments that reduce a line).
+ */
+export const QuantityInput: React.FC<BaseProps & { signed?: boolean }> = ({ value, onValueChange, blankZero, onBlur, signed = false, className, ...rest }) => {
+  const [text, setText] = useState(() => showQty(value, blankZero));
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const r = readQuantity(text, signed);
+    if (!r.ok || r.value !== value) {
+      setText(showQty(value, blankZero));
+      setError(null);
+    }
+  }, [value]);
+
+  return (
+    <input
+      {...rest}
+      type="text"
+      inputMode="decimal"
+      dir="ltr"
+      value={text}
+      aria-invalid={error ? true : undefined}
+      title={error ?? rest.title}
+      className={error ? `${className || ''} ring-1 ring-rose-400` : className}
+      onChange={(e) => {
+        setText(e.target.value);
+        const r = readQuantity(e.target.value, signed);
+        if (!r.ok) return setError(r.error);
+        setError(null);
+        onValueChange(r.value);
+      }}
+      onBlur={(e) => {
+        const r = readQuantity(text, signed);
+        setText(showQty(r.ok ? r.value : value, blankZero));
+        setError(null);
+        onBlur?.(e);
+      }}
+    />
+  );
+};

@@ -27,6 +27,8 @@ import type {
   PettyCashExpense,
   Contract,
   ContractAmendment,
+  ContractBOQItem,
+  GuaranteeKind,
   ContractAuditLog,
   ContractStatus,
   ContractType,
@@ -69,6 +71,10 @@ import {
   computeClientStatementDraft,
   computeSubcontractorStatementDraft,
   subcontractRetentionDeposit,
+  contractLinesTotal,
+  filledContractLines,
+  type AmendmentLineInput,
+  type ContractLineInput,
   type ClientStatementFormInput,
   type SubcontractorStatementFormInput,
 } from './views/contracts';
@@ -119,6 +125,14 @@ export interface NewClientContractInput {
   advancePaymentPercentage: number;
   retentionPercentage: number;
   description: string;
+  /** akph/v1 (0.7.0): BOQ lines; the server computes the contract amount from them. */
+  lines?: ContractLineInput[];
+  insurancePercentage?: number;
+  taxPercentage?: number;
+  otherPercentage?: number;
+  /** Base price index of the adjustment clause (empty: no adjustment). */
+  adjustmentBaseIndex?: number;
+  adjustmentFactorPercentage?: number;
 }
 
 function contractAudit(env: WorkflowEnv, contractId: string, action: ContractAuditLog['action'], targetField: string, oldValue: string, newValue: string, reason: string): ContractAuditLog {
@@ -130,6 +144,10 @@ export function createClientContract(env: WorkflowEnv, input: NewClientContractI
   const deny = guard(env, 'contract.manage', { projectId: input.projectId });
   if (deny) return deny;
   if (!input.projectTitle.trim() || !input.employer.trim()) return fail('لطفاً عنوان پیمان و نام کارفرما را وارد فرمایید.');
+  const filled = filledContractLines(input.lines || []);
+  if (filled.error) return fail(filled.error);
+  // With BOQ lines the contract amount is their total (quantity × rate).
+  if (filled.lines.length) input = { ...input, initialValue: contractLinesTotal(filled.lines) };
   if (!(input.initialValue > 0)) return fail('مبلغ اولیه قرارداد باید بیش از صفر باشد.');
   if (input.advancePaymentPercentage > 100 || input.retentionPercentage > 100) return fail('درصدها نمی‌توانند بیش از ۱۰۰ باشند.');
   const state = env.getState();
@@ -173,6 +191,26 @@ export function createClientContract(env: WorkflowEnv, input: NewClientContractI
     description: input.description,
   };
   env.set('contracts', (prev) => [contract, ...prev]);
+  if (filled.lines.length) {
+    const boq: ContractBOQItem[] = filled.lines.map((l, i) => ({
+      id: generateUUID(),
+      contractId: contract.id,
+      rowNumber: String(i + 1).padStart(3, '0'),
+      code: l.code,
+      chapter: '',
+      description: l.description.trim(),
+      unit: l.unit.trim(),
+      initialQuantity: l.quantity,
+      unitRate: l.rate,
+      initialAmount: roundRial(l.quantity * l.rate),
+      previousQuantity: 0,
+      currentPeriodQuantity: 0,
+      cumulativeExecutedQuantity: 0,
+      executedAmount: 0,
+      progressPercentage: 0,
+    }));
+    env.set('contractBoq', (prev) => [...prev, ...boq]);
+  }
   env.set('contractAuditLogs', (prev) => [contractAudit(env, contract.id, 'تأیید', 'contract', '-', contract.code, 'انعقاد قرارداد جدید'), ...prev]);
   return ok(`قرارداد ${contract.code} ثبت شد.`, { id: contract.id });
 }
@@ -186,6 +224,8 @@ export interface NewAmendmentInput {
   extendedDays: number;
   description: string;
   status: ContractAmendment['status'];
+  /** akph/v1 (0.7.0): quantity changes of contract lines and new lines; the server prices them. */
+  lines?: AmendmentLineInput[];
 }
 
 /** An amendment; an approved one raises the contract value and extends its duration. */
@@ -283,7 +323,7 @@ export function submitClientStatementForm(env: WorkflowEnv, form: ClientStatemen
 }
 
 /** The next approval step of a client statement, or its return to the site with a reason. */
-export function decideClientStatement(env: WorkflowEnv, id: string, decision: 'approve' | 'return', reason?: string): WorkflowResult {
+export function decideClientStatement(env: WorkflowEnv, id: string, decision: 'approve' | 'return', reason?: string, _employer?: EmployerApprovalFields): WorkflowResult {
   if (decision === 'return') {
     if (!reason?.trim()) return fail('دلیل بازگشت صورت‌وضعیت را بنویسید.');
     return returnClientStatement(env, id, reason.trim());
@@ -310,6 +350,12 @@ export interface NewSubcontractInput {
   advancePaid: number;
   retentionDepositRate: number;
   notes: string;
+  /** akph/v1 (0.7.0): the subcontractor's counterparty, BOQ lines and deduction percentages. */
+  counterpartyId?: string;
+  lines?: ContractLineInput[];
+  insurancePercentage?: number;
+  taxPercentage?: number;
+  advancePercentage?: number;
 }
 
 export function createSubcontractorContract(env: WorkflowEnv, input: NewSubcontractInput): WorkflowResult {
@@ -319,6 +365,9 @@ export function createSubcontractorContract(env: WorkflowEnv, input: NewSubcontr
   const deny = guard(env, 'contract.manage', { projectId: project.id });
   if (deny) return deny;
   if (!input.subcontractorName.trim()) return fail('نام پیمانکار را وارد کنید.');
+  const filled = filledContractLines(input.lines || []);
+  if (filled.error) return fail(filled.error);
+  if (filled.lines.length) input = { ...input, contractValue: contractLinesTotal(filled.lines) };
   if (!(input.contractValue > 0)) return fail('مبلغ قرارداد باید بیش از صفر باشد.');
   if (input.advancePaid > input.contractValue) return fail('پیش‌پرداخت از مبلغ قرارداد بیشتر است.');
   if (input.retentionDepositRate > 100) return fail('درصد سپرده نمی‌تواند بیش از ۱۰۰ باشد.');
@@ -1153,11 +1202,55 @@ export function closePettyCashPeriod(env: WorkflowEnv, fundId: string): Workflow
   return ok(`دوره تنخواه ${fund.title} بسته شد.`);
 }
 
+// -----------------------------------------------------------------------------
+// Contract approval, amendments, guarantees, advances and voids (akph/v1 0.7.0)
+// -----------------------------------------------------------------------------
+// The reference data has no approval chain for contracts: these run on the server only (the controls are
+// shown only for contracts that came from the server).
+
+const SERVER_ONLY = 'این عملیات فقط در اتصال به سرور (دفاتر رسمی) انجام می‌شود.';
+
+export interface GuaranteeInput {
+  kind: GuaranteeKind;
+  guaranteeNo: string;
+  bank: string;
+  /** Integer Rials. */
+  amount: number;
+  issueDate: string;
+  dueDate: string;
+  notes: string;
+}
+
+export function decideContract(_env: WorkflowEnv, _contractId: string, _decision: 'approve' | 'reject', _text: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function decideContractAmendment(_env: WorkflowEnv, _amendmentId: string, _decision: 'approve' | 'reject', _text: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function addContractGuarantee(_env: WorkflowEnv, _contractId: string, _input: GuaranteeInput): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function updateContractGuarantee(_env: WorkflowEnv, _guaranteeId: string, _patch: { status?: 'active' | 'released' | 'expired'; dueDate?: string; notes?: string }): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function requestSubcontractAdvance(_env: WorkflowEnv, _contractId: string, _amount: number): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function voidStatement(_env: WorkflowEnv, _statementId: string, _reason: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+
+/** Employer approval of a client statement: the employer's letter number and its (Jalali) date. */
+export interface EmployerApprovalFields {
+  employerRef: string;
+  employerDate: string;
+}
+
 /**
  * Approve or reject an item of the server's approval center (GET /approvals) through the command its own
  * module names. The demo gathers approvals from local records and never has such items.
  */
-export function decideServerApproval(_env: WorkflowEnv, _item: ApprovalItem, _decision: 'approve' | 'reject', _text: string): WorkflowResult {
+export function decideServerApproval(_env: WorkflowEnv, _item: ApprovalItem, _decision: 'approve' | 'reject', _text: string, _fields?: EmployerApprovalFields): WorkflowResult {
   return fail('این مورد فقط در اتصال به سرور قابل اقدام است.');
 }
 
