@@ -39,6 +39,8 @@ require_once AKPH_PORTAL_DIR . 'includes/class-akph-posting.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-flow.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-petty-cash.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-treasury.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-contracts.php';
+require_once AKPH_PORTAL_DIR . 'includes/class-akph-statements.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-approvals.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-print.php';
 require_once AKPH_PORTAL_DIR . 'includes/class-akph-account.php';

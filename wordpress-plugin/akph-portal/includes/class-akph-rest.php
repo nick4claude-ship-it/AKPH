@@ -84,6 +84,27 @@ final class Akph_Rest {
             '/bank-statement-lines/' . self::ID . '/voucher' => array(array('POST', 'bank_line_voucher', $r::TREASURY_MANAGE)),
             // Approval center: everything waiting for the signed-in user, from every server module.
             '/approvals' => array(array('GET', 'approvals', $r::ACCESS)),
+            // 0.7.0: contracts (client and subcontract), BOQ, amendments, guarantees, advances; progress statements.
+            '/contracts' => array(array('GET', 'contracts_list', $r::ACCESS), array('POST', 'contract_create', $r::CONTRACTS_MANAGE)),
+            '/contracts/guarantees-due' => array(array('GET', 'contracts_guarantees_due', $r::ACCESS)),
+            '/contracts/' . self::ID => array(array('GET', 'contract_get', $r::ACCESS), array('POST, PUT, PATCH', 'contract_update', $r::CONTRACTS_MANAGE)),
+            '/contracts/' . self::ID . '/approve' => array(array('POST', 'contract_approve', $r::CONTRACTS_APPROVE)),
+            '/contracts/' . self::ID . '/reject' => array(array('POST', 'contract_reject', $r::CONTRACTS_APPROVE)),
+            '/contracts/' . self::ID . '/amendments' => array(array('POST', 'contract_amendment_create', $r::CONTRACTS_MANAGE)),
+            '/contracts/' . self::ID . '/guarantees' => array(array('POST', 'contract_guarantee_create', $r::CONTRACTS_MANAGE)),
+            '/contracts/' . self::ID . '/advance' => array(array('POST', 'contract_advance', $r::CONTRACTS_MANAGE)),
+            '/contract-amendments/' . self::ID . '/approve' => array(array('POST', 'amendment_approve', $r::CONTRACTS_APPROVE)),
+            '/contract-amendments/' . self::ID . '/reject' => array(array('POST', 'amendment_reject', $r::CONTRACTS_APPROVE)),
+            '/contract-guarantees/' . self::ID => array(array('POST, PUT, PATCH', 'guarantee_update', $r::CONTRACTS_MANAGE)),
+            '/reports/contracts' => array(array('GET', 'contracts_report', $r::ACCESS)),
+            '/statements' => array(array('GET', 'statements_list', $r::ACCESS)),
+            '/client-statements' => array(array('POST', 'client_statement_create', $r::STATEMENTS_PREPARE)),
+            '/subcontractor-statements' => array(array('POST', 'sub_statement_create', $r::STATEMENTS_PREPARE)),
+            '/statements/' . self::ID => array(array('GET', 'statement_get', $r::ACCESS), array('POST, PUT, PATCH', 'statement_update', $r::STATEMENTS_PREPARE)),
+            '/statements/' . self::ID . '/approve' => array(array('POST', 'statement_approve', $r::CONTRACTS_APPROVE)),
+            '/statements/' . self::ID . '/return' => array(array('POST', 'statement_return', $r::CONTRACTS_APPROVE)),
+            '/statements/' . self::ID . '/reject' => array(array('POST', 'statement_reject', $r::CONTRACTS_APPROVE)),
+            '/statements/' . self::ID . '/void' => array(array('POST', 'statement_void', $r::CONTRACTS_APPROVE)),
             // 0.6.1: «تنظیمات گزارش و چاپ» (read by every portal user to print; changed by the system administrator)
             // and the signature slots of a record from its approval history.
             '/report-settings' => array(array('GET', 'report_settings', $r::ACCESS), array('POST', 'report_settings_update', $r::REPORT_SETTINGS)),
@@ -567,7 +588,7 @@ final class Akph_Rest {
     }
 
     public static function receipt_create(WP_REST_Request $request) {
-        return self::command($request, array('amount', 'receipt_type', 'credit_account_code', 'date', 'counterparty_id', 'payer_name', 'project_id', 'account_id', 'method', 'tracking', 'cheque_number', 'cheque_bank', 'cheque_due_date', 'description'), function ($body) {
+        return self::command($request, array('amount', 'receipt_type', 'credit_account_code', 'date', 'counterparty_id', 'payer_name', 'project_id', 'account_id', 'method', 'tracking', 'cheque_number', 'cheque_bank', 'cheque_due_date', 'description', 'statement_id', 'contract_id'), function ($body) {
             return Akph_Treasury::create_receipt($body);
         });
     }
@@ -893,6 +914,172 @@ final class Akph_Rest {
             }
             $id = Akph_Input::id($p, 'entity_id', false);
             return Akph_Print::signatures(isset($p['entity_type']) ? (string) $p['entity_type'] : '', $id);
+        });
+    }
+
+    // ------------------------------------------------------------------ contracts and statements (0.7.0)
+
+    const CONTRACT_FIELDS = array('contract_no', 'title', 'project_id', 'cost_center_id', 'counterparty_id', 'trade_type', 'contract_date', 'start_date', 'end_date', 'duration_days', 'advance_pct', 'retention_pct', 'insurance_pct', 'tax_pct', 'other_pct', 'adjustment_base_index', 'adjustment_factor_pct', 'description', 'lines');
+    const STATEMENT_FIELDS = array('title', 'period_start', 'period_end', 'lines', 'include_vat', 'adjustment_index', 'fixed_deduction', 'description');
+
+    private static function kind_param(WP_REST_Request $request, array $allowed) {
+        $p = $request->get_query_params();
+        foreach (array_keys($p) as $key) {
+            if (!in_array($key, array('kind', 'project_id', 'counterparty_id'), true)) {
+                throw new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));
+            }
+        }
+        return isset($p['kind']) && $p['kind'] !== '' ? Akph_Input::one_of($p, 'kind', $allowed) : '';
+    }
+
+    public static function contracts_list(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            return array('contracts' => Akph_Contracts::list_contracts(self::kind_param($request, Akph_Contracts::KINDS)));
+        });
+    }
+
+    public static function contract_get(WP_REST_Request $request) {
+        return self::query_read($request, function () use ($request) {
+            return array('contract' => Akph_Contracts::shape(Akph_Contracts::contract_or_404(self::id($request))));
+        });
+    }
+
+    public static function contracts_guarantees_due(WP_REST_Request $request) {
+        return self::query_read($request, function () {
+            return array('guarantees' => Akph_Contracts::guarantees_due());
+        });
+    }
+
+    public static function contracts_report(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            self::kind_param($request, Akph_Contracts::KINDS);
+            $p = $request->get_query_params();
+            $filters = array('project_id' => Akph_Input::id($p, 'project_id'), 'counterparty_id' => Akph_Input::id($p, 'counterparty_id'));
+            if ($filters['project_id']) {
+                Akph_Auth::assert_project($filters['project_id']);
+            }
+            return array('summary' => Akph_Contracts::summary($filters));
+        });
+    }
+
+    public static function contract_create(WP_REST_Request $request) {
+        return self::command($request, array_merge(array('kind'), self::CONTRACT_FIELDS), function ($body) {
+            $kind = Akph_Input::one_of($body, 'kind', Akph_Contracts::KINDS);
+            return Akph_Contracts::create($kind, $body);
+        });
+    }
+
+    public static function contract_update(WP_REST_Request $request) {
+        return self::command($request, array_merge(self::CONTRACT_FIELDS, array('version')), function ($body) use ($request) {
+            $version = Akph_Input::version($request, $body);
+            unset($body['version']);
+            return Akph_Contracts::update(self::id($request), $body, $version);
+        });
+    }
+
+    public static function contract_approve(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'version'), function ($body) use ($request) {
+            return Akph_Contracts::approve(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function contract_reject(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Contracts::reject(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function contract_amendment_create(WP_REST_Request $request) {
+        return self::command($request, array('amendment_no', 'date', 'extend_days', 'description', 'lines'), function ($body) use ($request) {
+            return Akph_Contracts::create_amendment(self::id($request), $body);
+        });
+    }
+
+    public static function amendment_approve(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'version'), function ($body) use ($request) {
+            return Akph_Contracts::approve_amendment(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function amendment_reject(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Contracts::reject_amendment(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function contract_guarantee_create(WP_REST_Request $request) {
+        return self::command($request, array('kind', 'guarantee_no', 'bank', 'amount', 'issue_date', 'due_date', 'notes'), function ($body) use ($request) {
+            return Akph_Contracts::create_guarantee(self::id($request), $body);
+        });
+    }
+
+    public static function guarantee_update(WP_REST_Request $request) {
+        return self::command($request, array('status', 'due_date', 'notes', 'version'), function ($body) use ($request) {
+            $version = Akph_Input::version($request, $body);
+            unset($body['version']);
+            return Akph_Contracts::update_guarantee(self::id($request), $body, $version);
+        });
+    }
+
+    public static function contract_advance(WP_REST_Request $request) {
+        return self::command($request, array('amount', 'due_date'), function ($body) use ($request) {
+            return Akph_Contracts::request_advance(self::id($request), $body);
+        });
+    }
+
+    public static function statements_list(WP_REST_Request $request) {
+        return self::read(function () use ($request) {
+            return array('statements' => Akph_Statements::list_statements(self::kind_param($request, Akph_Contracts::KINDS)));
+        });
+    }
+
+    public static function statement_get(WP_REST_Request $request) {
+        return self::query_read($request, function () use ($request) {
+            return array('statement' => Akph_Statements::shape(Akph_Statements::statement_or_404(self::id($request))));
+        });
+    }
+
+    public static function client_statement_create(WP_REST_Request $request) {
+        return self::command($request, array_merge(array('contract_id', 'submit'), self::STATEMENT_FIELDS), function ($body) {
+            return Akph_Statements::create('client', $body);
+        });
+    }
+
+    public static function sub_statement_create(WP_REST_Request $request) {
+        return self::command($request, array_merge(array('contract_id'), self::STATEMENT_FIELDS), function ($body) {
+            return Akph_Statements::create('subcontract', $body);
+        });
+    }
+
+    public static function statement_update(WP_REST_Request $request) {
+        return self::command($request, array_merge(self::STATEMENT_FIELDS, array('version')), function ($body) use ($request) {
+            $version = Akph_Input::version($request, $body);
+            unset($body['version']);
+            return Akph_Statements::update(self::id($request), $body, $version);
+        });
+    }
+
+    public static function statement_approve(WP_REST_Request $request) {
+        return self::command($request, array('comment', 'employer_ref', 'employer_date', 'version'), function ($body) use ($request) {
+            return Akph_Statements::advance(self::id($request), $body, Akph_Input::version($request, $body));
+        });
+    }
+
+    public static function statement_return(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Statements::send_back(self::id($request), $body, Akph_Input::version($request, $body), false);
+        });
+    }
+
+    public static function statement_reject(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Statements::send_back(self::id($request), $body, Akph_Input::version($request, $body), true);
+        });
+    }
+
+    public static function statement_void(WP_REST_Request $request) {
+        return self::command($request, array('reason', 'version'), function ($body) use ($request) {
+            return Akph_Statements::void(self::id($request), $body, Akph_Input::version($request, $body));
         });
     }
 }

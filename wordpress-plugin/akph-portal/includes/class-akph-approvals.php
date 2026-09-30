@@ -67,7 +67,10 @@ final class Akph_Approvals {
             self::petty_expenses($uid),
             self::petty_requests($uid),
             self::payment_requests($uid),
-            self::receipts($uid)
+            self::receipts($uid),
+            self::contracts($uid),
+            self::amendments($uid),
+            self::statements($uid)
         );
         usort($items, function ($a, $b) {
             return strcmp($b['date'], $a['date']) ?: strcmp($b['id'], $a['id']);
@@ -249,6 +252,115 @@ final class Akph_Approvals {
                 'reject_path' => '/receipts/' . $r->id . '/reject',
                 'entity_type' => 'receipt',
             ));
+        }
+        return $out;
+    }
+
+    // ------------------------------------------------------------------ 0.7.0: contracts, amendments, statements
+
+    private static function contracts($uid) {
+        if (!current_user_can(Akph_Roles::CONTRACTS_APPROVE)) {
+            return array();
+        }
+        global $wpdb;
+        $scope = Akph_Auth::project_scope_sql('project_id');
+        $rows = Akph_Db::results($wpdb->prepare(
+            'SELECT * FROM ' . Akph_Schema::table('contracts') . " WHERE status = 'pending' AND created_by <> %d AND (last_approved_by IS NULL OR last_approved_by <> %d) AND {$scope} ORDER BY id DESC LIMIT %d",
+            $uid,
+            $uid,
+            self::LIMIT
+        ));
+        $out = array();
+        foreach ((array) $rows as $r) {
+            $chain = Akph_Flow::chain($r->chain);
+            $step = isset($chain[(int) $r->step_index]) ? $chain[(int) $r->step_index] : Akph_Flow::SENIOR;
+            if (!Akph_Flow::can_act($step, $r->project_id)) {
+                continue;
+            }
+            $out[] = self::item('contract', $r->kind === 'client' ? 'قرارداد کارفرما' : 'قرارداد پیمانکار جزء', $r->id, array(
+                'doc_number' => $r->number,
+                'title' => $r->title . ' (' . $r->contract_no . ')',
+                'amount' => (int) $r->amount,
+                'requester_id' => $r->created_by,
+                'previous_approver_id' => $r->last_approved_by,
+                'project_id' => $r->project_id,
+                'date' => substr((string) $r->created_at, 0, 10),
+                'stage' => 'تأیید ' . $step,
+                'approver_role' => $step,
+                'version' => $r->version,
+                'approve_path' => '/contracts/' . $r->id . '/approve',
+                'reject_path' => '/contracts/' . $r->id . '/reject',
+                'entity_type' => 'contract',
+            ));
+        }
+        return $out;
+    }
+
+    private static function amendments($uid) {
+        if (!current_user_can(Akph_Roles::CONTRACTS_APPROVE) || !Akph_Flow::can_act(Akph_Flow::SENIOR, 0)) {
+            return array();
+        }
+        global $wpdb;
+        $rows = Akph_Db::results($wpdb->prepare(
+            'SELECT a.*, c.project_id, c.title AS contract_title, c.number AS contract_number FROM ' . Akph_Schema::table('contract_amendments') . ' a JOIN ' . Akph_Schema::table('contracts') . " c ON c.id = a.contract_id WHERE a.status = 'pending' AND a.created_by <> %d ORDER BY a.id DESC LIMIT %d",
+            $uid,
+            self::LIMIT
+        ));
+        $out = array();
+        foreach ((array) $rows as $r) {
+            $out[] = self::item('contract_amendment', 'الحاقیه قرارداد', $r->id, array(
+                'doc_number' => $r->number,
+                'title' => 'الحاقیه ' . $r->amendment_no . ' قرارداد ' . $r->contract_number . ' - ' . $r->contract_title,
+                'amount' => (int) $r->amount_delta,
+                'requester_id' => $r->created_by,
+                'project_id' => $r->project_id,
+                'date' => (string) $r->amendment_date,
+                'stage' => 'تأیید مدیر ارشد',
+                'approver_role' => Akph_Flow::SENIOR,
+                'version' => $r->version,
+                'approve_path' => '/contract-amendments/' . $r->id . '/approve',
+                'reject_path' => '/contract-amendments/' . $r->id . '/reject',
+                'entity_type' => 'contract',
+            ));
+        }
+        return $out;
+    }
+
+    /** Statements whose current step (preparation or approval) the user may take now. */
+    private static function statements($uid) {
+        global $wpdb;
+        $scope = Akph_Auth::project_scope_sql('project_id');
+        $in = "'" . implode("','", array_merge(array_keys(Akph_Statements::CLIENT_FLOW), array_keys(Akph_Statements::SUB_FLOW))) . "'";
+        $rows = Akph_Db::results($wpdb->prepare('SELECT * FROM ' . Akph_Schema::table('statements') . " WHERE status IN ({$in}) AND {$scope} ORDER BY id DESC LIMIT %d", self::LIMIT));
+        $out = array();
+        foreach ((array) $rows as $r) {
+            $flow = Akph_Statements::flow($r->kind);
+            list(, $role, $label, $approval) = $flow[$r->status];
+            if ($approval) {
+                if (!current_user_can(Akph_Roles::CONTRACTS_APPROVE) || (int) $r->created_by === $uid || ((int) $r->last_approved_by === $uid && $uid > 0)) {
+                    continue;
+                }
+            } elseif (!current_user_can(Akph_Roles::STATEMENTS_PREPARE)) {
+                continue;
+            }
+            if (!Akph_Flow::can_act($role, $r->project_id)) {
+                continue;
+            }
+            $out[] = self::item($r->kind === 'client' ? 'client_statement' : 'subcontractor_statement', $r->kind === 'client' ? 'صورت‌وضعیت کارفرما' : 'صورت‌وضعیت پیمانکار جزء', $r->id, array(
+                'doc_number' => $r->number,
+                'title' => $r->title,
+                'amount' => (int) $r->gross_amount,
+                'requester_id' => $r->created_by,
+                'previous_approver_id' => $r->last_approved_by,
+                'project_id' => $r->project_id,
+                'date' => (string) $r->period_end,
+                'stage' => $label,
+                'approver_role' => $role,
+                'version' => $r->version,
+                'approve_path' => '/statements/' . $r->id . '/approve',
+                'reject_path' => '/statements/' . $r->id . '/return',
+                'entity_type' => $r->kind === 'client' ? 'client_statement' : 'subcontractor_statement',
+            )) + array('requires' => $r->kind === 'client' && $r->status === 'approved_by_consultant' ? array('employer_ref', 'employer_date') : array());
         }
         return $out;
     }

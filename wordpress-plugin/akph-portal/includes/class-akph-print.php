@@ -362,6 +362,8 @@ final class Akph_Print {
             'petty_request' => 'petty_expense',
             'payment_request' => 'payment_request',
             'receipt' => 'receipt',
+            'client_statement' => 'client_statement',
+            'subcontractor_statement' => 'subcontractor_statement',
         ));
     }
 
@@ -427,6 +429,13 @@ final class Akph_Print {
 
     private static function builtin_slots($entity_type, $id) {
         switch ($entity_type) {
+            case 'client_statement':
+            case 'subcontractor_statement':
+                $s = Akph_Statements::statement_or_404($id);
+                if (($s->kind === 'client') !== ($entity_type === 'client_statement')) {
+                    throw Akph_Error::not_found('صورت‌وضعیت پیدا نشد.');
+                }
+                return Akph_Statements::signature_slots($id);
             case 'journal_entry':
                 Akph_Auth::assert_cap(Akph_Roles::VIEW_ALL, 'اسناد حسابداری در دسترس نقش شما نیست.');
                 $row = Akph_Db::find(Akph_Ledger::entries_table(), $id);

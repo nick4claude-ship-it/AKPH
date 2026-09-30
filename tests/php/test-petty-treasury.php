@@ -462,7 +462,7 @@ class Test_Akph_Petty_Treasury extends Akph_Test_Case {
         $this->fails('accountant', 'POST', "/cheques/{$cheque['id']}/status", array('version' => 2, 'status' => 'bounced', 'note' => 'x'), 409);
 
         // Receivable cheque: approved by another user into notes receivable; one bounces, a second clears.
-        $rec = $this->ok('accountant', 'POST', '/receipts', array('amount' => 50000000, 'receipt_type' => 'statement', 'payer_name' => 'کارفرما', 'project_id' => $this->project['id'], 'account_id' => $bank['id'], 'method' => 'cheque', 'cheque_number' => '777'), 201)['records']['receipts'][0];
+        $rec = $this->ok('accountant', 'POST', '/receipts', array('amount' => 50000000, 'receipt_type' => 'other_income', 'payer_name' => 'کارفرما', 'project_id' => $this->project['id'], 'account_id' => $bank['id'], 'method' => 'cheque', 'cheque_number' => '777'), 201)['records']['receipts'][0];
         $this->assertContains('receipt:' . $rec['id'], $this->approval_ids('senior'));
         $this->assertNotContains('receipt:' . $rec['id'], $this->approval_ids('accountant'));
         $this->fails('accountant', 'POST', "/receipts/{$rec['id']}/approve", array('version' => 1), 403, 'akph_segregation_of_duties');
