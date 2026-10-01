@@ -243,7 +243,7 @@ final class Akph_Account {
             }
         }
         foreach (array_keys((array) $body) as $key) {
-            if (in_array((string) $key, $allowed, true)) {
+            if (in_array((string) $key, $allowed, true) || Akph_Input::is_wp_global($key)) {
                 continue;
             }
             if (in_array((string) $key, self::FORBIDDEN_FIELDS, true)) {
@@ -550,6 +550,9 @@ final class Akph_Account {
             }
         }
         foreach (array_keys((array) $request->get_body_params()) as $key) {
+            if (Akph_Input::is_wp_global($key)) {
+                continue;
+            }
             throw in_array((string) $key, self::FORBIDDEN_FIELDS, true)
                 ? self::forbidden_field($key)
                 : new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));

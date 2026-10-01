@@ -908,7 +908,7 @@ final class Akph_Rest {
         return self::read(function () use ($request) {
             $p = $request->get_query_params();
             foreach (array_keys($p) as $key) {
-                if (!in_array($key, array('entity_type', 'entity_id'), true)) {
+                if (!Akph_Input::is_wp_global($key) && !in_array($key, array('entity_type', 'entity_id'), true)) {
                     throw new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));
                 }
             }
@@ -925,7 +925,7 @@ final class Akph_Rest {
     private static function kind_param(WP_REST_Request $request, array $allowed) {
         $p = $request->get_query_params();
         foreach (array_keys($p) as $key) {
-            if (!in_array($key, array('kind', 'project_id', 'counterparty_id'), true)) {
+            if (!Akph_Input::is_wp_global($key) && !in_array($key, array('kind', 'project_id', 'counterparty_id'), true)) {
                 throw new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));
             }
         }

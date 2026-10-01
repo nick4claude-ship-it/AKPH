@@ -232,7 +232,7 @@ final class Akph_Print {
             }
         }
         foreach (array_keys((array) $request->get_body_params()) as $key) {
-            if ($key !== 'version') {
+            if ($key !== 'version' && !Akph_Input::is_wp_global($key)) {
                 throw new Akph_Error('akph_unknown_field', 'فیلد ناشناخته: ' . $key, 400, array('field' => (string) $key));
             }
         }
