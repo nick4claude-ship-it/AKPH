@@ -18,6 +18,7 @@ import {
 import { InventoryDashboard } from './InventoryDashboard';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
+import { useServerBooks } from '../../store/session';
 import { selectActiveReservationCount, selectMaterials, selectWarehouses, selectStockByWarehouse } from '../../store/domainSelectors';
 import type { StoreIssueFormInput, TransferFormInput } from '../../store/views/inventory';
 import type { NewMaterialInput } from '../../store/recordWorkflows';
@@ -34,6 +35,7 @@ import { NewStoreIssueModal } from './NewStoreIssueModal';
 import { NewTransferModal } from './NewTransferModal';
 import { NewMaterialModal } from './NewMaterialModal';
 import { InventoryDocumentModal } from './InventoryDocumentModal';
+import { StocktakeCountForm, WarehouseCreateForm } from './InventoryServerForms';
 
 import {
   Warehouse as WarehouseIcon,
@@ -69,6 +71,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
   // Stock lives only in per-warehouse balances; catalog and warehouse totals are derived from them.
   const appState = useAppState();
   const wf = useWorkflows();
+  const live = useServerBooks();
   const warehouses = useMemo(() => selectWarehouses(appState), [appState]);
   const materials = useMemo(() => selectMaterials(appState), [appState]);
   const receipts = appState.goodsReceipts;
@@ -289,11 +292,14 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
           warehouses={warehouses}
           currentUser={currentUser}
           onApplyAdjustmentJournal={handleApplyAdjustmentJournal}
+          onRejectStocktake={live ? (id, reason) => showToast(wf.rejectStocktake(id, reason).message) : undefined}
+          countForm={live ? <StocktakeCountForm onToast={showToast} /> : undefined}
         />
       )}
 
       {activeTab === 'warehouses' && (
         <div className="space-y-4">
+          {live && <WarehouseCreateForm projects={projects} onToast={showToast} />}
           <WarehousesListView warehouses={warehouses} projects={projects} currentUser={currentUser} />
           <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

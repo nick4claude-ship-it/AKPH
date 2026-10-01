@@ -71,6 +71,14 @@ final class Akph_Inventory {
         global $wpdb;
         $project = $w->project_id ? Akph_Db::find(self::t('projects'), $w->project_id) : null;
         $agg = Akph_Db::row($wpdb->prepare('SELECT COUNT(*) AS items FROM ' . self::t('stock_balances') . ' WHERE warehouse_id = %d AND qty > 0', $w->id));
+        // Valuation of the warehouse at the current weighted averages (office roles only).
+        $valuation = null;
+        if (Akph_Auth::view_all()) {
+            $valuation = 0;
+            foreach ((array) Akph_Db::results($wpdb->prepare('SELECT b.qty, m.stock_qty, m.stock_value, m.last_unit_cost FROM ' . self::t('stock_balances') . ' b JOIN ' . self::t('materials') . ' m ON m.id = b.material_id WHERE b.warehouse_id = %d AND b.qty > 0', $w->id)) as $r) {
+                $valuation += Akph_Qty::amount(Akph_Qty::from_db($r->qty), self::average($r));
+            }
+        }
         return array(
             'id' => (string) $w->id,
             'code' => $w->code,
@@ -82,6 +90,7 @@ final class Akph_Inventory {
             'keeper_name' => $w->keeper_name,
             'active' => (bool) (int) $w->active,
             'items_count' => (int) $agg->items,
+            'valuation' => $valuation,
             'version' => (int) $w->version,
         );
     }
@@ -280,6 +289,8 @@ final class Akph_Inventory {
             'returns' => array_map(array(__CLASS__, 'return_shape'), (array) Akph_Db::results('SELECT * FROM ' . self::t('stock_returns') . ' WHERE ' . self::warehouse_scope_sql('warehouse_id') . ' ORDER BY id DESC LIMIT 1000')),
             'transfers' => array_map(array(__CLASS__, 'transfer_shape'), (array) Akph_Db::results('SELECT * FROM ' . self::t('stock_transfers') . ' WHERE ' . self::warehouse_scope_sql('source_warehouse_id') . ' OR ' . self::warehouse_scope_sql('target_warehouse_id') . ' ORDER BY id DESC LIMIT 1000')),
             'stocktakes' => array_map(array(__CLASS__, 'stocktake_shape'), (array) Akph_Db::results('SELECT * FROM ' . self::t('stocktakes') . ' WHERE ' . self::warehouse_scope_sql('warehouse_id') . ' ORDER BY id DESC LIMIT 500')),
+            // The latest movements (full history per material: GET /inventory/kardex).
+            'kardex' => self::kardex_rows('1=1 AND ' . self::warehouse_scope_sql('warehouse_id'), 'id DESC', 3000),
         );
     }
 
@@ -292,15 +303,22 @@ final class Akph_Inventory {
             throw Akph_Error::not_found('کالا پیدا نشد.');
         }
         $where = $wpdb->prepare('material_id = %d', $material) . ($warehouse ? $wpdb->prepare(' AND warehouse_id = %d', $warehouse) : '') . ' AND ' . self::warehouse_scope_sql('warehouse_id');
+        return array('kardex' => self::kardex_rows($where, 'move_date, id', 5000));
+    }
+
+    private static function kardex_rows($where, $order, $limit) {
         $full = Akph_Auth::view_all();
         $rows = array();
-        foreach ((array) Akph_Db::results('SELECT * FROM ' . self::t('kardex') . " WHERE {$where} ORDER BY move_date, id LIMIT 5000") as $k) {
-            $w = Akph_Db::find(self::t('warehouses'), $k->warehouse_id);
+        $names = array();
+        foreach ((array) Akph_Db::results('SELECT id, name FROM ' . self::t('warehouses')) as $w) {
+            $names[(int) $w->id] = $w->name;
+        }
+        foreach ((array) Akph_Db::results('SELECT * FROM ' . self::t('kardex') . " WHERE {$where} ORDER BY {$order} LIMIT " . (int) $limit) as $k) {
             $row = array(
                 'id' => (string) $k->id,
                 'material_id' => (string) $k->material_id,
                 'warehouse_id' => (string) $k->warehouse_id,
-                'warehouse_name' => $w ? $w->name : '',
+                'warehouse_name' => isset($names[(int) $k->warehouse_id]) ? $names[(int) $k->warehouse_id] : '',
                 'date' => $k->move_date,
                 'doc_type' => $k->doc_type,
                 'doc_number' => $k->doc_number,
@@ -314,7 +332,7 @@ final class Akph_Inventory {
             }
             $rows[] = $row;
         }
-        return array('kardex' => $rows);
+        return $rows;
     }
 
     // ------------------------------------------------------------------ master data

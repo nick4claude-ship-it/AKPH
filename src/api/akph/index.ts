@@ -11,7 +11,26 @@ import type { AccountFormInput, CostCenterFormInput, CounterpartyFormInput, Proj
 import type { PettyExpenseFormInput } from '../../store/views/pettyCash';
 import { fundTypeForHolderRole } from '../../store/views/pettyCash';
 import type { ManualPaymentRequestInput, PaymentFormInput } from '../../store/views/treasury';
-import type { EmployerApprovalFields, GuaranteeInput, NewAmendmentInput, NewClientContractInput, NewPettyFundInput, NewSubcontractInput, TreasuryAccountInput, TreasuryTransferInput } from '../../store/recordWorkflows';
+import type {
+  EmployeeInput,
+  EmployerApprovalFields,
+  GuaranteeInput,
+  NewAmendmentInput,
+  NewClientContractInput,
+  NewMaterialInput,
+  NewPettyFundInput,
+  NewSubcontractInput,
+  NewSupplierInput,
+  RfqQuoteInput,
+  StocktakeCountInput,
+  TimesheetInput,
+  TreasuryAccountInput,
+  TreasuryTransferInput,
+  VendorInvoiceInput,
+  WarehouseInput,
+} from '../../store/recordWorkflows';
+import type { RequisitionFormInput } from '../../store/views/procurement';
+import type { StoreIssueFormInput, TransferFormInput } from '../../store/views/inventory';
 import type { ClientStatementFormInput, SubcontractorStatementFormInput } from '../../store/views/contracts';
 import type { PaymentInput, ReceiptInput } from '../../store/workflows';
 import { apiClient, ApiError } from '../client';
@@ -20,6 +39,31 @@ import { createAkphAssistantApi } from './assistant';
 import { createAkphDocumentApi, loadDocuments } from './documents';
 import { createAkphPrintApi } from './print';
 import { contractSlices, qtyString, statementSlices } from './contracts';
+import {
+  CONTRACT_KEYS,
+  inventorySlices,
+  parseEmployee,
+  parseGoodsReceipt,
+  parseMaterial,
+  parsePayrollPeriod,
+  parsePayslip,
+  parsePurchaseOrder,
+  parseRequisition,
+  parseRfq,
+  parseStocktake,
+  parseStockReturn,
+  parseStoreIssue,
+  parseTimesheet,
+  parseTransfer,
+  parseVendorInvoice,
+  parseWarehouse,
+  payrollSlices,
+  PRIORITY_KEYS,
+  procurementSlices,
+  reservationsOf,
+  suppliersOf,
+  WAREHOUSE_KIND_KEYS,
+} from './operations';
 import type { CommandGateway, CommandResult, DataSource, PortalSession } from '../types';
 import {
   parseApprovals,
@@ -91,6 +135,12 @@ const WRITABLE_PATHS = [
   // 0.7.0: client contracts, subcontracts and their progress statements.
   '/contracts',
   '/statements',
+  // 0.8.0: procurement, inventory, payroll, the counterparty pages and the reports (read and print).
+  '/procurement',
+  '/inventory',
+  '/payroll',
+  '/partners',
+  '/reports',
 ];
 
 const optional = async <T>(p: Promise<T>, fallback: T): Promise<T> => {
@@ -170,6 +220,53 @@ function toRecords(raw: unknown, state: AppState): Records {
     const st = statementSlices(records.statements);
     push('clientStatements', st.clientStatements.map(as));
     push('subcontractorStatements', st.subcontractorStatements.map(as));
+  }
+  // 0.8.0: procurement, inventory and payroll.
+  const partyName = (id: string) => state.counterparties.find((c) => c.id === id)?.name || '';
+  const projectName = (id: string) => state.projects.find((p) => p.id === id)?.name || '';
+  if (Array.isArray(records.materials)) push('materials', records.materials.map((m) => as(parseMaterial(m))));
+  if (Array.isArray(records.warehouses)) push('warehouses', records.warehouses.map((w) => as(parseWarehouse(w))));
+  if (Array.isArray(records.stock_balances)) {
+    const touched = records.stock_balances.map((b) => obj('فرمان', b));
+    const rows = touched.map((b) => ({ warehouseId: String(b.warehouse_id), materialId: String(b.material_id), qty: Number(b.qty) || 0, reservedQty: Number(b.reserved) || 0 }));
+    const keys = new Set(rows.map((r) => `${r.warehouseId}:${r.materialId}`));
+    out.push({ slice: 'stockBalances', replace: [...state.stockBalances.filter((b) => !keys.has(`${b.warehouseId}:${b.materialId}`)), ...rows] });
+  }
+  if (Array.isArray(records.store_issues)) {
+    const issues = records.store_issues.map((v) => parseStoreIssue(v, partyName));
+    const cancelled = new Set(issues.filter((v) => v.server?.status === 'cancelled').map((v) => v.id));
+    const merged = [...issues.filter((v) => !cancelled.has(v.id)), ...state.storeIssues.filter((v) => !issues.some((x) => x.id === v.id))];
+    out.push({ slice: 'storeIssues', replace: merged });
+    out.push({ slice: 'stockReservations', replace: reservationsOf(merged) });
+  }
+  if (Array.isArray(records.stock_returns)) push('stockReturns', records.stock_returns.map((r) => as(parseStockReturn(r))));
+  if (Array.isArray(records.stock_transfers)) {
+    const transfers = records.stock_transfers.map(parseTransfer);
+    out.push({ slice: 'interTransfers', replace: [...transfers.filter((t) => t.server?.status !== 'cancelled'), ...state.interTransfers.filter((t) => !transfers.some((x) => x.id === t.id))] });
+  }
+  if (Array.isArray(records.stocktakes)) push('stocktakes', records.stocktakes.map((x) => as(parseStocktake(x))));
+  if (Array.isArray(records.requisitions)) push('purchaseRequisitions', records.requisitions.map((r) => as(parseRequisition(r))));
+  if (Array.isArray(records.rfqs)) {
+    const reqs = Array.isArray(records.requisitions) ? records.requisitions.map(parseRequisition) : [];
+    push('rfqs', records.rfqs.map((r) => as(parseRfq(r, [...reqs, ...state.purchaseRequisitions]))));
+  }
+  if (Array.isArray(records.purchase_orders)) push('purchaseOrders', records.purchase_orders.map((o) => as(parsePurchaseOrder(o))));
+  if (Array.isArray(records.goods_receipts)) push('goodsReceipts', records.goods_receipts.map((g) => as(parseGoodsReceipt(g))));
+  if (Array.isArray(records.vendor_invoices)) push('vendorInvoices', records.vendor_invoices.map((i) => as(parseVendorInvoice(i))));
+  if (Array.isArray(records.employees)) push('employees', records.employees.map((e) => as(parseEmployee(e, projectName))));
+  if (Array.isArray(records.payroll_periods)) {
+    const periods = records.payroll_periods.map(parsePayrollPeriod);
+    const allPeriods = [...periods, ...state.payrollPeriods.filter((p) => !periods.some((x) => x.id === p.id))];
+    out.push({ slice: 'payrollPeriods', replace: allPeriods });
+    const ids = new Set(periods.map((p) => p.id));
+    if (Array.isArray(records.timesheets)) {
+      const sheets = records.timesheets.map((t) => parseTimesheet(t, allPeriods, state.employees));
+      out.push({ slice: 'timesheets', replace: [...state.timesheets.filter((t) => !ids.has(String(t.server?.extra?.periodId))), ...sheets] });
+    }
+    if (Array.isArray(records.payslips)) {
+      const slips = records.payslips.map((x) => parsePayslip(x, allPeriods, state.employees));
+      out.push({ slice: 'payrollSlips', replace: [...state.payrollSlips.filter((x) => !ids.has(String(x.server?.extra?.periodId))), ...slips] });
+    }
   }
   if (Array.isArray(records.treasury_settings) && records.treasury_settings[0]) out.push({ slice: 'financeSettings', replace: { ...state.financeSettings, ...parseFinanceSettings(records.treasury_settings[0]) } });
   return out;
@@ -313,6 +410,51 @@ function contractVersion(state: AppState, id: string): number {
   const c = [...state.contracts, ...state.subcontractorContracts].find((x) => x.id === id);
   if (!c?.server) throw new ApiError(409, 'Unknown contract', 'قرارداد در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
   return c.server.version;
+}
+
+/** Version of a 0.8.0 record (its server info). */
+function serverVersion(rows: readonly { id: string; server?: { version: number } }[], id: string, what: string): number {
+  const row = rows.find((r) => r.id === id);
+  if (!row?.server?.version) throw new ApiError(409, `Unknown ${what}`, `${what} در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.`);
+  return row.server.version;
+}
+
+function periodVersion(state: AppState, id: string): number {
+  const p = state.payrollPeriods.find((x) => x.id === id);
+  if (!p) throw new ApiError(409, 'Unknown period', 'دوره حقوق در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
+  return p.version;
+}
+
+/** A requisition line typed by name: the material of the list with that name. */
+function materialIdByName(state: AppState, name: string): string {
+  const m = state.materials.find((x) => x.name.trim() === name.trim() || x.code === name.trim());
+  if (!m) throw new ApiError(400, 'Unknown material', `کالای «${name}» در فهرست کالاها نیست؛ ابتدا آن را تعریف کنید یا از فهرست انتخاب کنید.`);
+  return m.id;
+}
+
+function employeeBody(f: Partial<EmployeeInput>) {
+  const map: [keyof EmployeeInput, string, (v: never) => unknown][] = [
+    ['fullName', 'full_name', (v: string) => v.trim()],
+    ['nationalId', 'national_id', (v: string) => v.trim()],
+    ['insuranceNo', 'insurance_no', (v: string) => v.trim()],
+    ['bankName', 'bank_name', (v: string) => v.trim()],
+    ['sheba', 'sheba', (v: string) => v.trim()],
+    ['accountNumber', 'account_number', (v: string) => v.trim()],
+    ['jobTitle', 'job_title', (v: string) => v.trim()],
+    ['contractType', 'contract_type', (v: string) => CONTRACT_KEYS[v as keyof typeof CONTRACT_KEYS] || 'full_time'],
+    ['costCenterId', 'cost_center_id', (v: string) => v],
+    ['baseSalary', 'base_salary', (v: number) => v],
+    ['housingAllowance', 'housing_allowance', (v: number) => v],
+    ['foodAllowance', 'food_allowance', (v: number) => v],
+    ['childAllowance', 'child_allowance', (v: number) => v],
+    ['otherBenefits', 'other_benefits', (v: number) => v],
+    ['loanInstallment', 'loan_installment', (v: number) => v],
+    ['otherDeduction', 'other_deduction', (v: number) => v],
+    ['insured', 'insured', (v: boolean) => v],
+  ];
+  const body: Record<string, unknown> = {};
+  for (const [k, field, convert] of map) if (f[k] !== undefined) body[field] = convert(f[k] as never);
+  return body;
 }
 
 /** Commands; each key is the reference workflow (src/store) whose effect the server now performs. */
@@ -607,6 +749,202 @@ const COMMANDS: Record<string, Command> = {
     return result(await post(key, `statements/${id}/void`, { reason }, versionOf(all, id as string, 'صورت‌وضعیت')), state);
   },
 
+
+  // ------------------------------------------------------------------ procurement (0.8.0)
+  async createRequisition([form], state, key) {
+    const f = form as RequisitionFormInput;
+    const project = state.projects.find((p) => p.id === f.projectId);
+    const center = state.costCenters.find((c) => c.projectId === f.projectId && (c.name === f.costCenter || c.id === f.costCenter));
+    const body = {
+      project_id: f.projectId,
+      cost_center_id: center?.id || project?.costCenterIds?.[0] || undefined,
+      priority: PRIORITY_KEYS[f.priority] || 'normal',
+      justification: f.justification.trim(),
+      needed_date: isoOrUndefined(f.items[0]?.requiredDeliveryDate),
+      lines: f.items.map((i) =>
+        i.kind === 'service'
+          ? { kind: 'service', description: i.materialName.trim(), unit: i.unit.trim(), quantity: qtyString(i.requestedQty), estimated_rate: i.estimatedUnitPrice, account_code: (i.accountCode || '').trim() }
+          : { kind: 'goods', material_id: i.materialId || materialIdByName(state, i.materialName), quantity: qtyString(i.requestedQty), estimated_rate: i.estimatedUnitPrice, description: i.materialName.trim() || undefined }
+      ),
+    };
+    return result(await post(key, 'requisitions', body), state);
+  },
+  async approveRequisition([id], state, key) {
+    return result(await post(key, `requisitions/${id}/approve`, { comment: '' }, serverVersion(state.purchaseRequisitions, id as string, 'درخواست خرید')), state);
+  },
+  async cancelRequisition([id], state, key) {
+    return result(await post(key, `requisitions/${id}/cancel`, { reason: '' }, serverVersion(state.purchaseRequisitions, id as string, 'درخواست خرید')), state);
+  },
+  async createRfqFromRequisition([id], state, key) {
+    return result(await post(key, `requisitions/${id}/rfqs`, {}), state);
+  },
+  async addRfqQuote([rfqId, input], state, key) {
+    const q = input as RfqQuoteInput;
+    const body = {
+      counterparty_id: q.supplierId,
+      reference: q.reference.trim(),
+      prices: Object.entries(q.rates).map(([lineId, rate]) => ({ line_id: lineId, rate })),
+      vat_included: q.vatIncluded,
+      freight: q.freight,
+      delivery_days: q.deliveryDays,
+      payment_terms: q.paymentTerms,
+    };
+    return result(await post(key, `rfqs/${rfqId}/quotes`, body), state);
+  },
+  async selectWinningBid([rfqId, quoteId], state, key) {
+    return result(await post(key, `rfqs/${rfqId}/award`, { quote_id: quoteId }, serverVersion(state.rfqs, rfqId as string, 'استعلام')), state);
+  },
+  async createPurchaseOrderFromRfq([rfqId], state, key) {
+    const rfq = state.rfqs.find((r) => r.id === rfqId);
+    const warehouse = state.warehouses.find((w) => w.projectId === rfq?.projectId && w.server?.status !== 'temporary') || state.warehouses.find((w) => !w.projectId);
+    return result(await post(key, 'purchase-orders', { rfq_id: rfqId, warehouse_id: warehouse?.id }), state);
+  },
+  async createPurchaseOrder() {
+    throw new ApiError(400, 'Direct order', 'با دفاتر رسمی، سفارش خرید از برنده استعلام بهای درخواست تأییدشده صادر می‌شود.');
+  },
+  async decidePurchaseOrder([id, decision, text], state, key) {
+    const version = serverVersion(state.purchaseOrders, id as string, 'سفارش خرید');
+    const approve = decision === 'approve';
+    return result(await post(key, `purchase-orders/${id}/${approve ? 'approve' : 'reject'}`, approve ? { comment: (text as string) || '' } : { reason: text }, version), state);
+  },
+  async updatePurchaseOrderStatus([id, status], state, key) {
+    if (status !== 'فسخ شده') throw new ApiError(400, 'Status', 'وضعیت سفارش را رسید انبار تعیین می‌کند؛ فقط لغو سفارش (فسخ) ثبت می‌شود.');
+    return result(await post(key, `purchase-orders/${id}/reject`, { reason: 'فسخ سفارش' }, serverVersion(state.purchaseOrders, id as string, 'سفارش خرید')), state);
+  },
+  async receiveGoodsFromPO([input], state, key) {
+    const f = input as { poId: string; warehouseId: string; date?: string; waybillNumber: string; qcApprovalStatus: string; lines: { poItemId: string; deliveredQty: number; rejectedQty: number }[] };
+    const body = {
+      warehouse_id: f.warehouseId || undefined,
+      date: isoOrUndefined(f.date),
+      waybill: f.waybillNumber || '',
+      qc_status: f.qcApprovalStatus === 'مردود' ? 'rejected' : f.qcApprovalStatus === 'تأیید مشروط' ? 'conditional' : 'accepted',
+      lines: f.lines.filter((l) => l.deliveredQty > 0).map((l) => ({ po_line_id: l.poItemId, delivered_qty: qtyString(l.deliveredQty), rejected_qty: qtyString(l.rejectedQty || 0) })),
+    };
+    return result(await post(key, `purchase-orders/${f.poId}/receipts`, body), state);
+  },
+  async registerVendorInvoice([grnId, input], state, key) {
+    const v = input as VendorInvoiceInput;
+    const body = { invoice_no: v.invoiceNo.trim(), invoice_date: isoOrUndefined(v.invoiceDate), due_date: isoOrUndefined(v.dueDate), subtotal: v.subtotal, freight: v.freight, vat_amount: v.vatAmount };
+    return result(await post(key, `goods-receipts/${grnId}/invoices`, body), state);
+  },
+  async updateVendorInvoice([id, input], state, key) {
+    const v = input as Partial<VendorInvoiceInput>;
+    const body: Record<string, unknown> = {};
+    if (v.subtotal !== undefined) body.subtotal = v.subtotal;
+    if (v.freight !== undefined) body.freight = v.freight;
+    if (v.vatAmount !== undefined) body.vat_amount = v.vatAmount;
+    if (v.invoiceDate) body.invoice_date = isoOrUndefined(v.invoiceDate);
+    if (v.dueDate) body.due_date = isoOrUndefined(v.dueDate);
+    return result(await post(key, `vendor-invoices/${id}`, body, serverVersion(state.vendorInvoices, id as string, 'فاکتور')), state);
+  },
+  async approveVendorInvoice([id], state, key) {
+    return result(await post(key, `vendor-invoices/${id}/approve`, { comment: '' }, serverVersion(state.vendorInvoices, id as string, 'فاکتور')), state);
+  },
+  async rejectVendorInvoice([id, reason], state, key) {
+    return result(await post(key, `vendor-invoices/${id}/reject`, { reason }, serverVersion(state.vendorInvoices, id as string, 'فاکتور')), state);
+  },
+  async createSupplier([input], state, key) {
+    const f = input as NewSupplierInput;
+    const body = { kind: 'supplier', name: f.name.trim(), national_id: f.nationalId, economic_code: f.economicCode, phone: f.phone || f.mobile, email: f.email, address: [f.city, f.address].filter(Boolean).join('، '), sheba: f.shebaNumber, bank_name: f.bankName };
+    const res = result(await post(key, 'counterparties', body), state);
+    const party = res.records.find((r) => r.slice === 'counterparties')?.upserted || [];
+    res.records.push({ slice: 'suppliers', upserted: suppliersOf(party as never) as unknown as Record<string, unknown>[] });
+    return res;
+  },
+
+  // ------------------------------------------------------------------ inventory (0.8.0)
+  async createMaterial([input], state, key) {
+    const f = input as NewMaterialInput;
+    const body = { name: f.name.trim(), category: f.category, unit: f.unit.trim(), specification: [f.specifications, f.standardGrade].filter(Boolean).join(' — '), reorder_level: qtyString(f.reorderLevel), min_stock: qtyString(f.minSafetyStock), max_stock: qtyString(f.maxCapacity) };
+    return result(await post(key, 'materials', body), state);
+  },
+  async createWarehouse([input], state, key) {
+    const f = input as WarehouseInput;
+    return result(await post(key, 'warehouses', { name: f.name.trim(), kind: f.kind, project_id: f.kind === 'central' ? undefined : f.projectId || undefined, location: f.location, keeper_name: f.keeperName }), state);
+  },
+  async submitStoreIssueForm([form], state, key) {
+    const f = form as StoreIssueFormInput;
+    const warehouse = state.warehouses.find((w) => w.id === f.warehouseId);
+    const party = f.subcontractorName.trim() ? state.counterparties.find((c) => c.kind === 'subcontractor' && c.name === f.subcontractorName.trim()) : undefined;
+    const body = {
+      warehouse_id: f.warehouseId,
+      project_id: warehouse?.projectId || f.projectId || undefined,
+      counterparty_id: party?.id,
+      notes: [f.wbsSection, f.costCenter].filter(Boolean).join(' — '),
+      lines: f.lines.filter((l) => l.qty > 0).map((l) => ({ material_id: l.materialId, quantity: qtyString(l.qty) })),
+    };
+    return result(await post(key, 'store-issues', body), state);
+  },
+  async confirmStoreIssue([id], state, key) {
+    return result(await post(key, `store-issues/${id}/confirm`, { comment: '' }, serverVersion(state.storeIssues, id as string, 'حواله')), state);
+  },
+  async releaseStoreIssue([id], state, key) {
+    return result(await post(key, `store-issues/${id}/cancel`, { reason: 'لغو درخواست' }, serverVersion(state.storeIssues, id as string, 'حواله')), state);
+  },
+  async returnFromProject([issueId, materialId, quantity, reason], state, key) {
+    const issue = state.storeIssues.find((v) => v.id === issueId);
+    const index = (issue?.server?.extra?.lineMaterials as string[] | undefined)?.indexOf(materialId as string) ?? -1;
+    const lineId = index >= 0 ? issue?.server?.lineIds?.[index] : undefined;
+    if (!lineId) throw new ApiError(409, 'Unknown issue line', 'ردیف حواله در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
+    return result(await post(key, `store-issues/${issueId}/returns`, { line_id: lineId, quantity: qtyString(quantity as number), reason }), state);
+  },
+  async returnToSupplier([grnId, materialId, quantity, reason], state, key) {
+    const grn = state.goodsReceipts.find((g) => g.id === grnId);
+    const index = grn ? grn.items.findIndex((i) => i.materialId === materialId) : -1;
+    const lineId = index >= 0 ? grn?.server?.lineIds?.[index] : undefined;
+    if (!lineId) throw new ApiError(409, 'Unknown receipt line', 'ردیف رسید در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
+    return result(await post(key, `goods-receipts/${grnId}/returns`, { line_id: lineId, quantity: qtyString(quantity as number), reason }), state);
+  },
+  async submitTransferForm([form], state, key) {
+    const f = form as TransferFormInput;
+    const body = { source_warehouse_id: f.sourceWarehouseId, target_warehouse_id: f.targetWarehouseId, waybill: f.waybillNumber, driver_name: f.driverName, lines: f.lines.filter((l) => l.quantity > 0).map((l) => ({ material_id: l.materialId, quantity: qtyString(l.quantity) })) };
+    return result(await post(key, 'stock-transfers', body), state);
+  },
+  async advanceTransfer([id, status], state, key) {
+    if (status !== 'تخلیه و تحویل قطعی مقصد') throw new ApiError(400, 'Status', 'با دفاتر رسمی فقط تحویل قطعی در مقصد ثبت می‌شود.');
+    return result(await post(key, `stock-transfers/${id}/deliver`, { comment: '' }, serverVersion(state.interTransfers, id as string, 'انتقال')), state);
+  },
+  async createStocktake([input], state, key) {
+    const f = input as StocktakeCountInput;
+    return result(await post(key, 'stocktakes', { warehouse_id: f.warehouseId, date: isoOrUndefined(f.date), notes: f.notes, lines: f.lines.map((l) => ({ material_id: l.materialId, quantity: qtyString(l.physicalCount) })) }), state);
+  },
+  async applyStocktakeById([id], state, key) {
+    return result(await post(key, `stocktakes/${id}/approve`, { comment: '' }, serverVersion(state.stocktakes, id as string, 'انبارگردانی')), state);
+  },
+  async rejectStocktake([id, reason], state, key) {
+    return result(await post(key, `stocktakes/${id}/reject`, { reason }, serverVersion(state.stocktakes, id as string, 'انبارگردانی')), state);
+  },
+
+  // ------------------------------------------------------------------ payroll (0.8.0)
+  async createEmployee([input], state, key) {
+    return result(await post(key, 'employees', employeeBody(input as EmployeeInput)), state);
+  },
+  async updateEmployee([id, patch], state, key) {
+    const p = patch as Partial<EmployeeInput> & { active?: boolean };
+    const body: Record<string, unknown> = employeeBody(p);
+    if (p.active !== undefined) body.active = p.active;
+    return result(await post(key, `employees/${id}`, body, serverVersion(state.employees, id as string, 'پرسنل')), state);
+  },
+  async createPayrollPeriod([year, month], state, key) {
+    return result(await post(key, 'payroll/periods', { fiscal_year: year, month }), state);
+  },
+  async saveTimesheets([periodId, rows], state, key) {
+    const body = { timesheets: (rows as TimesheetInput[]).map((r) => ({ employee_id: r.employeeId, work_days: String(r.workDays), absent_days: String(r.absentDays), overtime_hours: String(r.overtimeHours), mission_days: String(r.missionDays) })) };
+    return result(await post(key, `payroll/periods/${periodId}/timesheets`, body, periodVersion(state, periodId as string)), state);
+  },
+  async calculatePayroll([periodId], state, key) {
+    return result(await post(key, `payroll/periods/${periodId}/calculate`, {}, periodVersion(state, periodId as string)), state);
+  },
+  async decidePayrollPeriod([periodId, decision, text], state, key) {
+    const approve = decision === 'approve';
+    return result(await post(key, `payroll/periods/${periodId}/${approve ? 'approve' : 'reject'}`, approve ? { comment: (text as string) || '' } : { reason: text }, periodVersion(state, periodId as string)), state);
+  },
+  async approvePayrollPeriod([monthYear], state, key) {
+    const period = state.payrollPeriods.find((p) => p.monthYear === monthYear);
+    if (!period) throw new ApiError(409, 'Unknown period', 'دوره حقوق در نسخه محلی پیدا نشد؛ صفحه را تازه کنید.');
+    return result(await post(key, `payroll/periods/${period.id}/approve`, { comment: '' }, period.version), state);
+  },
+
   // ------------------------------------------------------------------ approval center (0.6.0)
   async decideServerApproval([item, decision, text, fields], state, key) {
     const a = item as ApprovalItem;
@@ -671,6 +1009,42 @@ const SERVER_VALIDATED = new Set([
   'submitSubcontractorStatementForm',
   'decideSubcontractorStatement',
   'voidStatement',
+  // 0.8.0: steps, free stock, averages, matching and payslips are the server's.
+  'createRequisition',
+  'approveRequisition',
+  'cancelRequisition',
+  'createRfqFromRequisition',
+  'addRfqQuote',
+  'selectWinningBid',
+  'createPurchaseOrderFromRfq',
+  'createPurchaseOrder',
+  'decidePurchaseOrder',
+  'updatePurchaseOrderStatus',
+  'receiveGoodsFromPO',
+  'registerVendorInvoice',
+  'updateVendorInvoice',
+  'approveVendorInvoice',
+  'rejectVendorInvoice',
+  'createSupplier',
+  'createMaterial',
+  'createWarehouse',
+  'submitStoreIssueForm',
+  'confirmStoreIssue',
+  'releaseStoreIssue',
+  'returnFromProject',
+  'returnToSupplier',
+  'submitTransferForm',
+  'advanceTransfer',
+  'createStocktake',
+  'applyStocktakeById',
+  'rejectStocktake',
+  'createEmployee',
+  'updateEmployee',
+  'createPayrollPeriod',
+  'saveTimesheets',
+  'calculatePayroll',
+  'decidePayrollPeriod',
+  'approvePayrollPeriod',
 ]);
 
 /** GET /petty-cash and GET /treasury (office roles only) → the petty cash and treasury slices. */
@@ -750,10 +1124,14 @@ export function createAkphDataSource(): DataSource {
         optional(apiClient.get<unknown>('treasury'), null),
         apiClient.get<unknown>('approvals'),
       ]);
-      const [treasurySettings, contractsRaw, statementsRaw] = await Promise.all([
+      const [treasurySettings, contractsRaw, statementsRaw, inventoryRaw, procurementRaw, payrollRaw] = await Promise.all([
         optional(apiClient.get<unknown>('treasury/settings'), null),
         optional(apiClient.get<unknown>('contracts'), { contracts: [] }),
         optional(apiClient.get<unknown>('statements'), { statements: [] }),
+        optional(apiClient.get<unknown>('inventory'), null),
+        optional(apiClient.get<unknown>('procurement'), null),
+        // Personal data: accountant, senior manager and system administrator only (403 for the others).
+        optional(apiClient.get<unknown>('payroll'), null),
       ]);
       const costCenters = arr('/cost-centers', obj('/cost-centers', centersRaw), 'cost_centers').map(parseCostCenter);
       const projects = arr('/projects', obj('/projects', projectsRaw), 'projects').map((p) => parseProject(p, costCenters));
@@ -764,11 +1142,28 @@ export function createAkphDataSource(): DataSource {
       const finance = loadFinance(partial, pettyRaw, treasuryRaw);
       const contractState = contractSlices(arr('/contracts', obj('/contracts', contractsRaw), 'contracts'));
       const statementState = statementSlices(arr('/statements', obj('/statements', statementsRaw), 'statements'));
+      const partyName = (id: string) => counterparties.find((c) => c.id === id)?.name || '';
+      const projectName = (id: string) => projects.find((p) => p.id === id)?.name || '';
+      const inventoryState = inventoryRaw ? inventorySlices(inventoryRaw, partyName) : {};
+      const procurement = procurementRaw ? procurementSlices(procurementRaw) : null;
+      const payroll = payrollRaw ? payrollSlices(payrollRaw, projectName) : {};
       return {
         ...partial,
         ...finance,
         ...contractState,
         ...statementState,
+        ...inventoryState,
+        ...(procurement
+          ? {
+              purchaseRequisitions: procurement.purchaseRequisitions,
+              rfqs: procurement.rfqs,
+              purchaseOrders: procurement.purchaseOrders,
+              goodsReceipts: procurement.goodsReceipts,
+              vendorInvoices: procurement.vendorInvoices,
+            }
+          : {}),
+        ...payroll,
+        suppliers: suppliersOf(counterparties),
         serverApprovals: parseApprovals(approvalsRaw),
         journalEntries,
         documents,

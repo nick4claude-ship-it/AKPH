@@ -6,6 +6,7 @@
 // akph/v1 data source: reads from the server, sends only commands (Idempotency-Key, version/If-Match),
 // never a computed record, number, status or total. Dates: ISO on the wire, Jalali in the app.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 type Call = { method: string; url: string; query: string; headers: Record<string, string>; body?: unknown };
 const calls: Call[] = [];
@@ -114,7 +115,13 @@ const statementsBody = { statements: [statement(), statement({ id: '602', number
   current_step: { label: 'تأیید مدیر ارشد', role: 'مدیر ارشد', approval: true, next_status: 'management_approved', requires: [] }, include_vat: false, vat_amount: 0,
   payment_request: null, history: [] })] };
 
+// Procurement, inventory and payroll (0.8.0) as the server returns them: dumped from the PHP tests' flows.
+const ops = JSON.parse(readFileSync('tests/fixtures/akph-080.json', 'utf8')) as Record<'inventory' | 'procurement' | 'payroll', Record<string, unknown>>;
+
 const responses: Record<string, unknown> = {
+  'GET inventory': ops.inventory,
+  'GET procurement': ops.procurement,
+  'GET payroll': ops.payroll,
   'GET contracts': contractsBody,
   'GET statements': statementsBody,
   'POST contracts': { status: 201, message: 'قرارداد ثبت شد.', id: '203', doc_number: 'CNT-1405-00002', records: { contracts: [contract({ id: '203', number: 'CNT-1405-00002', status: 'pending', current_step: 'مدیر ارشد', step_index: 0, version: 1 })] } },
@@ -320,7 +327,8 @@ const commands = source.commands!;
 for (const a of ['createManualJournalEntry', 'submitManualJournalEntryForm', 'approveJournalEntryLogged', 'rejectJournalEntryLogged', 'reverseJournalEntryLogged', 'createProject', 'updateProject', 'createCostCenter', 'createCounterparty', 'createAccount']) {
   assert.equal(commands.supports(a), true, a);
 }
-for (const a of ['approveVendorInvoice', 'closeFiscalYearLogged', 'createRequisition']) assert.equal(commands.supports(a), false, a);
+for (const a of ['approveVendorInvoice', 'createRequisition', 'confirmStoreIssue', 'applyStocktakeById', 'approvePayrollPeriod']) assert.equal(commands.supports(a), true, a);
+for (const a of ['closeFiscalYearLogged']) assert.equal(commands.supports(a), false, a);
 console.log('  ✔ فرمان‌های این مرحله پشتیبانی می‌شوند؛ بقیه «فقط خواندنی — به‌زودی»');
 
 const draftKey = 'submission-key-0001';
@@ -367,7 +375,13 @@ console.log('  ✔ ویرایش پروژه فقط فیلدهای تغییرکر�
   for (const path of ['/petty-cash', '/finance/payments', '/finance/receipts', '/finance/banks', '/finance/cash', '/approvals']) {
     assert.equal(readOnlyNoticeFor(source.writablePaths, path), null, `${path} is not read-only with the server`);
   }
-  assert.match(readOnlyNoticeFor(source.writablePaths, '/procurement') || '', /فقط خواندنی/, 'sections without server commands stay read-only');
+  // 0.8.0: every route of the app runs on the server — no «فقط خواندنی — به‌زودی» section is left in live mode.
+  const routes = readFileSync('src/components/layout/AppShell.tsx', 'utf8')
+    .split('\n')
+    .filter((line) => !line.includes('<Navigate'))
+    .flatMap((line) => [...line.matchAll(/path="(\/[^"]*)"/g)].map((m) => m[1].replace(/\/:.*$/, '')));
+  assert.ok(routes.length > 20, 'the app routes were read');
+  for (const path of routes) assert.equal(readOnlyNoticeFor(source.writablePaths, path), null, `${path} is backed by the server`);
 
   const [f] = state.pettyCashAccounts;
   assert.equal(f.actualBalance, 1_850_000_000, 'fund balance from the server (ledger)');
@@ -711,6 +725,90 @@ assert.equal(replaced.chartOfAccounts[0].code, '1');
   assert.equal(rb.statement_id, '601', 'a statement receipt names its statement');
   assert.equal(rb.receipt_type, 'statement');
   console.log('  ✔ قرارداد، الحاقیه، ضمانت‌نامه و صورت‌وضعیت‌ها: فقط ورودی کاربر؛ مبلغ، مقدار قبلی، کسورات و سند را سرور تعیین می‌کند');
+}
+
+// ---------------------------------------------------------------- procurement, inventory, payroll (0.8.0)
+{
+  assert.ok(state.materials.length > 0 && state.warehouses.length > 0 && state.stockBalances.length > 0, 'inventory from the server');
+  assert.ok(state.stocktakes.length === 1 && state.interTransfers.length === 1 && state.kardex.length > 0);
+  assert.ok(state.purchaseRequisitions.length > 0 && state.rfqs.length === 1 && state.purchaseOrders.length === 1 && state.goodsReceipts.length === 1 && state.vendorInvoices.length === 1);
+  assert.equal(state.payrollPeriods.length, 1);
+  assert.equal(state.payrollSlips.length, 2);
+  const slip = state.payrollSlips.find((x) => x.grossTotalSalary > 0)!;
+  assert.ok(Number.isInteger(slip.netPayableSalary) && slip.netPayableSalary < slip.grossTotalSalary, 'payslip amounts are the server\'s integer Rials');
+  const inv = state.vendorInvoices[0];
+  assert.equal(inv.server?.status, 'approved');
+  assert.equal(inv.totalAmount, (ops.procurement.vendor_invoices as { total: number }[])[0].total);
+
+  const rebar = state.materials[0];
+  const accepted = { message: 'ثبت شد.', records: {} };
+  for (const k of ['requisitions', `rfqs/${state.rfqs[0].id}/quotes`, `goods-receipts/${state.goodsReceipts[0].id}/invoices`, `vendor-invoices/${inv.id}/reject`, 'store-issues', 'stocktakes',
+    `payroll/periods/${state.payrollPeriods[0].id}/timesheets`, `payroll/periods/${state.payrollPeriods[0].id}/reject`, 'employees']) {
+    responses[`POST ${k}`] = accepted;
+  }
+  calls.length = 0;
+  await commands.run('createRequisition', [{
+    projectId: '5', costCenter: '', priority: 'بالا', justification: ' فونداسیون ',
+    items: [
+      { id: 'a', kind: 'goods', materialId: rebar.id, materialName: rebar.name, unit: 'kg', requestedQty: 12.345, estimatedUnitPrice: 500_000, requiredDeliveryDate: '۱۴۰۵/۰۷/۱۰' },
+      { id: 'b', kind: 'service', materialName: 'اجاره جرثقیل', unit: 'روز', requestedQty: 2, estimatedUnitPrice: 30_000_000, accountCode: '514', requiredDeliveryDate: '' },
+    ],
+  }], state, 'req-key-1');
+  const rq = calls.find((c) => c.url === 'requisitions')!;
+  assert.equal(rq.headers['Idempotency-Key'], 'req-key-1');
+  const rb = rq.body as Record<string, unknown>;
+  for (const k of ['estimated_total', 'number', 'status', 'amount']) assert.ok(!(k in rb), `requisition body must not carry ${k}`);
+  assert.equal(rb.priority, 'urgent');
+  assert.equal(rb.needed_date, '2026-10-02');
+  assert.deepEqual((rb.lines as Record<string, unknown>[]).map((l) => [l.kind, l.quantity]), [['goods', '12.345'], ['service', '2']], 'quantities as decimal strings');
+
+  const rfq = state.rfqs[0];
+  calls.length = 0;
+  await commands.run('addRfqQuote', [rfq.id, { supplierId: '3', reference: ' P-1 ', rates: { '11': 480_000 }, vatIncluded: true, freight: 1000, deliveryDays: 5, paymentTerms: 'نقد' }], state, 'quote-key-1');
+  const qb = calls.find((c) => c.url === `rfqs/${rfq.id}/quotes`)!.body as Record<string, unknown>;
+  assert.deepEqual(qb.prices, [{ line_id: '11', rate: 480_000 }]);
+  for (const k of ['subtotal', 'total', 'vat_amount']) assert.ok(!(k in qb), `quote body must not carry ${k}`);
+
+  const grn = state.goodsReceipts[0];
+  calls.length = 0;
+  await commands.run('registerVendorInvoice', [grn.id, { invoiceNo: ' F-7 ', invoiceDate: '۱۴۰۵/۰۷/۰۱', dueDate: '', subtotal: 1000, freight: 0, vatAmount: 100 }], state, 'inv-key-1');
+  const ib = calls.find((c) => c.url === `goods-receipts/${grn.id}/invoices`)!.body as Record<string, unknown>;
+  assert.deepEqual(ib, { invoice_no: 'F-7', invoice_date: '2026-09-23', subtotal: 1000, freight: 0, vat_amount: 100 }, 'no total, match status or payable: the server matches');
+
+  calls.length = 0;
+  await commands.run('rejectVendorInvoice', [inv.id, 'مغایرت'], state, 'inv-key-2');
+  const ir = calls.find((c) => c.url === `vendor-invoices/${inv.id}/reject`)!;
+  assert.equal(ir.headers['If-Match'], `"${inv.server!.version}"`);
+
+  const site = state.warehouses.find((w) => w.projectId)!;
+  calls.length = 0;
+  await commands.run('submitStoreIssueForm', [{ warehouseId: site.id, costCenter: '', wbsSection: '', subcontractorName: '', tradeType: '', isSubcontractorContra: false, subcontractorDeductionRef: '', receivedByCrewLeaderName: '', reserveOnly: true,
+    lines: [{ rowKey: 'r', materialId: rebar.id, qty: 10.5 }, { rowKey: 's', materialId: rebar.id, qty: 0 }] }], state, 'issue-key-1');
+  const sb = calls.find((c) => c.url === 'store-issues')!.body as Record<string, unknown>;
+  assert.deepEqual(sb.lines, [{ material_id: rebar.id, quantity: '10.5' }], 'empty rows left out; no rate or cost');
+  assert.equal(sb.project_id, site.projectId, 'a project warehouse issues to its own project');
+
+  calls.length = 0;
+  await commands.run('createStocktake', [{ warehouseId: site.id, date: '', notes: '', lines: [{ materialId: rebar.id, physicalCount: 189.999 }] }], state, 'stk-key-1');
+  assert.deepEqual((calls.find((c) => c.url === 'stocktakes')!.body as Record<string, unknown>).lines, [{ material_id: rebar.id, quantity: '189.999' }]);
+
+  const period = state.payrollPeriods[0];
+  calls.length = 0;
+  await commands.run('saveTimesheets', [period.id, [{ employeeId: '1', workDays: 29.5, absentDays: 0.5, overtimeHours: 12, missionDays: 0 }]], state, 'ts-key-1');
+  const tsCall = calls.find((c) => c.url === `payroll/periods/${period.id}/timesheets`)!;
+  assert.equal(tsCall.headers['If-Match'], `"${period.version}"`);
+  assert.deepEqual((tsCall.body as Record<string, unknown>).timesheets, [{ employee_id: '1', work_days: '29.5', absent_days: '0.5', overtime_hours: '12', mission_days: '0' }]);
+  calls.length = 0;
+  await commands.run('decidePayrollPeriod', [period.id, 'reject', 'کارکرد اشتباه'], state, 'prl-key-1');
+  assert.deepEqual(calls.find((c) => c.url === `payroll/periods/${period.id}/reject`)!.body, { reason: 'کارکرد اشتباه', version: period.version });
+  calls.length = 0;
+  await commands.run('createEmployee', [{ fullName: ' کارمند ', nationalId: '', insuranceNo: '', bankName: '', sheba: '', accountNumber: '', jobTitle: '', contractType: 'قراردادی موقت', costCenterId: '8',
+    baseSalary: 100, housingAllowance: 0, foodAllowance: 0, childAllowance: 0, otherBenefits: 0, loanInstallment: 0, otherDeduction: 0, insured: true }], state, 'emp-key-1');
+  const eb = calls.find((c) => c.url === 'employees')!.body as Record<string, unknown>;
+  assert.equal(eb.full_name, 'کارمند');
+  assert.equal(eb.contract_type, 'temporary');
+  for (const k of ['gross', 'net', 'code', 'project_id']) assert.ok(!(k in eb), `employee body must not carry ${k}`);
+  console.log('  ✔ خرید، انبار و حقوق: فقط ورودی کاربر (مقدار اعشاری به‌صورت رشته)؛ مبلغ، مالیات، تطبیق و سند را سرور تعیین می‌کند');
 }
 
 // ---------------------------------------------------------------- strict parsing

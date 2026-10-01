@@ -21,7 +21,8 @@ import { Money } from '../common/Money';
 interface PurchaseOrdersViewProps {
   orders: PurchaseOrder[];
   projects: Project[];
-  onOpenNewOrderModal: () => void;
+  /** Absent with the server: orders are issued from the RFQ winner. */
+  onOpenNewOrderModal?: () => void;
   onSelectOrderForPrint: (order: PurchaseOrder) => void;
   onUpdateOrderStatus: (orderId: string, status: POStatus) => void;
   onNavigateToInventory?: () => void;
@@ -71,13 +72,15 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onOpenNewOrderModal}
-            className="btn btn-primary self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>صدور سفارش خرید جدید</span>
-          </button>
+          {onOpenNewOrderModal && (
+            <button
+              onClick={onOpenNewOrderModal}
+              className="btn btn-primary self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>صدور سفارش خرید جدید</span>
+            </button>
+          )}
         </div>
 
         {/* Filter Inputs Grid */}

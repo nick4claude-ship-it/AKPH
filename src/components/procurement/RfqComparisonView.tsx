@@ -20,17 +20,20 @@ import { formatMoney } from '../../utils/money';
 import { formatDecimal, formatInt, formatText } from '../../utils/formatters';
 import { rfqCanIssueOrder } from '../../store/views/procurement';
 import { Money } from '../common/Money';
+import { RfqQuoteForm } from './RfqQuoteForm';
 
 interface RfqComparisonViewProps {
   rfqs: RequestForQuotation[];
   onSelectWinningBid: (rfqId: string, quoteId: string) => void;
   onGeneratePoFromRfq: (rfq: RequestForQuotation) => void;
+  onToast?: (msg: string) => void;
 }
 
 export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
   rfqs,
   onSelectWinningBid,
   onGeneratePoFromRfq,
+  onToast,
 }) => {
   const [activeRfqForMatrix, setActiveRfqForMatrix] = useState<RequestForQuotation | null>(null);
 
@@ -113,6 +116,8 @@ export const RfqComparisonView: React.FC<RfqComparisonViewProps> = ({
                   </div>
                 )}
               </div>
+
+              <RfqQuoteForm rfq={rfq} onToast={onToast} />
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button

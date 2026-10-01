@@ -500,7 +500,51 @@ final class Akph_Assistant {
             $lines[] = '';
             $lines[] = 'اسناد حسابداری سال مالی ' . $fy . ': قطعی ' . $by['posted'] . '، در انتظار تأیید ' . $by['pending'] . '، ردشده ' . $by['rejected'];
         }
+        $lines = array_merge($lines, self::operations_context($money, $view_all));
         return implode("\n", $lines);
+    }
+
+    /**
+     * Procurement, inventory and payroll (0.8.0) within the user's project scope. Payroll: only the status of the
+     * latest period, for the roles that may read payroll — never a name, national id, account or per-person amount.
+     */
+    private static function operations_context(callable $money, $view_all) {
+        $count_by = function ($table, $extra = '') {
+            $rows = Akph_Db::results('SELECT status, COUNT(*) AS n' . $extra . ' FROM ' . Akph_Schema::table($table) . ' WHERE ' . Akph_Auth::project_scope_sql('project_id') . ' GROUP BY status');
+            $out = array();
+            foreach ((array) $rows as $r) {
+                $out[$r->status] = $r;
+            }
+            return $out;
+        };
+        $n = function (array $by, $status) {
+            return isset($by[$status]) ? (int) $by[$status]->n : 0;
+        };
+        $sum = function (array $by, $status) {
+            return isset($by[$status]) ? (int) $by[$status]->total : 0;
+        };
+        $lines = array('', 'خرید و انبار' . ($view_all ? '' : ' پروژه‌های این کاربر') . ':');
+        $req = $count_by('requisitions');
+        $lines[] = '- درخواست خرید: در انتظار تأیید ' . $n($req, 'pending') . '، تأییدشده ' . $n($req, 'approved') . '، در استعلام ' . $n($req, 'rfq') . '، سفارش‌شده ' . $n($req, 'ordered');
+        $po = $count_by('purchase_orders', ', SUM(total) AS total');
+        $lines[] = '- سفارش خرید: در انتظار تأیید ' . $n($po, 'pending') . ' (' . $money($sum($po, 'pending')) . ')، تأییدشده و در انتظار رسید ' . $n($po, 'approved') . ' (' . $money($sum($po, 'approved')) . ')، رسید ناقص ' . $n($po, 'partial') . '، تکمیل ' . $n($po, 'received');
+        $inv = $count_by('vendor_invoices', ', SUM(total) AS total');
+        $lines[] = '- فاکتور خرید: در انتظار تأیید ' . $n($inv, 'pending') . ' (' . $money($sum($inv, 'pending')) . ')، متوقف به‌علت مغایرت ' . $n($inv, 'stopped') . '، تأییدشده ' . $n($inv, 'approved') . ' (' . $money($sum($inv, 'approved')) . ')';
+        $issues = $count_by('store_issues', ', SUM(total_cost) AS total');
+        $lines[] = '- حواله مصرف: در انتظار تأیید ' . $n($issues, 'requested') . '، صادرشده ' . $n($issues, 'issued') . ' (بهای مصرف ' . $money($sum($issues, 'issued')) . ')';
+        if ($view_all) {
+            $stock = (int) Akph_Db::value('SELECT COALESCE(SUM(stock_value), 0) FROM ' . Akph_Schema::table('materials'));
+            $lines[] = '- ارزش موجودی انبارها (میانگین موزون): ' . $money($stock);
+        }
+        if (current_user_can(Akph_Roles::PAYROLL_MANAGE)) {
+            $p = Akph_Db::results('SELECT number, fiscal_year, month, status FROM ' . Akph_Schema::table('payroll_periods') . ' ORDER BY fiscal_year DESC, month DESC LIMIT 1');
+            $labels = array('draft' => 'پیش‌نویس کارکرد', 'calculated' => 'محاسبه‌شده، منتظر تأیید حسابدار', 'finance_approved' => 'منتظر تأیید مدیر ارشد', 'approved' => 'تأیید نهایی و سند صادر شد');
+            if ($p) {
+                $lines[] = '';
+                $lines[] = 'حقوق (فقط وضعیت؛ اطلاعات شخصی پرسنل در این داده نیست): آخرین دوره ' . $p[0]->fiscal_year . '/' . $p[0]->month . ' — ' . (isset($labels[$p[0]->status]) ? $labels[$p[0]->status] : $p[0]->status);
+            }
+        }
+        return $lines;
     }
 
     // ------------------------------------------------------------------ providers

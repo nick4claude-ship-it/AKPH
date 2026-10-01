@@ -42,11 +42,15 @@ export const MONEY_FIELDS: ReadonlySet<string> = new Set([
   'totalStockValue', 'totalValuation', 'totalVatAmount', 'turnoverCredit', 'turnoverDebit', 'unclearedChecksAmount',
   'unitCost', 'unitPrice', 'unitRate', 'usableBalance', 'varianceAmount', 'vatAmount', 'workAmountCurrent',
   'workerInsuranceDeduction', 'returnedAmount',
+  // akph/v1 0.8.0 payroll periods
+  'grossTotal', 'netTotal', 'costTotal',
 ]);
 
 /** Numeric fields that are not money. */
 export const NON_MONEY_NUMERIC_FIELDS: ReadonlySet<string> = new Set([
   // akph/v1 0.7.0 contracts: quantities (DECIMAL(18,3)), indexes, percentages, days, row numbers
+  // akph/v1 0.8.0 payroll period (Jalali year and month)
+  'fiscalYear', 'month',
   'baseQuantity', 'approvedQuantity', 'pendingQuantity', 'adjustmentBaseIndex', 'adjustmentIndex', 'adjustmentFactorPercent', 'durationDays', 'daysToDue', 'rowNo',
   // quantities and measures
   'acceptedQty', 'approvedQty', 'areaM2', 'balanceQty', 'contractQuantity', 'cumulativeExecutedQuantity', 'cumulativeQuantity',

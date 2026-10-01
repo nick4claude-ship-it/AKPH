@@ -26,7 +26,8 @@ import { sampleNames } from './check-live-bundle.mjs';
 const root = resolve('.');
 const buildDir = join(root, '.live-build');
 const outDir = join(root, 'ui-screenshots', 'print');
-const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/live-api.json'), 'utf8'));
+// 0.8.0: procurement, inventory and payroll as the server returns them (dumped from the PHP tests' flows).
+const fixture = { ...JSON.parse(readFileSync(join(root, 'tests/fixtures/live-api.json'), 'utf8')), ...JSON.parse(readFileSync(join(root, 'tests/fixtures/akph-080.json'), 'utf8')) };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
 if (!process.argv.includes('--no-build') || !existsSync(join(buildDir, 'index.html'))) {
@@ -141,6 +142,9 @@ try {
     ['/statements/subcontractor', 'صورت‌وضعیت'],
     ['/approvals', 'قرارداد پیمانکار جزء'],
     ['/notifications', 'سررسید ضمانت‌نامه'],
+    ['/procurement', 'میلگرد ۱۶'],
+    ['/inventory', 'انبار کارگاه یک'],
+    ['/payroll', 'کارگر کارگاه'],
   ];
   for (const [path, text] of checks) {
     await live.goto(`${base}#${path}`, { waitUntil: 'networkidle' });
@@ -172,6 +176,26 @@ try {
   if (plainCalls.some(([, keys]) => keys[0] !== 'rest_route')) problems.push('plain permalinks: rest_route is not the first query parameter');
   if (prettyCallsWhilePlain) problems.push(`plain permalinks: ${prettyCallsWhilePlain} request(s) went to /wp-json/`);
 
+  // 0.8.0: every tab of procurement, inventory and payroll renders the server records without a page error.
+  const tabs = [
+    ['/procurement', ['درخواست‌های خرید', 'استعلام بها و کمیسیون', 'سفارش‌های خرید', 'فاکتورها و تطبیق ۳جانبه', 'وندورلیست تأمین‌کنندگان'], 'ثبت پیشنهاد فروشنده|FRQ|RFQ'],
+    ['/inventory', ['کاتالوگ کالا و مصالح', 'رسید ورود و بارنامه', 'حواله خروج و مصرف', 'انتقال بین کارگاه‌ها', 'کاردکس کالا', 'انبارگردانی و مغایرت‌گیری', 'انبارها و باراندازها'], 'ثبت شمارش انبار'],
+    ['/payroll', ['شناسنامه پرسنل و قراردادها', 'کارکرد و تایم‌شیت کارگاه‌ها'], 'گشودن دوره حقوق'],
+  ];
+  for (const [path, labels, control] of tabs) {
+    await live.goto(`${base}#${path}`, { waitUntil: 'networkidle' });
+    await live.waitForSelector('main', { timeout: 20000 });
+    const seen = [];
+    for (const label of labels) {
+      await live.getByRole('button', { name: label }).first().click();
+      await live.waitForTimeout(150);
+      const body = await live.evaluate(() => document.querySelector('main')?.innerText || '');
+      if (body.includes('به‌زودی')) problems.push(`«به‌زودی» on ${path} › ${label}`);
+      seen.push(body);
+    }
+    if (!seen.some((b) => new RegExp(control).test(b))) problems.push(`${path}: the server control «${control}» is missing`);
+    await live.screenshot({ path: join(outDir, `${path.slice(1)}-live.png`), fullPage: true });
+  }
   // The contract opened from the list shows its server state (approval, guarantees, amendments).
   await live.goto(`${base}#/contracts/client`, { waitUntil: 'networkidle' });
   await live.getByRole('button', { name: 'قراردادهای کارفرما' }).click();

@@ -114,7 +114,10 @@ export type ApprovalModule =
   | 'bank_voucher'
   | 'receipt'
   | 'contract'
-  | 'contract_amendment';
+  | 'contract_amendment'
+  | 'purchase_order'
+  | 'store_issue'
+  | 'stocktake';
 
 /** A pending approval, gathered by a selector from the owning module's records. */
 export interface ApprovalItem {
@@ -760,6 +763,23 @@ export type PettyCashSubTab =
   | 'reports'
   | 'settings';
 
+/**
+ * Server state of a procurement, inventory or payroll record (akph/v1 0.8.0): the server's status and version,
+ * the approval step waiting, who created and last approved it (separation of duties), the posted entry and the
+ * ids of its lines in the order of the app's items.
+ */
+export interface ServerRecordInfo {
+  version: number;
+  status: string;
+  currentStep?: string | null;
+  createdById?: string;
+  lastApprovedById?: string | null;
+  entryNumber?: string;
+  lineIds?: string[];
+  /** Module-specific values (e.g. the requisition lines of an RFQ, the period of a payslip). */
+  extra?: Record<string, unknown>;
+}
+
 // ==================== PHASE 4: CONTRACTS & PROGRESS STATEMENTS ====================
 
 export type ContractStatus =
@@ -1362,6 +1382,8 @@ export interface StockReturn {
   totalCost: number;
   reason: string;
   journalEntryId?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface Warehouse {
@@ -1378,6 +1400,8 @@ export interface Warehouse {
   status: 'فعال' | 'موقت' | 'تکمیل';
   itemsCount: number;
   totalValuation: number;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface MaterialItem {
@@ -1396,6 +1420,8 @@ export interface MaterialItem {
   totalStockValue: number;
   requiresInspection: boolean;
   storageLocationBin?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface GoodsReceiptItem {
@@ -1445,6 +1471,8 @@ export interface GoodsReceiptNote {
   status: 'پیش‌نویس' | 'کنترل کیفیت' | 'تأیید نهایی انبارداری';
   receiverName: string;
   accountingJournalEntryId?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface StoreIssueItem {
@@ -1486,6 +1514,8 @@ export interface StoreIssueVoucher {
   confirmedById?: string;
   status: 'درخواست اولیه' | 'تأیید مدیر کارگاه' | 'خروج قطعی از انبار';
   accountingJournalEntryId?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface InterWarehouseTransfer {
@@ -1513,6 +1543,8 @@ export interface InterWarehouseTransfer {
   totalCost: number;
   status: 'صدور مجوز' | 'بارگیری و خروج از مبدأ' | 'در مسیر حمل' | 'تخلیه و تحویل قطعی مقصد';
   authorizedBy: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface StocktakeItem {
@@ -1540,6 +1572,8 @@ export interface StocktakeAudit {
   netVarianceAmount: number;
   status: 'شمارش در جریان' | 'مغایرت‌گیری و بازشماری' | 'تأیید نهایی و صدور سند تعدیل';
   accountingAdjustmentEntryId?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface KardexEntry {
@@ -1687,6 +1721,8 @@ export interface PurchaseRequisition {
   justification: string;
   linkedPoId?: string;
   linkedPoNumber?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface BidSupplierQuote {
@@ -1732,6 +1768,8 @@ export interface RequestForQuotation {
   selectedSupplierName?: string;
   commissionCommitteeNotes?: string;
   savingsVsBudgetAmount?: number;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export type POStatus =
@@ -1791,6 +1829,8 @@ export interface PurchaseOrder {
   approvedBy: string;
   linkedGrnNumbers?: string[];
   linkedInvoiceNumber?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export type MatchingStatus = 'تطبیق کامل و بدون مغایرت' | 'مغایرت قیمتی' | 'مغایرت مقداری' | 'در انتظار رسید انبار' | 'تأیید نهایی مالی';
@@ -1833,6 +1873,8 @@ export interface VendorInvoice {
     notes?: string;
   };
   accountingEntryNumber?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export type ProcurementSubTab =
@@ -2096,6 +2138,8 @@ export interface Employee {
   };
   insuranceNumber: string;
   status: 'فعال' | 'مرخصی بدون حقوق' | 'تسویه شده';
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 export interface MonthlyTimesheet {
@@ -2113,6 +2157,29 @@ export interface MonthlyTimesheet {
   holidayWorkHours: number;
   missionDays: number;
   status: 'تأیید سرپرست کارگاه' | 'تأیید مدیر پروژه' | 'تأیید منابع انسانی';
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
+}
+
+/** A monthly payroll period of the server (akph/v1 0.8.0): its approval step and the requests it created. */
+export interface PayrollPeriod {
+  id: string;
+  number: string;
+  fiscalYear: number;
+  month: number;
+  monthYear: string;
+  /** draft | calculated | finance_approved | approved */
+  status: string;
+  currentStep: string | null;
+  grossTotal: number;
+  netTotal: number;
+  costTotal: number;
+  calculatedById: string | null;
+  lastApprovedById: string | null;
+  rejectReason: string;
+  entryNumber?: string;
+  paymentRequests: { id: string; number: string; payableType: string; status: string; amount: number; paidAmount: number }[];
+  version: number;
 }
 
 export interface PayrollSlip {
@@ -2163,6 +2230,8 @@ export interface PayrollSlip {
   status: 'محاسبه شده' | 'تأیید مالی' | 'صادر شده جهت پرداخت' | 'پرداخت شده';
   journalEntryId?: string;
   paymentRequestId?: string;
+  /** akph/v1 (0.8.0): server state of the record (version, status, step, line ids). */
+  server?: ServerRecordInfo;
 }
 
 

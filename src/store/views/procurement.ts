@@ -53,7 +53,13 @@ export function selectProcurementDashboard(
 }
 
 /** A requisition can still be turned into an RFQ or an order. */
-export const requisitionConvertible = (r: PurchaseRequisition) => r.status !== 'سفارش صادر شده (PO)';
+export const requisitionConvertible = (r: PurchaseRequisition) => (r.server ? r.server.status === 'approved' : r.status !== 'سفارش صادر شده (PO)');
+/** Direct order from a requisition (demo only; with the server the order comes from the RFQ winner). */
+export const requisitionDirectOrder = (r: PurchaseRequisition) => !r.server && requisitionConvertible(r);
+/** A supplier invoice that can be approved: with the server only a matched invoice pending the accountant (a stopped one is not). */
+export const invoiceApprovable = (i: VendorInvoice) => (i.server ? i.server.status === 'pending' : i.remainingBalance > 0);
+/** A supplier invoice the accountant can still reject (server only). */
+export const invoiceRejectable = (i: VendorInvoice) => i.server?.status === 'pending' || i.server?.status === 'stopped';
 /** An RFQ with a winner that is not an order yet. */
 export const rfqCanIssueOrder = (r: RequestForQuotation) => r.status !== 'تبدیل به سفارش (PO)';
 
@@ -119,6 +125,10 @@ export interface RequisitionLineInput {
   estimatedUnitPrice: number;
   requiredDeliveryDate: string;
   suggestedVendors?: string;
+  /** akph/v1: a line is a material of the list (goods) or a service with a cost account of group 5/6. */
+  kind?: 'goods' | 'service';
+  materialId?: string;
+  accountCode?: string;
 }
 
 export interface RequisitionFormInput {
@@ -147,4 +157,17 @@ export function blankRequisitionLine(): RequisitionLineInput {
 /** Estimated total of a requisition (quantity × estimated price of every line). */
 export function requisitionEstimate(items: readonly RequisitionLineInput[]): number {
   return sumBy(items, (it) => it.requestedQty * it.estimatedUnitPrice);
+}
+
+/** Postable cost accounts (group 5 and 6, no children) for service lines of a requisition. */
+export function expenseAccountOptions(state: Pick<AppState, 'chartOfAccounts'>): { code: string; title: string }[] {
+  const out: { code: string; title: string }[] = [];
+  const walk = (nodes: AppState['chartOfAccounts']) => {
+    for (const n of nodes) {
+      if (n.children?.length) walk(n.children);
+      else if (n.code.startsWith('5') || n.code.startsWith('6')) out.push({ code: n.code, title: n.title });
+    }
+  };
+  walk(state.chartOfAccounts);
+  return out;
 }

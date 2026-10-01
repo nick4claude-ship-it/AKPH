@@ -23,12 +23,17 @@ import {
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
 import { formatDecimal, formatText } from '../../utils/formatters';
 import { Money } from '../common/Money';
+import { stocktakePending } from '../../store/views/inventory';
 
 interface StocktakeViewProps {
   stocktakes: StocktakeAudit[];
   warehouses: Warehouse[];
   currentUser: UserProfile;
   onApplyAdjustmentJournal: (stocktakeId: string) => void;
+  /** Server: a counted stocktake goes back with a reason. */
+  onRejectStocktake?: (stocktakeId: string, reason: string) => void;
+  /** Server: the physical count form. */
+  countForm?: React.ReactNode;
 }
 
 export const StocktakeView: React.FC<StocktakeViewProps> = ({
@@ -36,7 +41,10 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
   warehouses,
   currentUser,
   onApplyAdjustmentJournal,
+  onRejectStocktake,
+  countForm,
 }) => {
+  const [rejectReason, setRejectReason] = useState('');
   const [selectedAuditId, setSelectedAuditId] = useState<string>(
     stocktakes.length > 0 ? stocktakes[0].id : ''
   );
@@ -64,6 +72,7 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
             </span>
           </div>
         </div>
+        {countForm && <div className="mt-4">{countForm}</div>}
 
         {/* Audit Select Tab Bar */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 overflow-x-auto">
@@ -123,13 +132,38 @@ export const StocktakeView: React.FC<StocktakeViewProps> = ({
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     سند تعدیل صادر شد ({selectedAudit.accountingAdjustmentEntryId})
                   </span>
+                ) : stocktakePending(selectedAudit) ? (
+                  <>
+                    <button
+                      onClick={() => onApplyAdjustmentJournal(selectedAudit.id)}
+                      className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-xs transition-all cursor-pointer"
+                    >
+                      صدور خودکار سند تعدیل انبار
+                    </button>
+                    {onRejectStocktake && (
+                      <>
+                        <input
+                          aria-label="دلیل رد انبارگردانی"
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="دلیل رد"
+                          className="px-2 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+                        />
+                        <button
+                          disabled={!rejectReason.trim()}
+                          onClick={() => {
+                            onRejectStocktake(selectedAudit.id, rejectReason);
+                            setRejectReason('');
+                          }}
+                          className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm cursor-pointer disabled:opacity-40"
+                        >
+                          رد شمارش
+                        </button>
+                      </>
+                    )}
+                  </>
                 ) : (
-                  <button
-                    onClick={() => onApplyAdjustmentJournal(selectedAudit.id)}
-                    className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-xs transition-all cursor-pointer"
-                  >
-                    صدور خودکار سند تعدیل انبار
-                  </button>
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold bg-slate-100 text-slate-600">رد شده</span>
                 )}
               </div>
             </div>

@@ -20,11 +20,13 @@ export const PayslipPrint: React.FC<{ slip: PayrollSlip; onClose: () => void }> 
     ['حق اولاد', slip.childAllowance],
     ['حق تخصص', slip.specialSkillAllowance],
     ['اضافه‌کار', slip.overtimePay],
+    ['فوق‌العاده مأموریت', slip.missionPay || 0],
   ];
   const deductions: [string, number][] = [
     ['بیمه سهم کارگر', slip.workerInsuranceDeduction],
     ['مالیات حقوق', slip.incomeTaxDeduction],
     ['مساعده / اقساط وام', slip.loanDeduction],
+    ['سایر کسور', slip.disciplinaryDeduction || 0],
   ];
   return (
     <Dialog onClose={onClose} label={`چاپ فیش حقوق ${slip.employeeName}`} overlayClassName="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl my-auto overflow-hidden flex flex-col max-h-[92vh]">

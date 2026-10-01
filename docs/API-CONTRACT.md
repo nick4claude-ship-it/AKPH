@@ -123,6 +123,15 @@
 | `POST /client-statements`، `POST /subcontractor-statements`، `POST /statements/{id}` | `akph_statements_prepare` | — | ✓ پروژه خودش |
 | `POST /statements/{id}/approve`، `/return`، `/reject` | مرحله تهیه: `akph_statements_prepare`؛ مرحله تأیید: `akph_contracts_approve` + نقش مرحله | ✓ مرحله «حسابدار» | ✓ مراحل «مدیر پروژه» پروژه خودش |
 | `POST /statements/{id}/void` | مدیر ارشد یا مدیر سیستم | — | — |
+| `GET /procurement`، `GET /inventory`، `GET /inventory/kardex?material_id=&warehouse_id=` | `akph_access` | ✓ همه | ✓ فقط پروژه‌ها و انبارهای پروژه‌های خودش؛ بدون ارزش ریالی کالا |
+| `POST /requisitions`، `POST /requisitions/{id}/cancel` | `akph_procurement_request` | — | ✓ پروژه خودش |
+| `POST /requisitions/{id}/approve`، `/reject`، `POST /purchase-orders/{id}/approve`، `/reject`، `POST /vendor-invoices/{id}/approve`، `/reject` | `akph_procurement_approve` + نقش مرحله | ✓ مرحله «حسابدار» (درخواست) و فاکتور | ✓ مرحله «مدیر پروژه» درخواست پروژه خودش |
+| `POST /requisitions/{id}/rfqs`، `POST /rfqs/{id}/quotes`، `/award`، `POST /purchase-orders`، `POST /goods-receipts/{id}/invoices`، `POST /vendor-invoices/{id}` | `akph_procurement_manage` | ✓ | — |
+| `POST /purchase-orders/{id}/receipts`، `POST /goods-receipts/{id}/returns` | `akph_inventory_receive` | ✓ | ✓ پروژه خودش |
+| `POST /store-issues`، `/confirm`، `/cancel`، `/returns`، `POST /stock-transfers`، `/deliver`، `/cancel` | `akph_inventory_issue` | — | ✓ انبارهای پروژه خودش |
+| `POST /materials`، `POST /materials/{id}`، `POST /warehouses`، `POST /warehouses/{id}`، `POST /stocktakes`، `/approve`، `/reject` | `akph_inventory_manage` | ✓ | — |
+| `GET /payroll`، `POST /employees`، `POST /employees/{id}`، `POST /payroll/periods`، `/timesheets`، `/calculate`، `/approve`، `/reject` | `akph_payroll_manage` (اطلاعات شخصی) | ✓ | — هرگز |
+| `POST /procurement/settings`، `POST /payroll/settings` | `akph_settings` | — | — |
 | `GET /` (فهرست فضای نام) | `akph_access` | ✓ | ✓ |
 
 ## ۴. جزئیات مسیرها
@@ -547,6 +556,50 @@ cumulative_quantity, rate, amount, cumulative_amount }]`، `work_amount`، `adju
 | `POST /statements/{id}/return`، `/reject` | `reason`، `version` | برگشت به تهیه (زنجیره از نو) یا رد |
 | `POST /statements/{id}/void` | `reason`، `version` | مدیر ارشد/مدیر سیستم؛ بدون دریافت یا پرداخت؛ سند برگشتی `STATEMENT_VOIDED` و لغو درخواست پرداخت پرداخت‌نشده |
 
+### خرید، انبار و حقوق (۰٫۸٫۰)
+
+مقدارها رشته اعشاری با حداکثر سه رقم (`"1200.75"`) و مبالغ ریال صحیح‌اند. مبلغ ردیف، جمع‌ها، ارزش افزوده، بهای میانگین موزون،
+ارزش رسید، اختلاف قیمت، فیش حقوق، شماره‌ها و تأییدکننده را سرور تعیین می‌کند؛ فیلد اضافه در بدنه یا ردیف ← `akph_unknown_field`.
+همه فرمان‌ها Idempotency-Key می‌خواهند و فرمان روی رکورد موجود `version` (یا `If-Match`) را؛ تعارض ← 409.
+
+`GET /procurement` → `{ requisitions, rfqs, purchase_orders, goods_receipts, vendor_invoices, supplier_returns, settings }`؛
+`GET /inventory` → `{ materials, warehouses, balances, issues, returns, transfers, stocktakes, kardex }` (کاردکس ۳۰۰۰ ردیف آخر؛ برای
+یک کالا `GET /inventory/kardex?material_id=&warehouse_id=` با مانده هر انبار)؛ `GET /payroll` → `{ employees, periods, timesheets,
+payslips, settings }`. نمونه کامل پاسخ‌ها (از جریان آزمون‌های PHP) در `tests/fixtures/akph-080.json`.
+
+| فرمان | بدنه | قاعده |
+|---|---|---|
+| `POST /requisitions` | `project_id`، `cost_center_id`، `priority` (`normal`\|`urgent`\|`critical`)، `needed_date`، `justification`، `lines: [{ kind: goods, material_id, quantity, estimated_rate }` یا `{ kind: service, description, unit, quantity, estimated_rate, account_code }]` | شماره REQ؛ زنجیره [مدیر پروژه، حسابدار]؛ حساب خدمت از گروه ۵ یا ۶ |
+| `POST /requisitions/{id}/approve`، `/reject`، `/cancel` | `comment` / `reason`، `version` | ثبت‌کننده و تأییدکننده مرحله قبل تأیید نمی‌کنند |
+| `POST /requisitions/{id}/rfqs` | `title`، `deadline` | فقط درخواست تأییدشده؛ شماره RFQ |
+| `POST /rfqs/{id}/quotes` | `counterparty_id` (تأمین‌کننده)، `reference`، `prices: [{ line_id, rate }]` (برای همه ردیف‌ها)، `vat_included`، `freight`، `delivery_days`، `payment_terms`، `notes` | |
+| `POST /rfqs/{id}/award` | `quote_id`، `version` | |
+| `POST /purchase-orders` | `rfq_id` (+ `warehouse_id`) یا `requisition_id`، `counterparty_id`، `lines: [{ requisition_line_id, rate }]`، `freight`، `vat_applies`؛ `payment_terms`، `due_date`، `notes` | شماره PO؛ ارزش افزوده به نرخ تنظیمات؛ کالا انبار لازم دارد؛ تأیید مدیر ارشد (نه ثبت‌کننده) |
+| `POST /purchase-orders/{id}/approve`، `/reject` | `comment` / `reason`، `version` | رد: سفارش در انتظار یا لغو سفارش تأییدشده بدون رسید |
+| `POST /purchase-orders/{id}/receipts` | `warehouse_id`، `date`، `waybill`، `qc_status`، `notes`، `lines: [{ po_line_id, delivered_qty, rejected_qty }]` | ≤ مانده سفارش؛ سند `GOODS_RECEIPT` |
+| `POST /goods-receipts/{id}/invoices` | `invoice_no`، `invoice_date`، `due_date`، `subtotal`، `freight`، `vat_amount`، `notes` | تطبیق سه‌جانبه: `pending` یا `stopped` (`match_status: mismatch`) |
+| `POST /vendor-invoices/{id}` | `subtotal`، `freight`، `vat_amount`، تاریخ‌ها، `version` | اصلاح و تطبیق دوباره |
+| `POST /vendor-invoices/{id}/approve`، `/reject` | `comment` / `reason`، `version` | فاکتور متوقف قابل تأیید نیست؛ سند `VENDOR_INVOICE` و درخواست پرداخت خزانه |
+| `POST /goods-receipts/{id}/returns` | `line_id`، `quantity`، `reason` | سند `PURCHASE_RETURN`؛ کاهش درخواست پرداخت باز |
+| `POST /materials`، `POST /materials/{id}` | `code` (اختیاری؛ وگرنه MAT)، `name`، `category`، `unit`، `specification`، `reorder_level`، `min_stock`، `max_stock`؛ ویرایش + `active`، `version` | |
+| `POST /warehouses`، `POST /warehouses/{id}` | `name`، `kind` (`central`\|`project`\|`temporary`)، `project_id` (انبار پروژه الزامی، مرکزی ممنوع)، `location`، `keeper_name` | شماره WH |
+| `POST /store-issues` | `warehouse_id`، `project_id` (فقط انبار مرکزی/موقت)، `cost_center_id`، `counterparty_id`، `date`، `notes`، `lines: [{ material_id, quantity }]` | شماره SIV؛ رزرو؛ ردیف‌های یک کالا جمع می‌شوند |
+| `POST /store-issues/{id}/confirm`، `/cancel` | `comment` / `reason`، `version` | تأیید نه درخواست‌کننده؛ سند `STORE_ISSUE`؛ لغو رزرو را آزاد می‌کند |
+| `POST /store-issues/{id}/returns` | `line_id`، `quantity`، `reason` | شماره RTN؛ سند `STORE_RETURN` |
+| `POST /stock-transfers`، `/{id}/deliver`، `/{id}/cancel` | `source_warehouse_id`، `target_warehouse_id`، `date`، `waybill`، `driver_name`، `notes`، `lines` | شماره STR؛ سند `INVENTORY_TRANSFER` |
+| `POST /stocktakes` | `warehouse_id`، `date`، `notes`، `lines: [{ material_id, quantity }]` (شمارش) | شماره STK؛ در انتظار تأیید کاربر دوم |
+| `POST /stocktakes/{id}/approve`، `/reject` | `comment` / `reason`، `version` | نه ثبت‌کننده؛ سند `STOCKTAKE_ADJUSTMENT` با ردیف جدای کسری و اضافه |
+| `POST /employees`، `POST /employees/{id}` | `full_name`، `user_id`، `national_id`، `insurance_no`، `bank_name`، `sheba`، `account_number`، `job_title`، `contract_type`، `hire_date`، `cost_center_id`، `base_salary`، `housing_allowance`، `food_allowance`، `child_allowance`، `other_benefits`، `loan_installment`، `other_deduction`، `insured`؛ ویرایش + `active`، `version` | |
+| `POST /payroll/periods` | `fiscal_year`، `month` | یک دوره برای هر ماه (409)؛ شماره PRL |
+| `POST /payroll/periods/{id}/timesheets` | `timesheets: [{ employee_id, work_days, absent_days, overtime_hours, mission_days }]`، `version` | دوره محاسبه‌شده به پیش‌نویس برمی‌گردد |
+| `POST /payroll/periods/{id}/calculate` | `version` | فیش‌ها (PSL) روی سرور |
+| `POST /payroll/periods/{id}/approve`، `/reject` | `comment` / `reason`، `version` | حسابدار ← مدیر ارشد؛ نهایی: سند `PAYROLL_APPROVED` و سه درخواست پرداخت |
+| `POST /procurement/settings` | `price_tolerance_pct` | |
+| `POST /payroll/settings` | `worker_insurance_pct`، `employer_insurance_pct`، `insurance_ceiling`، `month_days`، `month_hours`، `overtime_factor_pct`، `mission_factor_pct`، `tax_table: { fiscal_year, brackets: [{ upto, rate_pct }] }` | |
+
+کارتابل تأییدات موارد تازه را هم برمی‌گرداند: `purchase_requisition`، `purchase_order`، `vendor_invoice`، `store_issue`، `stocktake` و
+`payroll` (برای مرحله و دامنه کاربر).
+
 ### گزارش و چاپ (۰٫۶٫۱)
 
 `GET /report-settings` → `{ settings: { company, signatories, report_types, version, updated_at } }`:
@@ -617,7 +670,7 @@ cumulative_quantity, rate, amount, cumulative_amount }]`، `work_amount`، `adju
   `/contracts` و `/statements` در `WRITABLE_PATHS` هستند. کنترل‌های سرور (`ContractServerPanel`: تأیید، الحاقیه، ضمانت‌نامه،
   پیش‌پرداخت؛ نامه کارفرما و ابطال در جزئیات صورت‌وضعیت) فقط برای رکوردهای سرور نمایش داده می‌شوند.
 
-## ۶. فرمان‌های فاز بعد (هنوز فقط‌خواندنی)
+## ۶. خارج از دامنه (عمداً)
 
-خرید، انبار، حقوق و بستن سال. قواعد آن‌ها در
-[SERVER-RULES.md](./SERVER-RULES.md) آمده و با همین چارچوب (Idempotency-Key، version، تراکنش، ممیزی) ساخته می‌شوند.
+بستن سال مالی، تطبیق خودکار بانک و خروجی اکسل تعدیلات هنوز فرمان سرور ندارند و در اپ هم دکمه‌ای برای آن‌ها نیست (فهرست کامل در
+[INSTALL-FA.md](./INSTALL-FA.md)). از ۰٫۸٫۰ هیچ مسیر اپ در حالت واقعی «فقط خواندنی — به‌زودی» نیست.

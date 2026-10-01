@@ -20,7 +20,7 @@ import { PurchaseRequisition, Project, RequisitionPriority, RequisitionStatus } 
 import { Dialog } from '../../ui/Dialog';
 import { formatMoney } from '../../utils/money';
 import { formatDecimal, formatInt, formatText } from '../../utils/formatters';
-import { requisitionConvertible } from '../../store/views/procurement';
+import { requisitionConvertible, requisitionDirectOrder } from '../../store/views/procurement';
 import { Money } from '../common/Money';
 
 interface RequisitionsListViewProps {
@@ -240,6 +240,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                           >
                             استعلام
                           </button>
+                          {requisitionDirectOrder(req) && (
                           <button
                             onClick={() => onConvertToPo(req)}
                             title="صدور مستقیم سفارش خرید"
@@ -247,6 +248,7 @@ export const RequisitionsListView: React.FC<RequisitionsListViewProps> = ({
                           >
                             سفارش
                           </button>
+                          )}
                         </>
                       )}
                     </div>
