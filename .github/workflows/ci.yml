@@ -62,13 +62,19 @@ jobs:
           exit $status
 
   wordpress:
-    name: WordPress ${{ matrix.wp }} tests (PHP ${{ matrix.php }}, MySQL 8)
+    name: WordPress ${{ matrix.wp }} tests (PHP ${{ matrix.php }}, MySQL 8, ${{ matrix.permalinks }} permalinks)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         php: ['7.4', '8.3']
         wp: ['7.1.2']
+        permalinks: ['pretty']
+        include:
+          # A site with plain permalinks: REST at /index.php?rest_route=/akph/v1/... (rest_route in the query).
+          - php: '8.3'
+            wp: '7.1.2'
+            permalinks: 'plain'
     services:
       mysql:
         image: mysql:8.0
@@ -108,6 +114,7 @@ jobs:
         env:
           WP_TESTS_DIR: ${{ github.workspace }}/wordpress-develop/tests/phpunit
           WP_TESTS_PHPUNIT_POLYFILLS_PATH: ${{ github.workspace }}/tests/php/vendor/yoast/phpunit-polyfills
+          AKPH_PERMALINKS: ${{ matrix.permalinks }}
         run: vendor/bin/phpunit -c phpunit.xml.dist
 
   ui:

@@ -38,13 +38,28 @@ if (!process.argv.includes('--no-build') || !existsSync(join(buildDir, 'index.ht
 }
 
 const PORTAL = { mode: 'live', restUrl: '/wp-json/akph/v1', nonce: 'ui-test', userId: fixture.me.id, displayName: fixture.me.display_name, siteName: 'سایت آزمون' };
+// 0.7.1: a site with plain permalinks (opened as /?plain=1#/…): the REST base is a query string.
+const PLAIN_PORTAL = { ...PORTAL, restUrl: '/index.php?rest_route=/akph/v1' };
+/** REST requests of the plain-permalink pages: [path, query keys]. */
+const plainCalls = [];
+let prettyCallsWhilePlain = 0;
+let plainMode = false;
 
 function serve() {
   return new Promise((ok) => {
     const server = createServer((req, res) => {
       const url = new URL(req.url, 'http://x');
-      if (url.pathname.startsWith('/wp-json/akph/v1/')) {
-        const route = url.pathname.slice('/wp-json/akph/v1/'.length);
+      const plainRoute = url.pathname === '/index.php' ? url.searchParams.get('rest_route') || '' : '';
+      if (url.pathname.startsWith('/wp-json/akph/v1/') || plainRoute.startsWith('/akph/v1/')) {
+        const route = plainRoute ? plainRoute.slice('/akph/v1/'.length) : url.pathname.slice('/wp-json/akph/v1/'.length);
+        if (plainRoute) plainCalls.push([route, [...url.searchParams.keys()]]);
+        else if (plainMode) prettyCallsWhilePlain++;
+        // Under plain permalinks other parameters must follow rest_route with «&» (a second «?» would end up inside rest_route).
+        if (plainRoute.includes('?')) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ code: 'rest_no_route', message: 'No route' }));
+          return;
+        }
         const body = fixture[route];
         // A route the fixture does not hold answers as for a role without its capability (403).
         res.writeHead(body ? 200 : 403, { 'Content-Type': 'application/json' });
@@ -54,7 +69,8 @@ function serve() {
       let file = join(buildDir, decodeURIComponent(url.pathname));
       if (!file.startsWith(buildDir) || !existsSync(file) || statSync(file).isDirectory()) file = join(buildDir, 'index.html');
       if (file.endsWith('index.html')) {
-        const html = readFileSync(file, 'utf8').replace('<head>', `<head><script>window.AkphPortal=${JSON.stringify(PORTAL)}</script>`);
+        const portal = url.searchParams.has('plain') ? PLAIN_PORTAL : PORTAL;
+        const html = readFileSync(file, 'utf8').replace('<head>', `<head><script>window.AkphPortal=${JSON.stringify(portal)}</script>`);
         res.writeHead(200, { 'Content-Type': TYPES['.html'] });
         res.end(html);
         return;
@@ -134,6 +150,28 @@ try {
     if (body.includes('به‌زودی')) problems.push(`«به‌زودی» notice on ${path} in live mode`);
     if (!body.includes(text)) problems.push(`${path}: «${text}» from the server is not shown`);
   }
+  // 0.7.1: plain permalinks — the app loads with restUrl «/index.php?rest_route=/akph/v1» and the contract and
+  // statement pages read their records through rest_route.
+  plainMode = true;
+  const plain = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: 'fa-IR' });
+  plain.on('pageerror', (e) => errors.push(`plain permalinks: ${e.message}`));
+  for (const [path, text] of [['/contracts/client', 'اجرای فونداسیون'], ['/contracts/subcontract', 'آرماتوربندی'], ['/statements', 'صورت‌وضعیت'], ['/statements/subcontractor', 'صورت‌وضعیت']]) {
+    await plain.goto(`${base}?plain=1#${path}`, { waitUntil: 'networkidle' });
+    await plain.waitForSelector('main', { timeout: 20000 }).catch(() => {});
+    await plain.waitForFunction((t) => (document.querySelector('main')?.innerText || '').includes(t), text, { timeout: 5000 }).catch(() => {});
+    const body = await plain.evaluate(() => document.body.innerText || '');
+    if (body.includes('بارگذاری پورتال انجام نشد')) problems.push(`plain permalinks ${path}: the portal did not load`);
+    if (!body.includes(text)) problems.push(`plain permalinks ${path}: «${text}» from the server is not shown`);
+  }
+  await plain.screenshot({ path: join(outDir, 'contracts-plain-permalinks.png'), fullPage: true });
+  await plain.close();
+  plainMode = false;
+  for (const route of ['me', 'contracts', 'statements']) {
+    if (!plainCalls.some(([r]) => r === route)) problems.push(`plain permalinks: GET ${route} was not read through rest_route`);
+  }
+  if (plainCalls.some(([, keys]) => keys[0] !== 'rest_route')) problems.push('plain permalinks: rest_route is not the first query parameter');
+  if (prettyCallsWhilePlain) problems.push(`plain permalinks: ${prettyCallsWhilePlain} request(s) went to /wp-json/`);
+
   // The contract opened from the list shows its server state (approval, guarantees, amendments).
   await live.goto(`${base}#/contracts/client`, { waitUntil: 'networkidle' });
   await live.getByRole('button', { name: 'قراردادهای کارفرما' }).click();
@@ -155,3 +193,4 @@ if (problems.length) {
 }
 console.log(`✔ چاپ رسمی گزارش پروژه‌ها در حالت واقعی: فقط سند رسمی، بدون نام نمونه، سربرگ و امضاهای تنظیمات؛ ${join('ui-screenshots', 'print')}`);
 console.log('✔ قراردادها و صورت‌وضعیت‌ها در حالت واقعی: بدون «به‌زودی»، وضعیت سرور، کارتابل و هشدار سررسید ضمانت‌نامه');
+console.log('✔ پیوند یکتای ساده (?rest_route=): پرتال بار می‌شود و قراردادها و صورت‌وضعیت‌ها از سرور خوانده می‌شوند');

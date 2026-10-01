@@ -47,6 +47,13 @@ abstract class Akph_Test_Case extends WP_UnitTestCase {
         $wp_rest_server = new WP_REST_Server();
         do_action('rest_api_init', $wp_rest_server);
         wp_set_current_user(0);
+        // AKPH_PERMALINKS=plain runs the whole suite as a site with plain permalinks (see request()).
+        update_option('permalink_structure', self::plain_permalinks() ? '' : '/%postname%/');
+    }
+
+    /** Plain permalinks: the REST address is /index.php?rest_route=/akph/v1/... (CI runs the suite once like that). */
+    protected static function plain_permalinks() {
+        return getenv('AKPH_PERMALINKS') === 'plain';
     }
 
     public function tear_down() {
@@ -75,6 +82,10 @@ abstract class Akph_Test_Case extends WP_UnitTestCase {
         if ($body !== null) {
             $request->set_header('Content-Type', 'application/json');
             $request->set_body(wp_json_encode($body));
+        }
+        if (self::plain_permalinks() && !isset($query['rest_route'])) {
+            // As WordPress hands it over under plain permalinks: rest_route among the query parameters.
+            $query = array_merge(array('rest_route' => '/akph/v1' . $path), $query);
         }
         if ($query) {
             $request->set_query_params($query);

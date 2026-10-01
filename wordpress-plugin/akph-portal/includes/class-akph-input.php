@@ -11,6 +11,18 @@ final class Akph_Input {
     /** Largest amount of a single field or entry total: Number.MAX_SAFE_INTEGER. */
     const MAX_AMOUNT = 9007199254740991;
 
+    /**
+     * WordPress's own request parameters. With plain permalinks the REST address is /index.php?rest_route=/akph/v1/...
+     * and `rest_route` comes back in get_query_params(); the others are global REST switches (_locale, _wpnonce,
+     * _method, _envelope, _fields, _embed, _jsonp). Strict field checks never treat them as unknown fields.
+     */
+    const WP_GLOBAL_PARAMS = array('rest_route', '_locale', '_wpnonce', '_method', '_envelope', '_fields', '_embed', '_jsonp');
+
+    /** True for a WordPress global request parameter (see WP_GLOBAL_PARAMS). */
+    public static function is_wp_global($key) {
+        return in_array((string) $key, self::WP_GLOBAL_PARAMS, true);
+    }
+
     public static function text($body, $key, $max = 190, $required = false, $label = '') {
         $value = isset($body[$key]) ? $body[$key] : '';
         if (!is_string($value) && !is_int($value)) {

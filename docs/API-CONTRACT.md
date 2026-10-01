@@ -16,6 +16,7 @@
 | موضوع | قاعده |
 |---|---|
 | آدرس | `rest_url('akph/v1')`. با پیوند یکتای ساده: `https://site/?rest_route=/akph/v1/projects`؛ پارامترها با `&` وصل می‌شوند: `…/journal-entries&status=pending` |
+| پارامترهای سراسری وردپرس | `rest_route`، `_locale`، `_wpnonce`، `_method`، `_envelope`، `_fields`، `_embed` و `_jsonp` (فهرست `Akph_Input::WP_GLOBAL_PARAMS`) هیچ‌جا «فیلد ناشناخته» نیستند و در همه اعتبارسنج‌های سخت‌گیر query و فرم نادیده گرفته می‌شوند (۰٫۷٫۱)؛ هر پارامتر ناشناخته دیگر همچنان `400 akph_unknown_field` می‌گیرد. |
 | احراز هویت | کوکی ورود وردپرس **و** سربرگ `X-WP-Nonce` (از `window.AkphPortal.nonce`، عمل `wp_rest`) در **همه** مسیرها، حتی GET |
 | نقش | فقط `administrator`، `paydar_senior_manager`، `paydar_accountant`، `paydar_project_manager`؛ هر مسیر یک قابلیت `akph_*` لازم دارد (جدول ۳) |
 | مبلغ | عدد صحیح **ریال** (JSON integer یا رشته رقمی)، ≥ ۰، حداکثر ۹٬۰۰۷٬۱۹۹٬۲۵۴٬۷۴۰٬۹۹۱ (دقیق در مرورگر). اعشار، منفی و رقم جداشده (`1,000`) رد می‌شود. در پایگاه‌داده `BIGINT`. |
