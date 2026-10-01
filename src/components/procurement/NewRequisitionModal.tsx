@@ -3,9 +3,10 @@ import { X, Plus, Trash2, AlertCircle, ShoppingCart, Check } from 'lucide-react'
 import { Project, ProcurementCategory, RequisitionPriority } from '../../types';
 import { Dialog } from '../../ui/Dialog';
 import { formatMoney, moneyUnitLabel, formatInt } from '../../utils/money';
-import { IntegerInput, MoneyInput } from '../../ui/NumberInput';
-import { useCurrentUser } from '../../store/session';
-import { blankRequisitionLine, requisitionEstimate, type RequisitionFormInput, type RequisitionLineInput } from '../../store/views/procurement';
+import { MoneyInput, QuantityInput } from '../../ui/NumberInput';
+import { useCurrentUser, useServerBooks } from '../../store/session';
+import { useSelector } from '../../store/AppStore';
+import { blankRequisitionLine, expenseAccountOptions, requisitionEstimate, type RequisitionFormInput, type RequisitionLineInput } from '../../store/views/procurement';
 import { Money } from '../common/Money';
 import { formatText } from '../../utils/formatters';
 
@@ -43,6 +44,10 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
   const [justification, setJustification] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [items, setItems] = useState<DraftItem[]>(() => [blankRequisitionLine()]);
+  // akph/v1: a line is a material of the list or a service with its cost account (the server checks both).
+  const live = useServerBooks();
+  const materials = useSelector((s) => s.materials);
+  const accounts = useSelector(expenseAccountOptions);
 
   if (!isOpen) return null;
 
@@ -197,6 +202,33 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                         required
                       />
                     </div>
+                    {live ? (
+                    <div>
+                      <label htmlFor={`new-requisition-kind-${item.id}`} className="block text-xs text-slate-600 mb-1">کالا از فهرست / خدمت:</label>
+                      <select id={`new-requisition-kind-${item.id}`}
+                        value={item.kind === 'service' ? 'service' : item.materialId || ''}
+                        onChange={(e) => {
+                          const m = materials.find((x) => x.id === e.target.value);
+                          setItems((prev) => prev.map((it) => (it.id !== item.id ? it : m ? { ...it, kind: 'goods', materialId: m.id, materialName: m.name, unit: m.unit } : { ...it, kind: 'service', materialId: undefined })));
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      >
+                        <option value="">— انتخاب کالا —</option>
+                        {materials.map((m) => (
+                          <option key={m.id} value={m.id}>{formatText(m.name)} ({formatText(m.unit)})</option>
+                        ))}
+                        <option value="service">خدمت (با حساب هزینه)</option>
+                      </select>
+                      {item.kind === 'service' && (
+                        <select aria-label="حساب هزینه خدمت" value={item.accountCode || ''} onChange={(e) => handleUpdateItem(item.id, 'accountCode', e.target.value)} className="mt-1 w-full bg-white border border-slate-200 rounded-lg p-2 text-sm">
+                          <option value="">— حساب هزینه —</option>
+                          {accounts.map((a) => (
+                            <option key={a.code} value={a.code}>{formatText(a.code)} - {formatText(a.title)}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    ) : (
                     <div>
                       <label htmlFor="new-requisition-modal-7" className="block text-xs text-slate-600 mb-1">رسته کالا:</label>
                       <select id="new-requisition-modal-7"
@@ -209,12 +241,13 @@ export const NewRequisitionModal: React.FC<NewRequisitionModalProps> = ({
                         ))}
                       </select>
                     </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
                       <label htmlFor="new-requisition-modal-8" className="block text-xs text-slate-600 mb-1">مقدار درخواستی:</label>
-                      <IntegerInput id="new-requisition-modal-8"
+                      <QuantityInput id="new-requisition-modal-8"
                         value={item.requestedQty}
                         onValueChange={(v) => handleUpdateItem(item.id, 'requestedQty', v)}
                         className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm tabular-nums font-bold focus:ring-2 focus:ring-indigo-500 outline-hidden"

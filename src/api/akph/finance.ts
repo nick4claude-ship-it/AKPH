@@ -569,6 +569,13 @@ const APPROVAL_MODULES: ReadonlySet<string> = new Set([
   'contract_amendment',
   'client_statement',
   'subcontractor_statement',
+  // 0.8.0
+  'purchase_requisition',
+  'purchase_order',
+  'vendor_invoice',
+  'store_issue',
+  'stocktake',
+  'payroll',
 ]);
 
 function approvalAction(module: string, role: string, approval: boolean): UserAction {
@@ -576,6 +583,12 @@ function approvalAction(module: string, role: string, approval: boolean): UserAc
   if (module === 'payment_request') return 'payment_request.approve';
   if (module === 'receipt') return 'receipt.record';
   if (module === 'contract' || module === 'contract_amendment') return 'contract.approve';
+  if (module === 'purchase_requisition') return role === 'مدیر پروژه' ? 'requisition.approve_pm' : role === 'حسابدار' ? 'requisition.approve_procurement' : 'requisition.approve_final';
+  if (module === 'purchase_order') return 'requisition.approve_final';
+  if (module === 'vendor_invoice') return 'vendor_invoice.approve';
+  if (module === 'store_issue') return 'inventory.issue_confirm';
+  if (module === 'stocktake') return 'inventory.stocktake';
+  if (module === 'payroll') return 'payroll.approve';
   if (module === 'client_statement') {
     if (!approval) return 'client_statement.prepare';
     return role === 'مدیر پروژه' ? 'client_statement.consultant_approval' : 'client_statement.employer_approval';

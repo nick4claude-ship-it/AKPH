@@ -1,0 +1,1047 @@
+{
+ "inventory": {
+  "materials": [
+   {
+    "id": "2",
+    "code": "CEM-01",
+    "name": "سیمان",
+    "category": "",
+    "unit": "تن",
+    "specification": "",
+    "reorder_level": "0",
+    "min_stock": "0",
+    "max_stock": "0",
+    "stock_qty": "0",
+    "active": true,
+    "version": 1,
+    "stock_value": 0,
+    "average_cost": 0
+   },
+   {
+    "id": "1",
+    "code": "MAT-1405-00001",
+    "name": "میلگرد ۱۶",
+    "category": "آهن‌آلات",
+    "unit": "kg",
+    "specification": "",
+    "reorder_level": "0",
+    "min_stock": "0",
+    "max_stock": "0",
+    "stock_qty": "310",
+    "active": true,
+    "version": 1,
+    "stock_value": 148800000,
+    "average_cost": 480000
+   }
+  ],
+  "warehouses": [
+   {
+    "id": "1",
+    "code": "WH-1405-00001",
+    "name": "انبار مرکزی",
+    "kind": "central",
+    "project_id": null,
+    "project_name": "",
+    "location": "",
+    "keeper_name": "",
+    "active": true,
+    "items_count": 1,
+    "valuation": 57600000,
+    "version": 1
+   },
+   {
+    "id": "2",
+    "code": "WH-1405-00002",
+    "name": "انبار کارگاه یک",
+    "kind": "project",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "location": "",
+    "keeper_name": "",
+    "active": true,
+    "items_count": 1,
+    "valuation": 91200000,
+    "version": 1
+   }
+  ],
+  "balances": [
+   {
+    "warehouse_id": "2",
+    "material_id": "1",
+    "qty": "190",
+    "reserved": "0"
+   },
+   {
+    "warehouse_id": "1",
+    "material_id": "1",
+    "qty": "120",
+    "reserved": "0"
+   }
+  ],
+  "issues": [
+   {
+    "id": "2",
+    "number": "SIV-1405-00001",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "cost_center_id": "1",
+    "counterparty_id": null,
+    "date": "2026-09-30",
+    "status": "issued",
+    "total_cost": 96240000,
+    "notes": "",
+    "lines": [
+     {
+      "id": "1",
+      "material_id": "1",
+      "material_code": "MAT-1405-00001",
+      "material_name": "میلگرد ۱۶",
+      "unit": "kg",
+      "quantity": "200.5",
+      "amount": 96240000,
+      "returned_qty": "20.5",
+      "returned_amount": 9840000
+     }
+    ],
+    "requested_by": "6",
+    "requested_by_name": "کاربر pm",
+    "confirmed_by": "3",
+    "confirmed_by_name": "کاربر senior",
+    "entry": {
+     "id": "5",
+     "number": "ACC-1405-00005",
+     "status": "posted"
+    },
+    "version": 3
+   }
+  ],
+  "returns": [
+   {
+    "id": "2",
+    "number": "RTN-1405-00002",
+    "kind": "warehouse_to_supplier",
+    "source_id": "1",
+    "source_line_id": "1",
+    "warehouse_id": "2",
+    "project_id": "1",
+    "counterparty_id": "1",
+    "material_id": "1",
+    "material_code": "MAT-1405-00001",
+    "material_name": "میلگرد ۱۶",
+    "unit": "kg",
+    "quantity": "100",
+    "amount": 48000000,
+    "inventory_value": 48000000,
+    "vat_amount": 4800000,
+    "date": "2026-09-30",
+    "reason": "معیوب",
+    "entry": {
+     "id": "7",
+     "number": "ACC-1405-00007",
+     "status": "posted"
+    }
+   },
+   {
+    "id": "1",
+    "number": "RTN-1405-00001",
+    "kind": "project_to_warehouse",
+    "source_id": "2",
+    "source_line_id": "1",
+    "warehouse_id": "2",
+    "project_id": "1",
+    "counterparty_id": null,
+    "material_id": "1",
+    "material_code": "MAT-1405-00001",
+    "material_name": "میلگرد ۱۶",
+    "unit": "kg",
+    "quantity": "20.5",
+    "amount": 9840000,
+    "inventory_value": 9840000,
+    "vat_amount": 0,
+    "date": "2026-09-30",
+    "reason": "مازاد",
+    "entry": {
+     "id": "6",
+     "number": "ACC-1405-00006",
+     "status": "posted"
+    }
+   }
+  ],
+  "transfers": [
+   {
+    "id": "1",
+    "number": "STR-1405-00001",
+    "source_warehouse_id": "2",
+    "source_warehouse_name": "انبار کارگاه یک",
+    "source_project_id": "1",
+    "target_warehouse_id": "1",
+    "target_warehouse_name": "انبار مرکزی",
+    "target_project_id": null,
+    "date": "2026-09-30",
+    "status": "delivered",
+    "total_cost": 57600000,
+    "waybill": "",
+    "driver_name": "",
+    "notes": "",
+    "lines": [
+     {
+      "id": "1",
+      "material_id": "1",
+      "material_code": "MAT-1405-00001",
+      "material_name": "میلگرد ۱۶",
+      "unit": "kg",
+      "quantity": "120",
+      "amount": 57600000
+     }
+    ],
+    "created_by": "6",
+    "created_by_name": "کاربر pm",
+    "entry": {
+     "id": "8",
+     "number": "ACC-1405-00008",
+     "status": "posted"
+    },
+    "version": 2
+   }
+  ],
+  "stocktakes": [
+   {
+    "id": "1",
+    "number": "STK-1405-00001",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "project_id": "1",
+    "date": "2026-09-30",
+    "status": "approved",
+    "loss_amount": 4800000,
+    "gain_amount": 0,
+    "notes": "",
+    "lines": [
+     {
+      "id": "1",
+      "material_id": "1",
+      "material_code": "MAT-1405-00001",
+      "material_name": "میلگرد ۱۶",
+      "unit": "kg",
+      "system_qty": "200",
+      "physical_qty": "190",
+      "variance_qty": "-10",
+      "loss_amount": 4800000,
+      "gain_amount": 0
+     }
+    ],
+    "created_by": "4",
+    "created_by_name": "کاربر accountant",
+    "approved_by": "5",
+    "approved_by_name": "کاربر accountant2",
+    "reject_reason": "",
+    "entry": {
+     "id": "9",
+     "number": "ACC-1405-00009",
+     "status": "posted"
+    },
+    "version": 2
+   }
+  ],
+  "kardex": [
+   {
+    "id": "7",
+    "material_id": "1",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "date": "2026-09-30",
+    "doc_type": "stocktake",
+    "doc_number": "STK-1405-00001",
+    "counterparty": "انبارگردانی",
+    "in_qty": "0",
+    "out_qty": "10",
+    "balance_qty": "190",
+    "value": -4800000
+   },
+   {
+    "id": "6",
+    "material_id": "1",
+    "warehouse_id": "1",
+    "warehouse_name": "انبار مرکزی",
+    "date": "2026-09-30",
+    "doc_type": "transfer_in",
+    "doc_number": "STR-1405-00001",
+    "counterparty": "انبار کارگاه یک",
+    "in_qty": "120",
+    "out_qty": "0",
+    "balance_qty": "120",
+    "value": 57600000
+   },
+   {
+    "id": "5",
+    "material_id": "1",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "date": "2026-09-30",
+    "doc_type": "transfer_out",
+    "doc_number": "STR-1405-00001",
+    "counterparty": "انبار مرکزی",
+    "in_qty": "0",
+    "out_qty": "120",
+    "balance_qty": "200",
+    "value": -57600000
+   },
+   {
+    "id": "4",
+    "material_id": "1",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "date": "2026-09-30",
+    "doc_type": "supplier_return",
+    "doc_number": "RTN-1405-00002",
+    "counterparty": "فروشنده یک",
+    "in_qty": "0",
+    "out_qty": "100",
+    "balance_qty": "320",
+    "value": -48000000
+   },
+   {
+    "id": "3",
+    "material_id": "1",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "date": "2026-09-30",
+    "doc_type": "project_return",
+    "doc_number": "RTN-1405-00001",
+    "counterparty": "پروژه یک",
+    "in_qty": "20.5",
+    "out_qty": "0",
+    "balance_qty": "420",
+    "value": 9840000
+   },
+   {
+    "id": "2",
+    "material_id": "1",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "date": "2026-09-30",
+    "doc_type": "store_issue",
+    "doc_number": "SIV-1405-00001",
+    "counterparty": "پروژه یک",
+    "in_qty": "0",
+    "out_qty": "200.5",
+    "balance_qty": "399.5",
+    "value": -96240000
+   },
+   {
+    "id": "1",
+    "material_id": "1",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "date": "2026-09-30",
+    "doc_type": "goods_receipt",
+    "doc_number": "GRN-1405-00001",
+    "counterparty": "فروشنده یک",
+    "in_qty": "600",
+    "out_qty": "0",
+    "balance_qty": "600",
+    "value": 288000000
+   }
+  ]
+ },
+ "procurement": {
+  "requisitions": [
+   {
+    "id": "2",
+    "number": "REQ-1405-00002",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "cost_center_id": "1",
+    "priority": "urgent",
+    "needed_date": null,
+    "justification": "فونداسیون بلوک الف",
+    "estimated_total": 560000000,
+    "status": "ordered",
+    "chain": [
+     "مدیر پروژه",
+     "حسابدار"
+    ],
+    "step_index": 2,
+    "current_step": null,
+    "history": [
+     {
+      "action": "submitted",
+      "step": "ثبت درخواست خرید",
+      "user_id": "6",
+      "user_name": "کاربر pm",
+      "role": "مدیر پروژه",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     },
+     {
+      "action": "approved",
+      "step": "مدیر پروژه",
+      "user_id": "3",
+      "user_name": "کاربر senior",
+      "role": "مدیر ارشد",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     },
+     {
+      "action": "approved",
+      "step": "حسابدار",
+      "user_id": "4",
+      "user_name": "کاربر accountant",
+      "role": "حسابدار",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     }
+    ],
+    "last_approved_by": "4",
+    "reject_reason": "",
+    "lines": [
+     {
+      "id": "2",
+      "kind": "goods",
+      "material_id": "1",
+      "account_code": "",
+      "description": "میلگرد ۱۶",
+      "unit": "kg",
+      "quantity": "1000",
+      "estimated_rate": 500000,
+      "estimated_amount": 500000000
+     },
+     {
+      "id": "3",
+      "kind": "service",
+      "material_id": null,
+      "account_code": "514",
+      "description": "اجاره جرثقیل",
+      "unit": "روز",
+      "quantity": "2",
+      "estimated_rate": 30000000,
+      "estimated_amount": 60000000
+     }
+    ],
+    "created_by": "6",
+    "created_by_name": "کاربر pm",
+    "created_at": "2026-09-30T18:59:54Z",
+    "version": 5
+   },
+   {
+    "id": "1",
+    "number": "REQ-1405-00001",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "cost_center_id": "1",
+    "priority": "normal",
+    "needed_date": null,
+    "justification": "آزمون",
+    "estimated_total": 0,
+    "status": "pending",
+    "chain": [
+     "مدیر پروژه",
+     "حسابدار"
+    ],
+    "step_index": 1,
+    "current_step": "حسابدار",
+    "history": [
+     {
+      "action": "submitted",
+      "step": "ثبت درخواست خرید",
+      "user_id": "6",
+      "user_name": "کاربر pm",
+      "role": "مدیر پروژه",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     },
+     {
+      "action": "approved",
+      "step": "مدیر پروژه",
+      "user_id": "3",
+      "user_name": "کاربر senior",
+      "role": "مدیر ارشد",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     }
+    ],
+    "last_approved_by": "3",
+    "reject_reason": "",
+    "lines": [
+     {
+      "id": "1",
+      "kind": "goods",
+      "material_id": "1",
+      "account_code": "",
+      "description": "میلگرد ۱۶",
+      "unit": "kg",
+      "quantity": "10",
+      "estimated_rate": 0,
+      "estimated_amount": 0
+     }
+    ],
+    "created_by": "6",
+    "created_by_name": "کاربر pm",
+    "created_at": "2026-09-30T18:59:54Z",
+    "version": 2
+   }
+  ],
+  "rfqs": [
+   {
+    "id": "1",
+    "number": "RFQ-1405-00001",
+    "requisition_id": "2",
+    "requisition_number": "REQ-1405-00002",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "title": "استعلام بهای درخواست REQ-1405-00002",
+    "deadline": "2026-09-30",
+    "status": "ordered",
+    "winner_quote_id": "1",
+    "quotes": [
+     {
+      "id": "1",
+      "counterparty_id": "1",
+      "counterparty_name": "فروشنده یک",
+      "reference": "",
+      "prices": [
+       {
+        "line_id": "2",
+        "rate": 480000
+       },
+       {
+        "line_id": "3",
+        "rate": 30000000
+       }
+      ],
+      "vat_included": true,
+      "freight": 10000000,
+      "delivery_days": 5,
+      "payment_terms": "",
+      "notes": "",
+      "subtotal": 540000000,
+      "winner": true
+     },
+     {
+      "id": "2",
+      "counterparty_id": "2",
+      "counterparty_name": "فروشنده دو",
+      "reference": "",
+      "prices": [
+       {
+        "line_id": "2",
+        "rate": 490000
+       },
+       {
+        "line_id": "3",
+        "rate": 31000000
+       }
+      ],
+      "vat_included": false,
+      "freight": 0,
+      "delivery_days": 0,
+      "payment_terms": "",
+      "notes": "",
+      "subtotal": 552000000,
+      "winner": false
+     }
+    ],
+    "created_by": "4",
+    "version": 5
+   }
+  ],
+  "purchase_orders": [
+   {
+    "id": "1",
+    "number": "PO-1405-00001",
+    "requisition_id": "2",
+    "rfq_id": "1",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "cost_center_id": "1",
+    "counterparty_id": "1",
+    "counterparty_name": "فروشنده یک",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "issue_date": "2026-09-30",
+    "due_date": null,
+    "payment_terms": "",
+    "vat_rate": 10,
+    "subtotal": 540000000,
+    "vat_amount": 54000000,
+    "freight": 10000000,
+    "total": 604000000,
+    "status": "partial",
+    "current_step": null,
+    "history": [
+     {
+      "action": "submitted",
+      "step": "صدور سفارش",
+      "user_id": "4",
+      "user_name": "کاربر accountant",
+      "role": "حسابدار",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     },
+     {
+      "action": "approved",
+      "step": "مدیر ارشد",
+      "user_id": "3",
+      "user_name": "کاربر senior",
+      "role": "مدیر ارشد",
+      "at": "2026-09-30T18:59:54Z",
+      "comment": ""
+     }
+    ],
+    "approved_by": "3",
+    "approved_by_name": "کاربر senior",
+    "reject_reason": "",
+    "notes": "",
+    "lines": [
+     {
+      "id": "1",
+      "requisition_line_id": "2",
+      "kind": "goods",
+      "material_id": "1",
+      "account_code": "",
+      "description": "میلگرد ۱۶",
+      "unit": "kg",
+      "quantity": "1000",
+      "rate": 480000,
+      "amount": 480000000,
+      "vat_amount": 48000000,
+      "received_qty": "600"
+     },
+     {
+      "id": "2",
+      "requisition_line_id": "3",
+      "kind": "service",
+      "material_id": null,
+      "account_code": "514",
+      "description": "اجاره جرثقیل",
+      "unit": "روز",
+      "quantity": "2",
+      "rate": 30000000,
+      "amount": 60000000,
+      "vat_amount": 6000000,
+      "received_qty": "2"
+     }
+    ],
+    "created_by": "4",
+    "created_by_name": "کاربر accountant",
+    "version": 3
+   }
+  ],
+  "goods_receipts": [
+   {
+    "id": "1",
+    "number": "GRN-1405-00001",
+    "po_id": "1",
+    "po_number": "PO-1405-00001",
+    "warehouse_id": "2",
+    "warehouse_name": "انبار کارگاه یک",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "cost_center_id": "1",
+    "counterparty_id": "1",
+    "counterparty_name": "فروشنده یک",
+    "date": "2026-09-30",
+    "waybill": "B-1",
+    "qc_status": "accepted",
+    "notes": "",
+    "goods_value": 288000000,
+    "service_value": 60000000,
+    "total": 348000000,
+    "lines": [
+     {
+      "id": "1",
+      "po_line_id": "1",
+      "kind": "goods",
+      "material_id": "1",
+      "description": "میلگرد ۱۶",
+      "unit": "kg",
+      "delivered_qty": "650",
+      "rejected_qty": "50",
+      "accepted_qty": "600",
+      "rate": 480000,
+      "amount": 288000000,
+      "returned_qty": "100",
+      "returned_amount": 48000000
+     },
+     {
+      "id": "2",
+      "po_line_id": "2",
+      "kind": "service",
+      "material_id": null,
+      "description": "اجاره جرثقیل",
+      "unit": "روز",
+      "delivered_qty": "2",
+      "rejected_qty": "0",
+      "accepted_qty": "2",
+      "rate": 30000000,
+      "amount": 60000000,
+      "returned_qty": "0",
+      "returned_amount": 0
+     }
+    ],
+    "invoice_id": "1",
+    "created_by": "6",
+    "created_by_name": "کاربر pm",
+    "entry": {
+     "id": "1",
+     "number": "ACC-1405-00001",
+     "status": "posted"
+    }
+   }
+  ],
+  "vendor_invoices": [
+   {
+    "id": "1",
+    "number": "INV-1405-00001",
+    "invoice_no": "F-100",
+    "invoice_date": "2026-09-30",
+    "due_date": null,
+    "grn_id": "1",
+    "grn_number": "GRN-1405-00001",
+    "po_id": "1",
+    "po_number": "PO-1405-00001",
+    "project_id": "1",
+    "project_name": "پروژه یک",
+    "cost_center_id": "1",
+    "counterparty_id": "1",
+    "counterparty_name": "فروشنده یک",
+    "subtotal": 350000000,
+    "freight": 10000000,
+    "vat_amount": 35000000,
+    "total": 395000000,
+    "receipt_value": 348000000,
+    "price_variance": 2000000,
+    "match_status": "matched",
+    "match_notes": "",
+    "status": "approved",
+    "returned_amount": 52800000,
+    "paid_amount": 100000000,
+    "remaining_amount": 242200000,
+    "payment_request": {
+     "id": "1",
+     "number": "PAY-1405-00001",
+     "status": "approved",
+     "amount": 342200000,
+     "paid_amount": 100000000
+    },
+    "notes": "",
+    "reject_reason": "",
+    "created_by": "4",
+    "created_by_name": "کاربر accountant",
+    "approved_by": "5",
+    "approved_by_name": "کاربر accountant2",
+    "entry": {
+     "id": "2",
+     "number": "ACC-1405-00002",
+     "status": "posted"
+    },
+    "version": 4
+   }
+  ],
+  "supplier_returns": [
+   {
+    "id": "2",
+    "number": "RTN-1405-00002",
+    "kind": "warehouse_to_supplier",
+    "source_id": "1",
+    "source_line_id": "1",
+    "warehouse_id": "2",
+    "project_id": "1",
+    "counterparty_id": "1",
+    "material_id": "1",
+    "material_code": "MAT-1405-00001",
+    "material_name": "میلگرد ۱۶",
+    "unit": "kg",
+    "quantity": "100",
+    "amount": 48000000,
+    "inventory_value": 48000000,
+    "vat_amount": 4800000,
+    "date": "2026-09-30",
+    "reason": "معیوب",
+    "entry": {
+     "id": "7",
+     "number": "ACC-1405-00007",
+     "status": "posted"
+    }
+   }
+  ],
+  "settings": {
+   "price_tolerance_pct": "2",
+   "vat_rate_percent": 10
+  }
+ },
+ "payroll": {
+  "employees": [
+   {
+    "id": "1",
+    "code": "EMP-1405-00001",
+    "full_name": "کارگر کارگاه",
+    "user_id": null,
+    "national_id": "",
+    "insurance_no": "",
+    "bank_name": "",
+    "sheba": "",
+    "account_number": "",
+    "job_title": "",
+    "contract_type": "full_time",
+    "hire_date": null,
+    "project_id": "1",
+    "cost_center_id": "1",
+    "base_salary": 250000000,
+    "housing_allowance": 0,
+    "food_allowance": 0,
+    "child_allowance": 0,
+    "other_benefits": 0,
+    "loan_installment": 0,
+    "other_deduction": 0,
+    "insured": true,
+    "active": true,
+    "version": 1
+   },
+   {
+    "id": "2",
+    "code": "EMP-1405-00002",
+    "full_name": "کارمند ستاد",
+    "user_id": null,
+    "national_id": "",
+    "insurance_no": "",
+    "bank_name": "",
+    "sheba": "",
+    "account_number": "",
+    "job_title": "",
+    "contract_type": "full_time",
+    "hire_date": null,
+    "project_id": null,
+    "cost_center_id": "2",
+    "base_salary": 400000000,
+    "housing_allowance": 0,
+    "food_allowance": 0,
+    "child_allowance": 0,
+    "other_benefits": 0,
+    "loan_installment": 0,
+    "other_deduction": 0,
+    "insured": true,
+    "active": true,
+    "version": 1
+   }
+  ],
+  "periods": [
+   {
+    "id": "1",
+    "number": "PRL-1405-00001",
+    "fiscal_year": 1405,
+    "month": 7,
+    "status": "approved",
+    "current_step": null,
+    "gross_total": 665909091,
+    "net_total": 601765909,
+    "cost_total": 819068182,
+    "history": [
+     {
+      "action": "submitted",
+      "step": "ایجاد دوره حقوق",
+      "user_id": "4",
+      "user_name": "کاربر accountant",
+      "role": "حسابدار",
+      "at": "2026-09-30T18:59:32Z",
+      "comment": ""
+     },
+     {
+      "action": "calculated",
+      "step": "محاسبه حقوق",
+      "user_id": "4",
+      "user_name": "کاربر accountant",
+      "role": "حسابدار",
+      "at": "2026-09-30T18:59:32Z",
+      "comment": ""
+     },
+     {
+      "action": "approved",
+      "step": "حسابدار",
+      "user_id": "5",
+      "user_name": "کاربر accountant2",
+      "role": "حسابدار",
+      "at": "2026-09-30T18:59:32Z",
+      "comment": ""
+     },
+     {
+      "action": "approved",
+      "step": "مدیر ارشد",
+      "user_id": "3",
+      "user_name": "کاربر senior",
+      "role": "مدیر ارشد",
+      "at": "2026-09-30T18:59:32Z",
+      "comment": ""
+     }
+    ],
+    "calculated_by": "4",
+    "calculated_by_name": "کاربر accountant",
+    "last_approved_by": "3",
+    "reject_reason": "",
+    "entry": {
+     "id": "12",
+     "number": "ACC-1405-00012",
+     "status": "posted"
+    },
+    "payment_requests": [
+     {
+      "id": "4",
+      "number": "PAY-1405-00004",
+      "payable_type": "payroll",
+      "status": "paid",
+      "amount": 601765909,
+      "paid_amount": 601765909
+     },
+     {
+      "id": "5",
+      "number": "PAY-1405-00005",
+      "payable_type": "insurance",
+      "status": "paid",
+      "amount": 199772727,
+      "paid_amount": 199772727
+     },
+     {
+      "id": "6",
+      "number": "PAY-1405-00006",
+      "payable_type": "tax_payroll",
+      "status": "paid",
+      "amount": 17529546,
+      "paid_amount": 17529546
+     }
+    ],
+    "created_by": "4",
+    "version": 5
+   }
+  ],
+  "timesheets": [
+   {
+    "id": "1",
+    "period_id": "1",
+    "employee_id": "1",
+    "work_days": "30",
+    "absent_days": "0",
+    "overtime_hours": "10",
+    "mission_days": "0",
+    "notes": ""
+   },
+   {
+    "id": "2",
+    "period_id": "1",
+    "employee_id": "2",
+    "work_days": "30",
+    "absent_days": "0",
+    "overtime_hours": "0",
+    "mission_days": "0",
+    "notes": ""
+   }
+  ],
+  "payslips": [
+   {
+    "id": "1",
+    "number": "PSL-1405-00001",
+    "period_id": "1",
+    "fiscal_year": 1405,
+    "month": 7,
+    "status": "approved",
+    "employee_id": "1",
+    "employee_name": "کارگر کارگاه",
+    "employee_code": "EMP-1405-00001",
+    "job_title": "",
+    "project_id": "1",
+    "cost_center_id": "1",
+    "work_days": "30",
+    "overtime_hours": "10",
+    "base_pay": 250000000,
+    "housing": 0,
+    "food": 0,
+    "child": 0,
+    "other_benefits": 0,
+    "overtime_pay": 15909091,
+    "mission_pay": 0,
+    "gross": 265909091,
+    "insurable": 265909091,
+    "worker_insurance": 18613636,
+    "employer_insurance": 61159091,
+    "taxable": 247295455,
+    "income_tax": 729546,
+    "loan_deduction": 0,
+    "other_deduction": 0,
+    "total_deductions": 19343182,
+    "net": 246565909,
+    "cost": 327068182
+   },
+   {
+    "id": "2",
+    "number": "PSL-1405-00002",
+    "period_id": "1",
+    "fiscal_year": 1405,
+    "month": 7,
+    "status": "approved",
+    "employee_id": "2",
+    "employee_name": "کارمند ستاد",
+    "employee_code": "EMP-1405-00002",
+    "job_title": "",
+    "project_id": null,
+    "cost_center_id": "2",
+    "work_days": "30",
+    "overtime_hours": "0",
+    "base_pay": 400000000,
+    "housing": 0,
+    "food": 0,
+    "child": 0,
+    "other_benefits": 0,
+    "overtime_pay": 0,
+    "mission_pay": 0,
+    "gross": 400000000,
+    "insurable": 400000000,
+    "worker_insurance": 28000000,
+    "employer_insurance": 92000000,
+    "taxable": 372000000,
+    "income_tax": 16800000,
+    "loan_deduction": 0,
+    "other_deduction": 0,
+    "total_deductions": 44800000,
+    "net": 355200000,
+    "cost": 492000000
+   }
+  ],
+  "settings": {
+   "worker_insurance_pct": "7",
+   "employer_insurance_pct": "23",
+   "insurance_ceiling": 0,
+   "month_days": 30,
+   "month_hours": 220,
+   "overtime_factor_pct": "140",
+   "mission_factor_pct": "50",
+   "tax_tables": [],
+   "default_brackets": [
+    {
+     "upto": 240000000,
+     "rate_pct": "0"
+    },
+    {
+     "upto": 300000000,
+     "rate_pct": "10"
+    },
+    {
+     "upto": 380000000,
+     "rate_pct": "15"
+    },
+    {
+     "upto": 500000000,
+     "rate_pct": "20"
+    },
+    {
+     "upto": 666666666,
+     "rate_pct": "25"
+    },
+    {
+     "upto": null,
+     "rate_pct": "30"
+    }
+   ]
+  }
+ }
+}

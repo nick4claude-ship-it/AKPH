@@ -20,12 +20,16 @@ import { formatMoney } from '../../utils/money';
 import { formatPercent, formatText } from '../../utils/formatters';
 import { Money } from '../common/Money';
 import { AttachmentsPanel } from '../documents/AttachmentsPanel';
+import { VendorInvoiceRegisterForm } from './VendorInvoiceRegisterForm';
+import { invoiceApprovable, invoiceRejectable } from '../../store/views/procurement';
 
 interface VendorInvoicesViewProps {
   invoices: VendorInvoice[];
   projects: Project[];
   onApproveInvoice: (invoiceId: string) => void;
   onRecordPayment: (invoiceId: string, amount: number) => void;
+  onRejectInvoice?: (invoiceId: string, reason: string) => void;
+  onToast?: (msg: string) => void;
 }
 
 export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
@@ -33,7 +37,10 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
   projects,
   onApproveInvoice,
   onRecordPayment,
+  onRejectInvoice,
+  onToast,
 }) => {
+  const [rejectReason, setRejectReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [activeInvoiceForDetail, setActiveInvoiceForDetail] = useState<VendorInvoice | null>(null);
@@ -70,6 +77,8 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
             </div>
           </div>
         </div>
+
+        {onToast && <VendorInvoiceRegisterForm onToast={onToast} />}
 
         {/* Filter Controls */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
@@ -322,7 +331,7 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
             </div>
 
             <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex justify-between items-center">
-              {activeInvoiceForDetail.remainingBalance > 0 && (
+              {invoiceApprovable(activeInvoiceForDetail) && (
                 <button
                   onClick={() => {
                     onApproveInvoice(activeInvoiceForDetail.id);
@@ -334,6 +343,29 @@ export const VendorInvoicesView: React.FC<VendorInvoicesViewProps> = ({
                   <Check className="w-4 h-4" />
                   <span>تأیید تطبیق و صدور چک تسویه</span>
                 </button>
+              )}
+              {onRejectInvoice && invoiceRejectable(activeInvoiceForDetail) && (
+                <div className="flex items-center gap-2">
+                  <input
+                    aria-label="دلیل رد فاکتور"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="دلیل رد"
+                    className="px-2 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={!rejectReason.trim()}
+                    onClick={() => {
+                      onRejectInvoice(activeInvoiceForDetail.id, rejectReason);
+                      setRejectReason('');
+                      setActiveInvoiceForDetail(null);
+                    }}
+                    className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-40"
+                  >
+                    رد فاکتور
+                  </button>
+                </div>
               )}
               <button
                 onClick={() => setActiveInvoiceForDetail(null)}

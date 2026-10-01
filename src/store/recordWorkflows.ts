@@ -28,6 +28,7 @@ import type {
   Contract,
   ContractAmendment,
   ContractBOQItem,
+  Employee,
   GuaranteeKind,
   ContractAuditLog,
   ContractStatus,
@@ -1237,6 +1238,117 @@ export function requestSubcontractAdvance(_env: WorkflowEnv, _contractId: string
   return fail(SERVER_ONLY);
 }
 export function voidStatement(_env: WorkflowEnv, _statementId: string, _reason: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+
+// -----------------------------------------------------------------------------
+// Procurement, inventory and payroll on the server (akph/v1 0.8.0)
+// -----------------------------------------------------------------------------
+// The reference data has no quotes, invoice registration, warehouses, stocktake counts or payroll periods to write:
+// these run on the server only (their controls are shown only with the official books).
+
+export interface RfqQuoteInput {
+  supplierId: string;
+  reference: string;
+  /** Integer Rials by requisition line id. */
+  rates: Record<string, number>;
+  vatIncluded: boolean;
+  freight: number;
+  deliveryDays: number;
+  paymentTerms: string;
+}
+
+export interface VendorInvoiceInput {
+  invoiceNo: string;
+  invoiceDate: string;
+  dueDate: string;
+  /** Integer Rials as on the supplier's invoice. */
+  subtotal: number;
+  freight: number;
+  vatAmount: number;
+}
+
+export interface WarehouseInput {
+  name: string;
+  kind: 'central' | 'project' | 'temporary';
+  projectId: string;
+  location: string;
+  keeperName: string;
+}
+
+export interface StocktakeCountInput {
+  warehouseId: string;
+  date: string;
+  lines: { materialId: string; physicalCount: number }[];
+  notes: string;
+}
+
+export interface EmployeeInput {
+  fullName: string;
+  nationalId: string;
+  insuranceNo: string;
+  bankName: string;
+  sheba: string;
+  accountNumber: string;
+  jobTitle: string;
+  contractType: Employee['contractType'];
+  costCenterId: string;
+  /** Integer Rials. */
+  baseSalary: number;
+  housingAllowance: number;
+  foodAllowance: number;
+  childAllowance: number;
+  otherBenefits: number;
+  loanInstallment: number;
+  otherDeduction: number;
+  insured: boolean;
+}
+
+export interface TimesheetInput {
+  employeeId: string;
+  workDays: number;
+  absentDays: number;
+  overtimeHours: number;
+  missionDays: number;
+}
+
+export function addRfqQuote(_env: WorkflowEnv, _rfqId: string, _input: RfqQuoteInput): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function registerVendorInvoice(_env: WorkflowEnv, _grnId: string, _input: VendorInvoiceInput): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function updateVendorInvoice(_env: WorkflowEnv, _invoiceId: string, _input: Partial<VendorInvoiceInput>): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function decidePurchaseOrder(_env: WorkflowEnv, _orderId: string, _decision: 'approve' | 'reject', _text: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function createWarehouse(_env: WorkflowEnv, _input: WarehouseInput): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function createStocktake(_env: WorkflowEnv, _input: StocktakeCountInput): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function rejectStocktake(_env: WorkflowEnv, _stocktakeId: string, _reason: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function createEmployee(_env: WorkflowEnv, _input: EmployeeInput): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function updateEmployee(_env: WorkflowEnv, _employeeId: string, _patch: Partial<EmployeeInput> & { active?: boolean }): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function createPayrollPeriod(_env: WorkflowEnv, _fiscalYear: number, _month: number): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function saveTimesheets(_env: WorkflowEnv, _periodId: string, _rows: TimesheetInput[]): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function calculatePayroll(_env: WorkflowEnv, _periodId: string): WorkflowResult {
+  return fail(SERVER_ONLY);
+}
+export function decidePayrollPeriod(_env: WorkflowEnv, _periodId: string, _decision: 'approve' | 'reject', _text: string): WorkflowResult {
   return fail(SERVER_ONLY);
 }
 

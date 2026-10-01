@@ -91,4 +91,7 @@ export const APPROVAL_MODULE_PATHS: Record<ApprovalItem['module'], string> = {
   receipt: '/finance/receipts',
   contract: '/contracts/client',
   contract_amendment: '/contracts/client',
+  purchase_order: '/procurement',
+  store_issue: '/inventory',
+  stocktake: '/inventory',
 };

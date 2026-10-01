@@ -73,6 +73,7 @@ export function emptyState(): AppState {
     stockReservations: [],
     stockReturns: [],
     payrollSlips: [],
+    payrollPeriods: [],
     employees: [],
     timesheets: [],
     subledgers: [],

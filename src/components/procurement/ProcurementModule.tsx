@@ -28,6 +28,7 @@ import { NewSupplierModal } from './NewSupplierModal';
 import { PurchaseOrderPrintModal } from './PurchaseOrderPrintModal';
 import { useAppState } from '../../store/AppStore';
 import { useWorkflows } from '../../store/useWorkflows';
+import { useServerBooks } from '../../store/session';
 import type { WorkflowResult } from '../../store/workflowKit';
 import { formatInt, formatText } from '../../utils/formatters';
 import { PageHeader } from '../common/PageHeader';
@@ -44,6 +45,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
   onToast,
 }) => {
   const wf = useWorkflows();
+  const live = useServerBooks();
   const { suppliers, purchaseRequisitions: requisitions, rfqs, purchaseOrders: orders, vendorInvoices: invoices } = useAppState();
   const [activeTab, setActiveTab] = useState<ProcurementSubTab>('dashboard');
 
@@ -184,6 +186,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
             rfqs={rfqs}
             onSelectWinningBid={handleSelectWinningBid}
             onGeneratePoFromRfq={handleGeneratePoFromRfq}
+            onToast={onToast}
           />
         )}
 
@@ -191,7 +194,7 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
           <PurchaseOrdersView
             orders={orders}
             projects={projects}
-            onOpenNewOrderModal={() => setIsNewOrderOpen(true)}
+            onOpenNewOrderModal={live ? undefined : () => setIsNewOrderOpen(true)}
             onSelectOrderForPrint={(o) => setOrderForPrint(o)}
             onUpdateOrderStatus={handleUpdateOrderStatus}
           />
@@ -203,6 +206,8 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({
             projects={projects}
             onApproveInvoice={handleApproveInvoice}
             onRecordPayment={handleRecordPayment}
+            onRejectInvoice={(id, reason) => run(wf.rejectVendorInvoice(id, reason))}
+            onToast={onToast}
           />
         )}
 

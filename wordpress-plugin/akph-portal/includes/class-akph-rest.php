@@ -116,13 +116,13 @@ final class Akph_Rest {
             '/assistant/ask' => array(array('POST', 'assistant_ask', $r::ASSISTANT_USE)),
             '/assistant/settings' => array(array('GET', 'assistant_settings', $r::AI_MANAGE), array('POST', 'assistant_update_settings', $r::AI_MANAGE)),
             '/assistant/test' => array(array('POST', 'assistant_test', $r::AI_MANAGE)),
-        );
+        ) + self::module_routes();
         foreach ($routes as $path => $defs) {
             $args = array();
             foreach ($defs as $def) {
                 $args[] = array(
                     'methods' => $def[0],
-                    'callback' => array(__CLASS__, $def[1]),
+                    'callback' => is_string($def[1]) ? array(__CLASS__, $def[1]) : $def[1],
                     'permission_callback' => Akph_Auth::require_cap($def[2]),
                     // Kept out of the public /wp-json index; the namespace index itself needs portal access.
                     'show_in_index' => false,
@@ -130,6 +130,111 @@ final class Akph_Rest {
             }
             register_rest_route(self::NS, $path, $args);
         }
+    }
+
+    // ------------------------------------------------------------------ 0.8.0: inventory, procurement, payroll
+
+    /** GET route: `$fn($query)` in the read wrapper. */
+    private static function r(callable $fn) {
+        return function (WP_REST_Request $request) use ($fn) {
+            return self::read(function () use ($request, $fn) {
+                return $fn($request->get_query_params());
+            });
+        };
+    }
+
+    /** Command on a collection: `$fn($body)`. */
+    private static function c(array $fields, callable $fn) {
+        return function (WP_REST_Request $request) use ($fields, $fn) {
+            return self::command($request, $fields, $fn);
+        };
+    }
+
+    /** Command on one record: `$fn($id, $body)`. */
+    private static function ci(array $fields, callable $fn) {
+        return function (WP_REST_Request $request) use ($fields, $fn) {
+            return self::command($request, $fields, function ($body) use ($request, $fn) {
+                return $fn(self::id($request), $body);
+            });
+        };
+    }
+
+    /** Versioned command on one record: `$fn($id, $body, $version)` (version from the body or If-Match). */
+    private static function cv(array $fields, callable $fn) {
+        return function (WP_REST_Request $request) use ($fields, $fn) {
+            return self::command($request, array_merge($fields, array('version')), function ($body) use ($request, $fn) {
+                $version = Akph_Input::version($request, $body);
+                unset($body['version']);
+                return $fn(self::id($request), $body, $version);
+            });
+        };
+    }
+
+    private static function module_routes() {
+        $r = Akph_Roles::class;
+        $I = 'Akph_Inventory';
+        $P = 'Akph_Procurement';
+        $Y = 'Akph_Payroll';
+        $id = '/' . self::ID;
+        $material = array('code', 'name', 'category', 'unit', 'specification', 'reorder_level', 'min_stock', 'max_stock');
+        $warehouse = array('name', 'kind', 'project_id', 'location', 'keeper_name');
+        $employee = array('full_name', 'user_id', 'national_id', 'insurance_no', 'bank_name', 'sheba', 'account_number', 'job_title', 'contract_type', 'hire_date', 'project_id', 'cost_center_id', 'base_salary', 'housing_allowance', 'food_allowance', 'child_allowance', 'other_benefits', 'loan_installment', 'other_deduction', 'insured');
+        return array(
+            // inventory
+            '/inventory' => array(array('GET', self::r(function () use ($I) {
+                return $I::overview();
+            }), $r::ACCESS)),
+            '/inventory/kardex' => array(array('GET', self::r(function ($q) use ($I) {
+                return $I::kardex($q);
+            }), $r::ACCESS)),
+            '/materials' => array(array('POST', self::c($material, array($I, 'create_material')), $r::INVENTORY_MANAGE)),
+            '/materials' . $id => array(array('POST, PUT, PATCH', self::cv(array_merge($material, array('active')), array($I, 'update_material')), $r::INVENTORY_MANAGE)),
+            '/warehouses' => array(array('POST', self::c($warehouse, array($I, 'create_warehouse')), $r::INVENTORY_MANAGE)),
+            '/warehouses' . $id => array(array('POST, PUT, PATCH', self::cv(array_merge($warehouse, array('active')), array($I, 'update_warehouse')), $r::INVENTORY_MANAGE)),
+            '/store-issues' => array(array('POST', self::c(array('warehouse_id', 'project_id', 'cost_center_id', 'counterparty_id', 'date', 'notes', 'lines'), array($I, 'create_issue')), $r::INVENTORY_ISSUE)),
+            '/store-issues' . $id . '/confirm' => array(array('POST', self::cv(array('comment'), array($I, 'confirm_issue')), $r::INVENTORY_ISSUE)),
+            '/store-issues' . $id . '/cancel' => array(array('POST', self::cv(array('reason'), array($I, 'cancel_issue')), $r::INVENTORY_ISSUE)),
+            '/store-issues' . $id . '/returns' => array(array('POST', self::ci(array('line_id', 'quantity', 'reason'), array($I, 'return_from_project')), $r::INVENTORY_ISSUE)),
+            '/stock-transfers' => array(array('POST', self::c(array('source_warehouse_id', 'target_warehouse_id', 'date', 'waybill', 'driver_name', 'notes', 'lines'), array($I, 'create_transfer')), $r::INVENTORY_ISSUE)),
+            '/stock-transfers' . $id . '/deliver' => array(array('POST', self::cv(array('comment'), array($I, 'deliver_transfer')), $r::INVENTORY_ISSUE)),
+            '/stock-transfers' . $id . '/cancel' => array(array('POST', self::cv(array('reason'), array($I, 'cancel_transfer')), $r::INVENTORY_ISSUE)),
+            '/stocktakes' => array(array('POST', self::c(array('warehouse_id', 'date', 'notes', 'lines'), array($I, 'create_stocktake')), $r::INVENTORY_MANAGE)),
+            '/stocktakes' . $id . '/approve' => array(array('POST', self::cv(array('comment'), array($I, 'approve_stocktake')), $r::INVENTORY_MANAGE)),
+            '/stocktakes' . $id . '/reject' => array(array('POST', self::cv(array('reason'), array($I, 'reject_stocktake')), $r::INVENTORY_MANAGE)),
+            // procurement
+            '/procurement' => array(array('GET', self::r(function () use ($P) {
+                return $P::overview();
+            }), $r::ACCESS)),
+            '/procurement/settings' => array(array('POST', self::c(array('price_tolerance_pct'), array($P, 'update_settings')), $r::SETTINGS)),
+            '/requisitions' => array(array('POST', self::c(array('project_id', 'cost_center_id', 'priority', 'needed_date', 'justification', 'lines'), array($P, 'create_requisition')), $r::PROCUREMENT_REQUEST)),
+            '/requisitions' . $id . '/approve' => array(array('POST', self::cv(array('comment'), array($P, 'approve_requisition')), $r::PROCUREMENT_APPROVE)),
+            '/requisitions' . $id . '/reject' => array(array('POST', self::cv(array('reason'), array($P, 'reject_requisition')), $r::PROCUREMENT_APPROVE)),
+            '/requisitions' . $id . '/cancel' => array(array('POST', self::cv(array('reason'), array($P, 'cancel_requisition')), $r::PROCUREMENT_REQUEST)),
+            '/requisitions' . $id . '/rfqs' => array(array('POST', self::ci(array('title', 'deadline'), array($P, 'create_rfq')), $r::PROCUREMENT_MANAGE)),
+            '/rfqs' . $id . '/quotes' => array(array('POST', self::ci(array('counterparty_id', 'reference', 'prices', 'vat_included', 'freight', 'delivery_days', 'payment_terms', 'notes'), array($P, 'add_quote')), $r::PROCUREMENT_MANAGE)),
+            '/rfqs' . $id . '/award' => array(array('POST', self::cv(array('quote_id'), array($P, 'award_rfq')), $r::PROCUREMENT_MANAGE)),
+            '/purchase-orders' => array(array('POST', self::c(array('rfq_id', 'requisition_id', 'counterparty_id', 'lines', 'freight', 'vat_applies', 'payment_terms', 'warehouse_id', 'due_date', 'notes'), array($P, 'create_po')), $r::PROCUREMENT_MANAGE)),
+            '/purchase-orders' . $id . '/approve' => array(array('POST', self::cv(array('comment'), array($P, 'approve_po')), $r::PROCUREMENT_APPROVE)),
+            '/purchase-orders' . $id . '/reject' => array(array('POST', self::cv(array('reason'), array($P, 'reject_po')), $r::PROCUREMENT_APPROVE)),
+            '/purchase-orders' . $id . '/receipts' => array(array('POST', self::ci(array('warehouse_id', 'date', 'waybill', 'qc_status', 'notes', 'lines'), array($P, 'receive')), $r::INVENTORY_RECEIVE)),
+            '/goods-receipts' . $id . '/invoices' => array(array('POST', self::ci(array('invoice_no', 'invoice_date', 'due_date', 'subtotal', 'freight', 'vat_amount', 'notes'), array($P, 'register_invoice')), $r::PROCUREMENT_MANAGE)),
+            '/goods-receipts' . $id . '/returns' => array(array('POST', self::ci(array('line_id', 'quantity', 'reason'), array($P, 'return_to_supplier')), $r::INVENTORY_RECEIVE)),
+            '/vendor-invoices' . $id => array(array('POST, PUT, PATCH', self::cv(array('invoice_date', 'due_date', 'subtotal', 'freight', 'vat_amount', 'notes'), array($P, 'update_invoice')), $r::PROCUREMENT_MANAGE)),
+            '/vendor-invoices' . $id . '/approve' => array(array('POST', self::cv(array('comment'), array($P, 'approve_invoice')), $r::PROCUREMENT_APPROVE)),
+            '/vendor-invoices' . $id . '/reject' => array(array('POST', self::cv(array('reason'), array($P, 'reject_invoice')), $r::PROCUREMENT_APPROVE)),
+            // payroll (personal data: accountant, senior manager and system administrator only)
+            '/payroll' => array(array('GET', self::r(function () use ($Y) {
+                return $Y::overview();
+            }), $r::PAYROLL_MANAGE)),
+            '/payroll/settings' => array(array('POST', self::c(array('worker_insurance_pct', 'employer_insurance_pct', 'insurance_ceiling', 'month_days', 'month_hours', 'overtime_factor_pct', 'mission_factor_pct', 'tax_table'), array($Y, 'update_settings')), $r::SETTINGS)),
+            '/employees' => array(array('POST', self::c($employee, array($Y, 'create_employee')), $r::PAYROLL_MANAGE)),
+            '/employees' . $id => array(array('POST, PUT, PATCH', self::cv(array_merge($employee, array('active')), array($Y, 'update_employee')), $r::PAYROLL_MANAGE)),
+            '/payroll/periods' => array(array('POST', self::c(array('fiscal_year', 'month'), array($Y, 'create_period')), $r::PAYROLL_MANAGE)),
+            '/payroll/periods' . $id . '/timesheets' => array(array('POST', self::cv(array('timesheets'), array($Y, 'save_timesheets')), $r::PAYROLL_MANAGE)),
+            '/payroll/periods' . $id . '/calculate' => array(array('POST', self::cv(array(), array($Y, 'calculate')), $r::PAYROLL_MANAGE)),
+            '/payroll/periods' . $id . '/approve' => array(array('POST', self::cv(array('comment'), array($Y, 'approve')), $r::PAYROLL_MANAGE)),
+            '/payroll/periods' . $id . '/reject' => array(array('POST', self::cv(array('reason'), array($Y, 'reject')), $r::PAYROLL_MANAGE)),
+        );
     }
 
     /** GET /akph/v1 (the namespace index WordPress adds) answers only users with portal access. */

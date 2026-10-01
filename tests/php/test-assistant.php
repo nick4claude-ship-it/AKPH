@@ -240,6 +240,36 @@ class Test_Akph_Assistant extends Akph_Test_Case {
         $this->assertStringContainsString('اسناد حسابداری سال مالی', $system);
     }
 
+    public function test_operations_context_without_payroll_personal_data() {
+        $this->install_chart();
+        delete_option(Akph_Payroll::OPTION);
+        $own = $this->make_project(array('name' => 'پروژه الف', 'manager_user_id' => self::$users['pm']));
+        $this->login('accountant');
+        $material = $this->request('POST', '/materials', array('name' => 'میلگرد', 'unit' => 'kg'))->get_data()['records']['materials'][0];
+        $center = $this->request('POST', '/cost-centers', array('name' => 'کارگاه الف', 'project_id' => $own['id'], 'type' => 'project_site'))->get_data()['records']['cost_centers'][0];
+        $this->assertStatus(201, $this->request('POST', '/employees', array('full_name' => 'نام‌خانوادگی‌محرمانه', 'national_id' => '0012345678', 'sheba' => 'IR' . str_repeat('1', 24), 'cost_center_id' => $center['id'], 'base_salary' => 123456789)));
+        $this->assertStatus(201, $this->request('POST', '/payroll/periods', array('fiscal_year' => 1405, 'month' => 7)));
+        $this->login('pm');
+        $this->assertStatus(201, $this->request('POST', '/requisitions', array('project_id' => $own['id'], 'justification' => 'آزمون', 'lines' => array(array('material_id' => $material['id'], 'quantity' => '5')))));
+
+        $this->configure();
+        foreach (array('pm', 'accountant', 'senior') as $i => $who) {
+            $this->login($who);
+            $this->assertStatus(200, $this->ask('وضعیت خرید و حقوق؟'));
+            $sent = wp_json_encode($this->sent[$i]['body'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $this->assertStringContainsString('درخواست خرید: در انتظار تأیید 1', $sent, $who);
+            foreach (array('نام‌خانوادگی‌محرمانه', '0012345678', str_repeat('1', 24), '123,456,789', '12,345,678') as $private) {
+                $this->assertStringNotContainsString($private, $sent, "no payroll personal data for {$who}");
+            }
+            if ($who === 'pm') {
+                $this->assertStringNotContainsString('حقوق (فقط وضعیت', $sent, 'no payroll for the project manager');
+                $this->assertStringNotContainsString('ارزش موجودی انبارها', $sent);
+            } else {
+                $this->assertStringContainsString('آخرین دوره 1405/7 — پیش‌نویس کارکرد', $sent);
+            }
+        }
+    }
+
     public function test_request_shape_rules_and_conversation() {
         $this->configure();
         $this->login('senior');

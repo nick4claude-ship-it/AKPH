@@ -5,7 +5,7 @@
 
 /** View models of inventory: issue and transfer form calculators, list totals and dashboard figures. */
 
-import type { GoodsReceiptNote, InterWarehouseTransfer, KardexEntry, MaterialItem, StoreIssueVoucher, Warehouse } from '../../types';
+import type { GoodsReceiptNote, InterWarehouseTransfer, KardexEntry, MaterialItem, StocktakeAudit, StoreIssueVoucher, Warehouse } from '../../types';
 import type { AppState } from '../types';
 import { availableQty } from '../workflows';
 import { ACCOUNTS } from '../postingRules';
@@ -37,6 +37,8 @@ export interface StoreIssueFormInput {
   /** Request mode reserves the stock; the issue is confirmed later from the voucher. */
   reserveOnly: boolean;
   lines: IssueLineInput[];
+  /** akph/v1: project of an issue from the central warehouse (a project warehouse issues to its own project). */
+  projectId?: string;
 }
 
 export function newIssueLine(materials: readonly MaterialItem[]): IssueLineInput {
@@ -184,3 +186,17 @@ export function catalogFigures(materials: readonly MaterialItem[]) {
 
 /** Value of a stock balance row at the weighted average price. */
 export const stockValue = (qty: number, averageUnitPrice: number) => Math.round(qty * averageUnitPrice);
+
+/** Rows of a physical count: every item held in the warehouse with its system quantity. */
+export function warehouseCountRows(state: AppState, warehouseId: string) {
+  if (!warehouseId) return [];
+  return state.stockBalances
+    .filter((b) => b.warehouseId === warehouseId && b.qty > 0)
+    .map((b) => {
+      const m = state.materials.find((x) => x.id === b.materialId);
+      return { materialId: b.materialId, materialName: m?.name || b.materialId, unit: m?.unit || '', systemQty: b.qty };
+    });
+}
+
+/** A counted stocktake waiting for the second user's approval (server) / without its adjustment entry (demo). */
+export const stocktakePending = (s: StocktakeAudit) => (s.server ? s.server.status === 'pending' : !s.accountingAdjustmentEntryId);

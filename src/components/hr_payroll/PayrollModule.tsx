@@ -29,10 +29,11 @@ import {
 } from 'lucide-react';
 import { Project, UserProfile, PayrollSlip } from '../../types';
 import { useAppState } from '../../store/AppStore';
-import { usePermission, useCompany } from '../../store/session';
+import { usePermission, useCompany, useServerBooks } from '../../store/session';
+import { PayrollServerPanel, EmployeeCreateForm } from './PayrollServerPanel';
 import { Dialog } from '../../ui/Dialog';
 import { useWorkflows } from '../../store/useWorkflows';
-import { payrollTotals } from '../../store/views/people';
+import { payrollAwaitingApproval, payrollPeriodOptions, payrollTotals } from '../../store/views/people';
 import { useNavigate } from 'react-router-dom';
 import { formatNumber, formatCurrencyCompact, formatInt, formatText } from '../../utils/formatters';
 import { formatMoney, moneyUnitLabel } from '../../utils/money';
@@ -55,16 +56,17 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
   const [activeTab, setActiveTab] = useState<'payroll_slips' | 'employees' | 'timesheets'>('payroll_slips');
 
   const { can } = usePermission();
-  const { employees, timesheets, payrollSlips } = useAppState();
-  // Periods come from the slips; the latest one is shown first.
-  const periods = [...new Set(payrollSlips.map((s) => s.monthYear))].sort();
+  const { employees, timesheets, payrollSlips, payrollPeriods } = useAppState();
+  const live = useServerBooks();
+  // Periods of the server (else the months of the slips); the latest one is shown first.
+  const periods = payrollPeriodOptions({ payrollPeriods, payrollSlips });
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(() => periods[periods.length - 1] ?? '');
   const slips = payrollSlips.filter((s) => s.monthYear === selectedMonth);
-  const hasCalculated = slips.some((s) => s.status === 'محاسبه شده');
+  const hasCalculated = payrollAwaitingApproval(slips);
   const canApprove = can('payroll.approve');
 
   // Modal State for Slip View & Print
@@ -228,6 +230,8 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
         </div>
       </div>
 
+      {live && <PayrollServerPanel monthYear={selectedMonth} onSelectMonth={setSelectedMonth} onToast={onToast} />}
+
       {/* Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200 scrollbar-none">
         <button
@@ -386,6 +390,7 @@ export const PayrollModule: React.FC<PayrollModuleProps> = ({
       )}
 
       {/* View 2: Employees Directory */}
+      {activeTab === 'employees' && live && <EmployeeCreateForm onToast={onToast} />}
       {activeTab === 'employees' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredEmployees.map((emp) => (

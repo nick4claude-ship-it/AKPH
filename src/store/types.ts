@@ -35,6 +35,7 @@ import {
   Warehouse,
   BankReconciliationItem,
   PayrollSlip,
+  PayrollPeriod,
   PaymentRequest,
   ProjectCashDesk,
   Subledger,
@@ -95,6 +96,8 @@ export interface AppState {
   stockReservations: StockReservation[];
   stockReturns: StockReturn[];
   payrollSlips: PayrollSlip[];
+  /** akph/v1 (0.8.0): payroll periods of the server (empty in the demo, where periods come from the slips). */
+  payrollPeriods: PayrollPeriod[];
   employees: Employee[];
   timesheets: MonthlyTimesheet[];
   subledgers: Subledger[];

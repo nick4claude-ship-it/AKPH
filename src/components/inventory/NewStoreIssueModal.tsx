@@ -68,6 +68,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
   const [reserveOnly, setReserveOnly] = useState(false);
   const [rows, setRows] = useState<IssueLineInput[]>(() => [newIssueLine(materials)]);
   const [formError, setFormError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState('');
 
   const form: StoreIssueFormInput = {
     warehouseId,
@@ -80,6 +81,7 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
     receivedByCrewLeaderName,
     reserveOnly,
     lines: rows,
+    projectId,
   };
   // Lines priced at the weighted average, the free stock of each material and the first problem.
   const draft = useSelector((s) => computeStoreIssueDraft(s, form), [JSON.stringify(form)]);
@@ -158,6 +160,21 @@ export const NewStoreIssueModal: React.FC<NewStoreIssueModalProps> = ({
                   </option>
                 ))}
               </select>
+              {selectedWarehouse && !selectedWarehouse.projectId && (
+                <select
+                  aria-label="پروژه مصرف‌کننده"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="mt-2 w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500 bg-slate-50 cursor-pointer"
+                >
+                  <option value="">— پروژه مصرف‌کننده —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {formatText(p.name)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
